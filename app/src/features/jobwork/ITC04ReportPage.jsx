@@ -106,6 +106,10 @@ export default function ITC04ReportPage() {
       (r.vendorName || '').toLowerCase().includes(q)
     );
   });
+  const paginatedTable5a = table5aRows.slice(
+    (table5aPage - 1) * table5aPageSize,
+    table5aPage * table5aPageSize
+  );
 
   return (
     <div className="space-y-6">

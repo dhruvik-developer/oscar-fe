@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useERP } from '../../context/ERPContext';
 import { DataTable } from '../../components/ui/DataTable';
 import { StatusBadge } from '../../components/ui/StatusBadge';
@@ -43,7 +43,36 @@ export const SalesOrdersPage = () => {
     const [stageFilter, setStageFilter] = useState('All');
     const [showAddModal, setShowAddModal] = useState(false);
     const [isFullscreen, setIsFullscreen] = useState(false);
+    // Order detail modal: drag-to-resize + maximize, same behaviour as ui/Modal.
+    const detailCardRef = useRef(null);
+    const [detailSize, setDetailSize] = useState(null);
+    const [detailMaximized, setDetailMaximized] = useState(false);
     const [selectedOrder, setSelectedOrder] = useState(null);
+    useEffect(() => {
+        if (!selectedOrder) { setDetailSize(null); setDetailMaximized(false); }
+    }, [selectedOrder]);
+    const handleDetailResizeStart = (e) => {
+        if (e.button !== 0 || !detailCardRef.current) return;
+        e.preventDefault();
+        const rect = detailCardRef.current.getBoundingClientRect();
+        const startX = e.clientX, startY = e.clientY;
+        setDetailMaximized(false);
+        const onMove = (ev) => {
+            const width = Math.min(Math.max(Math.min(480, window.innerWidth - 32), rect.width + (ev.clientX - startX)), window.innerWidth - 32);
+            const height = Math.min(Math.max(320, rect.height + (ev.clientY - startY)), window.innerHeight - 32);
+            setDetailSize({ width: Math.round(width), height: Math.round(height) });
+        };
+        const onUp = () => {
+            window.removeEventListener('mousemove', onMove);
+            window.removeEventListener('mouseup', onUp);
+            document.body.style.userSelect = '';
+            document.body.style.cursor = '';
+        };
+        document.body.style.userSelect = 'none';
+        document.body.style.cursor = 'nwse-resize';
+        window.addEventListener('mousemove', onMove);
+        window.addEventListener('mouseup', onUp);
+    };
     const [pickingListOrder, setPickingListOrder] = useState(null);
     const [printSalesOrderTarget, setPrintSalesOrderTarget] = useState(null);
     const [cancelModalTarget, setCancelModalTarget] = useState(null);
@@ -578,8 +607,16 @@ export const SalesOrdersPage = () => {
 
       {/* Sales Order Detail & Lifecycle Stepper Modal */}
       {selectedOrder && (<div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
-          <div className="bg-white rounded-2xl border border-slate-200 max-w-4xl w-full p-4 sm:p-6 shadow-2xl text-xs max-h-[90vh] flex flex-col overflow-hidden">
-            <div className="flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 lg:gap-0 pb-3 border-b border-slate-200">
+          <div
+            ref={detailCardRef}
+            style={detailMaximized
+              ? { width: '98vw', height: '96vh', maxWidth: '98vw', maxHeight: '96vh' }
+              : detailSize ? { width: detailSize.width, height: detailSize.height, maxWidth: '98vw', maxHeight: '96vh' } : undefined}
+            className="relative bg-white rounded-2xl border border-slate-200 max-w-4xl w-full p-4 sm:p-6 shadow-2xl text-xs max-h-[90vh] flex flex-col overflow-hidden">
+            <div
+              className="flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 lg:gap-0 pb-3 border-b border-slate-200 select-none"
+              onDoubleClick={(e) => { if (!e.target.closest('button')) setDetailMaximized((v) => !v); }}
+              title="Double click to toggle maximize">
               <div className="flex flex-wrap lg:flex-nowrap items-center gap-2 sm:gap-3 min-w-0 lg:min-w-auto">
                 <h3 className="font-bold text-lg text-[#1F2E4A]">{selectedOrder.orderNumber}</h3>
                 <span className="font-semibold text-slate-600 bg-slate-100 px-2.5 py-0.5 rounded">
@@ -610,6 +647,14 @@ export const SalesOrdersPage = () => {
                 >
                   <Printer size={13}/>
                   Print Official Order
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDetailMaximized((v) => !v)}
+                  className="text-slate-400 hover:text-slate-600 p-1 cursor-pointer"
+                  title={detailMaximized ? 'Restore down' : 'Maximize (Fit Screen)'}
+                >
+                  {detailMaximized ? <Minimize2 size={16}/> : <Maximize2 size={16}/>}
                 </button>
                 <button onClick={() => setSelectedOrder(null)} className="text-slate-400 hover:text-slate-600 p-1 cursor-pointer">
                   <X size={18}/>
@@ -748,6 +793,21 @@ export const SalesOrdersPage = () => {
                 </Button>
               </div>
             </div>
+            {!detailMaximized && (
+              <div
+                role="button"
+                tabIndex={-1}
+                aria-label="Resize modal"
+                title="Drag to resize (double-click to reset)"
+                onMouseDown={handleDetailResizeStart}
+                onDoubleClick={() => setDetailSize(null)}
+                className="modal-resize-handle"
+              >
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+                  <path d="M11 4L4 11M11 7L7 11M11 10L10 11" />
+                </svg>
+              </div>
+            )}
           </div>
         </div>)}
 

@@ -59,6 +59,7 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
     const [filterText, setFilterText] = useState('');
     const [statusFilter, setStatusFilter] = useState('All');
     const [currentPage, setCurrentPage] = useState(1);
+    const [pageSize, setPageSize] = useState(10);
     const navigate = useNavigate();
 
     const handleConvertToChallan = async (inv) => {

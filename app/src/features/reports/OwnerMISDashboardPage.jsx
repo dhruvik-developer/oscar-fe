@@ -34,6 +34,7 @@ import {
   FileText,
   UserCheck,
   ShoppingBag,
+  ShoppingCart,
   Briefcase,
   SlidersHorizontal,
   ChevronDown,

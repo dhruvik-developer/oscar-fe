@@ -1,0 +1,2 @@
+/* Static showroom — no animation, no 3D. Scoped, non-overriding. */
+.oscar-showroom img { display: block; }

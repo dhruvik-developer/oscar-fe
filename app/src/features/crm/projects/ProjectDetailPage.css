@@ -1,0 +1,141 @@
+.crm-project-detail {
+  max-width: 1520px;
+  margin-inline: auto;
+  color: var(--text);
+}
+
+.crm-project-detail .card {
+  border-color: color-mix(in srgb, var(--text) 11%, var(--card));
+  border-radius: 16px;
+  box-shadow: 0 3px 16px rgb(15 23 42 / 3%);
+}
+
+.crm-project-detail .project-hero {
+  position: relative;
+  overflow: hidden;
+  border-top: 3px solid #4875ef;
+  background: linear-gradient(115deg, var(--card) 55%, color-mix(in srgb, #4875ef 6%, var(--card)));
+}
+
+.project-hero h1 {
+  font-size: clamp(24px, 2.2vw, 32px);
+  line-height: 1.25;
+  letter-spacing: -0.035em;
+}
+
+.project-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--text) 7%, var(--card));
+  color: var(--text);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.project-status::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  flex-shrink: 0;
+}
+
+.project-status[data-tone='positive'] {
+  background: #ecfdf5;
+  color: #047857;
+}
+
+.project-schedule {
+  display: flex;
+  align-items: center;
+  gap: 26px;
+  padding-top: 18px;
+  border-top: 1px solid color-mix(in srgb, var(--text) 9%, transparent);
+}
+
+.project-schedule > div {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.project-schedule svg { color: #6681ac; }
+.project-schedule span { color: var(--muted); font-size: 11px; }
+.project-schedule strong { display: block; color: var(--text); font-size: 13px; font-weight: 600; margin-top: 3px; }
+
+.project-summary > .card { padding: 18px 20px; box-shadow: none; }
+.project-summary > .card > span { border-radius: 12px; }
+.project-summary p:last-child { font-size: 14px; }
+
+.project-panel-heading {
+  padding: 17px 22px;
+  border-color: color-mix(in srgb, var(--text) 8%, transparent);
+}
+
+.project-panel-heading h2 { letter-spacing: -0.015em; }
+.project-panel-heading h2 svg { width: 18px; height: 18px; }
+.project-panel > div:last-child { padding: 20px 22px; }
+.project-fields { row-gap: 18px; }
+.project-fields > div { border-bottom: 1px solid color-mix(in srgb, var(--text) 6%, transparent); padding-bottom: 12px; }
+.project-fields dt { color: var(--muted); font-size: 11px; }
+.project-fields dd { line-height: 1.5; font-weight: 500; }
+
+.project-deal-value {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 22px;
+  padding: 18px;
+  border: 1px solid color-mix(in srgb, #4875ef 15%, var(--card));
+  border-radius: 12px;
+  background: color-mix(in srgb, #4875ef 4%, var(--card));
+}
+
+.project-deal-value > div { min-width: 0; }
+.project-deal-value > div > span { color: var(--muted); font-size: 12px; }
+.project-deal-value strong { display: block; margin-top: 4px; font-size: clamp(20px, 2vw, 26px); letter-spacing: -0.03em; overflow-wrap: anywhere; }
+.project-deal-value > .project-status { flex-shrink: 0; }
+.project-relationship > div, .project-relationship > a { padding: 16px 18px; border-radius: 12px; }
+.project-relationship > a { transition: border-color 150ms, background-color 150ms; }
+.project-relationship > a:hover { border-color: #4875ef; background: color-mix(in srgb, #4875ef 6%, var(--card)); }
+.project-relationship > [aria-current='page'] { border-left: 3px solid #4875ef; }
+.crm-project-detail a:focus-visible, .crm-project-detail button:focus-visible { outline: 2px solid #4875ef; outline-offset: 4px; }
+
+@media (min-width: 1280px) {
+  .project-information-grid { grid-template-columns: 1.15fr 1fr; }
+}
+
+@media (max-width: 639px) {
+  .project-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .project-summary > .card { padding: 14px 12px; align-items: flex-start; flex-direction: column; gap: 10px; }
+  .project-panel-heading { padding: 16px; }
+  .project-panel > div:last-child { padding: 16px; }
+  .project-schedule { gap: 14px; justify-content: space-between; }
+  .project-schedule > div { gap: 7px; }
+  .project-schedule-arrow { display: none; }
+  .project-schedule strong { font-size: 12px; }
+}
+
+.project-mobile-navigation {
+  display: none;
+}
+
+/* The app shell handles the mobile navigation drawer natively; this page only
+   adds a floating shortcut button that toggles it. */
+@media (max-width: 767px) {
+  .crm-project-detail .project-mobile-navigation {
+    display: inline-flex;
+    position: fixed;
+    right: 12px;
+    bottom: 80px;
+    z-index: 70;
+    background: var(--card);
+    box-shadow: var(--shadow-modal);
+  }
+}

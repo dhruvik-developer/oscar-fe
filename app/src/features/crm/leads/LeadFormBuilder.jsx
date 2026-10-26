@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import {
+  ArrowLeft,
   AtSign,
   CalendarDays,
   Check,
@@ -234,6 +235,7 @@ export default function LeadFormBuilder({
   onDuplicateSection,
   onPreview,
   onSaveAndOpen,
+  onBack,
   saveSuccess = false,
   formTitle = "Lead Form Builder",
   hideHeader = false,
@@ -340,10 +342,20 @@ export default function LeadFormBuilder({
           subtitle="Create and manage your lead form with custom fields. Click or drag fields to build your layout."
           actions={
             <div className="flex flex-wrap items-center gap-3">
+              {onBack && (
+                <button
+                  type="button"
+                  onClick={onBack}
+                  className="btn-outline cursor-pointer"
+                >
+                  <ArrowLeft size={16} />
+                  Back
+                </button>
+              )}
               <button
                 type="button"
                 onClick={onPreview}
-                className="btn-outline"
+                className="btn-outline cursor-pointer"
               >
                 <Eye size={16} />
                 Preview
@@ -351,7 +363,7 @@ export default function LeadFormBuilder({
               <button
                 type="button"
                 onClick={onSaveAndOpen}
-                className="btn-primary"
+                className="btn-primary cursor-pointer"
               >
                 <Save size={16} />
                 Save Changes

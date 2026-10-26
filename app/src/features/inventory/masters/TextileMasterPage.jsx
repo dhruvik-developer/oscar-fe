@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Search, Plus, X, Pencil, Trash2, RotateCcw, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Search, Plus, X, Pencil, Trash2, RotateCcw } from 'lucide-react';
 
 import PageHeader from '../../../components/ui/PageHeader';
 import InfoBanner from '../../../components/ui/InfoBanner';
+import AppPagination from '../../../components/ui/AppPagination';
 import { fabricMasterSync, isBackendEnabled, describeError } from '../../../services/fabricMasterSync';
+import { useTableSort } from '../../../hooks/useTableSort';
+import SortableTh from '../../../components/ui/SortableTh';
 
 // One screen for every textile master. Each master is a config object (see
 // textileMasterConfigs.js): its API key, form fields and table columns.
@@ -91,9 +94,14 @@ export default function TextileMasterPage({ config }) {
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PER_PAGE));
   const safePage = Math.min(page, totalPages);
-  const pageItems = filtered.slice((safePage - 1) * PER_PAGE, safePage * PER_PAGE);
-  const from = filtered.length === 0 ? 0 : (safePage - 1) * PER_PAGE + 1;
-  const to = Math.min(safePage * PER_PAGE, filtered.length);
+  const sortAccessors = {
+    _status: (r) => (r.isActive !== false ? 'Active' : 'Inactive'),
+  };
+  columns.forEach((c) => {
+    if (c.searchValue) sortAccessors[c.key] = c.searchValue;
+  });
+  const sort = useTableSort(filtered, { accessors: sortAccessors });
+  const pageItems = sort.rows.slice((safePage - 1) * PER_PAGE, safePage * PER_PAGE);
 
   function openCreate() {
     setEditing(null);
@@ -286,9 +294,9 @@ export default function TextileMasterPage({ config }) {
               <tr className="border-b border-slate-100 bg-slate-50/60 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
                 <th className="px-4 py-3 w-14">#</th>
                 {columns.map((c) => (
-                  <th key={c.key} className={`px-3 py-3 ${c.align === 'right' ? 'text-right' : ''}`}>{c.label}</th>
+                  <SortableTh key={c.key} sort={sort} sortKey={c.key} className={`px-3 py-3 ${c.align === 'right' ? 'text-right' : ''}`} align={c.align === 'right' ? 'right' : 'left'}>{c.label}</SortableTh>
                 ))}
-                {hasStatus && <th className="px-3 py-3">Status</th>}
+                {hasStatus && <SortableTh sort={sort} sortKey="_status" className="px-3 py-3">Status</SortableTh>}
                 <th className="px-4 py-3 text-right">Actions</th>
               </tr>
             </thead>
@@ -337,18 +345,12 @@ export default function TextileMasterPage({ config }) {
           </table>
         </div>
 
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 px-4 py-3 border-t border-slate-100 text-xs text-slate-500 pr-20 sm:pr-24">
-          <span>Showing {from} to {to} of {filtered.length}</span>
-          <div className="flex items-center gap-2">
-            <button type="button" disabled={safePage <= 1} onClick={() => setPage(safePage - 1)} className="p-1.5 rounded-lg border border-slate-200 disabled:opacity-40 hover:bg-slate-50 transition cursor-pointer" aria-label="Previous page">
-              <ChevronLeft size={14} />
-            </button>
-            <span className="min-w-7 h-7 px-2 grid place-items-center rounded-lg bg-blue-600 text-white text-xs font-bold">{safePage}</span>
-            <button type="button" disabled={safePage >= totalPages} onClick={() => setPage(safePage + 1)} className="p-1.5 rounded-lg border border-slate-200 disabled:opacity-40 hover:bg-slate-50 transition cursor-pointer" aria-label="Next page">
-              <ChevronRight size={14} />
-            </button>
-          </div>
-        </div>
+        <AppPagination
+          total={filtered.length}
+          page={safePage}
+          pageSize={PER_PAGE}
+          onPageChange={setPage}
+        />
       </div>
 
       {modalOpen && (

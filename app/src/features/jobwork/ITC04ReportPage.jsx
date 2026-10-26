@@ -13,6 +13,8 @@ import {
 } from 'lucide-react';
 import PageHeader from '../../components/ui/PageHeader';
 import TablePagination from '../../components/ui/TablePagination';
+import SortableTh from '../../components/ui/SortableTh';
+import { useTableSort } from '../../hooks/useTableSort';
 import KpiCard from '../../components/ui/KpiCard';
 import { jobworkService } from '../../services/domainServices';
 
@@ -91,7 +93,10 @@ export default function ITC04ReportPage() {
     setTable5aPage(1);
   }, [tableSearch, financialYear, quarter]);
 
-  const paginatedTable4 = (table4Rows || []).slice(
+  const sort4 = useTableSort(table4Rows, {
+    accessors: { description: (r) => r.process || r.goodsType },
+  });
+  const paginatedTable4 = sort4.rows.slice(
     (table4Page - 1) * table4PageSize,
     table4Page * table4PageSize
   );
@@ -106,7 +111,8 @@ export default function ITC04ReportPage() {
       (r.vendorName || '').toLowerCase().includes(q)
     );
   });
-  const paginatedTable5a = table5aRows.slice(
+  const sort5a = useTableSort(table5aRows);
+  const paginatedTable5a = sort5a.rows.slice(
     (table5aPage - 1) * table5aPageSize,
     table5aPage * table5aPageSize
   );
@@ -238,16 +244,16 @@ export default function ITC04ReportPage() {
             <table className="w-full text-left border-collapse text-xs">
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-200 font-semibold text-slate-600 uppercase tracking-wider">
-                  <th className="py-3 px-3">Outward Challan</th>
-                  <th className="py-3 px-3">Date</th>
-                  <th className="py-3 px-3">JWO No</th>
-                  <th className="py-3 px-3">Job Worker / GSTIN</th>
-                  <th className="py-3 px-3">State</th>
-                  <th className="py-3 px-3">Description</th>
-                  <th className="py-3 px-3 text-right">Quantity (Mtr)</th>
-                  <th className="py-3 px-3 text-right">Takas</th>
-                  <th className="py-3 px-3 text-right">Weight (Kg)</th>
-                  <th className="py-3 px-3 text-right font-bold text-slate-900">Taxable Value</th>
+                  <SortableTh sort={sort4} sortKey="challanNumber" className="py-3 px-3">Outward Challan</SortableTh>
+                  <SortableTh sort={sort4} sortKey="challanDate" className="py-3 px-3">Date</SortableTh>
+                  <SortableTh sort={sort4} sortKey="jwoNumber" className="py-3 px-3">JWO No</SortableTh>
+                  <SortableTh sort={sort4} sortKey="vendorName" className="py-3 px-3">Job Worker / GSTIN</SortableTh>
+                  <SortableTh sort={sort4} sortKey="state" className="py-3 px-3">State</SortableTh>
+                  <SortableTh sort={sort4} sortKey="description" className="py-3 px-3">Description</SortableTh>
+                  <SortableTh sort={sort4} sortKey="quantity" className="py-3 px-3 text-right" align="right">Quantity (Mtr)</SortableTh>
+                  <SortableTh sort={sort4} sortKey="takaCount" className="py-3 px-3 text-right" align="right">Takas</SortableTh>
+                  <SortableTh sort={sort4} sortKey="weightKg" className="py-3 px-3 text-right" align="right">Weight (Kg)</SortableTh>
+                  <SortableTh sort={sort4} sortKey="taxableValue" className="py-3 px-3 text-right font-bold text-slate-900" align="right">Taxable Value</SortableTh>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-slate-700">
@@ -307,17 +313,17 @@ export default function ITC04ReportPage() {
             <table className="w-full text-left border-collapse text-xs">
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-200 font-semibold text-slate-600 uppercase tracking-wider">
-                  <th className="py-3 px-3">Inward Receipt</th>
-                  <th className="py-3 px-3">Inward Date</th>
-                  <th className="py-3 px-3">Orig Challan</th>
-                  <th className="py-3 px-3">JWO No</th>
-                  <th className="py-3 px-3">Job Worker</th>
-                  <th className="py-3 px-3 text-right">Received (Mtr)</th>
-                  <th className="py-3 px-3 text-right">Accepted</th>
-                  <th className="py-3 px-3 text-right text-rose-600">Rejected</th>
-                  <th className="py-3 px-3 text-right">Takas</th>
-                  <th className="py-3 px-3 text-right">Loss (Mtr)</th>
-                  <th className="py-3 px-3 text-right font-bold text-slate-900">Status</th>
+                  <SortableTh sort={sort5a} sortKey="inwardChallanNumber" className="py-3 px-3">Inward Receipt</SortableTh>
+                  <SortableTh sort={sort5a} sortKey="inwardDate" className="py-3 px-3">Inward Date</SortableTh>
+                  <SortableTh sort={sort5a} sortKey="originalChallanNumber" className="py-3 px-3">Orig Challan</SortableTh>
+                  <SortableTh sort={sort5a} sortKey="jwoNumber" className="py-3 px-3">JWO No</SortableTh>
+                  <SortableTh sort={sort5a} sortKey="vendorName" className="py-3 px-3">Job Worker</SortableTh>
+                  <SortableTh sort={sort5a} sortKey="quantityReceived" className="py-3 px-3 text-right" align="right">Received (Mtr)</SortableTh>
+                  <SortableTh sort={sort5a} sortKey="quantityAccepted" className="py-3 px-3 text-right" align="right">Accepted</SortableTh>
+                  <SortableTh sort={sort5a} sortKey="quantityRejected" className="py-3 px-3 text-right text-rose-600" align="right">Rejected</SortableTh>
+                  <SortableTh sort={sort5a} sortKey="takaCount" className="py-3 px-3 text-right" align="right">Takas</SortableTh>
+                  <SortableTh sort={sort5a} sortKey="approvedLoss" className="py-3 px-3 text-right" align="right">Loss (Mtr)</SortableTh>
+                  <SortableTh sort={sort5a} sortKey="status" className="py-3 px-3 text-right font-bold text-slate-900" align="right">Status</SortableTh>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-slate-700">

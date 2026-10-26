@@ -11,7 +11,7 @@
  * child rows. Document numbers (JWO, outward, inward, reprocess) are
  * allocated by the server.
  */
-import { api } from './api';
+import { api, getAllPages } from './api';
 import { getStoredToken } from '../utils/authUtils';
 
 export function isJobWorkBackendEnabled() {
@@ -22,12 +22,7 @@ export function isJobWorkBackendEnabled() {
   }
 }
 
-const PAGE_SIZE = 200;
 
-function rowsFrom(body) {
-  if (Array.isArray(body)) return body;
-  return body?.results || [];
-}
 
 const num = (v) => Number(v ?? 0) || 0;
 const orUndef = (v) => (v === '' || v === null || v === undefined ? undefined : v);
@@ -346,8 +341,7 @@ export function planToApi(p, { withCharges = false } = {}) {
 /* ── Job Work Orders ── */
 
 export async function fetchJWOs() {
-  const body = await api.get('/jobwork/orders/', { query: { limit: PAGE_SIZE } });
-  return rowsFrom(body).map(jwoFromApi);
+  return (await getAllPages('/jobwork/orders/')).map(jwoFromApi);
 }
 
 export async function fetchJWO(id) {
@@ -399,8 +393,7 @@ export async function signJWODocument(orderId, { documentType, documentId, signa
 /* ── Process Plans ── */
 
 export async function fetchPlans() {
-  const body = await api.get('/jobwork/process-plans/', { query: { limit: PAGE_SIZE } });
-  return rowsFrom(body).map(planFromApi);
+  return (await getAllPages('/jobwork/process-plans/')).map(planFromApi);
 }
 
 export async function fetchPlan(id) {

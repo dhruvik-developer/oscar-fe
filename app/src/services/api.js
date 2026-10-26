@@ -9,6 +9,7 @@ import {
   AUTH_TOKEN_KEY,
   EVENMORE_AUTH_TOKEN_KEY,
   getStoredRefreshToken,
+  readStoredAccessToken,
   saveRefreshedTokens,
   clearStoredAuth,
 } from '../utils/authUtils';
@@ -40,9 +41,11 @@ export function buildQuery(params = {}) {
   return qs ? `?${qs}` : '';
 }
 
-export function getAuthToken(storage = typeof localStorage !== 'undefined' ? localStorage : null) {
+/** The bearer token. With no `storage` given, looks where the session lives. */
+export function getAuthToken(storage = null) {
+  if (!storage) return readStoredAccessToken();
   try {
-    return storage?.getItem(EVENMORE_AUTH_TOKEN_KEY) || storage?.getItem(AUTH_TOKEN_KEY) || '';
+    return storage.getItem(EVENMORE_AUTH_TOKEN_KEY) || storage.getItem(AUTH_TOKEN_KEY) || '';
   } catch {
     return '';
   }
@@ -75,7 +78,7 @@ export function refreshAccessToken() {
 
   const refreshToken = getStoredRefreshToken();
   if (!refreshToken) {
-    clearStoredAuth();
+    clearStoredAuth({ reason: 'expired' });
     return Promise.reject(
       new ApiError('Your session has expired. Please sign in again.', {
         status: 401,
@@ -97,7 +100,8 @@ export function refreshAccessToken() {
 
     const payload = await parseBodySafe(response);
     if (!response.ok) {
-      clearStoredAuth();
+      // TOKEN_REVOKED: signed out elsewhere (password change, admin, logout).
+      clearStoredAuth({ reason: payload?.code === 'TOKEN_REVOKED' ? 'revoked' : 'expired' });
       const message =
         payload?.message ||
         payload?.detail ||
@@ -111,7 +115,7 @@ export function refreshAccessToken() {
 
     const access = payload?.access || payload?.token;
     if (!access) {
-      clearStoredAuth();
+      clearStoredAuth({ reason: 'expired' });
       throw new ApiError('The server did not return a new access token.', {
         status: 0,
         endpoint: '/auth/refresh/',
@@ -234,7 +238,7 @@ export async function apiClient(
         } else if (!isAuthEndpoint) {
           // No refresh token, or the freshly minted token was rejected too —
           // the session is genuinely over. clearStoredAuth fires the event.
-          clearStoredAuth();
+          clearStoredAuth({ reason: 'expired' });
         }
       }
 
@@ -271,6 +275,34 @@ export async function apiClient(
       throw new ApiError(err?.message || 'Network error occurred', { endpoint: normalizedEp });
     }
   }
+}
+
+/** The largest page the server serves (EnvelopePagination.max_page_size). */
+export const MAX_PAGE_SIZE = 200;
+// A runaway guard (50,000 rows), not a business limit.
+const MAX_PAGES = 250;
+
+/**
+ * GET every page of an envelope list and return all rows.
+ *
+ * The server pages lists (25 by default, 200 at most), so reading only the
+ * first response silently drops everything after it. A plain array from a
+ * non-paginated endpoint is returned as is.
+ */
+export async function getAllPages(endpoint, { query = {}, ...config } = {}) {
+  const rows = [];
+  for (let page = 1; page <= MAX_PAGES; page += 1) {
+    const body = await apiClient(endpoint, {
+      ...config,
+      method: 'GET',
+      query: { ...query, page, page_size: query.page_size || MAX_PAGE_SIZE },
+    });
+    if (Array.isArray(body)) return body;
+    rows.push(...(body?.results || []));
+    if (!body?.next) return rows;
+  }
+  console.warn(`[api] ${endpoint}: stopped after ${MAX_PAGES} pages (${rows.length} rows).`);
+  return rows;
 }
 
 export const api = {

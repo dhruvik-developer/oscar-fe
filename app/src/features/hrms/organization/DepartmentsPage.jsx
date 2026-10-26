@@ -6,6 +6,8 @@ import PageHeader from '../../../components/ui/PageHeader';
 import { hrmsGuides } from '../../../data/hrms/hrmsGuides';
 import { hrmsSync, isBackendEnabled } from '../../../services/hrmsSync';
 import { Avatar } from "../../../components/hrms/Avatar";
+import { useTableSort } from '../../../hooks/useTableSort';
+import SortableTh from '../../../components/ui/SortableTh';
 import {
   Building2,
   Plus,
@@ -50,6 +52,14 @@ export function DepartmentsPage() {
     String(d.name ?? '').toLowerCase().includes(q.toLowerCase()) ||
     String(d.head ?? '').toLowerCase().includes(q.toLowerCase())
   );
+  const sort = useTableSort(filtered, {
+    accessors: {
+      teams: (d) => d.teams || 0,
+      employees: (d) => d.employees || 0,
+      openRoles: (d) => d.openRoles || 0,
+      status: (d) => d.status || 'Active',
+    },
+  });
 
   async function handleCreate(e) {
     e.preventDefault();
@@ -182,18 +192,18 @@ export function DepartmentsPage() {
             <table className="w-full min-w-[720px] lg:min-w-0 text-left">
               <thead className="bg-off border-b border-bdr text-[11px] uppercase text-muted">
                 <tr>
-                  <th className="py-3 px-5">Department</th>
-                  <th className="py-3 px-5">Head</th>
-                  <th className="py-3 px-5">Teams</th>
-                  <th className="py-3 px-5">Employees</th>
-                  <th className="py-3 px-5">Open Roles</th>
-                  <th className="py-3 px-5">Budget</th>
-                  <th className="py-3 px-5">Status</th>
+                  <SortableTh sort={sort} sortKey="name" className="py-3 px-5">Department</SortableTh>
+                  <SortableTh sort={sort} sortKey="head" className="py-3 px-5">Head</SortableTh>
+                  <SortableTh sort={sort} sortKey="teams" className="py-3 px-5">Teams</SortableTh>
+                  <SortableTh sort={sort} sortKey="employees" className="py-3 px-5">Employees</SortableTh>
+                  <SortableTh sort={sort} sortKey="openRoles" className="py-3 px-5">Open Roles</SortableTh>
+                  <SortableTh sort={sort} sortKey="budget" className="py-3 px-5">Budget</SortableTh>
+                  <SortableTh sort={sort} sortKey="status" className="py-3 px-5">Status</SortableTh>
                   <th className="py-3 px-5 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-bdr/40 text-[13px]">
-                {filtered.map((d) => (
+                {sort.rows.map((d) => (
                   <tr key={d.id} className="hover:bg-off/60 transition-colors">
                     <td className="py-4 px-5 font-semibold text-slate-900 flex items-center gap-2">
                       <Building2 size={16} className="text-navy shrink-0" />

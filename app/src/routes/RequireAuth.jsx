@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Navigate, useLocation, Outlet } from 'react-router-dom';
 import { hasStoredSession } from '../utils/authUtils';
+import { useAppStore } from '../stores/appStore';
 
 /**
  * RequireAuth — Route guard that verifies a session still exists.
@@ -12,6 +13,7 @@ import { hasStoredSession } from '../utils/authUtils';
 export default function RequireAuth() {
   const location = useLocation();
   const [signedIn, setSignedIn] = useState(() => hasStoredSession());
+  const mustChangePassword = useAppStore((s) => Boolean(s.currentUser?.mustChangePassword));
 
   useEffect(() => {
     // Re-verify on every route change.
@@ -33,6 +35,11 @@ export default function RequireAuth() {
   if (!signedIn) {
     const returnTo = location.pathname + location.search;
     return <Navigate to={`/login?returnTo=${encodeURIComponent(returnTo)}`} replace />;
+  }
+
+  if (mustChangePassword && location.pathname !== '/change-password') {
+    const returnTo = location.pathname + location.search;
+    return <Navigate to={`/change-password?returnTo=${encodeURIComponent(returnTo)}`} replace />;
   }
 
   return <Outlet />;

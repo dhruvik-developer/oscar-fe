@@ -168,6 +168,10 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
     const [dueDate, setDueDate] = useState(() => addDaysISO(getCurrentISODate(), 30));
     const [notes, setNotes] = useState('');
     const [lineItems, setLineItems] = useState([]);
+    // Freight and other charges are billed here (the quotation no longer
+    // carries them); like the server, no GST is computed on them.
+    const [freightCharges, setFreightCharges] = useState('');
+    const [otherCharges, setOtherCharges] = useState('');
     const [salesperson, setSalesperson] = useState({ id: '', name: '' });
     const [billingAddress, setBillingAddress] = useState({ line1: '', line2: '', city: '', state: '', pincode: '', country: 'India' });
     const [shippingAddress, setShippingAddress] = useState({ line1: '', line2: '', city: '', state: '', pincode: '', country: 'India' });
@@ -208,6 +212,8 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
                 if (order.items && order.items.length > 0) {
                     setLineItems(order.items);
                 }
+                if (Number(order.freightCharges) > 0) setFreightCharges(String(Number(order.freightCharges)));
+                if (Number(order.otherCharges) > 0) setOtherCharges(String(Number(order.otherCharges)));
                 if (order.salespersonId || order.salesperson) {
                     setSalesperson({ id: order.salespersonId || '', name: order.salesperson || '' });
                 }
@@ -230,6 +236,8 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
                 if (pi.items && pi.items.length > 0) {
                     setLineItems(pi.items);
                 }
+                if (Number(pi.freightCharges) > 0) setFreightCharges(String(Number(pi.freightCharges)));
+                if (Number(pi.otherCharges) > 0) setOtherCharges(String(Number(pi.otherCharges)));
                 if (pi.billingAddress) setBillingAddress(pi.billingAddress);
                 if (pi.shippingAddress) setShippingAddress(pi.shippingAddress);
                 if (pi.notes) setNotes(`Sourced from Proforma ${pi.proformaNumber || pi.piNumber}.\n${pi.notes}`);
@@ -250,6 +258,8 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
         setDueDate(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
         setNotes('');
         setLineItems([]);
+        setFreightCharges('');
+        setOtherCharges('');
         setSalesperson({ id: '', name: '' });
         setSameAsBilling(true);
         setErrorMessage('');
@@ -267,6 +277,8 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
         setDueDate(inv.dueDate || '30 Days');
         setNotes(inv.notes || '');
         setLineItems(inv.items || []);
+        setFreightCharges(Number(inv.freightCharges) > 0 ? String(Number(inv.freightCharges)) : '');
+        setOtherCharges(Number(inv.otherCharges) > 0 ? String(Number(inv.otherCharges)) : '');
         setSalesperson({ id: inv.salespersonId || '', name: inv.salesperson || '' });
         setSameAsBilling(false);
         setErrorMessage('');
@@ -320,7 +332,9 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
             sgst = Math.round((totalTax - cgst) * 100) / 100;
         }
 
-        const grandTotal = Math.round((taxableAmount + cgst + sgst + igst) * 100) / 100;
+        const freight = Math.max(0, Number(freightCharges) || 0);
+        const other = Math.max(0, Number(otherCharges) || 0);
+        const grandTotal = Math.round((taxableAmount + cgst + sgst + igst + freight + other) * 100) / 100;
         const effectiveShipAddress = sameAsBilling ? billingAddress : shippingAddress;
 
         // Check if Delivery Challan exists for linked SO
@@ -345,6 +359,8 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
                 cgst,
                 sgst,
                 igst,
+                freightCharges: freight,
+                otherCharges: other,
                 total: grandTotal,
                 grandTotal,
                 notes,
@@ -380,6 +396,8 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
             sgst,
             igst,
             tax: totalTax,
+            freightCharges: freight,
+            otherCharges: other,
             total: grandTotal,
             grandTotal,
             amount: grandTotal,
@@ -990,6 +1008,35 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
                             <div>
                                 <label className="text-xs font-semibold text-slate-800 block mb-2">Invoice Line Items</label>
                                 <LineItemEditor items={lineItems} onChange={setLineItems} type="sales"/>
+                            </div>
+
+                            {/* Charges billed on top of the goods */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <div>
+                                    <label className="text-xs font-semibold text-slate-800 block mb-1.5">Freight Charges (₹)</label>
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        step="any"
+                                        value={freightCharges}
+                                        onChange={(e) => setFreightCharges(e.target.value)}
+                                        placeholder="0"
+                                        className="w-full border border-slate-300 rounded-xl p-2.5 text-xs bg-white text-slate-800"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-xs font-semibold text-slate-800 block mb-1.5">Other Charges (₹)</label>
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        step="any"
+                                        value={otherCharges}
+                                        onChange={(e) => setOtherCharges(e.target.value)}
+                                        placeholder="Loading, packing, etc."
+                                        className="w-full border border-slate-300 rounded-xl p-2.5 text-xs bg-white text-slate-800"
+                                    />
+                                </div>
+                                <p className="sm:col-span-2 text-[11px] text-slate-500">Added to the invoice total after GST.</p>
                             </div>
 
                             {/* Notes */}

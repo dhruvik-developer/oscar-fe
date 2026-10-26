@@ -15,6 +15,8 @@ import {
   routeCustomerReturnStock,
   issueCustomerReturnCreditNote,
 } from '../../../../services/jobWorkSync';
+import { useTableSort } from '../../../../hooks/useTableSort';
+import { SortableTh } from '../../../../components/ui/SortableTh';
 
 const n = (v) => Number(v || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 });
 
@@ -222,6 +224,7 @@ export function CustomerReturnTab({ project }) {
       return matchesSearch && matchesReason && matchesStage;
     });
   }, [returnsList, searchTerm, selectedReasonFilter, selectedStageFilter]);
+  const returnSort = useTableSort(filteredReturns);
 
   // Handlers to open modals
   const handleOpenCreateModal = () => {
@@ -651,21 +654,21 @@ export function CustomerReturnTab({ project }) {
             <table className="w-full text-left border-collapse text-xs">
               <thead>
                 <tr className="border-b border-slate-200 bg-slate-50/70 text-[10.5px] font-bold uppercase tracking-wider text-slate-500">
-                  <th className="py-2.5 px-3">Return # / Date</th>
-                  <th className="py-2.5 px-3">Customer & Order</th>
-                  <th className="py-2.5 px-3">Invoice & DC</th>
-                  <th className="py-2.5 px-3 text-right">Delivered</th>
-                  <th className="py-2.5 px-3 text-right">Requested</th>
-                  <th className="py-2.5 px-3 text-right">Received</th>
-                  <th className="py-2.5 px-3">Return Reason</th>
-                  <th className="py-2.5 px-3">QC Status</th>
-                  <th className="py-2.5 px-3">Destination</th>
-                  <th className="py-2.5 px-3">Credit Note</th>
+                  <SortableTh sort={returnSort} sortKey="returnNumber" className="py-2.5 px-3">Return # / Date</SortableTh>
+                  <SortableTh sort={returnSort} sortKey="customerName" className="py-2.5 px-3">Customer & Order</SortableTh>
+                  <SortableTh sort={returnSort} sortKey="salesInvoiceNumber" className="py-2.5 px-3">Invoice & DC</SortableTh>
+                  <SortableTh sort={returnSort} sortKey="deliveredQty" className="py-2.5 px-3 text-right" align="right">Delivered</SortableTh>
+                  <SortableTh sort={returnSort} sortKey="requestedQty" className="py-2.5 px-3 text-right" align="right">Requested</SortableTh>
+                  <SortableTh sort={returnSort} sortKey="receivedQty" className="py-2.5 px-3 text-right" align="right">Received</SortableTh>
+                  <SortableTh sort={returnSort} sortKey="reason" className="py-2.5 px-3">Return Reason</SortableTh>
+                  <SortableTh sort={returnSort} sortKey="returnStage" className="py-2.5 px-3">QC Status</SortableTh>
+                  <SortableTh sort={returnSort} sortKey="stockDestination" className="py-2.5 px-3">Destination</SortableTh>
+                  <SortableTh sort={returnSort} sortKey="creditNoteNumber" className="py-2.5 px-3">Credit Note</SortableTh>
                   <th className="py-2.5 px-3 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {filteredReturns.map((ret) => {
+                {returnSort.rows.map((ret) => {
                   const isExpanded = expandedId === ret.id;
                   const lines = ret.lines || [];
                   const isRequested = ret.returnStage === 'REQUESTED' || !ret.returnStage;

@@ -14,6 +14,8 @@ import {
   describeError,
 } from "../../../services/hrmsSync";
 import { Avatar } from "../../../components/hrms/Avatar";
+import { useTableSort } from "../../../hooks/useTableSort";
+import SortableTh from "../../../components/ui/SortableTh";
 
 const STATUS_OPTIONS = ["Present", "Late", "Half Day", "WFH", "Absent", "On Leave"];
 const FILTER_STATUSES = ["Present", "Late", "Half Day", "WFH", "Absent", "On Leave", "Not Marked", "Holiday", "Week Off"];
@@ -97,6 +99,10 @@ export default function BulkAttendance() {
       return true;
     });
   }, [rows, dept, location, shift, statusFilter, search]);
+
+  const sort = useTableSort(filtered, {
+    accessors: { checkIn: (e) => e.checkIn || e.checkOut || "" },
+  });
 
   const selectable = useMemo(() => filtered.filter((e) => !e.leaveType), [filtered]);
   const selectedRows = useMemo(() => rows.filter((e) => selectedIds.has(e.employeeId) && !e.leaveType), [rows, selectedIds]);
@@ -323,11 +329,11 @@ export default function BulkAttendance() {
                       aria-label="Select all"
                     />
                   </th>
-                  <th>EMPLOYEE</th>
-                  <th>EMPLOYEE ID</th>
-                  <th>DEPARTMENT</th>
-                  <th>CHECK IN / OUT</th>
-                  <th>CURRENT STATUS</th>
+                  <SortableTh sort={sort} sortKey="name">EMPLOYEE</SortableTh>
+                  <SortableTh sort={sort} sortKey="employeeCode">EMPLOYEE ID</SortableTh>
+                  <SortableTh sort={sort} sortKey="department">DEPARTMENT</SortableTh>
+                  <SortableTh sort={sort} sortKey="checkIn">CHECK IN / OUT</SortableTh>
+                  <SortableTh sort={sort} sortKey="status">CURRENT STATUS</SortableTh>
                 </tr>
               </thead>
               <tbody>
@@ -338,7 +344,7 @@ export default function BulkAttendance() {
                     </td>
                   </tr>
                 )}
-                {filtered.map((e) => {
+                {sort.rows.map((e) => {
                   const locked = Boolean(e.leaveType);
                   return (
                     <tr key={e.employeeId} className={locked ? "bulk-row-locked" : ""}>

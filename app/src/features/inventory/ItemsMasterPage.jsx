@@ -2,11 +2,12 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useERP } from '../../context/ERPContext';
 import { StatusBadge } from '../../components/ui/StatusBadge';
 import { Button } from '../../components/ui/Button';
+import AppPagination from '../../components/ui/AppPagination';
 import {
   Plus, MapPin, AlertTriangle, Layers, Tag, Zap, CheckCircle2, Upload,
   DollarSign, Package, Cpu, QrCode, Shirt, Palette, ShoppingCart, Trash2,
   Search, Info, Clock, ArrowRight, X, ChevronDown, MoreVertical, RefreshCw,
-  AlertCircle, ExternalLink, ChevronLeft, ChevronRight, Sliders
+  AlertCircle, ExternalLink, ChevronRight, Sliders
 } from 'lucide-react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { BarcodeLabelModal } from '../../components/common/BarcodeLabelModal';
@@ -14,6 +15,8 @@ import { ImportModal } from '../../components/common/ImportModal';
 import MasterSourceLink from '../../components/common/MasterSourceLink';
 import { inventoryService } from '../../services/domainServices';
 import { describeError, isServerId } from '../../services/backendSync';
+import { useTableSort } from '../../hooks/useTableSort';
+import SortableTh from '../../components/ui/SortableTh';
 
 /** Map a fabric colour name to a display hex for the swatch dot. */
 const FABRIC_COLOR_HEX = {
@@ -256,12 +259,35 @@ export const ItemsMasterPage = () => {
     setCurrentPage(1);
   };
 
+  // Column sorting (applied before pagination)
+  const itemSort = useTableSort(filteredItems, {
+    accessors: {
+      quality: (i) => i.fabricQuality || i.name,
+      design: (i) => i.fabricDesign || 'Plain',
+      colour: (i) => i.fabricColor || 'Grey',
+      onHand: (i) => Number(i.onHandQty ?? i.stock ?? i.availableQty ?? 0),
+      reserved: (i) => Number(i.reservedQty ?? 0),
+      available: (i) => Number(i.availableQty ?? i.stock ?? 0),
+      cost: (i) => Number(i.costPrice ?? i.unitCost ?? 0),
+      sell: (i) => Number(i.sellingPrice ?? 0),
+      status: (i) => {
+        const raw = String(i.status || '').toLowerCase();
+        const reorder = Number(i.reorderLevel ?? 0);
+        const avail = Number(i.availableQty ?? i.stock ?? 0);
+        if (raw === 'critical' || raw === 'low stock' || (reorder > 0 && avail <= reorder)) return 'Low Stock';
+        if (raw === 'watch' || raw === 'warning') return 'Watch';
+        return 'Normal';
+      },
+      reorder: (i) => Number(i.reorderLevel ?? 0) || 500,
+    },
+  });
+  const sortedItems = itemSort.rows;
+
   // Paginated items
-  const totalPages = Math.max(1, Math.ceil(filteredItems.length / pageSize));
   const paginatedItems = useMemo(() => {
     const start = (currentPage - 1) * pageSize;
-    return filteredItems.slice(start, start + pageSize);
-  }, [filteredItems, currentPage, pageSize]);
+    return sortedItems.slice(start, start + pageSize);
+  }, [sortedItems, currentPage, pageSize]);
 
   // Selection helpers
   const allOnPageSelected = paginatedItems.length > 0 && paginatedItems.every((i) => selectedIds.has(String(i.id)));
@@ -871,17 +897,17 @@ export const ItemsMasterPage = () => {
                   />
                 </th>
                 <th className="py-3 px-2 text-center w-14">Sr. No.</th>
-                <th className="py-3 px-3">SKU / Model #</th>
-                <th className="py-3 px-3">Fabric Quality</th>
-                <th className="py-3 px-3">Design</th>
-                <th className="py-3 px-3">Shade / Colour</th>
-                <th className="py-3 px-3 text-right">Total Stock (m)</th>
-                <th className="py-3 px-3 text-right">Reserved (m)</th>
-                <th className="py-3 px-3 text-right">Available (m)</th>
-                <th className="py-3 px-3 text-right">Unit Cost (₹)</th>
-                <th className="py-3 px-3 text-right">Selling Rate (₹)</th>
-                <th className="py-3 px-3 text-center">Status</th>
-                <th className="py-3 px-3 text-right">Reorder Qty (m)</th>
+                <SortableTh sort={itemSort} sortKey="sku" className="py-3 px-3">SKU / Model #</SortableTh>
+                <SortableTh sort={itemSort} sortKey="quality" className="py-3 px-3">Fabric Quality</SortableTh>
+                <SortableTh sort={itemSort} sortKey="design" className="py-3 px-3">Design</SortableTh>
+                <SortableTh sort={itemSort} sortKey="colour" className="py-3 px-3">Shade / Colour</SortableTh>
+                <SortableTh sort={itemSort} sortKey="onHand" className="py-3 px-3 text-right" align="right">Total Stock (m)</SortableTh>
+                <SortableTh sort={itemSort} sortKey="reserved" className="py-3 px-3 text-right" align="right">Reserved (m)</SortableTh>
+                <SortableTh sort={itemSort} sortKey="available" className="py-3 px-3 text-right" align="right">Available (m)</SortableTh>
+                <SortableTh sort={itemSort} sortKey="cost" className="py-3 px-3 text-right" align="right">Unit Cost (₹)</SortableTh>
+                <SortableTh sort={itemSort} sortKey="sell" className="py-3 px-3 text-right" align="right">Selling Rate (₹)</SortableTh>
+                <SortableTh sort={itemSort} sortKey="status" className="py-3 px-3 text-center" align="center">Status</SortableTh>
+                <SortableTh sort={itemSort} sortKey="reorder" className="py-3 px-3 text-right" align="right">Reorder Qty (m)</SortableTh>
                 <th className="py-3 px-3 text-center w-36">Actions</th>
               </tr>
             </thead>
@@ -1110,71 +1136,14 @@ export const ItemsMasterPage = () => {
         </div>
 
         {/* ── Table Footer & Pagination (Matching Reference Image) ── */}
-        <div className="p-3.5 border-t border-slate-200/80 bg-slate-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-slate-600">
-          <div>
-            Showing <strong>{filteredItems.length === 0 ? 0 : (currentPage - 1) * pageSize + 1}</strong> to{' '}
-            <strong>{Math.min(currentPage * pageSize, filteredItems.length)}</strong> of{' '}
-            <strong>{filteredItems.length}</strong> records
-          </div>
-
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-1.5">
-              <span>Per page:</span>
-              <select
-                value={pageSize}
-                onChange={(e) => {
-                  setPageSize(Number(e.target.value));
-                  setCurrentPage(1);
-                }}
-                className="border border-slate-200 rounded-lg p-1 bg-white text-xs font-semibold focus:outline-none"
-              >
-                <option value={10}>10 per page</option>
-                <option value={25}>25 per page</option>
-                <option value={50}>50 per page</option>
-                <option value={100}>100 per page</option>
-              </select>
-            </div>
-
-            {/* Pagination Controls */}
-            <div className="flex items-center gap-1">
-              <button
-                type="button"
-                disabled={currentPage <= 1}
-                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                className="w-7 h-7 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
-              >
-                <ChevronLeft size={14} />
-              </button>
-
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => {
-                const isActive = p === currentPage;
-                return (
-                  <button
-                    key={p}
-                    type="button"
-                    onClick={() => setCurrentPage(p)}
-                    className={`w-7 h-7 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
-                      isActive
-                        ? 'bg-blue-600 text-white'
-                        : 'border border-slate-200 bg-white hover:bg-slate-50 text-slate-700'
-                    }`}
-                  >
-                    {p}
-                  </button>
-                );
-              })}
-
-              <button
-                type="button"
-                disabled={currentPage >= totalPages}
-                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                className="w-7 h-7 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
-              >
-                <ChevronRight size={14} />
-              </button>
-            </div>
-          </div>
-        </div>
+        <AppPagination
+          total={filteredItems.length}
+          page={currentPage}
+          pageSize={pageSize}
+          onPageChange={setCurrentPage}
+          onPageSizeChange={setPageSize}
+          pageSizeOptions={[10, 25, 50, 100]}
+        />
       </div>
 
       {/* ── Floating Bulk Action Bar when checkboxes are selected ── */}

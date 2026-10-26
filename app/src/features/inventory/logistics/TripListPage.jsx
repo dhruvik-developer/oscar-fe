@@ -24,6 +24,8 @@ import { inventoryService } from '../../../services/domainServices';
 import PageInfoButton from '../../../components/ui/PageInfoButton';
 import { PrintLorryReceiptModal } from '../../../components/common/PrintLorryReceiptModal';
 import MasterSourceLink, { useMasterDataRefresh } from '../../../components/common/MasterSourceLink';
+import { useTableSort } from '../../../hooks/useTableSort';
+import SortableTh from '../../../components/ui/SortableTh';
 
 export default function TripListPage() {
   const [trips, setTrips] = useState([]);
@@ -296,6 +298,16 @@ export default function TripListPage() {
     );
   });
 
+  const sort = useTableSort(filteredTrips, {
+    accessors: {
+      route: (t) => `${t.from_location || 'Mill / Godown'} → ${t.to_location || 'Destination'}`,
+      transporter: (t) => t.transporter_name || t.transporter?.name || 'Local Tempo',
+      total_charges: (t) => Number(t.total_charges) || 0,
+      allocation: (t) => (t.freight_allocated || t.freightAllocated || t.is_cost_allocated ? 'Allocated' : 'Pending Allocation'),
+      status: (t) => t.status || 'In Transit',
+    },
+  });
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -362,13 +374,13 @@ export default function TripListPage() {
           <table className="w-full text-left border-collapse text-sm">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-medium">
-                <th className="py-3 px-4">Trip No / Date</th>
-                <th className="py-3 px-4">Vehicle & Driver</th>
-                <th className="py-3 px-4">Route</th>
-                <th className="py-3 px-4">LR / Transporter</th>
-                <th className="py-3 px-4 text-right">Total Charges</th>
-                <th className="py-3 px-4">Cost Allocation</th>
-                <th className="py-3 px-4">Delivery Status</th>
+                <SortableTh sort={sort} sortKey="trip_number" className="py-3 px-4">Trip No / Date</SortableTh>
+                <SortableTh sort={sort} sortKey="vehicle_number" className="py-3 px-4">Vehicle & Driver</SortableTh>
+                <SortableTh sort={sort} sortKey="route" className="py-3 px-4">Route</SortableTh>
+                <SortableTh sort={sort} sortKey="transporter" className="py-3 px-4">LR / Transporter</SortableTh>
+                <SortableTh sort={sort} sortKey="total_charges" className="py-3 px-4 text-right" align="right">Total Charges</SortableTh>
+                <SortableTh sort={sort} sortKey="allocation" className="py-3 px-4">Cost Allocation</SortableTh>
+                <SortableTh sort={sort} sortKey="status" className="py-3 px-4">Delivery Status</SortableTh>
                 <th className="py-3 px-4 text-right">Actions</th>
               </tr>
             </thead>
@@ -382,7 +394,7 @@ export default function TripListPage() {
                   <td colSpan="8" className="text-center py-10 text-slate-400">No transport trips recorded.</td>
                 </tr>
               ) : (
-                filteredTrips.map((t) => (
+                sort.rows.map((t) => (
                   <tr key={t.id} className="hover:bg-slate-50/75 transition-colors">
                     <td className="py-3 px-4 font-semibold text-slate-900">
                       {t.trip_number}

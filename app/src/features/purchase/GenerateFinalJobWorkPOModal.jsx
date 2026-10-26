@@ -6,6 +6,8 @@ import {
 } from 'lucide-react';
 import { api } from '../../services/api';
 import { useERP } from '../../context/ERPContext';
+import { useTableSort } from '../../hooks/useTableSort';
+import SortableTh from '../../components/ui/SortableTh';
 import MasterSourceLink from '../../components/common/MasterSourceLink';
 
 const fmtM = (n) => (n === null || n === undefined || n === '' ? '—' : `${Number(n).toLocaleString('en-IN', { maximumFractionDigits: 2 })} M`);
@@ -285,6 +287,13 @@ export default function GenerateFinalJobWorkPOModal({
   // Verified Details totals
   const verifiedProducedSum = useMemo(() => dailyEntries.reduce((s, e) => s + (Number(e.produced) || 0), 0), [dailyEntries]);
   const verifiedRejectedSum = useMemo(() => dailyEntries.reduce((s, e) => s + (Number(e.rejected) || 0), 0), [dailyEntries]);
+  const dailySort = useTableSort(dailyEntries, {
+    accessors: {
+      produced: (e) => Number(e.produced || 0),
+      rejected: (e) => Number(e.rejected || 0),
+      accepted: (e) => Number(e.accepted) || (Number(e.produced) - (Number(e.rejected) || 0)),
+    },
+  });
   const verifiedAcceptedSum = useMemo(() => dailyEntries.reduce((s, e) => s + (Number(e.accepted) || (Number(e.produced) - (Number(e.rejected) || 0))), 0), [dailyEntries]);
 
   // Form Submission
@@ -732,15 +741,15 @@ export default function GenerateFinalJobWorkPOModal({
                 <thead>
                   <tr className="border-b border-slate-100 bg-slate-50/70 text-slate-500">
                     <th className="px-4 py-2 font-bold whitespace-nowrap">Sr. No.</th>
-                    <th className="px-4 py-2 font-bold whitespace-nowrap">Date</th>
-                    <th className="px-4 py-2 font-bold whitespace-nowrap">Produced Qty (M)</th>
-                    <th className="px-4 py-2 font-bold whitespace-nowrap">Rejected Qty (M)</th>
-                    <th className="px-4 py-2 font-bold whitespace-nowrap">Accepted Qty (M)</th>
-                    <th className="px-4 py-2 font-bold whitespace-nowrap">Remarks</th>
+                    <SortableTh sort={dailySort} sortKey="date" className="px-4 py-2 font-bold whitespace-nowrap" align="center">Date</SortableTh>
+                    <SortableTh sort={dailySort} sortKey="produced" className="px-4 py-2 font-bold whitespace-nowrap" align="center">Produced Qty (M)</SortableTh>
+                    <SortableTh sort={dailySort} sortKey="rejected" className="px-4 py-2 font-bold whitespace-nowrap" align="center">Rejected Qty (M)</SortableTh>
+                    <SortableTh sort={dailySort} sortKey="accepted" className="px-4 py-2 font-bold whitespace-nowrap" align="center">Accepted Qty (M)</SortableTh>
+                    <SortableTh sort={dailySort} sortKey="remarks" className="px-4 py-2 font-bold whitespace-nowrap" align="center">Remarks</SortableTh>
                   </tr>
                 </thead>
                 <tbody>
-                  {dailyEntries.map((row, idx) => (
+                  {dailySort.rows.map((row, idx) => (
                     <tr key={idx} className="border-b border-slate-50 text-slate-700 hover:bg-slate-50/50">
                       <td className="px-4 py-2 text-slate-400 font-semibold">{idx + 1}</td>
                       <td className="px-4 py-2">{fmtDateDisplay(row.date)}</td>

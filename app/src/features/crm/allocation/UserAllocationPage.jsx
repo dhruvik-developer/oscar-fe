@@ -130,7 +130,7 @@ export default function UserAllocationPage() {
         setServerMembers((prev) => [...(prev || []), saved]);
         await hydrateCrm({ force: true }).catch(() => {});
       }
-      setNewMember({ name: '', role: 'Sales Representative', email: '', phone: '', avatar: '' });
+      setNewMember({ name: '', role: 'Sales Representative', email: '', phone: '+91 ', avatar: '' });
       setIsAddOpen(false);
     } catch (err) {
       setMembersError(err?.message || 'Representative could not be saved.');

@@ -32,6 +32,8 @@ import { fetchJWOs, fetchPlans, errorMessage } from '../../../../services/jobWor
 import { usePmsStore } from '../../../../stores/pmsStore';
 import { Modal } from '../../../../components/ui/Modal';
 import { Button } from '../../../../components/ui/Button';
+import { useTableSort } from '../../../../hooks/useTableSort';
+import { SortableTh } from '../../../../components/ui/SortableTh';
 
 const n = (v) => Number(v || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 });
 const todayISO = () => new Date().toISOString().slice(0, 10);
@@ -357,6 +359,29 @@ export function Stage13ProcessingWorkspace({
     return orders.reduce((sum, o) => sum + (o.inwards?.length || 0), 0);
   }, [orders]);
 
+  const orderSort = useTableSort(filteredOrders, {
+    accessors: { process: (ord) => ord.process || 'Dyeing' },
+  });
+  const modalOutwardSort = useTableSort(selectedOrderModal?.outwards || [], {
+    accessors: {
+      challanNo: (out) => out.challanNo || out.no,
+      status: (out) => out.status || 'Sent',
+    },
+  });
+  const modalInwardSort = useTableSort(selectedOrderModal?.inwards || [], {
+    accessors: {
+      accepted: (inv) => Number(inv.accepted || inv.qty || 0),
+      rejected: (inv) => Number(inv.rejected || 0),
+      status: (inv) => inv.status || 'Received',
+    },
+  });
+  const modalLossSort = useTableSort(selectedOrderModal?.lossEntries || [], {
+    accessors: {
+      lossReasonName: (l) => l.lossReasonName || 'Loss Entry',
+      status: (l) => l.status || 'Pending',
+    },
+  });
+
   return (
     <div className="space-y-5">
       {/* =========================================================================
@@ -611,23 +636,23 @@ export function Stage13ProcessingWorkspace({
           <table className="w-full text-left text-xs text-slate-700">
             <thead className="bg-slate-50 text-[11px] font-bold text-slate-600 uppercase border-b border-slate-200 sticky top-0 z-10">
               <tr>
-                <th className="p-3">JWO No</th>
-                <th className="p-3">Plan No</th>
-                <th className="p-3">Source PO / GRN</th>
-                <th className="p-3">Fabric & Quality</th>
-                <th className="p-3">Design / Shade</th>
-                <th className="p-3">Source Lot & Taka</th>
-                <th className="p-3">Process</th>
-                <th className="p-3">Processor</th>
-                <th className="p-3 text-right">Planned (m)</th>
-                <th className="p-3 text-right">Outward (m)</th>
-                <th className="p-3 text-right">Inward (m)</th>
-                <th className="p-3 text-right">Pending (m)</th>
-                <th className="p-3 text-right">Rate & Unit</th>
-                <th className="p-3 text-right">Charges</th>
-                <th className="p-3">Expected Return</th>
-                <th className="p-3">Actual Return</th>
-                <th className="p-3 text-center">Status</th>
+                <SortableTh sort={orderSort} sortKey="jwoNo" className="p-3">JWO No</SortableTh>
+                <SortableTh sort={orderSort} sortKey="effectivePlanNo" className="p-3">Plan No</SortableTh>
+                <SortableTh sort={orderSort} sortKey="sourcePo" className="p-3">Source PO / GRN</SortableTh>
+                <SortableTh sort={orderSort} sortKey="fabricItem" className="p-3">Fabric & Quality</SortableTh>
+                <SortableTh sort={orderSort} sortKey="shade" className="p-3">Design / Shade</SortableTh>
+                <SortableTh sort={orderSort} sortKey="lotNo" className="p-3">Source Lot & Taka</SortableTh>
+                <SortableTh sort={orderSort} sortKey="process" className="p-3">Process</SortableTh>
+                <SortableTh sort={orderSort} sortKey="vendor" className="p-3">Processor</SortableTh>
+                <SortableTh sort={orderSort} sortKey="plannedQty" className="p-3 text-right" align="right">Planned (m)</SortableTh>
+                <SortableTh sort={orderSort} sortKey="outwardQty" className="p-3 text-right" align="right">Outward (m)</SortableTh>
+                <SortableTh sort={orderSort} sortKey="inwardQty" className="p-3 text-right" align="right">Inward (m)</SortableTh>
+                <SortableTh sort={orderSort} sortKey="pendingQty" className="p-3 text-right" align="right">Pending (m)</SortableTh>
+                <SortableTh sort={orderSort} sortKey="rate" className="p-3 text-right" align="right">Rate & Unit</SortableTh>
+                <SortableTh sort={orderSort} sortKey="totalCharges" className="p-3 text-right" align="right">Charges</SortableTh>
+                <SortableTh sort={orderSort} sortKey="expectedCompletion" className="p-3">Expected Return</SortableTh>
+                <SortableTh sort={orderSort} sortKey="latestInwardDate" className="p-3">Actual Return</SortableTh>
+                <SortableTh sort={orderSort} sortKey="displayStatus" className="p-3 text-center" align="center">Status</SortableTh>
                 <th className="p-3 text-center">Actions</th>
               </tr>
             </thead>
@@ -641,7 +666,7 @@ export function Stage13ProcessingWorkspace({
                   </td>
                 </tr>
               ) : (
-                filteredOrders.map((ord) => (
+                orderSort.rows.map((ord) => (
                   <tr key={ord.id} className="hover:bg-slate-50/60 transition-colors">
                     {/* 1. Job Work Order Number */}
                     <td className="p-3 font-mono font-bold text-blue-700 whitespace-nowrap">
@@ -1027,13 +1052,13 @@ export function Stage13ProcessingWorkspace({
                   <table className="w-full text-left text-xs text-slate-700">
                     <thead className="bg-slate-50 text-[11px] font-bold text-slate-600 uppercase border-b border-slate-200">
                       <tr>
-                        <th className="p-2.5">Challan No</th>
-                        <th className="p-2.5">Date</th>
-                        <th className="p-2.5 text-right">Dispatched (m)</th>
-                        <th className="p-2.5">Transporter</th>
-                        <th className="p-2.5">Vehicle No</th>
-                        <th className="p-2.5">LR No</th>
-                        <th className="p-2.5 text-center">Status</th>
+                        <SortableTh sort={modalOutwardSort} sortKey="challanNo" className="p-2.5">Challan No</SortableTh>
+                        <SortableTh sort={modalOutwardSort} sortKey="date" className="p-2.5">Date</SortableTh>
+                        <SortableTh sort={modalOutwardSort} sortKey="qty" className="p-2.5 text-right" align="right">Dispatched (m)</SortableTh>
+                        <SortableTh sort={modalOutwardSort} sortKey="transporter" className="p-2.5">Transporter</SortableTh>
+                        <SortableTh sort={modalOutwardSort} sortKey="vehicleNo" className="p-2.5">Vehicle No</SortableTh>
+                        <SortableTh sort={modalOutwardSort} sortKey="lrNo" className="p-2.5">LR No</SortableTh>
+                        <SortableTh sort={modalOutwardSort} sortKey="status" className="p-2.5 text-center" align="center">Status</SortableTh>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 font-mono">
@@ -1044,7 +1069,7 @@ export function Stage13ProcessingWorkspace({
                           </td>
                         </tr>
                       ) : (
-                        selectedOrderModal.outwards.map((out) => (
+                        modalOutwardSort.rows.map((out) => (
                           <tr key={out.id} className="hover:bg-slate-50/50">
                             <td className="p-2.5 font-bold text-blue-700">{out.challanNo || out.no}</td>
                             <td className="p-2.5 font-sans text-slate-600">{out.date}</td>
@@ -1078,13 +1103,13 @@ export function Stage13ProcessingWorkspace({
                   <table className="w-full text-left text-xs text-slate-700">
                     <thead className="bg-slate-50 text-[11px] font-bold text-slate-600 uppercase border-b border-slate-200">
                       <tr>
-                        <th className="p-2.5">Receipt No</th>
-                        <th className="p-2.5">Date</th>
-                        <th className="p-2.5 text-right">Received (m)</th>
-                        <th className="p-2.5 text-right">Accepted (m)</th>
-                        <th className="p-2.5 text-right">Rejected (m)</th>
-                        <th className="p-2.5">Vendor Challan</th>
-                        <th className="p-2.5 text-center">Status</th>
+                        <SortableTh sort={modalInwardSort} sortKey="no" className="p-2.5">Receipt No</SortableTh>
+                        <SortableTh sort={modalInwardSort} sortKey="date" className="p-2.5">Date</SortableTh>
+                        <SortableTh sort={modalInwardSort} sortKey="qty" className="p-2.5 text-right" align="right">Received (m)</SortableTh>
+                        <SortableTh sort={modalInwardSort} sortKey="accepted" className="p-2.5 text-right" align="right">Accepted (m)</SortableTh>
+                        <SortableTh sort={modalInwardSort} sortKey="rejected" className="p-2.5 text-right" align="right">Rejected (m)</SortableTh>
+                        <SortableTh sort={modalInwardSort} sortKey="challanNo" className="p-2.5">Vendor Challan</SortableTh>
+                        <SortableTh sort={modalInwardSort} sortKey="status" className="p-2.5 text-center" align="center">Status</SortableTh>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 font-mono">
@@ -1095,7 +1120,7 @@ export function Stage13ProcessingWorkspace({
                           </td>
                         </tr>
                       ) : (
-                        selectedOrderModal.inwards.map((inv) => (
+                        modalInwardSort.rows.map((inv) => (
                           <tr key={inv.id} className="hover:bg-slate-50/50">
                             <td className="p-2.5 font-bold text-teal-700">{inv.no}</td>
                             <td className="p-2.5 font-sans text-slate-600">{inv.date}</td>
@@ -1147,12 +1172,12 @@ export function Stage13ProcessingWorkspace({
                   <table className="w-full text-left text-xs text-slate-700">
                     <thead className="bg-slate-50 text-[11px] font-bold text-slate-600 uppercase border-b border-slate-200">
                       <tr>
-                        <th className="p-2.5">Loss Reason</th>
-                        <th className="p-2.5 text-right">Quantity (m)</th>
-                        <th className="p-2.5 text-center">Status</th>
-                        <th className="p-2.5">Approved By</th>
-                        <th className="p-2.5">Approved Date</th>
-                        <th className="p-2.5">Remarks</th>
+                        <SortableTh sort={modalLossSort} sortKey="lossReasonName" className="p-2.5">Loss Reason</SortableTh>
+                        <SortableTh sort={modalLossSort} sortKey="qty" className="p-2.5 text-right" align="right">Quantity (m)</SortableTh>
+                        <SortableTh sort={modalLossSort} sortKey="status" className="p-2.5 text-center" align="center">Status</SortableTh>
+                        <SortableTh sort={modalLossSort} sortKey="approvedBy" className="p-2.5">Approved By</SortableTh>
+                        <SortableTh sort={modalLossSort} sortKey="approvedAt" className="p-2.5">Approved Date</SortableTh>
+                        <SortableTh sort={modalLossSort} sortKey="remarks" className="p-2.5">Remarks</SortableTh>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -1163,7 +1188,7 @@ export function Stage13ProcessingWorkspace({
                           </td>
                         </tr>
                       ) : (
-                        selectedOrderModal.lossEntries.map((l) => (
+                        modalLossSort.rows.map((l) => (
                           <tr key={l.id} className="hover:bg-slate-50/50">
                             <td className="p-2.5 font-medium text-slate-800">{l.lossReasonName || 'Loss Entry'}</td>
                             <td className="p-2.5 text-right font-mono font-bold text-rose-700">{n(l.qty)}</td>

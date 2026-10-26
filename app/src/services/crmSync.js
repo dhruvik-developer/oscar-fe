@@ -145,6 +145,8 @@ function dealFromApi(row) {
   return {
     ...asText(row, ['title', 'name', 'client', 'phone', 'status', 'source', 'assignedUser', 'notes', 'stage']),
     id: row.id,
+    leadId: row.leadId || row.lead || undefined,
+    dealNumber: row.deal_number || row.dealNumber || undefined,
     name: row.title || row.name,
     title: row.title || row.name,
     client: row.customerName || row.client || '',
@@ -534,6 +536,23 @@ export async function pullTeamRoster() {
   } catch (err) {
     console.warn('[crmSync] pull team roster failed:', err?.message || err);
     return null;
+  }
+}
+
+/**
+ * `GET /crm/assignment-options/` — role names (Administration → Roles) and
+ * department names (HRMS → Departments) a task template can be assigned to.
+ */
+export async function pullAssignmentOptions() {
+  const empty = { roles: [], departments: [] };
+  if (!isBackendEnabled()) return empty;
+  try {
+    const body = await api.get('/crm/assignment-options/');
+    const names = (rows) => (Array.isArray(rows) ? rows : []).map((r) => r?.name).filter(Boolean);
+    return { roles: names(body?.roles), departments: names(body?.departments) };
+  } catch (err) {
+    console.warn('[crmSync] pull assignment options failed:', err?.message || err);
+    return empty;
   }
 }
 

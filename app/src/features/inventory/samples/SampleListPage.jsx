@@ -24,6 +24,8 @@ import { inventoryService, partiesService } from '../../../services/domainServic
 import PageInfoButton from '../../../components/ui/PageInfoButton';
 import MasterSourceLink from '../../../components/common/MasterSourceLink';
 import KpiCard from '../../../components/ui/KpiCard';
+import { useTableSort } from '../../../hooks/useTableSort';
+import SortableTh from '../../../components/ui/SortableTh';
 
 export default function SampleListPage() {
   const [samples, setSamples] = useState([]);
@@ -165,6 +167,15 @@ export default function SampleListPage() {
     );
   });
 
+  const sort = useTableSort(filteredSamples, {
+    accessors: {
+      party: (s) => s.party_name || s.party?.name,
+      sample_type: (s) => s.sample_type?.replace('_', ' ') || 'Cut Piece',
+      quantity: (s) => Number(s.quantity),
+      status: (s) => s.status || 'Issued',
+    },
+  });
+
   const getStatusBadge = (status) => {
     switch (status) {
       case 'Returned':
@@ -296,12 +307,12 @@ export default function SampleListPage() {
           <table className="w-full text-left border-collapse text-sm">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-medium">
-                <th className="py-3 px-4">Sample No</th>
-                <th className="py-3 px-4">Party & Broker</th>
-                <th className="py-3 px-4">Type</th>
-                <th className="py-3 px-4 text-right">Quantity</th>
-                <th className="py-3 px-4">Due Date</th>
-                <th className="py-3 px-4">Status</th>
+                <SortableTh sort={sort} sortKey="sample_number" className="py-3 px-4">Sample No</SortableTh>
+                <SortableTh sort={sort} sortKey="party" className="py-3 px-4">Party & Broker</SortableTh>
+                <SortableTh sort={sort} sortKey="sample_type" className="py-3 px-4">Type</SortableTh>
+                <SortableTh sort={sort} sortKey="quantity" className="py-3 px-4 text-right" align="right">Quantity</SortableTh>
+                <SortableTh sort={sort} sortKey="due_date" className="py-3 px-4">Due Date</SortableTh>
+                <SortableTh sort={sort} sortKey="status" className="py-3 px-4">Status</SortableTh>
                 <th className="py-3 px-4 text-right">Actions</th>
               </tr>
             </thead>
@@ -315,7 +326,7 @@ export default function SampleListPage() {
                   <td colSpan="7" className="text-center py-10 text-slate-400">No samples found.</td>
                 </tr>
               ) : (
-                filteredSamples.map((s) => (
+                sort.rows.map((s) => (
                   <tr key={s.id} className="hover:bg-slate-50/75 transition-colors">
                     <td className="py-3 px-4 font-semibold text-slate-900">
                       {s.sample_number}

@@ -1,7 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  ChevronLeft,
-  ChevronRight,
   ChevronsUpDown,
   Mail,
   MapPin,
@@ -10,6 +8,7 @@ import {
   X,
 } from "lucide-react";
 import LeadAvatar from "./LeadAvatar";
+import AppPagination from "../../../components/ui/AppPagination";
 
 import { formatCurrency } from "../../../utils/currencyUtils";
 
@@ -77,10 +76,6 @@ export default function LeadMapView({
   const totalListPages = Math.max(1, Math.ceil(sortedRows.length / LIST_PAGE_SIZE));
   const safeListPage = Math.min(listPage, totalListPages);
   const pagedRows = sortedRows.slice((safeListPage - 1) * LIST_PAGE_SIZE, safeListPage * LIST_PAGE_SIZE);
-  const listPageNumbers = [];
-  for (let p = Math.max(1, safeListPage - 1); p <= Math.min(totalListPages, safeListPage + 1); p += 1) {
-    listPageNumbers.push(p);
-  }
 
   const showDetailPane = Boolean(activeLead) && detailClosedId !== activeLead.id;
 
@@ -128,50 +123,12 @@ export default function LeadMapView({
             ))}
           </div>
 
-          <div className="leads-map-pagination">
-            <button
-              type="button"
-              className="page-nav"
-              aria-label="Previous page"
-              disabled={safeListPage <= 1}
-              onClick={() => setListPage((p) => Math.max(1, p - 1))}
-            >
-              <ChevronLeft size={15} />
-            </button>
-            {listPageNumbers[0] > 1 && (
-              <>
-                <button type="button" className="page-num" onClick={() => setListPage(1)}>1</button>
-                {listPageNumbers[0] > 2 && <span>...</span>}
-              </>
-            )}
-            {listPageNumbers.map((p) => (
-              <button
-                key={p}
-                type="button"
-                className={`page-num${p === safeListPage ? " active" : ""}`}
-                onClick={() => setListPage(p)}
-              >
-                {p}
-              </button>
-            ))}
-            {listPageNumbers[listPageNumbers.length - 1] < totalListPages && (
-              <>
-                {listPageNumbers[listPageNumbers.length - 1] < totalListPages - 1 && <span>...</span>}
-                <button type="button" className="page-num" onClick={() => setListPage(totalListPages)}>
-                  {totalListPages}
-                </button>
-              </>
-            )}
-            <button
-              type="button"
-              className="page-nav"
-              aria-label="Next page"
-              disabled={safeListPage >= totalListPages}
-              onClick={() => setListPage((p) => Math.min(totalListPages, p + 1))}
-            >
-              <ChevronRight size={15} />
-            </button>
-          </div>
+          <AppPagination
+            total={sortedRows.length}
+            page={safeListPage}
+            pageSize={LIST_PAGE_SIZE}
+            onPageChange={setListPage}
+          />
         </aside>
 
         <div className="leads-map-stage">

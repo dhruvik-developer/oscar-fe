@@ -3,6 +3,8 @@ import { Plus, Search, RefreshCw, Pencil, X, CheckCircle2, XCircle } from 'lucid
 import api from '../../services/api';
 import PageHeader from '../ui/PageHeader';
 import TablePagination from '../ui/TablePagination';
+import SortableTh from '../ui/SortableTh';
+import { useTableSort } from '../../hooks/useTableSort';
 
 /** Every page of an envelope list (page_size is capped at 200 server-side). */
 async function fetchAll(endpoint, query) {
@@ -35,7 +37,9 @@ const isRowActive = (row) => row.isActive ?? row.is_active ?? true;
  *   fields:  [{ key, label, type: 'text'|'number'|'select'|'checkbox', required,
  *              options: [{value,label}] | (rows, aux) => [...], placeholder,
  *              hint, locked: (row) => bool }]
- *   columns: [{ key, label, render?: (row, ctx) => node, className? }]
+ *   columns: [{ key, label, render?: (row, ctx) => node, className?,
+ *              sortValue?: (row, ctx) => value }]  — sorting uses sortValue, else a
+ *              plain-text render result, else row[key].
  *   loadAux: optional async () => object, passed to select `options` and column renders.
  */
 export default function SimpleMasterPage({
@@ -95,11 +99,25 @@ export default function SimpleMasterPage({
     });
   }, [rows, search, showInactive, searchKeys]);
 
+  const sortAccessors = { __status: (row) => (isRowActive(row) ? 0 : 1) };
+  columns.forEach((c) => {
+    sortAccessors[c.key] = (row) => {
+      const ctx = { rows, aux };
+      if (c.sortValue) return c.sortValue(row, ctx);
+      if (c.render) {
+        const shown = c.render(row, ctx);
+        if (typeof shown === 'string' || typeof shown === 'number') return shown === '—' ? null : shown;
+      }
+      return row[c.key];
+    };
+  });
+  const sort = useTableSort(visible, { accessors: sortAccessors });
+
   // Back to page 1 when the filter changes; stay in range when rows shrink.
   useEffect(() => { setPage(1); }, [search, showInactive]);
   const totalPages = Math.max(1, Math.ceil(visible.length / pageSize));
   const currentPage = Math.min(page, totalPages);
-  const pageRows = visible.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  const pageRows = sort.rows.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   const activeCount = rows.filter(isRowActive).length;
 
@@ -230,8 +248,18 @@ export default function SimpleMasterPage({
             <table className="w-full text-left text-xs">
               <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200 uppercase tracking-wider text-[11px]">
                 <tr>
-                  {columns.map((c) => <th key={c.key} className={`px-4 py-3 ${c.className || ''}`}>{c.label}</th>)}
-                  <th className="px-4 py-3 text-center">Status</th>
+                  {columns.map((c) => (
+                    <SortableTh
+                      key={c.key}
+                      sort={sort}
+                      sortKey={c.key}
+                      className={`px-4 py-3 ${c.className || ''}`}
+                      align={/text-right/.test(c.className || '') ? 'right' : /text-center/.test(c.className || '') ? 'center' : 'left'}
+                    >
+                      {c.label}
+                    </SortableTh>
+                  ))}
+                  <SortableTh sort={sort} sortKey="__status" className="px-4 py-3 text-center" align="center">Status</SortableTh>
                   <th className="px-4 py-3 text-right">Actions</th>
                 </tr>
               </thead>

@@ -30,6 +30,8 @@ import {
 import { inventoryService } from '../../../services/domainServices';
 import { useERP } from '../../../context/ERPContext';
 import PageInfoButton from '../../../components/ui/PageInfoButton';
+import { useTableSort } from '../../../hooks/useTableSort';
+import SortableTh from '../../../components/ui/SortableTh';
 
 export default function QCDashboardPage({ defaultTab = 'All' }) {
   const { purchaseBills = [], vendors = [], items = [], formatCurrency } = useERP();
@@ -212,6 +214,25 @@ export default function QCDashboardPage({ defaultTab = 'All' }) {
   };
 
   const suppliersList = dashboardData?.filters?.suppliers || vendors.map((v) => v.name);
+
+  const qualitySort = useTableSort(qualityBreakdown, {
+    accessors: {
+      inspected: (q) => Number(q.inspected),
+      rejected: (q) => Number(q.rejected),
+      rejectionPct: (q) => Number(q.rejectionPct),
+    },
+  });
+  const num = (key) => (r) => Number(r[key]) || 0;
+  const recordSort = useTableSort(filteredRecords, {
+    accessors: {
+      received: num('received'),
+      inspected: num('inspected'),
+      good: num('good'),
+      hold: num('hold'),
+      reprocess: num('reprocess'),
+      rejected: num('rejected'),
+    },
+  });
 
   // Update Disposition Action
   // A whole-lot verdict can only move stock still at QC Hold (backend
@@ -688,14 +709,14 @@ export default function QCDashboardPage({ defaultTab = 'All' }) {
               <table className="w-full text-left text-[11px]">
                 <thead>
                   <tr className="border-b border-slate-100 text-slate-400 font-medium">
-                    <th className="pb-1.5">Quality</th>
-                    <th className="pb-1.5 text-right">Inspected ({cards.inspected.uom})</th>
-                    <th className="pb-1.5 text-right">Rejected</th>
-                    <th className="pb-1.5 text-right">Rejection %</th>
+                    <SortableTh sort={qualitySort} sortKey="quality" className="pb-1.5">Quality</SortableTh>
+                    <SortableTh sort={qualitySort} sortKey="inspected" className="pb-1.5 text-right" align="right">Inspected ({cards.inspected.uom})</SortableTh>
+                    <SortableTh sort={qualitySort} sortKey="rejected" className="pb-1.5 text-right" align="right">Rejected</SortableTh>
+                    <SortableTh sort={qualitySort} sortKey="rejectionPct" className="pb-1.5 text-right" align="right">Rejection %</SortableTh>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50 text-slate-700">
-                  {qualityBreakdown.map((q, idx) => (
+                  {qualitySort.rows.map((q, idx) => (
                     <tr key={q.quality || idx}>
                       <td className="py-1 font-medium text-slate-800">{q.quality}</td>
                       <td className="py-1 text-right font-mono">{Number(q.inspected).toLocaleString('en-IN')}</td>
@@ -964,28 +985,28 @@ export default function QCDashboardPage({ defaultTab = 'All' }) {
           <table className="w-full text-left text-xs whitespace-nowrap">
             <thead>
               <tr className="bg-slate-50/80 border-b border-slate-200 text-[10.5px] font-bold text-slate-500 uppercase tracking-wider">
-                <th className="py-2.5 px-3">QC No.</th>
-                <th className="py-2.5 px-3">Date</th>
-                <th className="py-2.5 px-3">Source Type</th>
-                <th className="py-2.5 px-3">GRN / JWI No.</th>
-                <th className="py-2.5 px-3">Supplier</th>
-                <th className="py-2.5 px-3">Item Code</th>
-                <th className="py-2.5 px-3">Item Name</th>
-                <th className="py-2.5 px-3">Lot No.</th>
-                <th className="py-2.5 px-3 text-center">Taka/Roll</th>
-                <th className="py-2.5 px-3 text-right">Received ({cards.totalReceived.uom})</th>
-                <th className="py-2.5 px-3 text-right">Inspected ({cards.inspected.uom})</th>
-                <th className="py-2.5 px-3 text-right">Good ({cards.good.uom})</th>
-                <th className="py-2.5 px-3 text-right">Hold ({cards.hold.uom})</th>
-                <th className="py-2.5 px-3 text-right">Reprocess ({cards.reprocess.uom})</th>
-                <th className="py-2.5 px-3 text-right">Rejected ({cards.rejected.uom})</th>
-                <th className="py-2.5 px-3 text-center">Status</th>
+                <SortableTh sort={recordSort} sortKey="id" className="py-2.5 px-3">QC No.</SortableTh>
+                <SortableTh sort={recordSort} sortKey="date" className="py-2.5 px-3">Date</SortableTh>
+                <SortableTh sort={recordSort} sortKey="sourceType" className="py-2.5 px-3">Source Type</SortableTh>
+                <SortableTh sort={recordSort} sortKey="refNo" className="py-2.5 px-3">GRN / JWI No.</SortableTh>
+                <SortableTh sort={recordSort} sortKey="supplier" className="py-2.5 px-3">Supplier</SortableTh>
+                <SortableTh sort={recordSort} sortKey="itemCode" className="py-2.5 px-3">Item Code</SortableTh>
+                <SortableTh sort={recordSort} sortKey="itemName" className="py-2.5 px-3">Item Name</SortableTh>
+                <SortableTh sort={recordSort} sortKey="lotNo" className="py-2.5 px-3">Lot No.</SortableTh>
+                <SortableTh sort={recordSort} sortKey="takaRoll" className="py-2.5 px-3 text-center" align="center">Taka/Roll</SortableTh>
+                <SortableTh sort={recordSort} sortKey="received" className="py-2.5 px-3 text-right" align="right">Received ({cards.totalReceived.uom})</SortableTh>
+                <SortableTh sort={recordSort} sortKey="inspected" className="py-2.5 px-3 text-right" align="right">Inspected ({cards.inspected.uom})</SortableTh>
+                <SortableTh sort={recordSort} sortKey="good" className="py-2.5 px-3 text-right" align="right">Good ({cards.good.uom})</SortableTh>
+                <SortableTh sort={recordSort} sortKey="hold" className="py-2.5 px-3 text-right" align="right">Hold ({cards.hold.uom})</SortableTh>
+                <SortableTh sort={recordSort} sortKey="reprocess" className="py-2.5 px-3 text-right" align="right">Reprocess ({cards.reprocess.uom})</SortableTh>
+                <SortableTh sort={recordSort} sortKey="rejected" className="py-2.5 px-3 text-right" align="right">Rejected ({cards.rejected.uom})</SortableTh>
+                <SortableTh sort={recordSort} sortKey="status" className="py-2.5 px-3 text-center" align="center">Status</SortableTh>
                 <th className="py-2.5 px-3 text-center">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-slate-700">
               {filteredRecords.length > 0 ? (
-                filteredRecords.map((r, idx) => (
+                recordSort.rows.map((r, idx) => (
                   <tr key={r.id || idx} className="hover:bg-slate-50/80 transition-colors">
                     <td className="py-2 px-3 font-semibold text-blue-600">{r.id}</td>
                     <td className="py-2 px-3 text-slate-500">{r.date}</td>

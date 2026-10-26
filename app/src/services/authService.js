@@ -32,6 +32,12 @@ export function normalizeUser(row) {
     reportingManager: row.reportingManager || null,
     status: row.status || 'Active',
     avatar: row.avatar || null,
+    // An administrator set the password; the app holds the user on
+    // /change-password until they replace it.
+    mustChangePassword: Boolean(row.mustChangePassword),
+    // Two-step sign-in: chosen by the user, or forced by the role.
+    twoFactorEnabled: Boolean(row.twoFactorEnabled),
+    twoFactorRequired: Boolean(row.twoFactorRequired),
     initials: name
       .split(/\s+/)
       .filter(Boolean)
@@ -42,17 +48,8 @@ export function normalizeUser(row) {
   };
 }
 
-/**
- * Sign in. Throws `ApiError` on bad credentials — there is no demo persona to
- * fall back to, so the form shows the server's own message.
- */
-export async function login({ email, password, tenant, remember = true }) {
-  const response = await api.post('/auth/login/', {
-    email: String(email || '').trim().toLowerCase(),
-    password,
-    tenant: String(tenant || '').trim() || undefined,
-  });
-
+/** Store the tokens from a finished sign-in and return the session. */
+function completeSignIn(response, remember) {
   const token = response?.access || response?.token;
   if (!token) {
     throw new Error('The server did not return a session token.');
@@ -65,6 +62,69 @@ export async function login({ email, password, tenant, remember = true }) {
     permissions: response.permissions || [],
     tenant: response.tenant || null,
   };
+}
+
+/**
+ * Sign in. Throws `ApiError` on bad credentials — there is no demo persona to
+ * fall back to, so the form shows the server's own message.
+ *
+ * For an account with two-step sign-in the password only earns a challenge:
+ * the result is `{ twoFactor: { challengeId, email, expiresIn } }` and no
+ * tokens are stored until `verifyLoginOtp` succeeds.
+ */
+export async function login({ email, password, tenant, remember = true }) {
+  const response = await api.post('/auth/login/', {
+    email: String(email || '').trim().toLowerCase(),
+    password,
+    tenant: String(tenant || '').trim() || undefined,
+  });
+  if (response?.twoFactorRequired) {
+    return {
+      twoFactor: {
+        challengeId: response.challengeId,
+        email: response.email,
+        expiresIn: response.expiresIn,
+      },
+    };
+  }
+  return completeSignIn(response, remember);
+}
+
+/** Second step of a two-step sign-in. */
+export async function verifyLoginOtp({ challengeId, otp, remember = true }) {
+  const response = await api.post('/auth/login/verify-otp/', {
+    challengeId,
+    otp: String(otp || '').trim(),
+  });
+  return completeSignIn(response, remember);
+}
+
+/** A fresh sign-in code; returns the new `{ challengeId, email, expiresIn }`. */
+export async function resendLoginOtp(challengeId) {
+  return api.post('/auth/login/resend-otp/', { challengeId });
+}
+
+/** Helpdesk contact shown on the sign-in page (empty strings when unset). */
+export async function getSupportInfo() {
+  return api.get('/auth/support/');
+}
+
+export async function listSessions() {
+  const body = await api.get('/auth/sessions/');
+  return body?.results || [];
+}
+
+export async function revokeSession(id) {
+  return api.delete(`/auth/sessions/${id}/`);
+}
+
+export async function revokeOtherSessions() {
+  return api.post('/auth/sessions/revoke-others/', {});
+}
+
+export async function getLoginHistory() {
+  const body = await api.get('/auth/login-history/');
+  return body?.results || [];
 }
 
 /**
@@ -88,7 +148,7 @@ export async function fetchMe() {
     // The API client clears the session when its refresh attempt fails; only
     // clear here for a 403 the refresh path never saw.
     if ((err?.status === 401 || err?.status === 403) && hasStoredSession()) {
-      clearStoredAuth();
+      clearStoredAuth({ reason: 'expired' });
     }
     return null;
   }
@@ -116,6 +176,20 @@ export async function forgotPassword(email) {
   return api.post('/auth/forgot-password/', {
     email: String(email || '').trim().toLowerCase(),
   });
+}
+
+/** Trade the emailed 6-digit code for a short-lived reset token. */
+export async function verifyResetOtp({ email, otp }) {
+  return api.post('/auth/verify-reset-otp/', {
+    email: String(email || '').trim().toLowerCase(),
+    otp: String(otp || '').trim(),
+  });
+}
+
+/** Redeem a reset token (emailed link or verified code). Every session is signed out. */
+export async function resetPassword({ token, otp, newPassword }) {
+  // A token from the emailed link needs the emailed code too.
+  return api.post('/auth/reset-password/', { token, newPassword, ...(otp ? { otp } : {}) });
 }
 
 export async function updateProfile(updates) {

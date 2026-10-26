@@ -17,6 +17,8 @@ import { numIN, toDDMMYYYY, purgeLegacyJobWorkCache } from './jobWorkOrdersStore
 import { fetchJWOs, createJWORow, updateJWORow, deleteJWORow, errorMessage } from '../../services/jobWorkSync';
 import PageHeader from '../../components/ui/PageHeader';
 import TablePagination from '../../components/ui/TablePagination';
+import SortableTh from '../../components/ui/SortableTh';
+import { useTableSort } from '../../hooks/useTableSort';
 import KpiCard from '../../components/ui/KpiCard';
 
 /**
@@ -156,10 +158,11 @@ export default function ReprocessPage() {
     setPage(1);
   }, [applied]);
 
+  const sort = useTableSort(filtered);
   const paginated = useMemo(() => {
     const start = (page - 1) * pageSize;
-    return filtered.slice(start, start + pageSize);
-  }, [filtered, page, pageSize]);
+    return sort.rows.slice(start, start + pageSize);
+  }, [sort.rows, page, pageSize]);
 
   const totals = useMemo(() => {
     const t = { count: 0, qty: 0, received: 0, inProcess: 0, pending: 0, completed: 0 };
@@ -394,8 +397,8 @@ export default function ReprocessPage() {
             <thead>
               <tr className="border-b border-slate-100 text-[11px] font-bold text-slate-500">
                 <th className="px-3 py-2.5 w-10 text-center">#</th>
-                {['Reprocess No.', 'JWO No.', 'Original Inward No.', 'Vendor / Processor', 'Process', 'Fabric Item', 'Fabric Quality', 'Shade / Colour', 'Received Qty (M)', 'Reprocess Qty (M)', 'Reason', 'Reprocess Date', 'Expected Return', 'Status'].map((h, i) => (
-                  <th key={h} className={`px-3 py-2.5 whitespace-nowrap ${(i === 8 || i === 9) ? 'text-right' : ''} ${i === 13 ? 'text-center' : ''}`}>{h}</th>
+                {[['Reprocess No.', 'no'], ['JWO No.', 'jwoNo'], ['Original Inward No.', 'inwardNo'], ['Vendor / Processor', 'vendor'], ['Process', 'process'], ['Fabric Item', 'fabricItem'], ['Fabric Quality', 'fabricQuality'], ['Shade / Colour', 'shade'], ['Received Qty (M)', 'receivedQty'], ['Reprocess Qty (M)', 'qty'], ['Reason', 'reason'], ['Reprocess Date', 'date'], ['Expected Return', 'expectedReturn'], ['Status', 'status']].map(([h, key], i) => (
+                  <SortableTh key={h} sort={sort} sortKey={key} align={(i === 8 || i === 9) ? 'right' : i === 13 ? 'center' : 'left'} className={`px-3 py-2.5 whitespace-nowrap ${(i === 8 || i === 9) ? 'text-right' : ''} ${i === 13 ? 'text-center' : ''}`}>{h}</SortableTh>
                 ))}
                 <th className="px-3 py-2.5 text-center">Actions</th>
               </tr>

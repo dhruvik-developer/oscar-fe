@@ -31,7 +31,7 @@ export const CustomersPage = () => {
         code: '',
         contactPerson: '',
         email: '',
-        phone: '',
+        phone: '+91 ',
         creditLimit: 50000,
         balance: 0,
         status: 'Active',
@@ -135,13 +135,13 @@ export const CustomersPage = () => {
             name: newCust.name,
             contactPerson: newCust.contactPerson || 'General Contact',
             email: newCust.email || 'billing@client.com',
-            phone: newCust.phone || '+1 (555) 000-0000',
+            phone: newCust.phone || '+91 ',
             balance: 0,
             creditLimit: Number(newCust.creditLimit) || 50000,
             status: 'Active',
         });
         setIsModalOpen(false);
-        setNewCust({ name: '', code: '', contactPerson: '', email: '', phone: '', creditLimit: 50000 });
+        setNewCust({ name: '', code: '', contactPerson: '', email: '', phone: '+91 ', creditLimit: 50000 });
     };
     return (<div className="space-y-6">
       <PageHeader title="Customer Master & Statements" subtitle="Corporate client accounts, active credit thresholds, multi-year invoice billing history, and real-time running statements." guide={customerGuide} actions={<Button icon={Plus} onClick={() => setIsModalOpen(true)}>

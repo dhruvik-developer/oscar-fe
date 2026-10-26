@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Building2, CheckCircle2, Download, Eye, FileText, Flag, FolderPlus, Pencil, Phone, Printer, Trash2, Users } from 'lucide-react';
 import Modal from '../../../components/ui/Modal';
+import { useTableSort } from '../../../hooks/useTableSort';
+import SortableTh from '../../../components/ui/SortableTh';
 
 export const formatDealMoney = (value) => `₹ ${Number(value || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
 export function formatDealDate(value) {
@@ -15,8 +17,9 @@ export function dealTotals(products, discount = 0, taxRate = 0) {
   const tax = Math.round((subtotal - deduction) * (Number(taxRate) || 0)) / 100;
   return { subtotal, discount: deduction, tax, total: Math.round((subtotal - deduction + tax) * 100) / 100 };
 }
-function Table({ columns, children, empty, count }) {
-  return <div className="deal-table-scroll"><table className="deal-detail-table deal-tab-table"><thead><tr>{columns.map((column) => <th key={column} scope="col">{column}</th>)}</tr></thead><tbody>{count ? children : <tr><td colSpan={columns.length} className="deal-detail-empty">{empty}</td></tr>}</tbody></table></div>;
+// A column is a plain label, or `{ label, key }` to make it sortable via `sort`.
+function Table({ columns, children, empty, count, sort }) {
+  return <div className="deal-table-scroll"><table className="deal-detail-table deal-tab-table"><thead><tr>{columns.map((column) => (typeof column === 'string' || !sort ? <th key={column.label || column} scope="col">{column.label || column}</th> : <SortableTh key={column.key} sort={sort} sortKey={column.key} scope="col">{column.label}</SortableTh>))}</tr></thead><tbody>{count ? children : <tr><td colSpan={columns.length} className="deal-detail-empty">{empty}</td></tr>}</tbody></table></div>;
 }
 function Status({ value }) {
   return <span className="deal-record-status" data-status={String(value || 'Draft').toLowerCase().replaceAll(' ', '-')}>{value || 'Draft'}</span>;
@@ -67,19 +70,37 @@ export function ActivitiesTimeline({ activities }) {
 export function DocumentsTable({ documents, onRemove }) {
   const [preview, setPreview] = useState(null);
   const type = (item) => (item.name?.split('.').pop() || item.mimeType?.split('/').pop() || 'File').toUpperCase();
-  return <><Table columns={['#', 'File Name', 'Type', 'Uploaded By', 'Date', 'Actions']} count={documents.length} empty="No documents uploaded yet.">{documents.map((item, index) => <tr key={item.id}><td>{index + 1}</td><td className="deal-cell-primary"><button className="deal-text-action" onClick={() => setPreview(item)}>{item.name}</button></td><td>{type(item)}</td><td>{item.uploadedBy || 'Not recorded'}</td><td>{formatDealDate(item.createdAt)}</td><td><div className="deal-row-actions"><button aria-label={`View ${item.name}`} onClick={() => setPreview(item)}><Eye size={14} /></button><a aria-label={`Download ${item.name}`} href={item.data} download={item.name}><Download size={14} /></a><button className="deal-delete-action" aria-label={`Remove ${item.name}`} onClick={() => onRemove(item)}><Trash2 size={14} /></button></div></td></tr>)}</Table><Modal isOpen={Boolean(preview)} onClose={() => setPreview(null)} title={preview?.name} size="lg">{preview && <><p className="deal-action-hint">{type(preview)} · {Math.ceil((preview.size || 0) / 1024)} KB · {preview.uploadedBy || 'Not recorded'}</p>{/^data:image\/(png|jpeg|gif|webp);/i.test(preview.data || '') ? <img className="deal-document-preview" src={preview.data} alt={preview.name} /> : /^data:application\/pdf;/i.test(preview.data || '') ? <iframe className="deal-document-preview" title={preview.name} sandbox="" src={preview.data} /> : <p className="deal-detail-empty">Download this file to view its contents.</p>}<a className="btn-primary btn-sm" href={preview.data} download={preview.name}><Download size={14} />Download</a></>}</Modal></>;
+  const sort = useTableSort(documents, { accessors: { type, createdAt: (item) => (item.createdAt ? Date.parse(item.createdAt) : null) } });
+  return <><Table sort={sort} columns={['#', { label: 'File Name', key: 'name' }, { label: 'Type', key: 'type' }, { label: 'Uploaded By', key: 'uploadedBy' }, { label: 'Date', key: 'createdAt' }, 'Actions']} count={documents.length} empty="No documents uploaded yet.">{sort.rows.map((item, index) => <tr key={item.id}><td>{index + 1}</td><td className="deal-cell-primary"><button className="deal-text-action" onClick={() => setPreview(item)}>{item.name}</button></td><td>{type(item)}</td><td>{item.uploadedBy || 'Not recorded'}</td><td>{formatDealDate(item.createdAt)}</td><td><div className="deal-row-actions"><button aria-label={`View ${item.name}`} onClick={() => setPreview(item)}><Eye size={14} /></button><a aria-label={`Download ${item.name}`} href={item.data} download={item.name}><Download size={14} /></a><button className="deal-delete-action" aria-label={`Remove ${item.name}`} onClick={() => onRemove(item)}><Trash2 size={14} /></button></div></td></tr>)}</Table><Modal isOpen={Boolean(preview)} onClose={() => setPreview(null)} title={preview?.name} size="lg">{preview && <><p className="deal-action-hint">{type(preview)} · {Math.ceil((preview.size || 0) / 1024)} KB · {preview.uploadedBy || 'Not recorded'}</p>{/^data:image\/(png|jpeg|gif|webp);/i.test(preview.data || '') ? <img className="deal-document-preview" src={preview.data} alt={preview.name} /> : /^data:application\/pdf;/i.test(preview.data || '') ? <iframe className="deal-document-preview" title={preview.name} sandbox="" src={preview.data} /> : <p className="deal-detail-empty">Download this file to view its contents.</p>}<a className="btn-primary btn-sm" href={preview.data} download={preview.name}><Download size={14} />Download</a></>}</Modal></>;
 }
 
+const quoteSentOn = (quote) => quote.sentAt || quote.sentOn || (quote.activity || quote.activities)?.find((item) => /sent/i.test(item.type))?.timestamp;
+const toTime = (value) => {
+  if (!value) return null;
+  const time = Date.parse(/^\d{4}-\d{2}-\d{2}$/.test(value) ? `${value}T00:00:00` : value);
+  return Number.isNaN(time) ? value : time;
+};
+
 export function QuotationsTable({ quotations }) {
-  return <Table columns={['#', 'Quotation', 'Date', 'Amount', 'Status', 'Sent On', 'Actions']} count={quotations.length} empty="No quotations linked to this deal yet.">{quotations.map((quote, index) => {
+  const sort = useTableSort(quotations, {
+    accessors: {
+      quoteNumber: (quote) => quote.quoteNumber || quote.id,
+      date: (quote) => toTime(quote.date),
+      amount: (quote) => Number(quote.amount || 0),
+      status: (quote) => quote.status || 'Draft',
+      sentOn: (quote) => toTime(quoteSentOn(quote)),
+    },
+  });
+  return <Table sort={sort} columns={['#', { label: 'Quotation', key: 'quoteNumber' }, { label: 'Date', key: 'date' }, { label: 'Amount', key: 'amount' }, { label: 'Status', key: 'status' }, { label: 'Sent On', key: 'sentOn' }, 'Actions']} count={quotations.length} empty="No quotations linked to this deal yet.">{sort.rows.map((quote, index) => {
     const url = `/crm/quotations?quotationId=${encodeURIComponent(quote.id)}`;
-    const sentOn = quote.sentAt || quote.sentOn || (quote.activity || quote.activities)?.find((item) => /sent/i.test(item.type))?.timestamp;
+    const sentOn = quoteSentOn(quote);
     return <tr key={quote.id}><td>{index + 1}</td><td><Link className="deal-text-action" to={url}>{quote.quoteNumber || quote.id}</Link></td><td>{formatDealDate(quote.date)}</td><td>{formatDealMoney(quote.amount)}</td><td><Status value={quote.status} /></td><td>{sentOn ? formatDealDate(sentOn) : 'Not sent'}</td><td><div className="deal-row-actions"><Link aria-label={`View ${quote.quoteNumber || quote.id}`} to={url}><Eye size={14} /></Link><Link aria-label={`Print ${quote.quoteNumber || quote.id}`} to={`${url}&print=true`}><Printer size={14} /></Link></div></td></tr>;
   })}</Table>;
 }
 
 export function TasksTable({ tasks, onEdit, onRemove }) {
-  return <Table columns={['#', 'Task', 'Assignee', 'Due Date', 'Status', 'Actions']} count={tasks.length} empty="No tasks linked to this deal yet.">{tasks.map((task, index) => <tr key={task.id}><td>{index + 1}</td><td className="deal-cell-primary">{task.title}</td><td>{task.owner || 'Unassigned'}</td><td>{formatDealDate(task.dueDate)}</td><td><Status value={task.status} /></td><td><div className="deal-row-actions"><button aria-label={`Edit task ${task.title}`} onClick={() => onEdit(task)}><Pencil size={14} /></button><button className="deal-delete-action" aria-label={`Remove task ${task.title}`} onClick={() => onRemove(task)}><Trash2 size={14} /></button></div></td></tr>)}</Table>;
+  const sort = useTableSort(tasks, { accessors: { dueDate: (task) => toTime(task.dueDate), status: (task) => task.status || 'Draft' } });
+  return <Table sort={sort} columns={['#', { label: 'Task', key: 'title' }, { label: 'Assignee', key: 'owner' }, { label: 'Due Date', key: 'dueDate' }, { label: 'Status', key: 'status' }, 'Actions']} count={tasks.length} empty="No tasks linked to this deal yet.">{sort.rows.map((task, index) => <tr key={task.id}><td>{index + 1}</td><td className="deal-cell-primary">{task.title}</td><td>{task.owner || 'Unassigned'}</td><td>{formatDealDate(task.dueDate)}</td><td><Status value={task.status} /></td><td><div className="deal-row-actions"><button aria-label={`Edit task ${task.title}`} onClick={() => onEdit(task)}><Pencil size={14} /></button><button className="deal-delete-action" aria-label={`Remove task ${task.title}`} onClick={() => onRemove(task)}><Trash2 size={14} /></button></div></td></tr>)}</Table>;
 }
 
 export function RelatedCards({ deal, customer }) {

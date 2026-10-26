@@ -7,17 +7,25 @@ import {
   Eye,
   EyeOff,
   ArrowRight,
-  CheckCircle2,
   AlertCircle,
-  KeyRound,
   Headphones,
   X,
   Clock,
+  Building2,
+  Info,
 } from 'lucide-react';
+
+const SESSION_END_NOTICES = {
+  expired: 'Your session expired. Please sign in again to continue.',
+  revoked: 'You were signed out because your password changed or an administrator ended your session.',
+};
 import { useAppStore } from '../../stores/appStore';
-import { login as loginRequest } from '../../services/authService';
+import { login as loginRequest, getSupportInfo } from '../../services/authService';
 import { describeError } from '../../services/resourceSync';
-import { getStoredToken } from '../../utils/authUtils';
+import { getStoredToken, takeAuthEndReason } from '../../utils/authUtils';
+import { capsLockOn } from './passwordRules';
+import ForgotPasswordModal from './ForgotPasswordModal';
+import TwoFactorStep from './TwoFactorStep';
 import BrandLogo, { useBrandName } from '../../components/common/BrandLogo';
 
 export function getRoleDefaultRoute(roleCode, permissions = []) {
@@ -53,14 +61,31 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
+  const [capsOn, setCapsOn] = useState(false);
+  const [notice, setNotice] = useState('');
+
+  // Filled only when the server answers TENANT_REQUIRED: the same email and
+  // password open accounts in more than one workspace.
+  const [workspaces, setWorkspaces] = useState([]);
+  const [tenant, setTenant] = useState('');
 
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
   const [isForgotModalOpen, setIsForgotModalOpen] = useState(false);
   const [forgotEmail, setForgotEmail] = useState('');
-  const [forgotSent, setForgotSent] = useState(false);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
+  // { email, phone, hours } from the server; null until the box is opened.
+  const [support, setSupport] = useState(null);
+  // Set when the password was right but the account wants an emailed code.
+  const [twoFactor, setTwoFactor] = useState(null);
+
+  useEffect(() => {
+    if (!isHelpOpen || support) return;
+    getSupportInfo()
+      .then((info) => setSupport(info || {}))
+      .catch(() => setSupport({}));
+  }, [isHelpOpen, support]);
 
   useEffect(() => {
     const existingToken = getStoredToken();
@@ -68,6 +93,27 @@ export default function LoginPage() {
       navigate(returnTo || '/dashboard', { replace: true });
     }
   }, [navigate, returnTo]);
+
+  // Explain a sign-out the user did not ask for. The reason is read once.
+  useEffect(() => {
+    const reason = takeAuthEndReason();
+    if (reason && SESSION_END_NOTICES[reason]) setNotice(SESSION_END_NOTICES[reason]);
+  }, []);
+
+  const finishSignIn = ({ user, permissions }) => {
+    setCurrentUser(user);
+    setPermissions(permissions);
+
+    showToast?.(`Signed in successfully as ${user?.name || email}`);
+    const targetRoute = (returnTo && returnTo !== '/dashboard')
+      ? returnTo
+      : getRoleDefaultRoute(user?.roleCode || user?.role?.code, permissions);
+    if (user?.mustChangePassword) {
+      navigate(`/change-password?returnTo=${encodeURIComponent(targetRoute)}`, { replace: true });
+      return;
+    }
+    navigate(targetRoute, { replace: true });
+  };
 
   const handleLoginSubmit = async (e) => {
     e?.preventDefault();
@@ -79,37 +125,56 @@ export default function LoginPage() {
       setError('Please enter your password.');
       return;
     }
+    if (workspaces.length > 0 && !tenant) {
+      setError('Please choose a workspace.');
+      return;
+    }
 
     setIsLoading(true);
     setError('');
+    setNotice('');
 
     try {
-      const { user, permissions } = await loginRequest({
+      const result = await loginRequest({
         email,
         password,
+        tenant: workspaces.length > 0 ? tenant : undefined,
         remember: rememberMe,
       });
-
-      setCurrentUser(user);
-      setPermissions(permissions);
-
-      showToast?.(`Signed in successfully as ${user?.name || email}`);
-      const targetRoute = (returnTo && returnTo !== '/dashboard')
-        ? returnTo
-        : getRoleDefaultRoute(user?.roleCode || user?.role?.code, permissions);
-      navigate(targetRoute, { replace: true });
+      if (result.twoFactor) {
+        setTwoFactor(result.twoFactor);
+        setPassword('');
+        return;
+      }
+      finishSignIn(result);
     } catch (err) {
+      const choices = err?.payload?.code === 'TENANT_REQUIRED'
+        ? err.payload.payload?.workspaces || []
+        : [];
+      if (choices.length > 0) {
+        setWorkspaces(choices);
+        setTenant('');
+      }
       setError(describeError(err));
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleForgotSubmit = (e) => {
-    e.preventDefault();
-    if (!forgotEmail.trim()) return;
-    setForgotSent(true);
+  // A different email may belong to different workspaces; drop the old list.
+  const handleEmailChange = (value) => {
+    setEmail(value);
+    if (workspaces.length > 0) {
+      setWorkspaces([]);
+      setTenant('');
+    }
   };
+
+  const openForgotModal = () => {
+    setForgotEmail(email.trim());
+    setIsForgotModalOpen(true);
+  };
+
 
   return (
     <div className="relative min-h-screen w-full overflow-hidden font-sans bg-[#f3f4f6] text-slate-900 select-none">
@@ -220,8 +285,16 @@ export default function LoginPage() {
               </p>
             </div>
 
-            {/* Error Banner */}
-            {error && (
+            {/* Why the last session ended (expired / revoked) */}
+            {notice && !error && (
+              <div className="mt-4 p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs flex items-start gap-2.5">
+                <Info size={15} className="shrink-0 mt-0.5 text-amber-600" />
+                <div className="flex-1 leading-relaxed font-semibold">{notice}</div>
+              </div>
+            )}
+
+            {/* Error Banner (the code step shows its own) */}
+            {error && !twoFactor && (
               <div className="mt-4 p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-start gap-2.5">
                 <AlertCircle size={15} className="shrink-0 mt-0.5 text-rose-600" />
                 <div className="flex-1 leading-relaxed font-semibold">{error}</div>
@@ -229,6 +302,14 @@ export default function LoginPage() {
             )}
 
             {/* Sign-in Form */}
+            {twoFactor ? (
+              <TwoFactorStep
+                challenge={twoFactor}
+                remember={rememberMe}
+                onSignedIn={finishSignIn}
+                onCancel={() => { setTwoFactor(null); setError(''); }}
+              />
+            ) : (
             <form onSubmit={handleLoginSubmit} className="mt-5 space-y-3.5">
               {/* Email Address */}
               <div>
@@ -241,8 +322,8 @@ export default function LoginPage() {
                     type="text"
                     required
                     value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="admin@oscartextiles.com"
+                    onChange={(e) => handleEmailChange(e.target.value)}
+                    placeholder="you@company.com"
                     autoComplete="username"
                     className="w-full h-11 bg-[#f0f4f9] hover:bg-[#eaf0f7] focus:bg-white border border-transparent focus:border-[var(--brand-primary,#1e6cfb)] rounded-xl py-2 pl-10 pr-3.5 text-xs sm:text-[13px] font-medium text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition"
                   />
@@ -261,6 +342,9 @@ export default function LoginPage() {
                     required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
+                    onKeyUp={(e) => setCapsOn(capsLockOn(e))}
+                    onKeyDown={(e) => setCapsOn(capsLockOn(e))}
+                    onBlur={() => setCapsOn(false)}
                     placeholder="••••••••••••"
                     autoComplete="current-password"
                     className="w-full h-11 bg-[#f0f4f9] hover:bg-[#eaf0f7] focus:bg-white border border-transparent focus:border-[var(--brand-primary,#1e6cfb)] rounded-xl py-2 pl-10 pr-10 text-xs sm:text-[13px] font-medium text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition font-mono"
@@ -275,17 +359,43 @@ export default function LoginPage() {
                   </button>
                 </div>
 
-                {/* Forgot Password Right Link */}
-                <div className="flex justify-end mt-1.5">
+                {/* Caps Lock warning + Forgot Password link */}
+                <div className="flex items-center justify-between mt-1.5">
+                  <span className="text-[11.5px] font-semibold text-amber-700" aria-live="polite">
+                    {capsOn ? 'Caps Lock is on' : ''}
+                  </span>
                   <button
                     type="button"
-                    onClick={() => setIsForgotModalOpen(true)}
+                    onClick={openForgotModal}
                     className="text-[11.5px] font-semibold text-[var(--brand-primary,#1e6cfb)] hover:underline cursor-pointer"
                   >
                     Forgot password?
                   </button>
                 </div>
               </div>
+
+              {/* Workspace picker: only when the account exists in several */}
+              {workspaces.length > 0 && (
+                <div>
+                  <label className="block text-[12.5px] font-medium text-slate-700 mb-1.5">
+                    Workspace
+                  </label>
+                  <div className="relative flex items-center">
+                    <Building2 size={16} className="absolute left-3.5 text-slate-400 pointer-events-none" />
+                    <select
+                      required
+                      value={tenant}
+                      onChange={(e) => setTenant(e.target.value)}
+                      className="w-full h-11 bg-[#f0f4f9] hover:bg-[#eaf0f7] focus:bg-white border border-transparent focus:border-[var(--brand-primary,#1e6cfb)] rounded-xl py-2 pl-10 pr-3.5 text-xs sm:text-[13px] font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition cursor-pointer"
+                    >
+                      <option value="">Choose a workspace…</option>
+                      {workspaces.map((w) => (
+                        <option key={w.slug} value={w.slug}>{w.name || w.slug}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              )}
 
               {/* Remember Me Checkbox */}
               <div className="pt-0.5">
@@ -321,6 +431,7 @@ export default function LoginPage() {
                 )}
               </button>
             </form>
+            )}
 
             {/* Card Footer: Need assistance + IT Helpdesk */}
             <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between text-[11.5px] text-slate-500">
@@ -338,78 +449,9 @@ export default function LoginPage() {
         </div>
       </div>
 
-      {/* ── MODAL 1: FORGOT PASSWORD ── */}
+      {/* ── MODAL 1: FORGOT PASSWORD (code or link) ── */}
       {isForgotModalOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150"
-          onClick={(e) => { if (e.target === e.currentTarget) setIsForgotModalOpen(false); }}
-        >
-          <div className="w-full max-w-sm bg-white rounded-2xl p-6 shadow-2xl border border-slate-100 relative">
-            <button
-              type="button"
-              onClick={() => setIsForgotModalOpen(false)}
-              className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 p-1 rounded-lg cursor-pointer transition"
-            >
-              <X size={16} />
-            </button>
-
-            <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center mb-3.5 border border-blue-100">
-              <KeyRound size={20} />
-            </div>
-
-            <h3 className="text-base font-bold text-slate-900">Reset Your Password</h3>
-            <p className="text-xs text-slate-500 mt-1 mb-4 leading-relaxed">
-              Enter your corporate email address. If an account is active, your system administrator will issue password reset credentials.
-            </p>
-
-            {forgotSent ? (
-              <div className="space-y-4">
-                <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs flex items-start gap-2.5">
-                  <CheckCircle2 size={16} className="shrink-0 mt-0.5 text-emerald-600" />
-                  <span>Recovery link generated. Please check your inbox or notify your workspace administrator.</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => { setIsForgotModalOpen(false); setForgotSent(false); }}
-                  className="w-full py-2.5 rounded-xl bg-slate-100 text-slate-800 text-xs font-semibold hover:bg-slate-200 transition cursor-pointer"
-                >
-                  Return to Sign In
-                </button>
-              </div>
-            ) : (
-              <form onSubmit={handleForgotSubmit} className="space-y-3.5">
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
-                    Corporate Email
-                  </label>
-                  <input
-                    type="email"
-                    required
-                    value={forgotEmail}
-                    onChange={(e) => setForgotEmail(e.target.value)}
-                    placeholder="admin@oscartextiles.com"
-                    className="w-full h-10 bg-white border border-slate-200 rounded-xl px-3 text-xs text-slate-800 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
-                  />
-                </div>
-                <div className="flex gap-2.5 pt-2">
-                  <button
-                    type="button"
-                    onClick={() => setIsForgotModalOpen(false)}
-                    className="flex-1 py-2.5 rounded-xl bg-slate-100 text-xs font-semibold text-slate-700 hover:bg-slate-200 transition cursor-pointer"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="flex-1 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-xs transition cursor-pointer"
-                  >
-                    Send Instructions
-                  </button>
-                </div>
-              </form>
-            )}
-          </div>
-        </div>
+        <ForgotPasswordModal initialEmail={forgotEmail} onClose={() => setIsForgotModalOpen(false)} />
       )}
 
       {/* ── MODAL 2: ENTERPRISE IT HELPDESK ── */}
@@ -431,27 +473,41 @@ export default function LoginPage() {
               <Headphones size={20} />
             </div>
 
-            <h3 className="text-base font-bold text-slate-900">Enterprise IT Helpdesk</h3>
+            <h3 className="text-base font-bold text-slate-900">IT Helpdesk</h3>
             <p className="text-xs text-slate-500 mt-1 mb-3 leading-relaxed">
-              For immediate credentials assistance, account lockouts, or role authorization requests:
+              For sign-in problems, locked accounts or access to more modules:
             </p>
 
-            <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80 space-y-2 text-xs">
-              <div className="flex items-center justify-between py-1 border-b border-slate-200/60">
-                <span className="text-slate-500 font-medium">Support Email</span>
-                <span className="font-mono font-semibold text-slate-800">support@evenmore.io</span>
+            {support === null ? (
+              <p className="text-xs text-slate-400">Loading contact details…</p>
+            ) : support.email || support.phone || support.hours ? (
+              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80 divide-y divide-slate-200/60 text-xs">
+                {support.email && (
+                  <div className="flex items-center justify-between py-1.5">
+                    <span className="text-slate-500 font-medium">Email</span>
+                    <a href={`mailto:${support.email}`} className="font-mono font-semibold text-slate-800 hover:underline">{support.email}</a>
+                  </div>
+                )}
+                {support.phone && (
+                  <div className="flex items-center justify-between py-1.5">
+                    <span className="text-slate-500 font-medium">Phone</span>
+                    <a href={`tel:${support.phone.replace(/[^\d+]/g, '')}`} className="font-mono font-semibold text-slate-800 hover:underline">{support.phone}</a>
+                  </div>
+                )}
+                {support.hours && (
+                  <div className="flex items-center justify-between py-1.5">
+                    <span className="text-slate-500 font-medium">Hours</span>
+                    <span className="font-semibold text-slate-700 flex items-center gap-1">
+                      <Clock size={12} /> {support.hours}
+                    </span>
+                  </div>
+                )}
               </div>
-              <div className="flex items-center justify-between py-1 border-b border-slate-200/60">
-                <span className="text-slate-500 font-medium">Hotline Ext.</span>
-                <span className="font-mono font-semibold text-slate-800">+91 (022) 4800-ERP1</span>
-              </div>
-              <div className="flex items-center justify-between py-1">
-                <span className="text-slate-500 font-medium">Availability</span>
-                <span className="font-semibold text-emerald-700 flex items-center gap-1">
-                  <Clock size={12} /> 24/7 Operations Desk
-                </span>
-              </div>
-            </div>
+            ) : (
+              <p className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80 text-xs text-slate-600 leading-relaxed">
+                Please contact your system administrator. They can unlock your account, reset your password or change your access.
+              </p>
+            )}
 
             <div className="mt-5">
               <button

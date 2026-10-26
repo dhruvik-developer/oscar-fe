@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { TablePagination } from '../../components/ui/TablePagination';
+import { useTableSort } from '../../hooks/useTableSort';
+import SortableTh from '../../components/ui/SortableTh';
 import { useERP } from '../../context/ERPContext';
 import { StatusBadge } from '../../components/ui/StatusBadge';
 import { StatCard } from '../../components/ui/StatCard';
@@ -501,10 +503,24 @@ export const GoodsReceiptPage = () => {
     setGrnPage(1);
   }, [grnSearch]);
 
+  const grnSort = useTableSort(filteredGrnList, {
+    accessors: {
+      lines: (g) => g.lines?.length || 0,
+      qc_status: (g) => g.qc_status || 'Pending',
+    },
+  });
+
   const paginatedGrnList = useMemo(() => {
     const start = (grnPage - 1) * grnPageSize;
-    return filteredGrnList.slice(start, start + grnPageSize);
-  }, [filteredGrnList, grnPage, grnPageSize]);
+    return grnSort.rows.slice(start, start + grnPageSize);
+  }, [grnSort.rows, grnPage, grnPageSize]);
+
+  const pendingSort = useTableSort(pendingReceipts, {
+    accessors: {
+      items: (b) => b.items?.length || 0,
+      total: (b) => Number(b.total || b.amount) || 0,
+    },
+  });
 
   return (
     <div className="space-y-6">
@@ -589,13 +605,13 @@ export const GoodsReceiptPage = () => {
                 <table className="w-full text-left text-xs">
                   <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200 uppercase tracking-wider text-[11px]">
                     <tr>
-                      <th className="px-4 py-3">GRN #</th>
-                      <th className="px-4 py-3">Receipt Date</th>
-                      <th className="px-4 py-3">Supplier</th>
-                      <th className="px-4 py-3">Supplier Challan #</th>
-                      <th className="px-4 py-3">PO Number</th>
-                      <th className="px-4 py-3 text-right">Lines</th>
-                      <th className="px-4 py-3 text-center">QC Status</th>
+                      <SortableTh sort={grnSort} sortKey="grn_number" className="px-4 py-3">GRN #</SortableTh>
+                      <SortableTh sort={grnSort} sortKey="receipt_date" className="px-4 py-3">Receipt Date</SortableTh>
+                      <SortableTh sort={grnSort} sortKey="vendorName" className="px-4 py-3">Supplier</SortableTh>
+                      <SortableTh sort={grnSort} sortKey="supplier_challan_no" className="px-4 py-3">Supplier Challan #</SortableTh>
+                      <SortableTh sort={grnSort} sortKey="poNumber" className="px-4 py-3">PO Number</SortableTh>
+                      <SortableTh sort={grnSort} sortKey="lines" className="px-4 py-3 text-right" align="right">Lines</SortableTh>
+                      <SortableTh sort={grnSort} sortKey="qc_status" className="px-4 py-3 text-center" align="center">QC Status</SortableTh>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -660,16 +676,16 @@ export const GoodsReceiptPage = () => {
               <table className="w-full text-left text-xs text-slate-600">
                 <thead className="bg-slate-50 uppercase font-semibold text-slate-500 tracking-wider border-b border-slate-200 text-[11px]">
                   <tr>
-                    <th className="py-2.5 px-4">Bill Number</th>
-                    <th className="py-2.5 px-4">Supplier</th>
-                    <th className="py-2.5 px-4">Date</th>
-                    <th className="py-2.5 px-4 text-right">Bill Items</th>
-                    <th className="py-2.5 px-4 text-right">Amount</th>
+                    <SortableTh sort={pendingSort} sortKey="billNumber" className="py-2.5 px-4">Bill Number</SortableTh>
+                    <SortableTh sort={pendingSort} sortKey="vendor" className="py-2.5 px-4">Supplier</SortableTh>
+                    <SortableTh sort={pendingSort} sortKey="date" className="py-2.5 px-4">Date</SortableTh>
+                    <SortableTh sort={pendingSort} sortKey="items" className="py-2.5 px-4 text-right" align="right">Bill Items</SortableTh>
+                    <SortableTh sort={pendingSort} sortKey="total" className="py-2.5 px-4 text-right" align="right">Amount</SortableTh>
                     <th className="py-2.5 px-4 text-center">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {pendingReceipts.map((bill) => (
+                  {pendingSort.rows.map((bill) => (
                     <tr key={bill.id} className="hover:bg-slate-50/70">
                       <td className="p-4 font-mono font-bold text-slate-800">{bill.billNumber}</td>
                       <td className="p-4 font-medium text-slate-900">{bill.vendor}</td>

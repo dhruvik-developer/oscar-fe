@@ -9,6 +9,8 @@ import Modal from "../../../components/ui/Modal";
 import PageHeader from "../../../components/ui/PageHeader";
 import { hrmsGuides } from "../../../data/hrms/hrmsGuides";
 import MasterSourceLink from "../../../components/common/MasterSourceLink";
+import { useTableSort } from "../../../hooks/useTableSort";
+import SortableTh from "../../../components/ui/SortableTh";
 import {
   Laptop,
   Monitor,
@@ -435,6 +437,21 @@ export function AssetsPage() {
       return matchesSearch && matchesStatus && matchesPriority && matchesType;
     });
   }, [requests, reqSearch, reqStatusFilter, reqPriorityFilter, reqTypeFilter]);
+
+  const assetSort = useTableSort(filtered, {
+    accessors: {
+      displayId: (a) => a.displayId || a.assetCode || "",
+      category: (a) => a.category || "Uncategorised",
+      assignedTo: (a) => (a.status === "Assigned" && a.assignedTo ? a.assignedTo : ""),
+    },
+  });
+  const requestSort = useTableSort(filteredRequests, {
+    accessors: {
+      assetName: (r) => r.assetName || r.itemName || "",
+      priority: (r) => (PRIORITIES.includes(r.priority) ? PRIORITIES.indexOf(r.priority) : null),
+      date: (r) => r.createdAt || r.requestedDate || "",
+    },
+  });
 
   const reqCancelled = requests.filter((r) => r.status === "Cancelled").length;
   const reqTotal = requests.length;
@@ -913,13 +930,13 @@ export function AssetsPage() {
               <table className="w-full min-w-[900px] text-left text-[13px] border-collapse">
                 <thead className="bg-off border-b border-bdr text-[11px] font-semibold uppercase tracking-wider text-muted">
                   <tr>
-                    <th className="py-3 px-5">Asset Details</th>
-                    <th className="py-3 px-5">Asset ID</th>
-                    <th className="py-3 px-5">Category</th>
-                    <th className="py-3 px-5">Serial Number</th>
-                    <th className="py-3 px-5">Assigned To</th>
-                    <th className="py-3 px-5">Department</th>
-                    <th className="py-3 px-5">Status</th>
+                    <SortableTh sort={assetSort} sortKey="name" className="py-3 px-5">Asset Details</SortableTh>
+                    <SortableTh sort={assetSort} sortKey="displayId" className="py-3 px-5">Asset ID</SortableTh>
+                    <SortableTh sort={assetSort} sortKey="category" className="py-3 px-5">Category</SortableTh>
+                    <SortableTh sort={assetSort} sortKey="serialNumber" className="py-3 px-5">Serial Number</SortableTh>
+                    <SortableTh sort={assetSort} sortKey="assignedTo" className="py-3 px-5">Assigned To</SortableTh>
+                    <SortableTh sort={assetSort} sortKey="dept" className="py-3 px-5">Department</SortableTh>
+                    <SortableTh sort={assetSort} sortKey="status" className="py-3 px-5">Status</SortableTh>
                     <th className="py-3 px-5 text-right">Actions</th>
                   </tr>
                 </thead>
@@ -946,7 +963,7 @@ export function AssetsPage() {
                       </td>
                     </tr>
                   ) : (
-                    filtered.map((r) => {
+                    assetSort.rows.map((r) => {
                       const cost = fmtCost(r.purchaseCost);
                       return (
                         <tr key={r.id} className="hover:bg-off/60 transition-colors">
@@ -1183,13 +1200,13 @@ export function AssetsPage() {
               <table className="w-full min-w-[1000px] text-left text-[13px] border-collapse">
                 <thead className="bg-off border-b border-bdr text-[11px] font-semibold uppercase tracking-wider text-muted">
                   <tr>
-                    <th className="py-3 px-5">Request</th>
-                    <th className="py-3 px-5">Employee</th>
-                    <th className="py-3 px-5">Type</th>
-                    <th className="py-3 px-5">Requested Item</th>
-                    <th className="py-3 px-5">Priority</th>
-                    <th className="py-3 px-5">Date</th>
-                    <th className="py-3 px-5">Status</th>
+                    <SortableTh sort={requestSort} sortKey="id" className="py-3 px-5">Request</SortableTh>
+                    <SortableTh sort={requestSort} sortKey="employeeName" className="py-3 px-5">Employee</SortableTh>
+                    <SortableTh sort={requestSort} sortKey="requestType" className="py-3 px-5">Type</SortableTh>
+                    <SortableTh sort={requestSort} sortKey="assetName" className="py-3 px-5">Requested Item</SortableTh>
+                    <SortableTh sort={requestSort} sortKey="priority" className="py-3 px-5">Priority</SortableTh>
+                    <SortableTh sort={requestSort} sortKey="date" className="py-3 px-5">Date</SortableTh>
+                    <SortableTh sort={requestSort} sortKey="status" className="py-3 px-5">Status</SortableTh>
                     <th className="py-3 px-5 text-right">Actions</th>
                   </tr>
                 </thead>
@@ -1214,7 +1231,7 @@ export function AssetsPage() {
                       </td>
                     </tr>
                   ) : (
-                    filteredRequests.map((req) => {
+                    requestSort.rows.map((req) => {
                       const isInventory = req.requestType === "Inventory";
                       const unitUnavailable =
                         isInventory && req.status === "Pending" && req.requestedAssetStatus && req.requestedAssetStatus !== "Available";

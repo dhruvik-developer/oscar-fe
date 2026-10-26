@@ -3,6 +3,8 @@ import { useAppStore } from "../../../stores/appStore";
 import { Badge } from "../../../components/hrms/Badge";
 import PageHeader from "../../../components/ui/PageHeader";
 import { hrmsGuides } from "../../../data/hrms/hrmsGuides";
+import { useTableSort } from "../../../hooks/useTableSort";
+import SortableTh from "../../../components/ui/SortableTh";
 export function Locations() {
   const showToast = useAppStore((s) => s.showToast);
   return <div className="flex flex-col gap-6">
@@ -31,6 +33,7 @@ export function Designations() {
     { title: "Product Manager", level: "L5", dept: "Product", count: 14 },
     { title: "HR Operations Lead", level: "L6", dept: "HR", count: 4 }
   ]);
+  const sort = useTableSort(rows);
   return <div className="flex flex-col gap-6">
       <PageHeader
         title="Designations"
@@ -44,8 +47,8 @@ export function Designations() {
         }
       />
       <div className="bg-white border border-bdr rounded-xl shadow-sm overflow-x-auto">
-        <table className="w-full min-w-[640px] lg:min-w-0 text-left"><thead className="bg-off border-b border-bdr text-[11px] uppercase text-muted"><tr><th className="py-3 px-5">Title</th><th className="py-3 px-5">Level</th><th className="py-3 px-5">Department</th><th className="py-3 px-5">Employees</th><th className="py-3 px-5 text-right">Actions</th></tr></thead>
-          <tbody className="divide-y divide-bdr/40 text-[13px]">{rows.map((r) => <tr key={r.title} className="hover:bg-off/60"><td className="py-4 px-5 font-medium">{r.title}</td><td className="py-4 px-5"><span className={`px-2.5 py-1 rounded-full text-[11px] border ${r.level === "L6" ? "bg-navy text-white border-navy" : "bg-off border-bdr"}`}>{r.level}</span></td><td className="py-4 px-5">{r.dept}</td><td className="py-4 px-5">{r.count}</td><td className="py-4 px-5 text-right flex justify-end gap-1"><button onClick={() => showToast("Edit " + r.title)} className="p-1.5 hover:bg-off rounded-lg"><span className="material-symbols-outlined text-[18px] text-muted">edit</span></button><button onClick={() => {
+        <table className="w-full min-w-[640px] lg:min-w-0 text-left"><thead className="bg-off border-b border-bdr text-[11px] uppercase text-muted"><tr><SortableTh sort={sort} sortKey="title" className="py-3 px-5">Title</SortableTh><SortableTh sort={sort} sortKey="level" className="py-3 px-5">Level</SortableTh><SortableTh sort={sort} sortKey="dept" className="py-3 px-5">Department</SortableTh><SortableTh sort={sort} sortKey="count" className="py-3 px-5">Employees</SortableTh><th className="py-3 px-5 text-right">Actions</th></tr></thead>
+          <tbody className="divide-y divide-bdr/40 text-[13px]">{sort.rows.map((r) => <tr key={r.title} className="hover:bg-off/60"><td className="py-4 px-5 font-medium">{r.title}</td><td className="py-4 px-5"><span className={`px-2.5 py-1 rounded-full text-[11px] border ${r.level === "L6" ? "bg-navy text-white border-navy" : "bg-off border-bdr"}`}>{r.level}</span></td><td className="py-4 px-5">{r.dept}</td><td className="py-4 px-5">{r.count}</td><td className="py-4 px-5 text-right flex justify-end gap-1"><button onClick={() => showToast("Edit " + r.title)} className="p-1.5 hover:bg-off rounded-lg"><span className="material-symbols-outlined text-[18px] text-muted">edit</span></button><button onClick={() => {
     if (confirm("Delete " + r.title + "?")) setRows(rows.filter((x) => x.title !== r.title));
   }} className="p-1.5 hover:bg-off rounded-lg"><span className="material-symbols-outlined text-[18px] text-muted">delete</span></button></td></tr>)}</tbody>
         </table>

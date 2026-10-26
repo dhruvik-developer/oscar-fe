@@ -35,12 +35,12 @@ export const EMPTY_DEAL_FORM = {
   name: '',
   price: '',
   client: '',
-  phone: '',
-  product: 'Diamond Jewelry',
+  phone: '+91 ',
+  product: '',
   stage: 'Draft',
-  source: 'Website',
+  source: '',
   assignedUser: '',
-  date: '15 Sep 2025',
+  date: '',
   tag: '',
 };
 

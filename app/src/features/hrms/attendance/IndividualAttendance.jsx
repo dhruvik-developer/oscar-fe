@@ -16,6 +16,8 @@ import {
   formatHours,
   describeError,
 } from "../../../services/hrmsSync";
+import { useTableSort } from "../../../hooks/useTableSort";
+import SortableTh from "../../../components/ui/SortableTh";
 
 const EDIT_STATUSES = ["Present", "Late", "Half Day", "WFH", "Absent", "On Leave"];
 const TIMED_STATUSES = ["Present", "Late", "Half Day", "WFH"];
@@ -155,6 +157,12 @@ export default function IndividualAttendance() {
 
   const days = useMemo(() => data?.days || [], [data]);
   const summary = data?.summary || {};
+  const sort = useTableSort(days, {
+    accessors: {
+      weekday: (d) => (d.date ? (new Date(`${d.date}T00:00:00`).getDay() + 6) % 7 : null),
+      leaveType: (d) => d.leaveType || "",
+    },
+  });
 
   const statCards = [
     { label: "Present", val: summary.present ?? 0 },
@@ -370,15 +378,15 @@ export default function IndividualAttendance() {
             <table className="ind-table">
               <thead>
                 <tr>
-                  <th>DATE</th>
-                  <th>DAY</th>
-                  <th>CHECK IN</th>
-                  <th>CHECK OUT</th>
-                  <th>WORK HOURS</th>
-                  <th>STATUS</th>
-                  <th>LEAVE TYPE</th>
-                  <th>SOURCE</th>
-                  <th>REMARKS</th>
+                  <SortableTh sort={sort} sortKey="date">DATE</SortableTh>
+                  <SortableTh sort={sort} sortKey="weekday">DAY</SortableTh>
+                  <SortableTh sort={sort} sortKey="checkIn">CHECK IN</SortableTh>
+                  <SortableTh sort={sort} sortKey="checkOut">CHECK OUT</SortableTh>
+                  <SortableTh sort={sort} sortKey="hours">WORK HOURS</SortableTh>
+                  <SortableTh sort={sort} sortKey="status">STATUS</SortableTh>
+                  <SortableTh sort={sort} sortKey="leaveType">LEAVE TYPE</SortableTh>
+                  <SortableTh sort={sort} sortKey="source">SOURCE</SortableTh>
+                  <SortableTh sort={sort} sortKey="remark">REMARKS</SortableTh>
                   <th>ACTIONS</th>
                 </tr>
               </thead>
@@ -390,7 +398,7 @@ export default function IndividualAttendance() {
                     </td>
                   </tr>
                 )}
-                {days.map((d) => {
+                {sort.rows.map((d) => {
                   const locked = lockReason(d);
                   return (
                     <tr key={d.date} className={d.isWorkingDay ? "" : "ind-row-off"}>

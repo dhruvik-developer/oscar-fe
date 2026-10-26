@@ -83,10 +83,19 @@ export default function LeadsTabs({
           <ViewButton label="Print Leads" onClick={onPrint}>
             <Printer size={18} />
           </ViewButton>
-          <ViewButton label="Grid View" active={leadView === "grid"} onClick={() => onLeadViewChange("grid")}>
+          {/* Clicking the active view again goes back to the standard list. */}
+          <ViewButton
+            label={leadView === "grid" ? "Back to List View" : "Grid View"}
+            active={leadView === "grid"}
+            onClick={() => onLeadViewChange(leadView === "grid" ? "list" : "grid")}
+          >
             <LayoutGrid size={18} />
           </ViewButton>
-          <ViewButton label="Tile View" active={leadView === "tile"} onClick={() => onLeadViewChange("tile")}>
+          <ViewButton
+            label={leadView === "tile" ? "Back to List View" : "Tile View"}
+            active={leadView === "tile"}
+            onClick={() => onLeadViewChange(leadView === "tile" ? "list" : "tile")}
+          >
             <SquareChartGantt size={18} />
           </ViewButton>
           {hasRecordAction && (

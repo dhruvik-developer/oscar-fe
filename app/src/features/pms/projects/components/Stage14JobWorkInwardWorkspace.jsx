@@ -41,6 +41,8 @@ import {
 import { usePmsStore } from '../../../../stores/pmsStore';
 import { Modal } from '../../../../components/ui/Modal';
 import { Button } from '../../../../components/ui/Button';
+import { useTableSort } from '../../../../hooks/useTableSort';
+import { SortableTh } from '../../../../components/ui/SortableTh';
 
 const n = (v) => Number(v || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 });
 const todayISO = () => new Date().toISOString().slice(0, 10);
@@ -558,6 +560,14 @@ export function Stage14JobWorkInwardWorkspace({
     }
   };
 
+  const orderStatusLabel = (ord) =>
+    ord.pendingQty === 0 && ord.outwardQty > 0 ? 'Fully Received' : ord.inwardQty > 0 ? 'Partially Received' : 'In Process';
+  const pendingOrderRows = useMemo(() => augmentedOrders.filter((o) => o.pendingQty > 0), [augmentedOrders]);
+  const inwardHistorySort = useTableSort(allInwardReceipts);
+  const jwoOrderSort = useTableSort(augmentedOrders, { accessors: { status: orderStatusLabel } });
+  const receivedTakaSort = useTableSort(allReceivedTakas);
+  const pendingOrderSort = useTableSort(pendingOrderRows, { accessors: { isOverdue: (ord) => (ord.isOverdue ? 1 : 0) } });
+
   return (
     <div className="space-y-5">
       {/* =========================================================================
@@ -843,17 +853,17 @@ export function Stage14JobWorkInwardWorkspace({
               <table className="w-full text-left text-xs text-slate-700">
                 <thead className="bg-slate-50 text-[11px] font-bold text-slate-600 uppercase border-b border-slate-200 sticky top-0 z-10">
                   <tr>
-                    <th className="p-3">Inward No</th>
-                    <th className="p-3">JWO No</th>
-                    <th className="p-3">Vendor / Processor</th>
-                    <th className="p-3">Process</th>
-                    <th className="p-3">Inward Date</th>
-                    <th className="p-3">Vendor Challan</th>
-                    <th className="p-3 text-right">Received (m)</th>
-                    <th className="p-3 text-right">Accepted (m)</th>
-                    <th className="p-3 text-right">Rejected (m)</th>
+                    <SortableTh sort={inwardHistorySort} sortKey="no" className="p-3">Inward No</SortableTh>
+                    <SortableTh sort={inwardHistorySort} sortKey="jwoNo" className="p-3">JWO No</SortableTh>
+                    <SortableTh sort={inwardHistorySort} sortKey="vendor" className="p-3">Vendor / Processor</SortableTh>
+                    <SortableTh sort={inwardHistorySort} sortKey="process" className="p-3">Process</SortableTh>
+                    <SortableTh sort={inwardHistorySort} sortKey="date" className="p-3">Inward Date</SortableTh>
+                    <SortableTh sort={inwardHistorySort} sortKey="challanNo" className="p-3">Vendor Challan</SortableTh>
+                    <SortableTh sort={inwardHistorySort} sortKey="receivedQty" className="p-3 text-right" align="right">Received (m)</SortableTh>
+                    <SortableTh sort={inwardHistorySort} sortKey="acceptedQty" className="p-3 text-right" align="right">Accepted (m)</SortableTh>
+                    <SortableTh sort={inwardHistorySort} sortKey="rejectedQty" className="p-3 text-right" align="right">Rejected (m)</SortableTh>
                     <th className="p-3 text-center">Holding Godown</th>
-                    <th className="p-3 text-center">Status</th>
+                    <SortableTh sort={inwardHistorySort} sortKey="effectiveStatus" className="p-3 text-center" align="center">Status</SortableTh>
                     <th className="p-3 text-center">Actions</th>
                   </tr>
                 </thead>
@@ -865,7 +875,7 @@ export function Stage14JobWorkInwardWorkspace({
                       </td>
                     </tr>
                   ) : (
-                    allInwardReceipts.map((inw) => (
+                    inwardHistorySort.rows.map((inw) => (
                       <tr key={inw.id} className="hover:bg-slate-50/60 transition-colors">
                         <td className="p-3 font-mono font-bold text-teal-700 whitespace-nowrap">
                           {inw.no}
@@ -943,18 +953,18 @@ export function Stage14JobWorkInwardWorkspace({
               <table className="w-full text-left text-xs text-slate-700">
                 <thead className="bg-slate-50 text-[11px] font-bold text-slate-600 uppercase border-b border-slate-200 sticky top-0 z-10">
                   <tr>
-                    <th className="p-3">JWO No</th>
-                    <th className="p-3">Plan No</th>
-                    <th className="p-3">Processor</th>
-                    <th className="p-3">Process</th>
-                    <th className="p-3 text-right">Planned (m)</th>
-                    <th className="p-3 text-right">Outward Dispatched (m)</th>
-                    <th className="p-3 text-right">Inward Received (m)</th>
-                    <th className="p-3 text-right">Pending at Mill (m)</th>
-                    <th className="p-3">Outward Challan</th>
-                    <th className="p-3">Dispatch Date</th>
-                    <th className="p-3">Target Return</th>
-                    <th className="p-3 text-center">Status</th>
+                    <SortableTh sort={jwoOrderSort} sortKey="jwoNo" className="p-3">JWO No</SortableTh>
+                    <SortableTh sort={jwoOrderSort} sortKey="effectivePlanNo" className="p-3">Plan No</SortableTh>
+                    <SortableTh sort={jwoOrderSort} sortKey="vendor" className="p-3">Processor</SortableTh>
+                    <SortableTh sort={jwoOrderSort} sortKey="process" className="p-3">Process</SortableTh>
+                    <SortableTh sort={jwoOrderSort} sortKey="plannedQty" className="p-3 text-right" align="right">Planned (m)</SortableTh>
+                    <SortableTh sort={jwoOrderSort} sortKey="outwardQty" className="p-3 text-right" align="right">Outward Dispatched (m)</SortableTh>
+                    <SortableTh sort={jwoOrderSort} sortKey="inwardQty" className="p-3 text-right" align="right">Inward Received (m)</SortableTh>
+                    <SortableTh sort={jwoOrderSort} sortKey="pendingQty" className="p-3 text-right" align="right">Pending at Mill (m)</SortableTh>
+                    <SortableTh sort={jwoOrderSort} sortKey="latestChallan" className="p-3">Outward Challan</SortableTh>
+                    <SortableTh sort={jwoOrderSort} sortKey="latestOutwardDate" className="p-3">Dispatch Date</SortableTh>
+                    <SortableTh sort={jwoOrderSort} sortKey="expectedCompletion" className="p-3">Target Return</SortableTh>
+                    <SortableTh sort={jwoOrderSort} sortKey="status" className="p-3 text-center" align="center">Status</SortableTh>
                     <th className="p-3 text-center">Actions</th>
                   </tr>
                 </thead>
@@ -966,7 +976,7 @@ export function Stage14JobWorkInwardWorkspace({
                       </td>
                     </tr>
                   ) : (
-                    augmentedOrders.map((ord) => (
+                    jwoOrderSort.rows.map((ord) => (
                       <tr key={ord.id} className="hover:bg-slate-50/60 transition-colors">
                         <td className="p-3 font-mono font-bold text-blue-700 whitespace-nowrap">
                           {ord.jwoNo}
@@ -1039,18 +1049,18 @@ export function Stage14JobWorkInwardWorkspace({
               <table className="w-full text-left text-xs text-slate-700">
                 <thead className="bg-slate-50 text-[11px] font-bold text-slate-600 uppercase border-b border-slate-200 sticky top-0 z-10">
                   <tr>
-                    <th className="p-3">Received Taka ID</th>
-                    <th className="p-3">Taka Roll No</th>
-                    <th className="p-3">Inward Receipt</th>
-                    <th className="p-3">JWO No</th>
-                    <th className="p-3">Source Lot No</th>
-                    <th className="p-3">Received Lot No</th>
-                    <th className="p-3 text-right">Length (m)</th>
-                    <th className="p-3 text-right">Weight (kg)</th>
-                    <th className="p-3 text-right">Width (in)</th>
-                    <th className="p-3">Shade / Colour</th>
+                    <SortableTh sort={receivedTakaSort} sortKey="receivedTakaId" className="p-3">Received Taka ID</SortableTh>
+                    <SortableTh sort={receivedTakaSort} sortKey="takaNumber" className="p-3">Taka Roll No</SortableTh>
+                    <SortableTh sort={receivedTakaSort} sortKey="inwardNo" className="p-3">Inward Receipt</SortableTh>
+                    <SortableTh sort={receivedTakaSort} sortKey="jwoNo" className="p-3">JWO No</SortableTh>
+                    <SortableTh sort={receivedTakaSort} sortKey="sourceLotNumber" className="p-3">Source Lot No</SortableTh>
+                    <SortableTh sort={receivedTakaSort} sortKey="receivedLotNumber" className="p-3">Received Lot No</SortableTh>
+                    <SortableTh sort={receivedTakaSort} sortKey="meters" className="p-3 text-right" align="right">Length (m)</SortableTh>
+                    <SortableTh sort={receivedTakaSort} sortKey="weightKg" className="p-3 text-right" align="right">Weight (kg)</SortableTh>
+                    <SortableTh sort={receivedTakaSort} sortKey="width" className="p-3 text-right" align="right">Width (in)</SortableTh>
+                    <SortableTh sort={receivedTakaSort} sortKey="shade" className="p-3">Shade / Colour</SortableTh>
                     <th className="p-3 text-center">Holding Location</th>
-                    <th className="p-3 text-center">QC Status</th>
+                    <SortableTh sort={receivedTakaSort} sortKey="qcStatus" className="p-3 text-center" align="center">QC Status</SortableTh>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -1061,7 +1071,7 @@ export function Stage14JobWorkInwardWorkspace({
                       </td>
                     </tr>
                   ) : (
-                    allReceivedTakas.map((t) => (
+                    receivedTakaSort.rows.map((t) => (
                       <tr key={t.id} className="hover:bg-slate-50/60 transition-colors">
                         <td className="p-3 font-mono font-bold text-teal-700 whitespace-nowrap">
                           {t.receivedTakaId}
@@ -1179,14 +1189,14 @@ export function Stage14JobWorkInwardWorkspace({
               <table className="w-full text-left text-xs text-slate-700">
                 <thead className="bg-slate-50 text-[11px] font-bold text-slate-600 uppercase border-b border-slate-200 sticky top-0 z-10">
                   <tr>
-                    <th className="p-3">JWO No</th>
-                    <th className="p-3">Vendor / Processor</th>
-                    <th className="p-3">Process</th>
-                    <th className="p-3 text-right">Dispatched (m)</th>
-                    <th className="p-3 text-right">Received (m)</th>
-                    <th className="p-3 text-right">Outstanding (m)</th>
-                    <th className="p-3">Expected Return</th>
-                    <th className="p-3 text-center">Overdue Status</th>
+                    <SortableTh sort={pendingOrderSort} sortKey="jwoNo" className="p-3">JWO No</SortableTh>
+                    <SortableTh sort={pendingOrderSort} sortKey="vendor" className="p-3">Vendor / Processor</SortableTh>
+                    <SortableTh sort={pendingOrderSort} sortKey="process" className="p-3">Process</SortableTh>
+                    <SortableTh sort={pendingOrderSort} sortKey="outwardQty" className="p-3 text-right" align="right">Dispatched (m)</SortableTh>
+                    <SortableTh sort={pendingOrderSort} sortKey="inwardQty" className="p-3 text-right" align="right">Received (m)</SortableTh>
+                    <SortableTh sort={pendingOrderSort} sortKey="pendingQty" className="p-3 text-right" align="right">Outstanding (m)</SortableTh>
+                    <SortableTh sort={pendingOrderSort} sortKey="expectedCompletion" className="p-3">Expected Return</SortableTh>
+                    <SortableTh sort={pendingOrderSort} sortKey="isOverdue" className="p-3 text-center" align="center">Overdue Status</SortableTh>
                     <th className="p-3 text-center">Action</th>
                   </tr>
                 </thead>
@@ -1198,8 +1208,7 @@ export function Stage14JobWorkInwardWorkspace({
                       </td>
                     </tr>
                   ) : (
-                    augmentedOrders
-                      .filter((o) => o.pendingQty > 0)
+                    pendingOrderSort.rows
                       .map((ord) => (
                         <tr key={ord.id} className="hover:bg-slate-50/60 transition-colors">
                           <td className="p-3 font-mono font-bold text-blue-700 whitespace-nowrap">

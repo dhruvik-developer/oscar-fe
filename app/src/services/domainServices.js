@@ -452,6 +452,8 @@ export const alertService = {
   acknowledgeIncident: (id) => api.post(`/alerts/incidents/${id}/acknowledge/`, {}),
   resolveIncident: (id) => api.post(`/alerts/incidents/${id}/resolve/`, {}),
   getSettings: (query) => api.get('/alerts/settings/', { query }),
+  // Runs every alert check for this workspace now (needs manage_alerts).
+  runChecks: (asOf) => api.post('/alerts/incidents/run/', asOf ? { asOf } : {}),
   updateSetting: (id, data) => api.patch(`/alerts/settings/${id}/`, data),
 };
 

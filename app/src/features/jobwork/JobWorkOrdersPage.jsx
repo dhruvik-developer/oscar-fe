@@ -7,6 +7,8 @@ import { api } from '../../services/api';
 import { useERP } from '../../context/ERPContext';
 import PageHeader from '../../components/ui/PageHeader';
 import TablePagination from '../../components/ui/TablePagination';
+import SortableTh from '../../components/ui/SortableTh';
+import { useTableSort } from '../../hooks/useTableSort';
 import MasterSourceLink from '../../components/common/MasterSourceLink';
 import KpiCard from '../../components/ui/KpiCard';
 
@@ -129,10 +131,19 @@ export default function JobWorkOrdersPage() {
     setPage(1);
   }, [q, status]);
 
+  const sort = useTableSort(rows, {
+    accessors: {
+      ordered: (o) => jwoKpis(o).totalOrdered,
+      inward: (o) => jwoKpis(o).totalInward,
+      pending: (o) => jwoKpis(o).pending,
+      rate: (o) => Number(o.rate || 0),
+      amount: (o) => jwoKpis(o).totalAmount,
+    },
+  });
   const pagedRows = useMemo(() => {
     const start = (page - 1) * pageSize;
-    return rows.slice(start, start + pageSize);
-  }, [rows, page, pageSize]);
+    return sort.rows.slice(start, start + pageSize);
+  }, [sort.rows, page, pageSize]);
 
   const openCreateModal = () => {
     setModalVendor('');
@@ -265,16 +276,16 @@ export default function JobWorkOrdersPage() {
             <thead>
               <tr className="border-b border-slate-100 text-slate-500 font-bold">
                 <th className="px-3 py-2.5">#</th>
-                <th className="px-3 py-2.5">JWO No</th>
-                <th className="px-3 py-2.5">Date</th>
-                <th className="px-3 py-2.5">Process</th>
-                <th className="px-3 py-2.5">Vendor</th>
-                <th className="px-3 py-2.5 text-right">Ordered (M)</th>
-                <th className="px-3 py-2.5 text-right">Inward (M)</th>
-                <th className="px-3 py-2.5 text-right">Pending (M)</th>
-                <th className="px-3 py-2.5 text-right">Rate</th>
-                <th className="px-3 py-2.5 text-right">Total Amount</th>
-                <th className="px-3 py-2.5 text-center">Status</th>
+                <SortableTh sort={sort} sortKey="jwoNo" className="px-3 py-2.5">JWO No</SortableTh>
+                <SortableTh sort={sort} sortKey="orderDate" className="px-3 py-2.5">Date</SortableTh>
+                <SortableTh sort={sort} sortKey="process" className="px-3 py-2.5">Process</SortableTh>
+                <SortableTh sort={sort} sortKey="vendor" className="px-3 py-2.5">Vendor</SortableTh>
+                <SortableTh sort={sort} sortKey="ordered" className="px-3 py-2.5 text-right" align="right">Ordered (M)</SortableTh>
+                <SortableTh sort={sort} sortKey="inward" className="px-3 py-2.5 text-right" align="right">Inward (M)</SortableTh>
+                <SortableTh sort={sort} sortKey="pending" className="px-3 py-2.5 text-right" align="right">Pending (M)</SortableTh>
+                <SortableTh sort={sort} sortKey="rate" className="px-3 py-2.5 text-right" align="right">Rate</SortableTh>
+                <SortableTh sort={sort} sortKey="amount" className="px-3 py-2.5 text-right" align="right">Total Amount</SortableTh>
+                <SortableTh sort={sort} sortKey="status" className="px-3 py-2.5 text-center" align="center">Status</SortableTh>
                 <th className="px-3 py-2.5 text-right">Actions</th>
               </tr>
             </thead>

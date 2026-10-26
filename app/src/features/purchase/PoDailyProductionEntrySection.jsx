@@ -2,13 +2,16 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Factory, Calendar, UserCheck, FileText, CheckCircle2, ArrowRight,
   Clock, Layers, AlertCircle, Save, Send, ShieldCheck, Lock, ExternalLink,
-  Plus, ChevronLeft, ChevronRight, Activity, AlertTriangle, RefreshCw,
+  Plus, Activity, AlertTriangle, RefreshCw,
   Check, Info, Sparkles, Filter, Trash2, X, Printer, Search
 } from 'lucide-react';
 import { purchaseService } from '../../services/domainServices';
 import { Button } from '../../components/ui/Button';
 import { useERP } from '../../context/ERPContext';
 import { useAppStore } from '../../stores/appStore';
+import AppPagination from '../../components/ui/AppPagination';
+import { useTableSort } from '../../hooks/useTableSort';
+import SortableTh from '../../components/ui/SortableTh';
 
 export function PoDailyProductionEntrySection({ po, onUpdated, navigate, onSwitchToInstruction, onProceedToQc }) {
   const { showToast } = useERP() || {};
@@ -223,6 +226,30 @@ export function PoDailyProductionEntrySection({ po, onUpdated, navigate, onSwitc
     }
   };
 
+  const productionAccessors = {
+    produced: (r) => Number(r.produced || 0),
+    accepted: (r) => Number(r.accepted || 0),
+    rejected: (r) => Number(r.rejected ?? r.rejectMeter ?? r.reject_meter ?? 0),
+    reprocess: (r) => Number(r.reprocess ?? r.reprocessMeter ?? r.reprocess_meter ?? 0),
+    cumulative: (r) => Number(r.cumulative || 0),
+    balance: (r) => Number(r.balance || 0),
+    status: (r) => r.status || 'Submitted',
+  };
+  const entrySort = useTableSort(entries, { accessors: productionAccessors });
+  const registerEntries = useMemo(() => entries.filter((r) => {
+    if (registerStatusFilter !== 'All' && r.status !== registerStatusFilter) return false;
+    if (registerSearch) {
+      const q = registerSearch.toLowerCase();
+      return (
+        (r.date || '').toLowerCase().includes(q) ||
+        (r.enteredBy || '').toLowerCase().includes(q) ||
+        (r.remarks || '').toLowerCase().includes(q)
+      );
+    }
+    return true;
+  }), [entries, registerStatusFilter, registerSearch]);
+  const registerSort = useTableSort(registerEntries, { accessors: productionAccessors });
+
   if (loading) {
     return (
       <div className="bg-slate-50 border border-slate-200 rounded-xl p-8 text-center text-slate-500 text-xs mt-4">
@@ -243,7 +270,7 @@ export function PoDailyProductionEntrySection({ po, onUpdated, navigate, onSwitc
   // Pagination calculation
   const totalEntries = entries.length;
   const totalPages = Math.ceil(totalEntries / pageSize) || 1;
-  const pagedEntries = entries.slice((page - 1) * pageSize, page * pageSize);
+  const pagedEntries = entrySort.rows.slice((page - 1) * pageSize, page * pageSize);
 
   // Status badge styling helper
   const getInstructionStatusBadge = (st) => {
@@ -720,16 +747,16 @@ export function PoDailyProductionEntrySection({ po, onUpdated, navigate, onSwitc
                 <table className="w-full text-left text-xs">
                   <thead>
                     <tr className="bg-slate-50 border-b border-slate-200 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                      <th className="px-3 py-2">Date</th>
-                      <th className="px-3 py-2 text-right">Produced (m)</th>
-                      <th className="px-3 py-2 text-right">Accepted</th>
-                      <th className="px-3 py-2 text-right">Rejected</th>
-                      <th className="px-3 py-2 text-right">Reprocess</th>
-                      <th className="px-3 py-2 text-right">Cumulative</th>
-                      <th className="px-3 py-2 text-right">Balance</th>
-                      <th className="px-3 py-2">Entered By</th>
-                      <th className="px-3 py-2 text-center">Status</th>
-                      <th className="px-3 py-2">Remarks</th>
+                      <SortableTh sort={entrySort} sortKey="date" className="px-3 py-2">Date</SortableTh>
+                      <SortableTh sort={entrySort} sortKey="produced" className="px-3 py-2 text-right" align="right">Produced (m)</SortableTh>
+                      <SortableTh sort={entrySort} sortKey="accepted" className="px-3 py-2 text-right" align="right">Accepted</SortableTh>
+                      <SortableTh sort={entrySort} sortKey="rejected" className="px-3 py-2 text-right" align="right">Rejected</SortableTh>
+                      <SortableTh sort={entrySort} sortKey="reprocess" className="px-3 py-2 text-right" align="right">Reprocess</SortableTh>
+                      <SortableTh sort={entrySort} sortKey="cumulative" className="px-3 py-2 text-right" align="right">Cumulative</SortableTh>
+                      <SortableTh sort={entrySort} sortKey="balance" className="px-3 py-2 text-right" align="right">Balance</SortableTh>
+                      <SortableTh sort={entrySort} sortKey="enteredBy" className="px-3 py-2">Entered By</SortableTh>
+                      <SortableTh sort={entrySort} sortKey="status" className="px-3 py-2 text-center" align="center">Status</SortableTh>
+                      <SortableTh sort={entrySort} sortKey="remarks" className="px-3 py-2">Remarks</SortableTh>
                       <th className="px-3 py-2 text-center">Actions</th>
                     </tr>
                   </thead>
@@ -795,27 +822,12 @@ export function PoDailyProductionEntrySection({ po, onUpdated, navigate, onSwitc
 
               {/* Table Pagination */}
               {totalPages > 1 && (
-                <div className="px-4 py-2 bg-slate-50 border-t border-slate-200 flex items-center justify-between text-xs text-slate-500">
-                  <span>Page {page} of {totalPages} ({totalEntries} total records)</span>
-                  <div className="flex items-center gap-1">
-                    <button
-                      type="button"
-                      disabled={page <= 1}
-                      onClick={() => setPage((p) => Math.max(1, p - 1))}
-                      className="p-1 border rounded bg-white disabled:opacity-40 cursor-pointer"
-                    >
-                      <ChevronLeft size={14} />
-                    </button>
-                    <button
-                      type="button"
-                      disabled={page >= totalPages}
-                      onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                      className="p-1 border rounded bg-white disabled:opacity-40 cursor-pointer"
-                    >
-                      <ChevronRight size={14} />
-                    </button>
-                  </div>
-                </div>
+                <AppPagination
+                  total={totalEntries}
+                  page={page}
+                  pageSize={pageSize}
+                  onPageChange={setPage}
+                />
               )}
             </div>
 
@@ -974,32 +986,20 @@ export function PoDailyProductionEntrySection({ po, onUpdated, navigate, onSwitc
               <table className="w-full text-left text-xs border border-slate-200 rounded-xl overflow-hidden">
                 <thead>
                   <tr className="bg-slate-100/80 border-b border-slate-200 text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                    <th className="px-3 py-2.5">Date</th>
-                    <th className="px-3 py-2.5 text-right">Produced (m)</th>
-                    <th className="px-3 py-2.5 text-right">Accepted (m)</th>
-                    <th className="px-3 py-2.5 text-right">Rejected (m)</th>
-                    <th className="px-3 py-2.5 text-right">Reprocess (m)</th>
-                    <th className="px-3 py-2.5 text-right">Cumulative (m)</th>
-                    <th className="px-3 py-2.5 text-right">Balance (m)</th>
-                    <th className="px-3 py-2.5">Entered By</th>
-                    <th className="px-3 py-2.5 text-center">Status</th>
-                    <th className="px-3 py-2.5">Remarks</th>
+                    <SortableTh sort={registerSort} sortKey="date" className="px-3 py-2.5">Date</SortableTh>
+                    <SortableTh sort={registerSort} sortKey="produced" className="px-3 py-2.5 text-right" align="right">Produced (m)</SortableTh>
+                    <SortableTh sort={registerSort} sortKey="accepted" className="px-3 py-2.5 text-right" align="right">Accepted (m)</SortableTh>
+                    <SortableTh sort={registerSort} sortKey="rejected" className="px-3 py-2.5 text-right" align="right">Rejected (m)</SortableTh>
+                    <SortableTh sort={registerSort} sortKey="reprocess" className="px-3 py-2.5 text-right" align="right">Reprocess (m)</SortableTh>
+                    <SortableTh sort={registerSort} sortKey="cumulative" className="px-3 py-2.5 text-right" align="right">Cumulative (m)</SortableTh>
+                    <SortableTh sort={registerSort} sortKey="balance" className="px-3 py-2.5 text-right" align="right">Balance (m)</SortableTh>
+                    <SortableTh sort={registerSort} sortKey="enteredBy" className="px-3 py-2.5">Entered By</SortableTh>
+                    <SortableTh sort={registerSort} sortKey="status" className="px-3 py-2.5 text-center" align="center">Status</SortableTh>
+                    <SortableTh sort={registerSort} sortKey="remarks" className="px-3 py-2.5">Remarks</SortableTh>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {entries
-                    .filter((r) => {
-                      if (registerStatusFilter !== 'All' && r.status !== registerStatusFilter) return false;
-                      if (registerSearch) {
-                        const q = registerSearch.toLowerCase();
-                        return (
-                          (r.date || '').toLowerCase().includes(q) ||
-                          (r.enteredBy || '').toLowerCase().includes(q) ||
-                          (r.remarks || '').toLowerCase().includes(q)
-                        );
-                      }
-                      return true;
-                    })
+                  {registerSort.rows
                     .map((row, idx) => (
                       <tr key={row.id || idx} className="hover:bg-slate-50 transition-colors">
                         <td className="px-3 py-2 font-mono text-slate-800">{row.date || '—'}</td>

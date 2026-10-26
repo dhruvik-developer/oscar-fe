@@ -22,6 +22,8 @@ import {
   todayISO,
   unwrapList,
 } from './accountingShared';
+import { useTableSort } from '../../hooks/useTableSort';
+import SortableTh from '../../components/ui/SortableTh';
 
 const cashBankGuide = {
   title: 'Cash & Bank Accounts (Treasury)',
@@ -152,6 +154,14 @@ export const CashBankPage = () => {
 
   const bankById = useMemo(() => Object.fromEntries(banks.map((b) => [b.id, b])), [banks]);
   const bankName = (id) => (bankById[id] ? bankById[id].name : id);
+  const bankSort = useTableSort(banks, {
+    accessors: {
+      bankBranch: (b) => [b.bankName, b.branch].filter(Boolean).join(' · '),
+      accountNo: (b) => [b.accountNumber, b.ifsc].filter(Boolean).join(' · '),
+      openingBalance: (b) => Number(b.openingBalance || 0),
+      balance: (b) => Number(b.balance || 0),
+    },
+  });
 
   const handleCreateBank = async (e) => {
     e.preventDefault();
@@ -260,18 +270,18 @@ export const CashBankPage = () => {
             <table className="w-full min-w-[760px] text-left text-xs text-slate-600">
               <thead className="bg-slate-50 border-b border-[#dce5f4]">
                 <tr>
-                  <th className={thClass}>Account</th>
-                  <th className={thClass}>Type</th>
-                  <th className={thClass}>Bank / Branch</th>
-                  <th className={thClass}>Account No. / IFSC</th>
-                  <th className={thClass}>Ledger Account</th>
-                  <th className={`${thClass} text-right`}>Opening</th>
-                  <th className={`${thClass} text-right`}>Balance</th>
+                  <SortableTh sort={bankSort} sortKey="name" className={thClass}>Account</SortableTh>
+                  <SortableTh sort={bankSort} sortKey="type" className={thClass}>Type</SortableTh>
+                  <SortableTh sort={bankSort} sortKey="bankBranch" className={thClass}>Bank / Branch</SortableTh>
+                  <SortableTh sort={bankSort} sortKey="accountNo" className={thClass}>Account No. / IFSC</SortableTh>
+                  <SortableTh sort={bankSort} sortKey="accountName" className={thClass}>Ledger Account</SortableTh>
+                  <SortableTh sort={bankSort} sortKey="openingBalance" className={`${thClass} text-right`} align="right">Opening</SortableTh>
+                  <SortableTh sort={bankSort} sortKey="balance" className={`${thClass} text-right`} align="right">Balance</SortableTh>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {banks.length === 0 && <EmptyRow colSpan={7} message="No bank or cash accounts yet. Add one to start tracking balances." />}
-                {banks.map((b) => (
+                {bankSort.rows.map((b) => (
                   <tr key={b.id} className="hover:bg-slate-50">
                     <td className="py-2 px-3">
                       <span className="font-semibold text-slate-800">{b.name}</span>

@@ -42,7 +42,7 @@ export const VendorsPage = () => {
         category: 'Hardware',
         contactPerson: '',
         email: '',
-        phone: '',
+        phone: '+91 ',
         paymentTerms: 'Net 30',
     });
     const totalPayable = vendors.reduce((sum, v) => sum + v.balance, 0);
@@ -143,13 +143,13 @@ export const VendorsPage = () => {
             category: newVend.category || 'Hardware',
             contactPerson: newVend.contactPerson || 'Vendor Account Rep',
             email: newVend.email || 'orders@supplier.com',
-            phone: newVend.phone || '+1 (800) 000-0000',
+            phone: newVend.phone || '+91 ',
             balance: 0,
             paymentTerms: newVend.paymentTerms || 'Net 30',
             status: 'Active',
         });
         setIsModalOpen(false);
-        setNewVend({ name: '', code: '', category: 'Hardware', contactPerson: '', email: '', phone: '', paymentTerms: 'Net 30' });
+        setNewVend({ name: '', code: '', category: 'Hardware', contactPerson: '', email: '', phone: '+91 ', paymentTerms: 'Net 30' });
     };
     const vendorEntries = selectedVendor ? getVendorLedger(selectedVendor.id) : [];
     return (<div className="space-y-6">

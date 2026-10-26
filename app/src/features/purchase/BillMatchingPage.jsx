@@ -6,6 +6,8 @@ import { StatusBadge } from '../../components/ui/StatusBadge';
 import { Button } from '../../components/ui/Button';
 import { PageHeader } from '../../components/common/PageHeader';
 import TablePagination from '../../components/ui/TablePagination';
+import { useTableSort } from '../../hooks/useTableSort';
+import SortableTh from '../../components/ui/SortableTh';
 import { RefreshCw, Check, X, AlertTriangle, Users, FileText, IndianRupee } from 'lucide-react';
 
 const billMatchingGuide = {
@@ -254,6 +256,14 @@ export const BillMatchingPage = () => {
   const overallStatus = matching?.overallStatus || selected?.matchResult?.overallStatus || null;
   const isMismatch = overallStatus === 'Mismatch';
   const isMatch = overallStatus === 'Match';
+  const lineSort = useTableSort(lines, {
+    accessors: {
+      fabric: (l) => l.fabric || l.itemName,
+      qtyMatch: (l) => Boolean(l.qtyMatch),
+      rateMatch: (l) => Boolean(l.rateMatch),
+      amountMatch: (l) => Boolean(l.amountMatch),
+    },
+  });
 
   const poNumber = matching?.poNumber || selected?.poNumber
     || purchaseOrders.find((p) => p.id === selected?.purchaseOrderId)?.poNumber || '—';
@@ -332,15 +342,13 @@ export const BillMatchingPage = () => {
               </button>
             ))}
           </div>
-          <div className="border-t border-slate-100">
-            <TablePagination
-              page={page}
-              pageSize={pageSize}
-              totalItems={filtered.length}
-              onPageChange={setPage}
-              onPageSizeChange={(sz) => { setPageSize(sz); setPage(1); }}
-            />
-          </div>
+          <TablePagination
+            page={page}
+            pageSize={pageSize}
+            totalItems={filtered.length}
+            onPageChange={setPage}
+            onPageSizeChange={(sz) => { setPageSize(sz); setPage(1); }}
+          />
         </div>
 
         {/* Main */}
@@ -401,24 +409,24 @@ export const BillMatchingPage = () => {
                         <thead className="bg-slate-50 font-semibold text-slate-500 tracking-wide border-b border-slate-200">
                           <tr>
                             <th className="py-2.5 px-2 text-center w-8">#</th>
-                            <th className="py-2.5 px-2">Fabric</th>
-                            <th className="py-2.5 px-2 text-right">{matching?.isAgencyMatch ? 'Final JW Qty' : 'PO Qty (M)'}</th>
-                            <th className="py-2.5 px-2 text-right">{matching?.isAgencyMatch ? 'Orig PO Qty' : 'GRN Qty (M)'}</th>
-                            <th className="py-2.5 px-2 text-right">Bill Qty (M)</th>
-                            <th className="py-2.5 px-2 text-right">{matching?.isAgencyMatch ? 'Final Rate (₹/M)' : 'PO Rate (₹/M)'}</th>
-                            <th className="py-2.5 px-2 text-right">Bill Rate (₹/M)</th>
-                            <th className="py-2.5 px-2 text-right">{matching?.isAgencyMatch ? 'Final Amount (₹)' : 'PO Amount (₹)'}</th>
-                            <th className="py-2.5 px-2 text-right">Bill Amount (₹)</th>
-                            <th className="py-2.5 px-2 text-center">Qty Match</th>
-                            <th className="py-2.5 px-2 text-center">Rate Match</th>
-                            <th className="py-2.5 px-2 text-center">Amount Match</th>
-                            <th className="py-2.5 px-2 text-center">Status</th>
+                            <SortableTh sort={lineSort} sortKey="fabric" className="py-2.5 px-2">Fabric</SortableTh>
+                            <SortableTh sort={lineSort} sortKey="poQty" className="py-2.5 px-2 text-right" align="right">{matching?.isAgencyMatch ? 'Final JW Qty' : 'PO Qty (M)'}</SortableTh>
+                            <SortableTh sort={lineSort} sortKey="grnQty" className="py-2.5 px-2 text-right" align="right">{matching?.isAgencyMatch ? 'Orig PO Qty' : 'GRN Qty (M)'}</SortableTh>
+                            <SortableTh sort={lineSort} sortKey="billQty" className="py-2.5 px-2 text-right" align="right">Bill Qty (M)</SortableTh>
+                            <SortableTh sort={lineSort} sortKey="poRate" className="py-2.5 px-2 text-right" align="right">{matching?.isAgencyMatch ? 'Final Rate (₹/M)' : 'PO Rate (₹/M)'}</SortableTh>
+                            <SortableTh sort={lineSort} sortKey="billRate" className="py-2.5 px-2 text-right" align="right">Bill Rate (₹/M)</SortableTh>
+                            <SortableTh sort={lineSort} sortKey="poAmount" className="py-2.5 px-2 text-right" align="right">{matching?.isAgencyMatch ? 'Final Amount (₹)' : 'PO Amount (₹)'}</SortableTh>
+                            <SortableTh sort={lineSort} sortKey="billAmount" className="py-2.5 px-2 text-right" align="right">Bill Amount (₹)</SortableTh>
+                            <SortableTh sort={lineSort} sortKey="qtyMatch" className="py-2.5 px-2 text-center" align="center">Qty Match</SortableTh>
+                            <SortableTh sort={lineSort} sortKey="rateMatch" className="py-2.5 px-2 text-center" align="center">Rate Match</SortableTh>
+                            <SortableTh sort={lineSort} sortKey="amountMatch" className="py-2.5 px-2 text-center" align="center">Amount Match</SortableTh>
+                            <SortableTh sort={lineSort} sortKey="status" className="py-2.5 px-2 text-center" align="center">Status</SortableTh>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
                           {lines.length === 0 ? (
                             <tr><td colSpan={14} className="p-6 text-center text-slate-400">No matching lines returned.</td></tr>
-                          ) : lines.map((l, idx) => (
+                          ) : lineSort.rows.map((l, idx) => (
                             <tr key={l.lineNo ?? idx} className="hover:bg-slate-50/70">
                               <td className="p-2 font-mono text-slate-400 text-center">{l.lineNo ?? idx + 1}</td>
                               <td className="p-2">

@@ -5,6 +5,8 @@ import { numIN, toDDMMYYYY, purgeLegacyJobWorkCache } from './jobWorkOrdersStore
 import { fetchJWOs, fetchPlans, createJWORow, deleteJWORow, errorMessage } from '../../services/jobWorkSync';
 import PageHeader from '../../components/ui/PageHeader';
 import TablePagination from '../../components/ui/TablePagination';
+import SortableTh from '../../components/ui/SortableTh';
+import { useTableSort } from '../../hooks/useTableSort';
 import { ConfirmModal } from '../../components/ui/ConfirmModal';
 
 const statusPill = (s) =>
@@ -134,10 +136,11 @@ export default function JobWorkInwardPage() {
     setPage(1);
   }, [inwardNo, jwoNo, vendor, process, status, fromDate, toDate]);
 
+  const sort = useTableSort(filtered);
   const pagedFiltered = useMemo(() => {
     const start = (page - 1) * pageSize;
-    return filtered.slice(start, start + pageSize);
-  }, [filtered, page, pageSize]);
+    return sort.rows.slice(start, start + pageSize);
+  }, [sort.rows, page, pageSize]);
 
   const selectedJWO = useMemo(
     () => orders.find((o) => String(o.id) === String(form.jwoId)),
@@ -282,8 +285,8 @@ export default function JobWorkInwardPage() {
             <thead>
               <tr className="border-b border-slate-100 text-[11px] font-bold text-slate-500">
                 <th className="px-3 py-2.5 w-10 text-center">#</th>
-                {['Inward No.', 'JWO No.', 'Date', 'Vendor / Processor', 'Process', 'Fabric Item', 'Fabric Quality', 'Shade / Colour', 'Lot No.', 'Taka / Roll', 'Received Qty (M)', 'Accepted Qty (M)', 'Rejected Qty (M)', 'Pending Qty (M)', 'Status'].map((h, i) => (
-                  <th key={h} className={`px-3 py-2.5 whitespace-nowrap ${i >= 10 && i <= 13 ? 'text-right' : ''} ${i === 14 ? 'text-center' : ''}`}>{h}</th>
+                {[['Inward No.', 'no'], ['JWO No.', 'jwoNo'], ['Date', 'date'], ['Vendor / Processor', 'vendor'], ['Process', 'process'], ['Fabric Item', 'fabricItem'], ['Fabric Quality', 'fabricQuality'], ['Shade / Colour', 'shade'], ['Lot No.', 'lotNo'], ['Taka / Roll', 'takaRoll'], ['Received Qty (M)', 'qty'], ['Accepted Qty (M)', 'accepted'], ['Rejected Qty (M)', 'rejected'], ['Pending Qty (M)', 'pendingQty'], ['Status', 'status']].map(([h, key], i) => (
+                  <SortableTh key={h} sort={sort} sortKey={key} align={i >= 10 && i <= 13 ? 'right' : i === 14 ? 'center' : 'left'} className={`px-3 py-2.5 whitespace-nowrap ${i >= 10 && i <= 13 ? 'text-right' : ''} ${i === 14 ? 'text-center' : ''}`}>{h}</SortableTh>
                 ))}
                 <th className="px-3 py-2.5 text-center">Actions</th>
               </tr>

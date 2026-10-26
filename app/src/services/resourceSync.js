@@ -11,13 +11,12 @@
  * "the server has nothing" from "the server did not answer" and leave what is
  * already on screen alone in the second case.
  */
-import { api, ApiError } from './api';
+import { api, ApiError, getAllPages } from './api';
 import { getStoredToken } from '../utils/authUtils';
 
 export { ApiError };
 
-/** Collections are pulled whole; the UI paginates in memory. */
-export const PAGE_SIZE = 200;
+/** Collections are pulled whole (every page, see `getAllPages`); the UI paginates in memory. */
 
 /** No token → no server. */
 export function isBackendEnabled() {
@@ -129,11 +128,10 @@ export function createSync(registry, { label = 'sync' } = {}) {
     const resource = get(key);
     if (!resource || !isBackendEnabled()) return null;
     try {
-      const body = await api.get(resource.pullPath || resource.path, {
-        // The API pages on `page_size` (default 25); `limit` is kept for older routes.
-        query: { limit: PAGE_SIZE, page_size: PAGE_SIZE, ...(resource.pullQuery || {}), ...query },
+      // Walks every page; the server serves at most 200 rows per request.
+      const rows = await getAllPages(resource.pullPath || resource.path, {
+        query: { ...(resource.pullQuery || {}), ...query },
       });
-      const rows = rowsOf(body);
       return resource.fromApi ? rows.map(resource.fromApi) : rows;
     } catch (err) {
       console.warn(`[${label}] pull ${key} failed:`, err?.message || err);

@@ -8,27 +8,17 @@ import { CalendarDays, ChevronDown, Clock3, ImagePlus, Plus, X, Building2, Shiel
 import { salesService } from "../../../services/domainServices";
 import MasterSourceLink from "../../../components/common/MasterSourceLink";
 
-/** Shipped Lead Source options — only these are offered for new selection. */
-export const DEFAULT_LEAD_SOURCES = [
-  "Broker",
-  "Sales Person",
-];
-
 /**
- * Options for the Lead Source dropdown: the backend sources are the source
- * of truth; the shipped pair only fills gaps when the workspace has no
- * sources configured yet, and the lead's current value is preserved so
- * existing rows never render blank or lose data on save.
+ * Options for the Lead Source dropdown: exactly the sources under CRM Setup →
+ * Lead Sources (the server seeds Broker / Sales Person for a new workspace).
+ * Nothing is added in the browser — a name-only option was never a real
+ * source, so a lead saved with it lost its source. The lead's current value
+ * is kept so an existing row never renders blank.
  */
 export function leadSourceOptions(sources, current) {
   // Sources deactivated under CRM Setup -> Lead Sources are not offered for
   // new selection (a lead already carrying one keeps it, see below).
   const rows = (sources || []).filter((s) => s?.isActive !== false);
-  for (const name of DEFAULT_LEAD_SOURCES) {
-    if (!(sources || []).some((s) => String(s?.name ?? '').toLowerCase() === name.toLowerCase())) {
-      rows.push({ id: name, name });
-    }
-  }
   const cur = String(current ?? '');
   if (cur && !rows.some((s) => String(s.id) === cur || String(s?.name ?? '').toLowerCase() === cur.toLowerCase())) {
     const known = (sources || []).find((s) => String(s.id) === cur);
@@ -58,8 +48,13 @@ function withFabricDefaults(sections) {
 /** Resolve the active form sections from the store, falling back to defaults. */
 function useFormSections() {
   // Subscribe so the modal re-renders when the builder saves a new layout.
-  useCrmStore((s) => s.forms);
-  return getActiveLeadFormSections();
+  const forms = useCrmStore((s) => s.forms);
+  // Memoised: getActiveLeadFormSections() builds a new array on every call,
+  // and effects keyed on `sections` then ran on every render. With the modal
+  // mounted (even closed) on the Leads page that looped forever ("Maximum
+  // update depth exceeded") and froze navigation, e.g. clicking a Lead No.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  return useMemo(() => getActiveLeadFormSections(), [forms]);
 }
 
 /**
@@ -91,6 +86,33 @@ function useSources() {
 // ---------------------------------------------------------------------------
 // Individual field renderers
 // ---------------------------------------------------------------------------
+
+function PhoneField({ field, value, onChange }) {
+  const displayVal = value !== undefined && value !== null && value !== '' ? value : '+91 ';
+
+  const handleChange = (e) => {
+    let v = e.target.value;
+    if (!v || v === '+' || v.trim() === '') {
+      onChange('+91 ');
+      return;
+    }
+    if (!v.startsWith('+91')) {
+      const cleaned = v.replace(/^\+?91\s*/, '');
+      onChange(`+91 ${cleaned}`);
+      return;
+    }
+    onChange(v);
+  };
+
+  return (
+    <input
+      type="tel"
+      placeholder={field.placeholder || "+91 98765 43210"}
+      value={displayVal}
+      onChange={handleChange}
+    />
+  );
+}
 
 function TextField({ field, value, onChange }) {
   const type =
@@ -385,7 +407,7 @@ function MultiSelectField({ field, value, onChange }) {
         <input
           ref={inputRef}
           type="text"
-          className="flex-1 min-w-[120px] text-xs bg-transparent border-none outline-none focus:ring-0 text-slate-800 placeholder-slate-400 p-0"
+          className="lead-multi-search flex-1 min-w-[120px] text-xs bg-transparent border-none outline-none focus:ring-0 text-slate-800 placeholder-slate-400 p-0"
           placeholder={selected.length === 0 ? (field.placeholder || "Search or type products...") : "Add more..."}
           value={search}
           onChange={(e) => {
@@ -547,7 +569,9 @@ export function DynamicField({ field, values, onChange, sources, userOptions }) 
     field.type === "Multi Select" ||
     field.id === "lead-users";
 
+  const isPhone = field.type === "Phone" || field.id === "lead-phone" || /phone|mobile/i.test(field.label);
   const inner = (() => {
+    if (isPhone) return <PhoneField field={field} value={value} onChange={set} />;
     switch (field.type) {
       case "Single Line":
       case "Number":
@@ -556,7 +580,7 @@ export function DynamicField({ field, values, onChange, sources, userOptions }) 
       case "Email":
         return <TextField field={field} value={value} onChange={set} />;
       case "Phone":
-        return <TextField field={field} value={value} onChange={set} />;
+        return <PhoneField field={field} value={value} onChange={set} />;
       case "Multi Line":
         return <TextAreaField field={field} value={value} onChange={set} />;
       case "Date":
@@ -604,8 +628,15 @@ export function DynamicField({ field, values, onChange, sources, userOptions }) 
           ? "items"
           : null;
 
+  // A <label> forwards every click inside it to its first control. For fields
+  // with their own buttons (multi-select chips with an ✕, image picker,
+  // checkbox/radio groups) that turned "pick an option" into "pick, then
+  // remove": the click landed on the option, then on the new chip's ✕.
+  // Those fields get a plain wrapper; simple inputs keep the label.
+  const Wrapper = ["Multi Select", "Lead Image", "Checkbox", "Radio", "User"].includes(field.type) ? "div" : "label";
+
   return (
-    <label className={`lead-create-field${isWide ? " lead-create-field-wide" : ""}`}>
+    <Wrapper className={`lead-create-field${isWide ? " lead-create-field-wide" : ""}`}>
       {masterSource ? (
         <span className="flex items-center justify-between gap-2">
           <span>{field.label}{field.required && " *"}</span>
@@ -616,7 +647,7 @@ export function DynamicField({ field, values, onChange, sources, userOptions }) 
       )}
       {inner}
       {field.helpText && <small className="lead-create-help">{field.helpText}</small>}
-    </label>
+    </Wrapper>
   );
 }
 
@@ -645,7 +676,9 @@ export function leadFormValuesToPayload(values, sections, { sources = [], userOp
   // Only a real store row may travel as sourceId (the API field is a PK —
   // a shipped-default name would 400). Unknown names still ride along as
   // `source` for local rows; the backend seed covers server rows.
-  const storeSource = (sources || []).find((s) => String(s.id) === rawSource) || null;
+  const storeSource = (sources || []).find(
+    (s) => String(s.id) === rawSource || String(s?.name || "").trim().toLowerCase() === rawSource.trim().toLowerCase()
+  ) || null;
   const rawOwner = ownerField ? String(get(ownerField.id) || "") : "";
   const storeOwner = (userOptions || []).find((m) => String(m.id) === rawOwner) || null;
   // Every captured value, keyed by field id — the leads table renders
@@ -658,7 +691,10 @@ export function leadFormValuesToPayload(values, sections, { sources = [], userOp
     leadName:    getValue("lead-name", /^\s*lead\s*name\s*$/i),
     company:     getValue("company", /comp/),
     email:       getValue("email", /^\s*e-?mail\s*$/i),
-    phone:       getValue("phone", /^\s*phone\s*$/i),
+    phone:       (() => {
+      const p = getValue("phone", /^\s*phone\s*$/i);
+      return (p && String(p).trim() !== '+91' && String(p).trim() !== '+91 ') ? String(p).trim() : '';
+    })(),
     sourceId:    storeSource ? storeSource.id : undefined,
     source:      storeSource ? storeSource.name : rawSource,
     titleValue:  getValue("title", /^\s*title\s*$/i),
@@ -723,8 +759,26 @@ export default function CreateLeadModal({ isOpen, onClose, onCreate, onEditLayou
   const isFormComplete = String(values[nameField?.id] ?? '').trim() !== '';
 
   useEffect(() => {
-    if (!isOpen) setValues({});
-  }, [isOpen]);
+    if (!isOpen) {
+      // Keep the same object when already empty, so this cannot re-render.
+      setValues((prev) => (Object.keys(prev).length ? {} : prev));
+    } else {
+      const initVals = {};
+      sections.forEach((sec) => {
+        (sec.fields || []).forEach((f) => {
+          if (f.type === "Phone" || f.id === "lead-phone" || /phone|mobile/i.test(f.label)) {
+            initVals[f.id] = "+91 ";
+          }
+        });
+      });
+      // Only fill phone prefixes that are missing; unchanged → same object.
+      setValues((prev) => {
+        const missing = Object.keys(initVals).filter((id) => !(id in prev));
+        if (missing.length === 0) return prev;
+        return { ...initVals, ...prev };
+      });
+    }
+  }, [isOpen, sections]);
 
   if (!isOpen) return null;
 

@@ -28,8 +28,6 @@ import {
   Plus,
   Users,
   Play,
-  ChevronLeft,
-  ChevronRight,
   Scale,
   Maximize2,
   Trash2,
@@ -37,6 +35,7 @@ import {
 import { inventoryService } from '../../../services/domainServices';
 import { useERP } from '../../../context/ERPContext';
 import PageInfoButton from '../../../components/ui/PageInfoButton';
+import AppPagination from '../../../components/ui/AppPagination';
 
 export default function QCPendingInspectionsPage() {
   const { purchaseBills = [], vendors = [], items = [], fabrics = [] } = useERP();
@@ -153,7 +152,6 @@ export default function QCPendingInspectionsPage() {
   }, [pendingList, searchQuery]);
 
   // Pagination calculations
-  const totalPages = Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE));
   const paginatedRows = useMemo(() => {
     const start = (currentPage - 1) * PAGE_SIZE;
     return filteredRows.slice(start, start + PAGE_SIZE);
@@ -767,50 +765,12 @@ export default function QCPendingInspectionsPage() {
         </div>
 
         {/* ── Pagination (Panel 8) ─────────────────────────────────── */}
-        <div className="p-3.5 border-t border-slate-200 flex items-center justify-between text-xs text-slate-500">
-          <span>
-            Showing {filteredRows.length > 0 ? (currentPage - 1) * PAGE_SIZE + 1 : 0} to{' '}
-            {Math.min(currentPage * PAGE_SIZE, filteredRows.length)} of {filteredRows.length} entries
-          </span>
-
-          <div className="flex items-center gap-1">
-            <button
-              type="button"
-              disabled={currentPage <= 1}
-              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-              className="p-1.5 border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-
-            {Array.from({ length: totalPages }).map((_, i) => {
-              const p = i + 1;
-              return (
-                <button
-                  key={p}
-                  type="button"
-                  onClick={() => setCurrentPage(p)}
-                  className={`w-7 h-7 rounded-lg font-semibold text-xs ${
-                    currentPage === p
-                      ? 'bg-blue-600 text-white'
-                      : 'border border-slate-200 text-slate-600 hover:bg-slate-50'
-                  }`}
-                >
-                  {p}
-                </button>
-              );
-            })}
-
-            <button
-              type="button"
-              disabled={currentPage >= totalPages}
-              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-              className="p-1.5 border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
+        <AppPagination
+          total={filteredRows.length}
+          page={currentPage}
+          pageSize={PAGE_SIZE}
+          onPageChange={setCurrentPage}
+        />
       </div>
 
       {/* ── Modal 1: Start QC Inspection (Single Row) (Panel 2) ───── */}

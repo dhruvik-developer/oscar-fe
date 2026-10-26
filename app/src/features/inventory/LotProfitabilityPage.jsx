@@ -20,6 +20,8 @@ import { StatCard } from '../../components/ui/StatCard';
 import { Button } from '../../components/ui/Button';
 import { inventoryService } from '../../services/domainServices';
 import { formatINR, formatDate, unwrapList, describeApiError } from '../accounts/accountingShared';
+import { useTableSort } from '../../hooks/useTableSort';
+import SortableTh from '../../components/ui/SortableTh';
 
 const COST_TYPE_LABELS = {
   GREY_PURCHASE: 'Grey Fabric Purchase',
@@ -161,6 +163,14 @@ export default function LotProfitabilityPage() {
   const selectedSummary = useMemo(() => {
     return profitabilityRows.find((r) => r.lotNumber === selectedLotNo) || null;
   }, [profitabilityRows, selectedLotNo]);
+
+  const entrySort = useTableSort(lotDetail?.entries || [], {
+    accessors: {
+      costType: (e) => COST_TYPE_LABELS[e.costType] || e.costType,
+      quantity: (e) => Number(e.quantity) || null,
+      amount: (e) => Number(e.amount),
+    },
+  });
 
   return (
     <div className="space-y-6">
@@ -410,12 +420,12 @@ export default function LotProfitabilityPage() {
                   <table className="w-full text-left text-xs border-collapse">
                     <thead>
                       <tr className="bg-slate-50 border-b border-[#dce5f4] text-slate-600 font-semibold uppercase text-[10.5px]">
-                        <th className="py-2.5 px-3">Date</th>
-                        <th className="py-2.5 px-3">Cost Type</th>
-                        <th className="py-2.5 px-3">Source Doc</th>
-                        <th className="py-2.5 px-3 text-right">Quantity</th>
-                        <th className="py-2.5 px-3 text-right">Amount</th>
-                        <th className="py-2.5 px-3">Remarks</th>
+                        <SortableTh sort={entrySort} sortKey="date" className="py-2.5 px-3">Date</SortableTh>
+                        <SortableTh sort={entrySort} sortKey="costType" className="py-2.5 px-3">Cost Type</SortableTh>
+                        <SortableTh sort={entrySort} sortKey="sourceDocumentType" className="py-2.5 px-3">Source Doc</SortableTh>
+                        <SortableTh sort={entrySort} sortKey="quantity" className="py-2.5 px-3 text-right" align="right">Quantity</SortableTh>
+                        <SortableTh sort={entrySort} sortKey="amount" className="py-2.5 px-3 text-right" align="right">Amount</SortableTh>
+                        <SortableTh sort={entrySort} sortKey="remarks" className="py-2.5 px-3">Remarks</SortableTh>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-[#dce5f4]">
@@ -432,7 +442,7 @@ export default function LotProfitabilityPage() {
                           </td>
                         </tr>
                       ) : (
-                        lotDetail.entries.map((entry) => (
+                        entrySort.rows.map((entry) => (
                           <tr key={entry.id} className="hover:bg-slate-50">
                             <td className="py-2.5 px-3 text-slate-600 whitespace-nowrap">
                               {formatDate(entry.date)}

@@ -5,6 +5,8 @@ import PageHeader from '../../../components/ui/PageHeader';
 import { hrmsGuides } from '../../../data/hrms/hrmsGuides';
 import { hrmsSync, isBackendEnabled } from '../../../services/hrmsSync';
 import { Plus, Award, Search, Edit2, Trash2 } from 'lucide-react';
+import { useTableSort } from '../../../hooks/useTableSort';
+import SortableTh from '../../../components/ui/SortableTh';
 
 export function DesignationsPage() {
   const showToast = useAppStore((s) => s.showToast);
@@ -37,6 +39,7 @@ export function DesignationsPage() {
       String(d.department ?? '').toLowerCase().includes(q.toLowerCase()) ||
       String(d.level ?? '').toLowerCase().includes(q.toLowerCase())
   );
+  const sort = useTableSort(filtered, { accessors: { count: (d) => d.count || 0 } });
 
   async function handleCreate(e) {
     e.preventDefault();
@@ -115,15 +118,15 @@ export function DesignationsPage() {
             <table className="w-full min-w-[640px] lg:min-w-0 text-left">
               <thead className="bg-off border-b border-bdr text-[11px] uppercase text-muted">
                 <tr>
-                  <th className="py-3 px-5">Job Title</th>
-                  <th className="py-3 px-5">Level</th>
-                  <th className="py-3 px-5">Department</th>
-                  <th className="py-3 px-5">Assigned Employees</th>
+                  <SortableTh sort={sort} sortKey="title" className="py-3 px-5">Job Title</SortableTh>
+                  <SortableTh sort={sort} sortKey="level" className="py-3 px-5">Level</SortableTh>
+                  <SortableTh sort={sort} sortKey="department" className="py-3 px-5">Department</SortableTh>
+                  <SortableTh sort={sort} sortKey="count" className="py-3 px-5">Assigned Employees</SortableTh>
                   <th className="py-3 px-5 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-bdr/40 text-[13px]">
-                {filtered.map((r) => (
+                {sort.rows.map((r) => (
                   <tr key={r.id} className="hover:bg-off/60 transition-colors">
                     <td className="py-4 px-5 font-semibold text-slate-900 flex items-center gap-2">
                       <Award size={15} className="text-navy shrink-0" />

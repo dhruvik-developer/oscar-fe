@@ -40,7 +40,6 @@ export const MASTER_SOURCES = {
   leadStageTasks: { to: '/crm/leads/stage-tasks', menu: 'CRM → Leads → Lead Stage Tasks' },
   leadForms: { to: '/crm/leads/forms', menu: 'CRM → Leads → Lead Create Form' },
   leadStages: { to: '/crm/system-setup', menu: 'CRM → CRM Setup → Lead Stages' },
-  dealStages: { to: '/crm/deal-stages', menu: 'CRM → CRM Setup → Deal Stages' },
   leadSources: { to: '/crm/lead-sources', menu: 'CRM → CRM Setup → Lead Sources' },
 
   // PMS

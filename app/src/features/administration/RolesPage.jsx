@@ -2,6 +2,7 @@ import InfoBanner from '../../components/ui/InfoBanner';
 import PageHeader from '../../components/ui/PageHeader';
 import AdministrationGuideButton from './AdministrationGuideButton';
 import KpiCard from '../../components/ui/KpiCard';
+import AppPagination from '../../components/ui/AppPagination';
 import React, { useState, useMemo, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { adminSync, duplicateRole, describeError } from '../../services/adminSync';
@@ -17,8 +18,6 @@ import {
   FileText,
   Trash2,
   CheckCircle2,
-  ChevronLeft,
-  ChevronRight,
   ChevronDown,
   ChevronUp,
   LayoutGrid,
@@ -395,9 +394,10 @@ export function RolesPage() {
     }
   }, [activeRole]);
 
-  const showNotification = (msg) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3500);
+  // tone: 'success' (green tick) or 'error' (red alert).
+  const showNotification = (msg, tone = 'success') => {
+    setToastMessage({ text: msg, tone });
+    setTimeout(() => setToastMessage(null), tone === 'error' ? 5000 : 3500);
   };
 
   const filteredRoles = useMemo(() => {
@@ -412,14 +412,10 @@ export function RolesPage() {
     });
   }, [roles, roleSearchQuery]);
 
-  const totalPages = Math.max(1, Math.ceil(filteredRoles.length / ROLES_PER_PAGE));
   const paginatedRoles = useMemo(() => {
     const start = (currentPage - 1) * ROLES_PER_PAGE;
     return filteredRoles.slice(start, start + ROLES_PER_PAGE);
   }, [filteredRoles, currentPage]);
-
-  const startCount = filteredRoles.length === 0 ? 0 : (currentPage - 1) * ROLES_PER_PAGE + 1;
-  const endCount = Math.min(currentPage * ROLES_PER_PAGE, filteredRoles.length);
 
   const stats = useMemo(() => {
     const totalRoles = roles.length;
@@ -517,7 +513,7 @@ export function RolesPage() {
   const handleUpdateRole = () => {
     if (!activeRole) return;
     if (!editingRoleName.trim()) {
-      showNotification('Please provide a valid role name.');
+      showNotification('Please provide a valid role name.', 'error');
       return;
     }
 
@@ -534,7 +530,7 @@ export function RolesPage() {
       permissions: editingPermissions,
       requiresTwoFactor: editingTwoFactor,
     })
-      .catch((err) => showNotification(`Role not saved — ${describeError(err)}`));
+      .catch((err) => showNotification(`Role not saved — ${describeError(err)}`, 'error'));
     showNotification(`Role "${name}" updated successfully!`);
   };
 
@@ -560,7 +556,7 @@ export function RolesPage() {
       setSelectedRoleId(mapped.id);
       showNotification(`Role "${targetRole.name}" duplicated successfully!`);
     } catch (err) {
-      showNotification(`Role not duplicated — ${describeError(err)}`);
+      showNotification(`Role not duplicated — ${describeError(err)}`, 'error');
     }
   };
 
@@ -576,7 +572,7 @@ export function RolesPage() {
 
     setRoles((prev) => prev.filter((r) => r.id !== target.id));
     adminSync.remove('roles', target.id)
-      .catch((err) => showNotification(`Role not deleted — ${describeError(err)}`));
+      .catch((err) => showNotification(`Role not deleted — ${describeError(err)}`, 'error'));
     setIsDeleteModalOpen(false);
     const remaining = roles.filter((r) => r.id !== target.id);
     if (remaining.length > 0 && selectedRoleId === target.id) {
@@ -601,7 +597,7 @@ export function RolesPage() {
       setIsCreateModalOpen(false);
       showNotification(`New role "${mapped.name}" created!`);
     } catch (err) {
-      showNotification(`Role not created — ${describeError(err)}`);
+      showNotification(`Role not created — ${describeError(err)}`, 'error');
     }
   };
 
@@ -609,8 +605,10 @@ export function RolesPage() {
     <div className="space-y-6">
       {toastMessage && (
         <div className="fixed top-4 right-4 left-4 sm:left-auto sm:top-6 sm:right-6 z-50 bg-[#0f172a] text-white px-4 py-3 rounded-xl shadow-2xl flex items-center gap-3 border border-slate-700 animate-in fade-in slide-in-from-top-4 duration-200">
-          <CheckCircle2 size={18} className="text-emerald-400" />
-          <span className="text-sm font-medium">{toastMessage}</span>
+          {toastMessage.tone === 'error'
+            ? <AlertTriangle size={18} className="text-rose-400 shrink-0" />
+            : <CheckCircle2 size={18} className="text-emerald-400 shrink-0" />}
+          <span className="text-sm font-medium">{toastMessage.text}</span>
         </div>
       )}
 
@@ -811,41 +809,14 @@ export function RolesPage() {
             })}
           </div>
 
-          <div className="flex items-center justify-between pt-3 border-t border-slate-100 text-xs text-slate-500">
-            <span>
-              Showing {startCount} to {endCount} of {filteredRoles.length} roles
-            </span>
-
-            <div className="flex items-center gap-1">
-              <button
-                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                disabled={currentPage === 1}
-                className="w-7 h-7 flex items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 disabled:opacity-40"
-              >
-                <ChevronLeft size={14} />
-              </button>
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map((pg) => (
-                <button
-                  key={pg}
-                  onClick={() => setCurrentPage(pg)}
-                  className={`w-7 h-7 flex items-center justify-center rounded-lg text-xs font-semibold ${
-                    currentPage === pg
-                      ? 'bg-[#1f6bff] text-white'
-                      : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
-                  }`}
-                >
-                  {pg}
-                </button>
-              ))}
-              <button
-                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                disabled={currentPage === totalPages}
-                className="w-7 h-7 flex items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 disabled:opacity-40"
-              >
-                <ChevronRight size={14} />
-              </button>
-            </div>
-          </div>
+          <AppPagination
+            total={filteredRoles.length}
+            page={currentPage}
+            pageSize={ROLES_PER_PAGE}
+            onPageChange={setCurrentPage}
+            bordered={false}
+            className="pt-3 border-t border-border"
+          />
         </div>
 
         <div className="flex-1 w-full bg-white border border-slate-200 rounded-2xl p-5 md:p-6 shadow-xs flex flex-col space-y-6">

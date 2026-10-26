@@ -6,6 +6,8 @@ import api from '../../services/api';
 import { formatDateDDMMYYYY } from '../../utils/dateUtils';
 import { formatQty } from '../../utils/uom';
 import { numIN } from '../../utils/formatters';
+import { useTableSort } from '../../hooks/useTableSort';
+import SortableTh from '../../components/ui/SortableTh';
 
 const QC_PILL = {
   Approved: 'bg-emerald-50 text-emerald-700 border-emerald-200',
@@ -74,6 +76,16 @@ export default function GrnDetailDrawer({ grn, onClose }) {
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, [grn]);
+
+  const detailLines = (detail || grn)?.lines;
+  const lineSort = useTableSort(Array.isArray(detailLines) ? detailLines : [], {
+    accessors: {
+      item: (l) => l.itemName || l.sku,
+      orderedQty: (l) => Number(l.orderedQty) || 0,
+      receivedQty: (l) => Number(l.receivedQty) || 0,
+      unitCost: (l) => Number(l.unitCost) || 0,
+    },
+  });
 
   if (!grn) return null;
 
@@ -158,15 +170,15 @@ export default function GrnDetailDrawer({ grn, onClose }) {
               <table className="w-full text-left">
                 <thead className="bg-slate-50 text-[10.5px] uppercase tracking-wider text-slate-500">
                   <tr>
-                    <th className="px-4 py-2">Item</th>
-                    <th className="px-3 py-2 text-right">Ordered</th>
-                    <th className="px-3 py-2 text-right">Received</th>
-                    <th className="px-3 py-2 text-right">Taka / Roll</th>
-                    <th className="px-3 py-2 text-right">Rate</th>
+                    <SortableTh sort={lineSort} sortKey="item" className="px-4 py-2">Item</SortableTh>
+                    <SortableTh sort={lineSort} sortKey="orderedQty" className="px-3 py-2 text-right" align="right">Ordered</SortableTh>
+                    <SortableTh sort={lineSort} sortKey="receivedQty" className="px-3 py-2 text-right" align="right">Received</SortableTh>
+                    <SortableTh sort={lineSort} sortKey="rollCount" className="px-3 py-2 text-right" align="right">Taka / Roll</SortableTh>
+                    <SortableTh sort={lineSort} sortKey="unitCost" className="px-3 py-2 text-right" align="right">Rate</SortableTh>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {lines.map((l, i) => {
+                  {lineSort.rows.map((l, i) => {
                     const short = Number(l.shortageQty) || 0;
                     const rejected = Number(l.rejectedQty) || 0;
                     const excess = Number(l.excessQty) || 0;

@@ -28,6 +28,8 @@ import {
 } from 'lucide-react';
 import { inventoryService } from '../../services/domainServices';
 import PageInfoButton from '../../components/ui/PageInfoButton';
+import { useTableSort } from '../../hooks/useTableSort';
+import SortableTh from '../../components/ui/SortableTh';
 
 // Helper for Indian Currency Formatting
 function formatINR(val) {
@@ -295,6 +297,10 @@ export function InventoryDashboardPage() {
       yLabels,
     };
   }, [data]);
+
+  const godownSort = useTableSort(data?.stockByGodown || []);
+  const recentMovements = useMemo(() => (data?.recentMovements || []).slice(0, 8), [data]);
+  const movementSort = useTableSort(recentMovements);
 
   return (
     <div className="space-y-5">
@@ -874,18 +880,18 @@ export function InventoryDashboardPage() {
             <table className="w-full text-left text-xs border-collapse">
               <thead>
                 <tr className="border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                  <th className="py-2 pr-2">Godown</th>
-                  <th className="py-2 px-2 text-right">Total Stock</th>
-                  <th className="py-2 px-2 text-right text-emerald-600">Good</th>
-                  <th className="py-2 px-2 text-right text-cyan-600">Sample</th>
-                  <th className="py-2 px-2 text-right text-rose-600">Wastage</th>
-                  <th className="py-2 px-2 text-right text-blue-600">Reprocess</th>
-                  <th className="py-2 px-2 text-right text-purple-600">Customer Return</th>
-                  <th className="py-2 pl-2 text-right text-slate-500">Grey / WIP</th>
+                  <SortableTh sort={godownSort} sortKey="godown" className="py-2 pr-2">Godown</SortableTh>
+                  <SortableTh sort={godownSort} sortKey="totalStock" className="py-2 px-2 text-right" align="right">Total Stock</SortableTh>
+                  <SortableTh sort={godownSort} sortKey="good" className="py-2 px-2 text-right text-emerald-600" align="right">Good</SortableTh>
+                  <SortableTh sort={godownSort} sortKey="sample" className="py-2 px-2 text-right text-cyan-600" align="right">Sample</SortableTh>
+                  <SortableTh sort={godownSort} sortKey="wastage" className="py-2 px-2 text-right text-rose-600" align="right">Wastage</SortableTh>
+                  <SortableTh sort={godownSort} sortKey="reprocess" className="py-2 px-2 text-right text-blue-600" align="right">Reprocess</SortableTh>
+                  <SortableTh sort={godownSort} sortKey="customerReturn" className="py-2 px-2 text-right text-purple-600" align="right">Customer Return</SortableTh>
+                  <SortableTh sort={godownSort} sortKey="greyWip" className="py-2 pl-2 text-right text-slate-500" align="right">Grey / WIP</SortableTh>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 font-mono text-[11.5px]">
-                {(data?.stockByGodown || []).map((row, idx) => (
+                {godownSort.rows.map((row, idx) => (
                   <tr key={idx} className="hover:bg-slate-50/80 transition-colors">
                     <td className="py-2 pr-2 font-sans font-bold text-slate-800">
                       {row.godown}
@@ -1108,17 +1114,17 @@ export function InventoryDashboardPage() {
             <table className="w-full text-left text-xs border-collapse">
               <thead>
                 <tr className="border-b border-slate-200 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-                  <th className="py-2 pr-1">Date</th>
-                  <th className="py-2 px-1">Type</th>
-                  <th className="py-2 px-1">Ref No.</th>
-                  <th className="py-2 px-1">Fabric</th>
-                  <th className="py-2 px-1 text-right">Qty (Mtr)</th>
-                  <th className="py-2 px-1">Category</th>
-                  <th className="py-2 pl-1">Godown</th>
+                  <SortableTh sort={movementSort} sortKey="date" className="py-2 pr-1">Date</SortableTh>
+                  <SortableTh sort={movementSort} sortKey="type" className="py-2 px-1">Type</SortableTh>
+                  <SortableTh sort={movementSort} sortKey="refNo" className="py-2 px-1">Ref No.</SortableTh>
+                  <SortableTh sort={movementSort} sortKey="fabric" className="py-2 px-1">Fabric</SortableTh>
+                  <SortableTh sort={movementSort} sortKey="qty" className="py-2 px-1 text-right" align="right">Qty (Mtr)</SortableTh>
+                  <SortableTh sort={movementSort} sortKey="category" className="py-2 px-1">Category</SortableTh>
+                  <SortableTh sort={movementSort} sortKey="godown" className="py-2 pl-1">Godown</SortableTh>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-[11px]">
-                {(data?.recentMovements || []).slice(0, 8).map((m, idx) => {
+                {movementSort.rows.map((m, idx) => {
                   // Category Badge Colors
                   const catBadgeColors = {
                     Inward: 'bg-emerald-50 text-emerald-700 border-emerald-200',

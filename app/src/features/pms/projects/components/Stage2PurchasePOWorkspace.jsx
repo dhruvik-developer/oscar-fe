@@ -26,6 +26,8 @@ import {
 import { usePmsStore } from '../../../../stores/pmsStore';
 import { useERP } from '../../../../context/ERPContext';
 import MasterSourceLink from '../../../../components/common/MasterSourceLink';
+import { useTableSort } from '../../../../hooks/useTableSort';
+import { SortableTh } from '../../../../components/ui/SortableTh';
 
 export function Stage2PurchasePOWorkspace({
   project,
@@ -284,6 +286,16 @@ export function Stage2PurchasePOWorkspace({
       ? Math.min(100, Math.round((totalOrderedQty / shortageMeters) * 100))
       : 100;
 
+  const poSort = useTableSort(purchaseOrders, {
+    accessors: {
+      itemName: (po) => po.itemName || 'Grey Fabric',
+      qty: (po) => Number(po.qty || 0),
+      rate: (po) => Number(po.rate || 0),
+      grandTotal: (po) => Number(po.grandTotal || 0),
+      status: (po) => po.status || 'Draft',
+    },
+  });
+
   return (
     <div className="space-y-4">
       {/* Stage Header Banner */}
@@ -389,19 +401,19 @@ export function Stage2PurchasePOWorkspace({
             <table className="w-full text-xs text-left">
               <thead>
                 <tr className="border-b border-[#dce5f4] bg-slate-50 text-slate-600 font-semibold uppercase text-[10px] tracking-wider">
-                  <th className="py-3 px-3.5">PO Number</th>
-                  <th className="py-3 px-3">Date</th>
-                  <th className="py-3 px-3">Supplier / Vendor</th>
-                  <th className="py-3 px-3">Fabric Quality / Item</th>
-                  <th className="py-3 px-3 text-right">Qty (m)</th>
-                  <th className="py-3 px-3 text-right">Rate (₹/m)</th>
-                  <th className="py-3 px-3 text-right">Total Amount (₹)</th>
-                  <th className="py-3 px-3 text-center">Status</th>
+                  <SortableTh sort={poSort} sortKey="poNumber" className="py-3 px-3.5">PO Number</SortableTh>
+                  <SortableTh sort={poSort} sortKey="docDate" className="py-3 px-3">Date</SortableTh>
+                  <SortableTh sort={poSort} sortKey="vendorName" className="py-3 px-3">Supplier / Vendor</SortableTh>
+                  <SortableTh sort={poSort} sortKey="itemName" className="py-3 px-3">Fabric Quality / Item</SortableTh>
+                  <SortableTh sort={poSort} sortKey="qty" className="py-3 px-3 text-right" align="right">Qty (m)</SortableTh>
+                  <SortableTh sort={poSort} sortKey="rate" className="py-3 px-3 text-right" align="right">Rate (₹/m)</SortableTh>
+                  <SortableTh sort={poSort} sortKey="grandTotal" className="py-3 px-3 text-right" align="right">Total Amount (₹)</SortableTh>
+                  <SortableTh sort={poSort} sortKey="status" className="py-3 px-3 text-center" align="center">Status</SortableTh>
                   <th className="py-3 px-3 text-center">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {purchaseOrders.map((po) => {
+                {poSort.rows.map((po) => {
                   const statusColors = {
                     Draft: 'bg-slate-100 text-slate-700 border-slate-200',
                     'Pending Approval': 'bg-amber-50 text-amber-700 border-amber-200',

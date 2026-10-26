@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import LeadFormBuilder from './LeadFormBuilder';
 import { createFieldFromType, defaultLeadFormSections } from '../../../data/crm/leadFormSchema';
 import { useCrmStore } from '../../../stores/crmStore';
@@ -7,8 +7,10 @@ import { loadForms, saveForms, findForm, getActiveFormId, setActiveFormId, LEAD_
 
 export default function LeadFormBuilderPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
   const formId = searchParams.get('formId') || getActiveFormId() || null;
+  const from = location.state?.from || searchParams.get('from');
 
   // The form being edited, from `/crm/forms/`.
   const storeForms = useCrmStore((s) => s.forms);
@@ -153,19 +155,23 @@ export default function LeadFormBuilderPage() {
 
   function persistSections() {
     const forms = loadForms(LEAD_FORM);
-    // When the builder was opened with no formId and no toggled-on form,
-    // `targetId` used to be `null` — saving `{ id: null }` meant the next
-    // load fell back to `defaultLeadFormSections` (with Email back in it).
-    // Generate a real local id and toggle it on instead.
     let targetId = currentForm?.id || formId;
     if (!targetId) {
       targetId = `lead-form-${Date.now()}`;
-      setActiveFormId(targetId);
     }
+    setActiveFormId(targetId);
     const updated = forms.some((f) => f.id === targetId)
       ? forms.map((f) => (f.id === targetId ? { ...f, sections: leadFormSections } : f))
       : [...forms, { id: targetId, name: currentForm?.name || 'Lead create form', sections: leadFormSections }];
     saveForms(updated, LEAD_FORM);
+  }
+
+  function handleBack() {
+    if (from === 'forms') {
+      navigate('/crm/leads/forms');
+    } else {
+      navigate('/crm/leads?create=1', { state: { openCreateModal: true } });
+    }
   }
 
   function saveLeadForm() {
@@ -173,8 +179,8 @@ export default function LeadFormBuilderPage() {
     setSaveSuccess(true);
     setTimeout(() => {
       setSaveSuccess(false);
-      navigate('/crm/leads/forms');
-    }, 600);
+      navigate('/crm/leads?create=1', { state: { openCreateModal: true } });
+    }, 450);
   }
 
   return (
@@ -193,6 +199,7 @@ export default function LeadFormBuilderPage() {
       onDuplicateSection={duplicateLeadFormSection}
       onPreview={openLeadCreateForm}
       onSaveAndOpen={saveLeadForm}
+      onBack={handleBack}
       saveSuccess={saveSuccess}
       formTitle={currentForm?.name}
     />

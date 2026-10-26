@@ -10,8 +10,6 @@ import {
   Clock,
   RefreshCw,
   XCircle,
-  ChevronLeft,
-  ChevronRight,
   FileSpreadsheet,
   X,
   Layers,
@@ -23,6 +21,7 @@ import {
 import { inventoryService } from '../../../services/domainServices';
 import { useERP } from '../../../context/ERPContext';
 import PageInfoButton from '../../../components/ui/PageInfoButton';
+import AppPagination from '../../../components/ui/AppPagination';
 import MasterSourceLink from '../../../components/common/MasterSourceLink';
 
 export default function QCInspectionRegisterPage() {
@@ -252,7 +251,6 @@ export default function QCInspectionRegisterPage() {
   }, [records, searchQuery]);
 
   // Pagination
-  const totalPages = Math.max(1, Math.ceil(filteredRecords.length / PAGE_SIZE));
   const paginatedRows = useMemo(() => {
     const start = (currentPage - 1) * PAGE_SIZE;
     return filteredRecords.slice(start, start + PAGE_SIZE);
@@ -772,42 +770,12 @@ export default function QCInspectionRegisterPage() {
         </div>
 
         {/* Table Footer / Pagination (Panel 4) */}
-        <div className="p-4 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-600">
-          <div>
-            Showing {filteredRecords.length ? (currentPage - 1) * PAGE_SIZE + 1 : 0} to{' '}
-            {Math.min(currentPage * PAGE_SIZE, filteredRecords.length)} of {filteredRecords.length} entries
-          </div>
-
-          <div className="flex items-center space-x-1">
-            <button
-              disabled={currentPage <= 1}
-              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-              className="p-1.5 rounded border border-slate-200 bg-white hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-            {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => i + 1).map((page) => (
-              <button
-                key={page}
-                onClick={() => setCurrentPage(page)}
-                className={`w-7 h-7 rounded text-xs font-medium border transition ${
-                  currentPage === page
-                    ? 'bg-blue-600 text-white border-blue-600 shadow-2xs'
-                    : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
-                }`}
-              >
-                {page}
-              </button>
-            ))}
-            <button
-              disabled={currentPage >= totalPages}
-              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-              className="p-1.5 rounded border border-slate-200 bg-white hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
+        <AppPagination
+          total={filteredRecords.length}
+          page={currentPage}
+          pageSize={PAGE_SIZE}
+          onPageChange={setCurrentPage}
+        />
       </div>
 
 

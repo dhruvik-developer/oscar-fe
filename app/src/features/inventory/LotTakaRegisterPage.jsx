@@ -22,8 +22,6 @@ import {
   Tag,
   Check,
   ChevronDown,
-  ChevronLeft,
-  ChevronRight,
   Barcode,
   Image as ImageIcon,
   Sparkles,
@@ -47,6 +45,7 @@ import QRCode from 'qrcode';
 import { TakaTagLabel } from './TakaTagPrintPage';
 import PageInfoButton from '../../components/ui/PageInfoButton';
 import KpiCard from '../../components/ui/KpiCard';
+import AppPagination from '../../components/ui/AppPagination';
 import MasterSourceLink from '../../components/common/MasterSourceLink';
 
 // Helper for Indian Currency formatting
@@ -817,8 +816,6 @@ export default function LotTakaRegisterPage({
     const start = (currentPage - 1) * pageSize;
     return all.slice(start, start + pageSize);
   }, [data, currentPage, pageSize]);
-
-  const totalPages = Math.ceil((data?.records?.length || 0) / pageSize) || 1;
 
   const isAllPageSelected =
     paginatedRecords.length > 0 && paginatedRecords.every((r) => selectedRowIds.has(r.id));
@@ -1684,55 +1681,14 @@ export default function LotTakaRegisterPage({
               </div>
 
               {/* Pagination Controls */}
-              <div className="p-3 bg-white border-t border-slate-200 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-600">
-                <div>
-                  Showing{' '}
-                  <span className="font-bold text-slate-900">
-                    {data?.records?.length ? (currentPage - 1) * pageSize + 1 : 0}
-                  </span>{' '}
-                  to{' '}
-                  <span className="font-bold text-slate-900">
-                    {Math.min(currentPage * pageSize, data?.records?.length || 0)}
-                  </span>{' '}
-                  of <span className="font-bold text-slate-900">{data?.records?.length || 0}</span> entries
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <select
-                    value={pageSize}
-                    onChange={(e) => {
-                      setPageSize(Number(e.target.value));
-                      setCurrentPage(1);
-                    }}
-                    className="h-7 px-2 bg-slate-50 border border-slate-200 rounded text-xs font-semibold text-slate-700 cursor-pointer"
-                  >
-                    <option value={10}>10</option>
-                    <option value={25}>25</option>
-                    <option value={50}>50</option>
-                    <option value={100}>100</option>
-                  </select>
-
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                      disabled={currentPage === 1}
-                      className="w-7 h-7 grid place-items-center bg-white border border-slate-200 rounded text-slate-600 hover:bg-slate-50 disabled:opacity-40 cursor-pointer"
-                    >
-                      <ChevronLeft size={14} />
-                    </button>
-                    <span className="px-2 text-xs font-bold text-slate-800">
-                      {currentPage} / {totalPages}
-                    </span>
-                    <button
-                      onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                      disabled={currentPage >= totalPages}
-                      className="w-7 h-7 grid place-items-center bg-white border border-slate-200 rounded text-slate-600 hover:bg-slate-50 disabled:opacity-40 cursor-pointer"
-                    >
-                      <ChevronRight size={14} />
-                    </button>
-                  </div>
-                </div>
-              </div>
+              <AppPagination
+                total={data?.records?.length || 0}
+                page={currentPage}
+                pageSize={pageSize}
+                onPageChange={setCurrentPage}
+                onPageSizeChange={setPageSize}
+                pageSizeOptions={[10, 25, 50, 100]}
+              />
             </>
           )}
         </div>

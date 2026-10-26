@@ -6,8 +6,6 @@ import {
   Eye,
   SquarePen,
   MoreHorizontal,
-  ChevronLeft,
-  ChevronRight,
   X,
   Trash2,
   Check,
@@ -33,6 +31,9 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { fabricMasterSync, isBackendEnabled, describeError } from '../../services/fabricMasterSync';
 import { uploadFileToBackend } from '../../services/fileUploadService';
 import PageInfoButton from '../../components/ui/PageInfoButton';
+import AppPagination from '../../components/ui/AppPagination';
+import { useTableSort } from '../../hooks/useTableSort';
+import SortableTh from '../../components/ui/SortableTh';
 
 const PER_PAGE = 10;
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
@@ -179,9 +180,13 @@ export const CategoriesPage = () => {
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PER_PAGE));
   const safePage = Math.min(page, totalPages);
-  const pageItems = filtered.slice((safePage - 1) * PER_PAGE, safePage * PER_PAGE);
-  const from = filtered.length === 0 ? 0 : (safePage - 1) * PER_PAGE + 1;
-  const to = Math.min(safePage * PER_PAGE, filtered.length);
+  const sort = useTableSort(filtered, {
+    accessors: {
+      parent: (c) => c.parentName || byId(c.parentId || c.parent)?.name || '',
+      status: (c) => (c.isActive !== false ? 'Active' : 'Inactive'),
+    },
+  });
+  const pageItems = sort.rows.slice((safePage - 1) * PER_PAGE, safePage * PER_PAGE);
 
   // Form open handlers
   const openCreate = () => {
@@ -568,11 +573,11 @@ export const CategoriesPage = () => {
             <thead>
               <tr className="border-b border-slate-200 bg-[#f8fafc] text-slate-700 font-semibold text-xs">
                 <th className="px-3.5 py-3.5 w-12 text-center text-slate-500 font-medium">#</th>
-                <th className="px-3.5 py-3.5 font-semibold text-slate-800">Category Code</th>
-                <th className="px-3.5 py-3.5 font-semibold text-slate-800">Category Name</th>
-                <th className="px-3.5 py-3.5 font-semibold text-slate-800">Parent Category</th>
-                <th className="px-3.5 py-3.5 font-semibold text-slate-800">Description</th>
-                <th className="px-3.5 py-3.5 font-semibold text-slate-800 text-center">Status</th>
+                <SortableTh sort={sort} sortKey="code" className="px-3.5 py-3.5 font-semibold text-slate-800">Category Code</SortableTh>
+                <SortableTh sort={sort} sortKey="name" className="px-3.5 py-3.5 font-semibold text-slate-800">Category Name</SortableTh>
+                <SortableTh sort={sort} sortKey="parent" className="px-3.5 py-3.5 font-semibold text-slate-800">Parent Category</SortableTh>
+                <SortableTh sort={sort} sortKey="description" className="px-3.5 py-3.5 font-semibold text-slate-800">Description</SortableTh>
+                <SortableTh sort={sort} sortKey="status" className="px-3.5 py-3.5 font-semibold text-slate-800 text-center" align="center">Status</SortableTh>
                 <th className="px-4 py-3.5 font-semibold text-slate-800 text-center">Action</th>
               </tr>
             </thead>
@@ -718,48 +723,12 @@ export const CategoriesPage = () => {
         </div>
 
         {/* ── Slide 2: Pagination Footer ── */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 py-3 border-t border-slate-100 text-xs text-slate-600 bg-white">
-          <div>
-            Showing {from} to {to} of {filtered.length} entries
-          </div>
-
-          <div className="flex items-center gap-1">
-            <button
-              type="button"
-              disabled={safePage <= 1}
-              onClick={() => setPage(safePage - 1)}
-              className="p-1.5 rounded-lg border border-slate-200 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-slate-50 transition cursor-pointer"
-              aria-label="Previous page"
-            >
-              <ChevronLeft className="w-3.5 h-3.5 text-slate-600" />
-            </button>
-
-            {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
-              <button
-                key={pageNum}
-                type="button"
-                onClick={() => setPage(pageNum)}
-                className={`w-7 h-7 rounded-md text-xs font-semibold transition cursor-pointer flex items-center justify-center ${
-                  pageNum === safePage
-                    ? 'bg-[#1e60f2] text-white shadow-2xs'
-                    : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50'
-                }`}
-              >
-                {pageNum}
-              </button>
-            ))}
-
-            <button
-              type="button"
-              disabled={safePage >= totalPages}
-              onClick={() => setPage(safePage + 1)}
-              className="p-1.5 rounded-lg border border-slate-200 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-slate-50 transition cursor-pointer"
-              aria-label="Next page"
-            >
-              <ChevronRight className="w-3.5 h-3.5 text-slate-600" />
-            </button>
-          </div>
-        </div>
+        <AppPagination
+          total={filtered.length}
+          page={safePage}
+          pageSize={PER_PAGE}
+          onPageChange={setPage}
+        />
       </div>
 
       {/* ── Slide 3 & 4: Add / Edit Modal Popup (Matching Slides 3 & 4 Exactly) ── */}

@@ -9,6 +9,8 @@ import PageHeader from "../../../components/ui/PageHeader";
 import { hrmsGuides } from "../../../data/hrms/hrmsGuides";
 import { Avatar } from "../../../components/hrms/Avatar";
 import MasterSourceLink from "../../../components/common/MasterSourceLink";
+import { useTableSort } from "../../../hooks/useTableSort";
+import SortableTh from "../../../components/ui/SortableTh";
 import {
   Calendar,
   Search,
@@ -413,6 +415,14 @@ export default function Leave() {
       mine,
     };
   }, [leaves, currentUser, delegateNameOf]);
+
+  const delegationSort = useTableSort(tab === "assigned" ? userDelegations.assigned : userDelegations.mine, {
+    accessors: { dates: (r) => String(r.dates || "").split(" – ")[0] },
+  });
+  const compOffSort = useTableSort(compOffCredits);
+  const encashmentSort = useTableSort(encashments, {
+    accessors: { amount: (e) => e.amount || e.days * 2083 },
+  });
 
   const pendingCount = leaves.filter((l) => PENDING_STATUSES.includes(l.status)).length;
 
@@ -1067,16 +1077,16 @@ export default function Leave() {
             <table className="w-full min-w-[720px] lg:min-w-0 text-left">
               <thead className="bg-slate-50/75 border-y border-bdr text-[11px] uppercase tracking-wider text-muted font-bold">
                 <tr>
-                  <th className="py-3.5 px-5">Colleague</th>
-                  <th className="py-3.5 px-5">Leave Period</th>
-                  <th className="py-3.5 px-5">Handover Deliverables</th>
-                  <th className="py-3.5 px-5">Type</th>
-                  <th className="py-3.5 px-5">Status</th>
+                  <SortableTh sort={delegationSort} sortKey="emp" className="py-3.5 px-5">Colleague</SortableTh>
+                  <SortableTh sort={delegationSort} sortKey="dates" className="py-3.5 px-5">Leave Period</SortableTh>
+                  <SortableTh sort={delegationSort} sortKey="note" className="py-3.5 px-5">Handover Deliverables</SortableTh>
+                  <SortableTh sort={delegationSort} sortKey="type" className="py-3.5 px-5">Type</SortableTh>
+                  <SortableTh sort={delegationSort} sortKey="status" className="py-3.5 px-5">Status</SortableTh>
                   <th className="py-3.5 px-5 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-bdr/40 text-[13px]">
-                {(tab === "assigned" ? userDelegations.assigned : userDelegations.mine).map((r, i) => (
+                {delegationSort.rows.map((r, i) => (
                   <tr key={r.id || i} className="hover:bg-slate-50/60 transition">
                     <td className="py-3.5 px-5">
                       <div className="flex items-center gap-2.5">
@@ -1126,17 +1136,17 @@ export default function Leave() {
             <table className="w-full min-w-[720px] lg:min-w-0 text-left">
               <thead className="bg-slate-50/75 border-y border-bdr text-[11px] uppercase tracking-wider text-muted font-bold">
                 <tr>
-                  <th className="py-3.5 px-5">Claim ID &amp; Employee</th>
-                  <th className="py-3.5 px-5">Worked Date &amp; Hours</th>
-                  <th className="py-3.5 px-5">Credit Entitlement</th>
-                  <th className="py-3.5 px-5">Project / Justification</th>
-                  <th className="py-3.5 px-5">Expiry Window</th>
-                  <th className="py-3.5 px-5">Status</th>
+                  <SortableTh sort={compOffSort} sortKey="employee" className="py-3.5 px-5">Claim ID &amp; Employee</SortableTh>
+                  <SortableTh sort={compOffSort} sortKey="workedDate" className="py-3.5 px-5">Worked Date &amp; Hours</SortableTh>
+                  <SortableTh sort={compOffSort} sortKey="creditDays" className="py-3.5 px-5">Credit Entitlement</SortableTh>
+                  <SortableTh sort={compOffSort} sortKey="reason" className="py-3.5 px-5">Project / Justification</SortableTh>
+                  <SortableTh sort={compOffSort} sortKey="expiryDate" className="py-3.5 px-5">Expiry Window</SortableTh>
+                  <SortableTh sort={compOffSort} sortKey="status" className="py-3.5 px-5">Status</SortableTh>
                   <th className="py-3.5 px-5 text-right">Approval Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-bdr/40 text-[13px]">
-                {compOffCredits.map((c) => (
+                {compOffSort.rows.map((c) => (
                   <tr key={c.id} className="hover:bg-slate-50/60 transition">
                     <td className="py-3.5 px-5">
                       <div className="flex items-center gap-2.5">
@@ -1212,17 +1222,17 @@ export default function Leave() {
             <table className="w-full min-w-[720px] lg:min-w-0 text-left">
               <thead className="bg-slate-50/75 border-y border-bdr text-[11px] uppercase tracking-wider text-muted font-bold">
                 <tr>
-                  <th className="py-3.5 px-5">Request ID &amp; Employee</th>
-                  <th className="py-3.5 px-5">Encashed Days</th>
-                  <th className="py-3.5 px-5">Estimated Payout Rate</th>
-                  <th className="py-3.5 px-5">Reason</th>
-                  <th className="py-3.5 px-5">Payroll Cycle</th>
-                  <th className="py-3.5 px-5">Status</th>
+                  <SortableTh sort={encashmentSort} sortKey="employee" className="py-3.5 px-5">Request ID &amp; Employee</SortableTh>
+                  <SortableTh sort={encashmentSort} sortKey="days" className="py-3.5 px-5">Encashed Days</SortableTh>
+                  <SortableTh sort={encashmentSort} sortKey="amount" className="py-3.5 px-5">Estimated Payout Rate</SortableTh>
+                  <SortableTh sort={encashmentSort} sortKey="reason" className="py-3.5 px-5">Reason</SortableTh>
+                  <SortableTh sort={encashmentSort} sortKey="processedMonth" className="py-3.5 px-5">Payroll Cycle</SortableTh>
+                  <SortableTh sort={encashmentSort} sortKey="status" className="py-3.5 px-5">Status</SortableTh>
                   <th className="py-3.5 px-5 text-right">Approval &amp; Payroll Sync</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-bdr/40 text-[13px]">
-                {encashments.map((e) => (
+                {encashmentSort.rows.map((e) => (
                   <tr key={e.id} className="hover:bg-slate-50/60 transition">
                     <td className="py-3.5 px-5">
                       <div className="flex items-center gap-2.5">

@@ -3,7 +3,6 @@ import { Outlet, useLocation } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import Topbar from './Topbar';
 import { CommandPalette } from '../common/CommandPalette';
-import { FloatingSupportModal } from '../common/FloatingSupportModal';
 import { useAppStore } from '../../stores/appStore';
 import { useProofApprovalSync } from '../../features/pms/approval/useProofApprovalSync';
 import { useModuleHydration } from '../../hooks/useModuleHydration';
@@ -118,9 +117,6 @@ export default function MainLayout() {
         isOpen={commandPaletteOpen}
         onClose={() => setCommandPaletteOpen(false)}
       />
-
-      {/* Global Floating Need Help / Support Button */}
-      <FloatingSupportModal />
 
       {/* Global Toast */}
       {toast && (

@@ -34,6 +34,8 @@ import {
 import { usePmsStore } from '../../../../stores/pmsStore';
 import { Modal } from '../../../../components/ui/Modal';
 import { Button } from '../../../../components/ui/Button';
+import { useTableSort } from '../../../../hooks/useTableSort';
+import { SortableTh } from '../../../../components/ui/SortableTh';
 
 export function Stage12JobWorkOutwardWorkspace({
   project,
@@ -489,6 +491,14 @@ export function Stage12JobWorkOutwardWorkspace({
     }
   };
 
+  const outwardSort = useTableSort(outwardsList, {
+    accessors: {
+      challanNo: (out) => out.challanNo || out.no,
+      qty: (out) => Number(out.qty || 0),
+      rolls: (out) => (out.takas || []).length || 1,
+    },
+  });
+
   return (
     <div className="space-y-6">
       {/* ─────────────────────────────────────────────────────────────
@@ -716,19 +726,19 @@ export function Stage12JobWorkOutwardWorkspace({
               <table className="w-full text-left text-xs text-slate-700">
                 <thead className="bg-slate-50 text-[11px] font-bold text-slate-600 uppercase border-b border-slate-200">
                   <tr>
-                    <th className="p-3">Challan / DC No</th>
-                    <th className="p-3">Dispatch Date</th>
-                    <th className="p-3 text-right">Quantity</th>
-                    <th className="p-3 text-center">Rolls (Takas)</th>
-                    <th className="p-3">Transporter / Vehicle</th>
-                    <th className="p-3">LR / Bilty No</th>
-                    <th className="p-3">Expected Return</th>
-                    <th className="p-3 text-center">Status</th>
+                    <SortableTh sort={outwardSort} sortKey="challanNo" className="p-3">Challan / DC No</SortableTh>
+                    <SortableTh sort={outwardSort} sortKey="date" className="p-3">Dispatch Date</SortableTh>
+                    <SortableTh sort={outwardSort} sortKey="qty" className="p-3 text-right" align="right">Quantity</SortableTh>
+                    <SortableTh sort={outwardSort} sortKey="rolls" className="p-3 text-center" align="center">Rolls (Takas)</SortableTh>
+                    <SortableTh sort={outwardSort} sortKey="transporter" className="p-3">Transporter / Vehicle</SortableTh>
+                    <SortableTh sort={outwardSort} sortKey="lrNo" className="p-3">LR / Bilty No</SortableTh>
+                    <SortableTh sort={outwardSort} sortKey="expectedReturnDate" className="p-3">Expected Return</SortableTh>
+                    <SortableTh sort={outwardSort} sortKey="status" className="p-3 text-center" align="center">Status</SortableTh>
                     <th className="p-3 text-center">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 font-mono">
-                  {outwardsList.map((out) => (
+                  {outwardSort.rows.map((out) => (
                     <tr key={out.id} className="hover:bg-slate-50/70 transition-colors">
                       <td className="p-3 font-bold text-blue-700">
                         {out.challanNo || out.no || '—'}

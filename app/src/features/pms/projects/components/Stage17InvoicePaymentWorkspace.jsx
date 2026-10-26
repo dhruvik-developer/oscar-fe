@@ -53,6 +53,8 @@ import {
 import { usePmsStore } from '../../../../stores/pmsStore';
 import { Modal } from '../../../../components/ui/Modal';
 import { Button } from '../../../../components/ui/Button';
+import { useTableSort } from '../../../../hooks/useTableSort';
+import { SortableTh } from '../../../../components/ui/SortableTh';
 
 const n = (v) => Number(v || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 });
 const todayISO = () => new Date().toISOString().slice(0, 10);
@@ -484,6 +486,29 @@ export function Stage17InvoicePaymentWorkspace({
     ? Math.max(0, Number(selectedInvoiceForPayment.outstandingBalance || 0) - Number(payAmount || 0))
     : 0;
 
+  const lineQty = (doc) => doc.lines?.reduce((s, l) => s + (l.qty || 0), 0) || 0;
+  const proformaSort = useTableSort(filteredProformas, {
+    accessors: {
+      itemName: (pi) => pi.lines?.[0]?.itemName || 'Finished Fabric',
+      taxableValue: (pi) => Number(pi.taxableValue || pi.subtotal || 0),
+      totalTax: (pi) => Number(pi.totalTax || 0),
+      total: (pi) => Number(pi.total || 0),
+    },
+  });
+  const finalInvoiceSort = useTableSort(filteredFinalInvoices, {
+    accessors: {
+      challanNumber: (inv) => inv.challanNumber || inv.proformaNumber,
+      billedQty: lineQty,
+      taxableValue: (inv) => Number(inv.taxableValue || inv.subtotal || 0),
+      total: (inv) => Number(inv.total || 0),
+      amountPaid: (inv) => Number(inv.amountPaid || 0),
+      outstandingBalance: (inv) => Number(inv.outstandingBalance || 0),
+    },
+  });
+  const paymentSort = useTableSort(filteredPayments, {
+    accessors: { amount: (p) => Number(p.amount || 0) },
+  });
+
   return (
     <div className="space-y-6">
       {/* 1. LIFECYCLE HEADER (Matching Stage 11, Stage 15 & Stage 16 design) */}
@@ -807,19 +832,19 @@ export function Stage17InvoicePaymentWorkspace({
               <table className="w-full text-left text-xs">
                 <thead className="bg-slate-50 text-[11px] font-bold text-slate-600 uppercase border-b border-slate-200">
                   <tr>
-                    <th className="py-3 px-3.5">Proforma No</th>
-                    <th className="py-3 px-3.5">Date / Validity</th>
-                    <th className="py-3 px-3.5">Items / Lines</th>
-                    <th className="py-3 px-3.5 text-right">Taxable Value</th>
-                    <th className="py-3 px-3.5 text-right">Total Tax</th>
-                    <th className="py-3 px-3.5 text-right">Total Amount</th>
-                    <th className="py-3 px-3.5 text-center">Status</th>
+                    <SortableTh sort={proformaSort} sortKey="proformaNumber" className="py-3 px-3.5">Proforma No</SortableTh>
+                    <SortableTh sort={proformaSort} sortKey="docDate" className="py-3 px-3.5">Date / Validity</SortableTh>
+                    <SortableTh sort={proformaSort} sortKey="itemName" className="py-3 px-3.5">Items / Lines</SortableTh>
+                    <SortableTh sort={proformaSort} sortKey="taxableValue" className="py-3 px-3.5 text-right" align="right">Taxable Value</SortableTh>
+                    <SortableTh sort={proformaSort} sortKey="totalTax" className="py-3 px-3.5 text-right" align="right">Total Tax</SortableTh>
+                    <SortableTh sort={proformaSort} sortKey="total" className="py-3 px-3.5 text-right" align="right">Total Amount</SortableTh>
+                    <SortableTh sort={proformaSort} sortKey="status" className="py-3 px-3.5 text-center" align="center">Status</SortableTh>
                     <th className="py-3 px-3.5 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {filteredProformas.length > 0 ? (
-                    filteredProformas.map((pi) => {
+                    proformaSort.rows.map((pi) => {
                       const totalQty = pi.lines?.reduce((s, l) => s + (l.qty || 0), 0) || 0;
                       return (
                         <tr key={pi.id} className="hover:bg-slate-50/70 transition-colors">
@@ -971,21 +996,21 @@ export function Stage17InvoicePaymentWorkspace({
               <table className="w-full text-left text-xs">
                 <thead className="bg-slate-50 text-[11px] font-bold text-slate-600 uppercase border-b border-slate-200">
                   <tr>
-                    <th className="py-3 px-3.5">Invoice No</th>
-                    <th className="py-3 px-3.5">Date / Ref</th>
-                    <th className="py-3 px-3.5">Challan / PI</th>
-                    <th className="py-3 px-3.5 text-right">Billed Qty</th>
-                    <th className="py-3 px-3.5 text-right">Taxable</th>
-                    <th className="py-3 px-3.5 text-right">Grand Total</th>
-                    <th className="py-3 px-3.5 text-right">Amount Paid</th>
-                    <th className="py-3 px-3.5 text-right">Balance Due</th>
-                    <th className="py-3 px-3.5 text-center">Status</th>
+                    <SortableTh sort={finalInvoiceSort} sortKey="invoiceNumber" className="py-3 px-3.5">Invoice No</SortableTh>
+                    <SortableTh sort={finalInvoiceSort} sortKey="docDate" className="py-3 px-3.5">Date / Ref</SortableTh>
+                    <SortableTh sort={finalInvoiceSort} sortKey="challanNumber" className="py-3 px-3.5">Challan / PI</SortableTh>
+                    <SortableTh sort={finalInvoiceSort} sortKey="billedQty" className="py-3 px-3.5 text-right" align="right">Billed Qty</SortableTh>
+                    <SortableTh sort={finalInvoiceSort} sortKey="taxableValue" className="py-3 px-3.5 text-right" align="right">Taxable</SortableTh>
+                    <SortableTh sort={finalInvoiceSort} sortKey="total" className="py-3 px-3.5 text-right" align="right">Grand Total</SortableTh>
+                    <SortableTh sort={finalInvoiceSort} sortKey="amountPaid" className="py-3 px-3.5 text-right" align="right">Amount Paid</SortableTh>
+                    <SortableTh sort={finalInvoiceSort} sortKey="outstandingBalance" className="py-3 px-3.5 text-right" align="right">Balance Due</SortableTh>
+                    <SortableTh sort={finalInvoiceSort} sortKey="status" className="py-3 px-3.5 text-center" align="center">Status</SortableTh>
                     <th className="py-3 px-3.5 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {filteredFinalInvoices.length > 0 ? (
-                    filteredFinalInvoices.map((inv) => {
+                    finalInvoiceSort.rows.map((inv) => {
                       const totalQty = inv.lines?.reduce((s, l) => s + (l.qty || 0), 0) || 0;
                       return (
                         <tr key={inv.id} className="hover:bg-slate-50/70 transition-colors">
@@ -1114,20 +1139,20 @@ export function Stage17InvoicePaymentWorkspace({
               <table className="w-full text-left text-xs">
                 <thead className="bg-slate-50 text-[11px] font-bold text-slate-600 uppercase border-b border-slate-200">
                   <tr>
-                    <th className="py-3 px-3.5">Payment Voucher</th>
-                    <th className="py-3 px-3.5">Date</th>
-                    <th className="py-3 px-3.5">Allocated Invoice</th>
-                    <th className="py-3 px-3.5">Mode</th>
-                    <th className="py-3 px-3.5">Bank / Account</th>
-                    <th className="py-3 px-3.5">Reference / UTR</th>
-                    <th className="py-3 px-3.5 text-right">Amount Received</th>
-                    <th className="py-3 px-3.5 text-center">Status</th>
+                    <SortableTh sort={paymentSort} sortKey="paymentNumber" className="py-3 px-3.5">Payment Voucher</SortableTh>
+                    <SortableTh sort={paymentSort} sortKey="paymentDate" className="py-3 px-3.5">Date</SortableTh>
+                    <SortableTh sort={paymentSort} sortKey="invoiceNumber" className="py-3 px-3.5">Allocated Invoice</SortableTh>
+                    <SortableTh sort={paymentSort} sortKey="mode" className="py-3 px-3.5">Mode</SortableTh>
+                    <SortableTh sort={paymentSort} sortKey="bankAccountName" className="py-3 px-3.5">Bank / Account</SortableTh>
+                    <SortableTh sort={paymentSort} sortKey="referenceNumber" className="py-3 px-3.5">Reference / UTR</SortableTh>
+                    <SortableTh sort={paymentSort} sortKey="amount" className="py-3 px-3.5 text-right" align="right">Amount Received</SortableTh>
+                    <SortableTh sort={paymentSort} sortKey="status" className="py-3 px-3.5 text-center" align="center">Status</SortableTh>
                     <th className="py-3 px-3.5 text-right">Receipt</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {filteredPayments.length > 0 ? (
-                    filteredPayments.map((p) => (
+                    paymentSort.rows.map((p) => (
                       <tr key={p.id} className="hover:bg-slate-50/70 transition-colors">
                         <td className="py-3 px-3.5 font-mono font-bold text-emerald-700">
                           {p.paymentNumber}

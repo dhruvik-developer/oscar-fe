@@ -88,6 +88,8 @@ import CompleteTaskModal from '../tasks/CompleteTaskModal';
 import QuotationComposerPage from '../../sales/QuotationComposerPage';
 import PageInfoButton from '../../../components/ui/PageInfoButton';
 import MasterSourceLink from '../../../components/common/MasterSourceLink';
+import { leadSourceOptions } from './CreateLeadModal';
+import AppPagination from '../../../components/ui/AppPagination';
 
 const DETAIL_TABS = [
   'General',
@@ -3881,9 +3883,14 @@ function UsersProductsTab({ lead, onCountsChange, onActivity }) {
           </table>
         </div>
 
-        <div className="pt-3.5 mt-2 border-t border-slate-100 text-[11px] text-slate-400">
-          Showing 1 to {filteredUsers.length} of {filteredUsers.length} entries
-        </div>
+        <AppPagination
+          total={filteredUsers.length}
+          page={1}
+          pageSize={Math.max(1, filteredUsers.length)}
+          onPageChange={() => {}}
+          bordered={false}
+          className="pt-3.5 mt-2 border-t border-border"
+        />
       </div>
 
       {/* Requirements Card */}
@@ -4062,9 +4069,14 @@ function UsersProductsTab({ lead, onCountsChange, onActivity }) {
           </table>
         </div>
 
-        <div className="pt-3.5 mt-2 border-t border-slate-100 text-[11px] text-slate-400">
-          Showing 1 to {filteredRequirements.length} of {filteredRequirements.length} entries
-        </div>
+        <AppPagination
+          total={filteredRequirements.length}
+          page={1}
+          pageSize={Math.max(1, filteredRequirements.length)}
+          onPageChange={() => {}}
+          bordered={false}
+          className="pt-3.5 mt-2 border-t border-border"
+        />
       </div>
     </div>
   );
@@ -4075,6 +4087,7 @@ export default function LeadDetailView({ lead, onBackToLeads }) {
   const [viewLead, setViewLead] = useState(lead);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editForm, setEditForm] = useState(null);
+  const leadSources = useCrmStore((s) => s.sources);
   // Subscribed so the edit form's Lead Status list (getLeadStageOrder) re-renders
   // after stages are edited from its "+ Add / Manage" popup.
   useCrmStore((s) => s.stages);
@@ -4180,6 +4193,7 @@ export default function LeadDetailView({ lead, onBackToLeads }) {
       email: source.email ?? '',
       phone: source.phone ?? '',
       source: source.source ?? '',
+      sourceId: source.sourceId ?? '',
       status: isConverted ? 'Converted' : (source.status ?? ''),
       owner: source.owner ?? '',
       jobTitle: source.jobTitle ?? '',
@@ -4214,6 +4228,8 @@ export default function LeadDetailView({ lead, onBackToLeads }) {
       email: String(editForm.email ?? '').trim(),
       phone: String(editForm.phone ?? '').trim(),
       source: String(editForm.source ?? '').trim(),
+      // The server stores the source by id; the name is for display.
+      sourceId: editForm.sourceId || undefined,
       status: String(editForm.status ?? '').trim() || viewLead?.status,
       owner: String(editForm.owner ?? '').trim(),
       jobTitle: String(editForm.jobTitle ?? '').trim(),
@@ -4614,14 +4630,21 @@ export default function LeadDetailView({ lead, onBackToLeads }) {
               </label>
               <label className="flex flex-col gap-1 text-xs font-semibold text-slate-600">
                 Phone
-                <input className="border border-slate-200 rounded-lg px-3 py-2 text-xs font-normal text-slate-900 outline-none focus:border-blue-400" value={editForm.phone} onChange={(e) => updateEditField('phone', e.target.value)} placeholder="Enter phone number" />
+                <input className="border border-slate-200 rounded-lg px-3 py-2 text-xs font-normal text-slate-900 outline-none focus:border-blue-400" value={editForm.phone} onChange={(e) => updateEditField('phone', e.target.value)} placeholder="+91 98765 43210" />
               </label>
               <label className="flex flex-col gap-1 text-xs font-semibold text-slate-600">
                 Lead Source
-                <select className="border border-slate-200 rounded-lg px-3 py-2 text-xs font-normal text-slate-900 outline-none focus:border-blue-400 bg-white" value={editForm.source} onChange={(e) => updateEditField('source', e.target.value)}>
+                <select
+                  className="border border-slate-200 rounded-lg px-3 py-2 text-xs font-normal text-slate-900 outline-none focus:border-blue-400 bg-white"
+                  value={editForm.sourceId || (leadSources || []).find((s) => s.name === editForm.source)?.id || ''}
+                  onChange={(e) => {
+                    const picked = (leadSources || []).find((s) => String(s.id) === e.target.value);
+                    setEditForm((current) => (current ? { ...current, sourceId: e.target.value, source: picked?.name ?? '' } : current));
+                  }}
+                >
                   <option value="">Select source</option>
-                  {Array.from(new Set(['Broker', 'Sales Person', editForm.source].filter(Boolean))).map((s) => (
-                    <option key={s} value={s}>{s}</option>
+                  {leadSourceOptions(leadSources, editForm.sourceId).map((s) => (
+                    <option key={s.id} value={s.id}>{s.name}</option>
                   ))}
                 </select>
               </label>

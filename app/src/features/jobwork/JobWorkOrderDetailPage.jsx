@@ -42,6 +42,8 @@ import {
 import { api } from '../../services/api';
 import PageHeader from '../../components/ui/PageHeader';
 import KpiCard from '../../components/ui/KpiCard';
+import SortableTh from '../../components/ui/SortableTh';
+import { useTableSort } from '../../hooks/useTableSort';
 import DigitalSignatureModal from '../../components/common/DigitalSignatureModal';
 import MasterSourceLink from '../../components/common/MasterSourceLink';
 import { PrintJobWorkChallanModal } from '../../components/common/PrintJobWorkChallanModal';
@@ -283,6 +285,17 @@ export default function JobWorkOrderDetailPage() {
 
   // Charges are the server rows only — nothing is synthesised.
   const charges = useMemo(() => (jwo?.charges || []), [jwo]);
+
+  // Column sorting for the read-only sub-record tables (hooks stay above the early return).
+  const outwardSort = useTableSort(jwo?.outwards);
+  const inwardSort = useTableSort(jwo?.inwards);
+  const materialSort = useTableSort(jwo?.materials);
+  const chargeSort = useTableSort(charges, {
+    accessors: { status: (c) => c.status || 'Active' },
+  });
+  const lossSort = useTableSort(jwo?.lossEntries, {
+    accessors: { lossReasonName: (l) => l.lossReasonName || 'Process Loss' },
+  });
 
   if (!jwo) {
     return (
@@ -808,12 +821,12 @@ export default function JobWorkOrderDetailPage() {
           <thead>
             <tr className="border-b border-slate-200/80 bg-[#f8fafc] text-[11px] font-bold text-slate-700">
               <th className="px-3.5 py-2.5 w-10 text-center">#</th>
-              <th className="px-3.5 py-2.5">Outward No.</th>
-              <th className="px-3.5 py-2.5">Date</th>
-              <th className="px-3.5 py-2.5 text-center">Quantity (M)</th>
-              <th className="px-3.5 py-2.5">LR No.</th>
-              <th className="px-3.5 py-2.5">Transporter</th>
-              <th className="px-3.5 py-2.5 text-center">Status</th>
+              <SortableTh sort={outwardSort} sortKey="no" className="px-3.5 py-2.5">Outward No.</SortableTh>
+              <SortableTh sort={outwardSort} sortKey="date" className="px-3.5 py-2.5">Date</SortableTh>
+              <SortableTh sort={outwardSort} sortKey="qty" className="px-3.5 py-2.5 text-center" align="center">Quantity (M)</SortableTh>
+              <SortableTh sort={outwardSort} sortKey="lrNo" className="px-3.5 py-2.5">LR No.</SortableTh>
+              <SortableTh sort={outwardSort} sortKey="transporter" className="px-3.5 py-2.5">Transporter</SortableTh>
+              <SortableTh sort={outwardSort} sortKey="status" className="px-3.5 py-2.5 text-center" align="center">Status</SortableTh>
               <th className="px-3.5 py-2.5 text-center w-28">Actions</th>
             </tr>
           </thead>
@@ -825,7 +838,7 @@ export default function JobWorkOrderDetailPage() {
                 </td>
               </tr>
             ) : (
-              (jwo.outwards || []).map((o, i) => (
+              outwardSort.rows.map((o, i) => (
                 <tr key={o.id || i} className="border-b border-slate-100 hover:bg-slate-50/50">
                   <td className="px-3.5 py-3 text-center text-slate-500 font-medium">{i + 1}</td>
                   <td className="px-3.5 py-3">
@@ -929,13 +942,13 @@ export default function JobWorkOrderDetailPage() {
           <thead>
             <tr className="border-b border-slate-200/80 bg-[#f8fafc] text-[11px] font-bold text-slate-700">
               <th className="px-3.5 py-2.5 w-10 text-center">#</th>
-              <th className="px-3.5 py-2.5">Inward No.</th>
-              <th className="px-3.5 py-2.5">Date</th>
-              <th className="px-3.5 py-2.5 text-center">Quantity (M)</th>
-              <th className="px-3.5 py-2.5 text-center">Accepted (M)</th>
-              <th className="px-3.5 py-2.5 text-center">Rejected (M)</th>
-              <th className="px-3.5 py-2.5">Challan No.</th>
-              <th className="px-3.5 py-2.5 text-center">Status</th>
+              <SortableTh sort={inwardSort} sortKey="no" className="px-3.5 py-2.5">Inward No.</SortableTh>
+              <SortableTh sort={inwardSort} sortKey="date" className="px-3.5 py-2.5">Date</SortableTh>
+              <SortableTh sort={inwardSort} sortKey="qty" className="px-3.5 py-2.5 text-center" align="center">Quantity (M)</SortableTh>
+              <SortableTh sort={inwardSort} sortKey="accepted" className="px-3.5 py-2.5 text-center" align="center">Accepted (M)</SortableTh>
+              <SortableTh sort={inwardSort} sortKey="rejected" className="px-3.5 py-2.5 text-center" align="center">Rejected (M)</SortableTh>
+              <SortableTh sort={inwardSort} sortKey="challanNo" className="px-3.5 py-2.5">Challan No.</SortableTh>
+              <SortableTh sort={inwardSort} sortKey="status" className="px-3.5 py-2.5 text-center" align="center">Status</SortableTh>
               <th className="px-3.5 py-2.5 text-center w-28">Actions</th>
             </tr>
           </thead>
@@ -947,7 +960,7 @@ export default function JobWorkOrderDetailPage() {
                 </td>
               </tr>
             ) : (
-              (jwo.inwards || []).map((r, i) => (
+              inwardSort.rows.map((r, i) => (
                 <tr key={r.id || i} className="border-b border-slate-100 hover:bg-slate-50/50">
                   <td className="px-3.5 py-3 text-center text-slate-500 font-medium">{i + 1}</td>
                   <td className="px-3.5 py-3">
@@ -1085,13 +1098,13 @@ export default function JobWorkOrderDetailPage() {
           <thead>
             <tr className="border-b border-slate-200/80 bg-[#f8fafc] text-[11px] font-bold text-slate-700">
               <th className="px-3.5 py-2.5 w-10 text-center">#</th>
-              <th className="px-3.5 py-2.5">Fabric Item</th>
-              <th className="px-3.5 py-2.5">Fabric Quality</th>
-              <th className="px-3.5 py-2.5">Shade / Colour</th>
-              <th className="px-3.5 py-2.5">Lot No.</th>
-              <th className="px-3.5 py-2.5 text-right">Quantity (M)</th>
-              <th className="px-3.5 py-2.5 text-right">Rate (₹/M)</th>
-              <th className="px-3.5 py-2.5 text-right">Amount (₹)</th>
+              <SortableTh sort={materialSort} sortKey="fabricItem" className="px-3.5 py-2.5">Fabric Item</SortableTh>
+              <SortableTh sort={materialSort} sortKey="fabricQuality" className="px-3.5 py-2.5">Fabric Quality</SortableTh>
+              <SortableTh sort={materialSort} sortKey="shade" className="px-3.5 py-2.5">Shade / Colour</SortableTh>
+              <SortableTh sort={materialSort} sortKey="lotNo" className="px-3.5 py-2.5">Lot No.</SortableTh>
+              <SortableTh sort={materialSort} sortKey="qty" className="px-3.5 py-2.5 text-right" align="right">Quantity (M)</SortableTh>
+              <SortableTh sort={materialSort} sortKey="rate" className="px-3.5 py-2.5 text-right" align="right">Rate (₹/M)</SortableTh>
+              <SortableTh sort={materialSort} sortKey="amount" className="px-3.5 py-2.5 text-right" align="right">Amount (₹)</SortableTh>
               <th className="px-3.5 py-2.5 w-12 text-center">
                 <ChevronUp size={14} className="inline text-slate-400" />
               </th>
@@ -1105,7 +1118,7 @@ export default function JobWorkOrderDetailPage() {
                 </td>
               </tr>
             )}
-            {(jwo.materials || []).map((m, idx) => (
+            {materialSort.rows.map((m, idx) => (
               <tr key={m.id || idx} className="border-b border-slate-100 hover:bg-slate-50/50">
                 <td className="px-3.5 py-3 text-center text-slate-500 font-medium">{idx + 1}</td>
                 <td className="px-3.5 py-3 font-semibold text-slate-800">{m.fabricItem}</td>
@@ -1257,12 +1270,12 @@ export default function JobWorkOrderDetailPage() {
           <thead>
             <tr className="border-b border-slate-200/80 bg-[#f8fafc] text-[11px] font-bold text-slate-700">
               <th className="px-3.5 py-2.5 w-10 text-center">#</th>
-              <th className="px-3.5 py-2.5">Charge Type</th>
-              <th className="px-3.5 py-2.5">Description</th>
-              <th className="px-3.5 py-2.5 text-center">Rate (₹/M)</th>
-              <th className="px-3.5 py-2.5 text-center">Quantity (M)</th>
-              <th className="px-3.5 py-2.5 text-center">Amount (₹)</th>
-              <th className="px-3.5 py-2.5 text-center">Status</th>
+              <SortableTh sort={chargeSort} sortKey="type" className="px-3.5 py-2.5">Charge Type</SortableTh>
+              <SortableTh sort={chargeSort} sortKey="description" className="px-3.5 py-2.5">Description</SortableTh>
+              <SortableTh sort={chargeSort} sortKey="rate" className="px-3.5 py-2.5 text-center" align="center">Rate (₹/M)</SortableTh>
+              <SortableTh sort={chargeSort} sortKey="qty" className="px-3.5 py-2.5 text-center" align="center">Quantity (M)</SortableTh>
+              <SortableTh sort={chargeSort} sortKey="amount" className="px-3.5 py-2.5 text-center" align="center">Amount (₹)</SortableTh>
+              <SortableTh sort={chargeSort} sortKey="status" className="px-3.5 py-2.5 text-center" align="center">Status</SortableTh>
               <th className="px-3.5 py-2.5 text-center w-28">Actions</th>
             </tr>
           </thead>
@@ -1274,7 +1287,7 @@ export default function JobWorkOrderDetailPage() {
                 </td>
               </tr>
             ) : (
-              charges.map((c, idx) => (
+              chargeSort.rows.map((c, idx) => (
                 <tr key={c.id || idx} className="border-b border-slate-100 hover:bg-slate-50/50">
                   <td className="px-3.5 py-3 text-center text-slate-500 font-medium">{idx + 1}</td>
                   <td className="px-3.5 py-3 font-semibold text-slate-800">{c.type}</td>
@@ -1555,11 +1568,11 @@ export default function JobWorkOrderDetailPage() {
             <thead>
               <tr className="border-b border-slate-200/80 bg-[#f8fafc] text-[11px] font-bold text-slate-700">
                 <th className="px-3.5 py-2.5 w-10 text-center">#</th>
-                <th className="px-3.5 py-2.5">Loss Reason</th>
-                <th className="px-3.5 py-2.5 text-center">Quantity (M)</th>
-                <th className="px-3.5 py-2.5 text-center">Status</th>
-                <th className="px-3.5 py-2.5">Approved By</th>
-                <th className="px-3.5 py-2.5">Remarks</th>
+                <SortableTh sort={lossSort} sortKey="lossReasonName" className="px-3.5 py-2.5">Loss Reason</SortableTh>
+                <SortableTh sort={lossSort} sortKey="qty" className="px-3.5 py-2.5 text-center" align="center">Quantity (M)</SortableTh>
+                <SortableTh sort={lossSort} sortKey="status" className="px-3.5 py-2.5 text-center" align="center">Status</SortableTh>
+                <SortableTh sort={lossSort} sortKey="approvedBy" className="px-3.5 py-2.5">Approved By</SortableTh>
+                <SortableTh sort={lossSort} sortKey="remarks" className="px-3.5 py-2.5">Remarks</SortableTh>
                 <th className="px-3.5 py-2.5 text-center w-28">Actions</th>
               </tr>
             </thead>
@@ -1571,7 +1584,7 @@ export default function JobWorkOrderDetailPage() {
                   </td>
                 </tr>
               ) : (
-                (jwo.lossEntries || []).map((l, idx) => (
+                lossSort.rows.map((l, idx) => (
                   <tr key={l.id || idx} className="border-b border-slate-100 hover:bg-slate-50/50">
                     <td className="px-3.5 py-3 text-center text-slate-500 font-medium">{idx + 1}</td>
                     <td className="px-3.5 py-3 font-semibold text-slate-800">{l.lossReasonName || 'Process Loss'}</td>

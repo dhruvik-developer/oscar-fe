@@ -7,6 +7,8 @@ import { useNavigate } from 'react-router-dom';
 import PageHeader from '../../components/ui/PageHeader';
 import KpiCard from '../../components/ui/KpiCard';
 import TablePagination from '../../components/ui/TablePagination';
+import { useTableSort } from '../../hooks/useTableSort';
+import SortableTh from '../../components/ui/SortableTh';
 import { useERP } from '../../context/ERPContext';
 import { api } from '../../services/api';
 import GenerateFinalJobWorkPOModal from './GenerateFinalJobWorkPOModal';
@@ -97,10 +99,20 @@ export default function FinalJobWorkPOsPage() {
     setPage(1);
   }, [search, statusFilter, vendorFilter]);
 
+  const sort = useTableSort(filteredOrders, {
+    accessors: {
+      po_number: (o) => o.po_number || `PO-${o.id}`,
+      vendor: (o) => o.party_name || o.party?.name,
+      total: (o) => Number(o.total) || 0,
+      qty: (o) => (o.line_items || []).reduce((s, l) => s + (Number(l.qty) || 0), 0),
+      status: (o) => o.status || 'Draft',
+    },
+  });
+
   const paginatedOrders = useMemo(() => {
     const start = (page - 1) * pageSize;
-    return filteredOrders.slice(start, start + pageSize);
-  }, [filteredOrders, page, pageSize]);
+    return sort.rows.slice(start, start + pageSize);
+  }, [sort.rows, page, pageSize]);
 
   // KPI Computations
   const totalCount = orders.length;
@@ -226,13 +238,13 @@ export default function FinalJobWorkPOsPage() {
           <table className="w-full text-left text-[12px]">
             <thead>
               <tr className="border-b border-slate-100 bg-[#f8fafc] text-slate-500">
-                <th className="px-4 py-3 font-bold whitespace-nowrap">PO Number</th>
-                <th className="px-4 py-3 font-bold whitespace-nowrap">PO Date</th>
-                <th className="px-4 py-3 font-bold whitespace-nowrap">Agency / Vendor</th>
-                <th className="px-4 py-3 font-bold whitespace-nowrap">PI Reference</th>
-                <th className="px-4 py-3 font-bold whitespace-nowrap text-right">Billable Qty</th>
-                <th className="px-4 py-3 font-bold whitespace-nowrap text-right">Total Amount (₹)</th>
-                <th className="px-4 py-3 font-bold whitespace-nowrap text-center">Status</th>
+                <SortableTh sort={sort} sortKey="po_number" className="px-4 py-3 font-bold whitespace-nowrap">PO Number</SortableTh>
+                <SortableTh sort={sort} sortKey="doc_date" className="px-4 py-3 font-bold whitespace-nowrap">PO Date</SortableTh>
+                <SortableTh sort={sort} sortKey="vendor" className="px-4 py-3 font-bold whitespace-nowrap">Agency / Vendor</SortableTh>
+                <SortableTh sort={sort} sortKey="reference_number" className="px-4 py-3 font-bold whitespace-nowrap">PI Reference</SortableTh>
+                <SortableTh sort={sort} sortKey="qty" className="px-4 py-3 font-bold whitespace-nowrap text-right" align="right">Billable Qty</SortableTh>
+                <SortableTh sort={sort} sortKey="total" className="px-4 py-3 font-bold whitespace-nowrap text-right" align="right">Total Amount (₹)</SortableTh>
+                <SortableTh sort={sort} sortKey="status" className="px-4 py-3 font-bold whitespace-nowrap text-center" align="center">Status</SortableTh>
                 <th className="px-4 py-3 font-bold whitespace-nowrap text-right">Actions</th>
               </tr>
             </thead>

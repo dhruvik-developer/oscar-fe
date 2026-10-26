@@ -1,11 +1,14 @@
 import { useState, useMemo, useEffect } from "react";
-import { Download, ChevronRight, ChevronLeft, ChevronDown, Trash2, Eye } from "lucide-react";
+import { Download, ChevronDown, Trash2, Eye } from "lucide-react";
 import EmployeeProfileModal from "./EmployeeProfileModal";
 import Modal from "../../../components/ui/Modal";
 import { useAppStore } from "../../../stores/appStore";
 import PageHeader from "../../../components/ui/PageHeader";
+import AppPagination from "../../../components/ui/AppPagination";
 import { Avatar } from "../../../components/hrms/Avatar";
 import { hrmsGuides } from "../../../data/hrms/hrmsGuides";
+import { useTableSort } from "../../../hooks/useTableSort";
+import SortableTh from "../../../components/ui/SortableTh";
 
 const DEPARTMENTS = ["All", "Engineering", "Design", "Marketing", "Finance", "HR", "Operations", "Sales"];
 const STATUSES = ["All", "Active", "On Leave", "Probation"];
@@ -58,11 +61,17 @@ export default function Employees() {
     [employees, dept, status]
   );
 
-  const totalPages = Math.ceil(filtered.length / pageSize) || 1;
+  const sort = useTableSort(filtered, {
+    accessors: {
+      empId: (e) => e.empId || e.employeeCode || e.id,
+      manager: (e) => e.manager || e.reportingManager || "",
+    },
+  });
+
   const paginatedEmployees = useMemo(() => {
     const start = (currentPage - 1) * pageSize;
-    return filtered.slice(start, start + pageSize);
-  }, [filtered, currentPage, pageSize]);
+    return sort.rows.slice(start, start + pageSize);
+  }, [sort.rows, currentPage, pageSize]);
 
   function handleAdd() {
     if (!form.name || !form.email) return setToast("Name and email are required.", "error");
@@ -226,12 +235,12 @@ export default function Employees() {
             <table className="emp-table">
               <thead>
                 <tr>
-                  <th>EMPLOYEE</th>
-                  <th>ID</th>
-                  <th>DESIGNATION</th>
-                  <th>DEPARTMENT</th>
-                  <th>MANAGER</th>
-                  <th>STATUS</th>
+                  <SortableTh sort={sort} sortKey="name">EMPLOYEE</SortableTh>
+                  <SortableTh sort={sort} sortKey="empId">ID</SortableTh>
+                  <SortableTh sort={sort} sortKey="designation">DESIGNATION</SortableTh>
+                  <SortableTh sort={sort} sortKey="department">DEPARTMENT</SortableTh>
+                  <SortableTh sort={sort} sortKey="manager">MANAGER</SortableTh>
+                  <SortableTh sort={sort} sortKey="status">STATUS</SortableTh>
                   <th style={{ width: 40 }}></th>
                 </tr>
               </thead>
@@ -356,32 +365,12 @@ export default function Employees() {
         )}
 
         {/* Pagination Footer */}
-        <div className="emp-footer">
-          <span style={{ fontSize: "13px", color: "#6b7280" }}>
-            Showing {paginatedEmployees.length} of {filtered.length}
-          </span>
-          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <button
-              type="button"
-              disabled={currentPage === 1}
-              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-              className="emp-page-btn"
-            >
-              <ChevronLeft size={16} />
-            </button>
-            <span className="emp-page-indicator">
-              {currentPage}/{totalPages}
-            </span>
-            <button
-              type="button"
-              disabled={currentPage === totalPages}
-              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-              className="emp-page-btn"
-            >
-              <ChevronRight size={16} />
-            </button>
-          </div>
-        </div>
+        <AppPagination
+          total={filtered.length}
+          page={currentPage}
+          pageSize={pageSize}
+          onPageChange={setCurrentPage}
+        />
       </div>
 
       {/* Add Employee Modal */}
@@ -549,11 +538,6 @@ export default function Employees() {
         .emp-grid-view { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; padding: 18px 20px; }
         .emp-grid-item { border: 1px solid #e5e7eb; border-radius: 12px; padding: 16px; background: #fff; }
         
-        .emp-footer { display: flex; align-items: center; justify-content: space-between; padding: 14px 20px; background: #ffffff; border-top: 1px solid #f1f5f9; }
-        .emp-page-btn { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 8px; border: 1px solid #e5e7eb; background: #fff; color: #4b5563; cursor: pointer; transition: all 0.15s ease; }
-        .emp-page-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-        .emp-page-btn:not(:disabled):hover { background: #f9fafb; border-color: #d1d5db; }
-        .emp-page-indicator { display: inline-flex; align-items: center; justify-content: center; background: #16233a; color: #fff; font-size: 12px; font-weight: 700; border-radius: 999px; padding: 4px 12px; height: 26px; }
         @media (max-width: 1023px) {
           .emp-dir-page { margin: -16px -20px -24px; }
         }
@@ -564,7 +548,6 @@ export default function Employees() {
           .emp-dir-page { padding: 14px 14px 22px; }
           .emp-filter-card { padding: 12px 14px; }
           .emp-grid-view { grid-template-columns: minmax(0, 1fr); padding: 14px; }
-          .emp-footer { flex-wrap: wrap; gap: 10px; padding: 12px 14px; }
           .emp-tabs { max-width: 100%; overflow-x: auto; scrollbar-width: none; }
           .emp-tab { flex-shrink: 0; white-space: nowrap; }
         }

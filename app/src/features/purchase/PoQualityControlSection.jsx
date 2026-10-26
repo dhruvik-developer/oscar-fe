@@ -10,6 +10,9 @@ import { purchaseService } from '../../services/domainServices';
 import { Button } from '../../components/ui/Button';
 import { useERP } from '../../context/ERPContext';
 import MasterSourceLink from '../../components/common/MasterSourceLink';
+import AppPagination from '../../components/ui/AppPagination';
+import { useTableSort } from '../../hooks/useTableSort';
+import SortableTh from '../../components/ui/SortableTh';
 
 export function PoQualityControlSection({
   po,
@@ -321,7 +324,33 @@ export function PoQualityControlSection({
   // Pagination for previous entries
   const totalEntries = entries.length;
   const totalPages = Math.ceil(totalEntries / pageSize) || 1;
-  const pagedEntries = entries.slice((page - 1) * pageSize, page * pageSize);
+  const qcAccessors = {
+    inspectedQty: (r) => Number(r.inspectedQty || 0),
+    acceptedQty: (r) => Number(r.acceptedQty || 0),
+    rejectedQty: (r) => Number(r.rejectedQty || 0),
+    reprocessQty: (r) => Number(r.reprocessQty || 0),
+    holdQty: (r) => Number(r.holdQty || 0),
+    grade: (r) => r.grade || 'A',
+    qualityGrade: (r) => r.qualityGrade || 'Grade A',
+    defectsFound: (r) => r.defectsFound || 'None',
+    status: (r) => r.status || 'Approved',
+  };
+  const entrySort = useTableSort(entries, { accessors: qcAccessors });
+  const pagedEntries = entrySort.rows.slice((page - 1) * pageSize, page * pageSize);
+  const registerEntries = useMemo(() => entries.filter((r) => {
+    if (qcRegisterGradeFilter !== 'All' && r.qualityGrade !== qcRegisterGradeFilter) return false;
+    if (qcRegisterSearch) {
+      const q = qcRegisterSearch.toLowerCase();
+      return (
+        (r.inspectionDate || '').toLowerCase().includes(q) ||
+        (r.inspector || '').toLowerCase().includes(q) ||
+        (r.defectsFound || '').toLowerCase().includes(q) ||
+        (r.remarks || '').toLowerCase().includes(q)
+      );
+    }
+    return true;
+  }), [entries, qcRegisterGradeFilter, qcRegisterSearch]);
+  const registerSort = useTableSort(registerEntries, { accessors: qcAccessors });
 
   return (
     <div className="bg-white border-2 border-blue-200/90 rounded-2xl shadow-xs overflow-hidden mt-4 transition-all">
@@ -860,15 +889,15 @@ export function PoQualityControlSection({
                   <table className="w-full text-left text-xs border-collapse">
                     <thead className="bg-slate-50/90 text-[10px] uppercase font-bold text-slate-500 border-b border-slate-200">
                       <tr>
-                        <th className="py-2 px-2.5">Date</th>
-                        <th className="py-2 px-2 text-right">Inspected</th>
-                        <th className="py-2 px-2 text-right text-emerald-700">Accepted</th>
-                        <th className="py-2 px-2 text-right text-rose-700">Rejected</th>
-                        <th className="py-2 px-2 text-right text-amber-700">Reprocess</th>
-                        <th className="py-2 px-2 text-right text-purple-700">Hold</th>
-                        <th className="py-2 px-2">Inspector</th>
-                        <th className="py-2 px-1.5 text-center">Grade</th>
-                        <th className="py-2 px-2">Remarks</th>
+                        <SortableTh sort={entrySort} sortKey="date" className="py-2 px-2.5">Date</SortableTh>
+                        <SortableTh sort={entrySort} sortKey="inspectedQty" className="py-2 px-2 text-right" align="right">Inspected</SortableTh>
+                        <SortableTh sort={entrySort} sortKey="acceptedQty" className="py-2 px-2 text-right text-emerald-700" align="right">Accepted</SortableTh>
+                        <SortableTh sort={entrySort} sortKey="rejectedQty" className="py-2 px-2 text-right text-rose-700" align="right">Rejected</SortableTh>
+                        <SortableTh sort={entrySort} sortKey="reprocessQty" className="py-2 px-2 text-right text-amber-700" align="right">Reprocess</SortableTh>
+                        <SortableTh sort={entrySort} sortKey="holdQty" className="py-2 px-2 text-right text-purple-700" align="right">Hold</SortableTh>
+                        <SortableTh sort={entrySort} sortKey="inspectorName" className="py-2 px-2">Inspector</SortableTh>
+                        <SortableTh sort={entrySort} sortKey="grade" className="py-2 px-1.5 text-center" align="center">Grade</SortableTh>
+                        <SortableTh sort={entrySort} sortKey="remarks" className="py-2 px-2">Remarks</SortableTh>
                         <th className="py-2 px-2 text-right">Action</th>
                       </tr>
                     </thead>
@@ -946,27 +975,12 @@ export function PoQualityControlSection({
 
                 {/* Pagination */}
                 {totalPages > 1 && (
-                  <div className="px-3.5 py-2 bg-slate-50/60 border-t border-slate-200 flex items-center justify-between text-xs text-slate-500">
-                    <span>Page {page} of {totalPages} ({totalEntries} entries)</span>
-                    <div className="flex items-center gap-1">
-                      <button
-                        type="button"
-                        disabled={page === 1}
-                        onClick={() => setPage((p) => Math.max(1, p - 1))}
-                        className="px-2 py-0.5 border rounded bg-white disabled:opacity-40"
-                      >
-                        Prev
-                      </button>
-                      <button
-                        type="button"
-                        disabled={page === totalPages}
-                        onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                        className="px-2 py-0.5 border rounded bg-white disabled:opacity-40"
-                      >
-                        Next
-                      </button>
-                    </div>
-                  </div>
+                  <AppPagination
+                    total={totalEntries}
+                    page={page}
+                    pageSize={pageSize}
+                    onPageChange={setPage}
+                  />
                 )}
               </div>
 
@@ -1133,33 +1147,20 @@ export function PoQualityControlSection({
               <table className="w-full text-left text-xs border border-slate-200 rounded-xl overflow-hidden">
                 <thead>
                   <tr className="bg-slate-100/80 border-b border-slate-200 text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                    <th className="px-3 py-2.5">Date</th>
-                    <th className="px-3 py-2.5">Entry No</th>
-                    <th className="px-3 py-2.5 text-right">Inspected (m)</th>
-                    <th className="px-3 py-2.5 text-right">Accepted (m)</th>
-                    <th className="px-3 py-2.5 text-right">Rejected (m)</th>
-                    <th className="px-3 py-2.5 text-right">Reprocess (m)</th>
-                    <th className="px-3 py-2.5 text-center">Grade</th>
-                    <th className="px-3 py-2.5">Defects</th>
-                    <th className="px-3 py-2.5">Inspector</th>
-                    <th className="px-3 py-2.5 text-center">Status</th>
+                    <SortableTh sort={registerSort} sortKey="inspectionDate" className="px-3 py-2.5">Date</SortableTh>
+                    <SortableTh sort={registerSort} sortKey="entryNo" className="px-3 py-2.5">Entry No</SortableTh>
+                    <SortableTh sort={registerSort} sortKey="inspectedQty" className="px-3 py-2.5 text-right" align="right">Inspected (m)</SortableTh>
+                    <SortableTh sort={registerSort} sortKey="acceptedQty" className="px-3 py-2.5 text-right" align="right">Accepted (m)</SortableTh>
+                    <SortableTh sort={registerSort} sortKey="rejectedQty" className="px-3 py-2.5 text-right" align="right">Rejected (m)</SortableTh>
+                    <SortableTh sort={registerSort} sortKey="reprocessQty" className="px-3 py-2.5 text-right" align="right">Reprocess (m)</SortableTh>
+                    <SortableTh sort={registerSort} sortKey="qualityGrade" className="px-3 py-2.5 text-center" align="center">Grade</SortableTh>
+                    <SortableTh sort={registerSort} sortKey="defectsFound" className="px-3 py-2.5">Defects</SortableTh>
+                    <SortableTh sort={registerSort} sortKey="inspector" className="px-3 py-2.5">Inspector</SortableTh>
+                    <SortableTh sort={registerSort} sortKey="status" className="px-3 py-2.5 text-center" align="center">Status</SortableTh>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {entries
-                    .filter((r) => {
-                      if (qcRegisterGradeFilter !== 'All' && r.qualityGrade !== qcRegisterGradeFilter) return false;
-                      if (qcRegisterSearch) {
-                        const q = qcRegisterSearch.toLowerCase();
-                        return (
-                          (r.inspectionDate || '').toLowerCase().includes(q) ||
-                          (r.inspector || '').toLowerCase().includes(q) ||
-                          (r.defectsFound || '').toLowerCase().includes(q) ||
-                          (r.remarks || '').toLowerCase().includes(q)
-                        );
-                      }
-                      return true;
-                    })
+                  {registerSort.rows
                     .map((row, idx) => (
                       <tr key={row.id || idx} className="hover:bg-slate-50 transition-colors">
                         <td className="px-3 py-2 font-mono text-slate-800">{row.inspectionDate}</td>

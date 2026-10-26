@@ -20,7 +20,7 @@ export default function LeadGridView({ rows = [], selected = [], pinnedLeadIds =
           </div>
           <div className="lead-tile-head">
             <div className="lead-tile-person">
-              <LeadAvatar lead={row} className="lead-tile-avatar" />
+              <LeadAvatar lead={row} className="lead-tile-avatar" previewable />
               <div>
                 <strong>{row.status}</strong>
                 <button type="button" className="lead-name-button" onClick={() => onOpenLead(row)}>

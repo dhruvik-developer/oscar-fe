@@ -17,6 +17,8 @@ import { useNavigate } from 'react-router-dom';
 import { api } from '../../services/api';
 import { useERP } from '../../context/ERPContext';
 import MasterSourceLink from '../../components/common/MasterSourceLink';
+import { useTableSort } from '../../hooks/useTableSort';
+import SortableTh from '../../components/ui/SortableTh';
 
 function numIN(val) {
   const n = Number(val) || 0;
@@ -480,6 +482,15 @@ export function GoodsReceiptInlineSlide({ po, delivery, onClose, onReceiptSaved,
     }
   };
 
+  const grnSort = useTableSort(existingGrns, {
+    accessors: {
+      grn_number: (g) => g.grn_number || g.id,
+      receipt_date: (g) => g.receipt_date || g.date,
+      lines: (g) => g.lines?.length || 0,
+      qc_status: (g) => g.qc_status || 'Pending QC',
+    },
+  });
+
   return (
     <div className="rounded-2xl border-2 border-emerald-500/80 bg-gradient-to-b from-emerald-50/50 via-white to-white p-4 sm:p-5 shadow-md space-y-4 animate-in fade-in slide-in-from-top-3 duration-300">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-emerald-100">
@@ -549,15 +560,15 @@ export function GoodsReceiptInlineSlide({ po, delivery, onClose, onReceiptSaved,
             <table className="w-full text-left text-xs bg-white rounded-lg border border-emerald-200 overflow-hidden">
               <thead className="bg-emerald-100/60 text-emerald-900 font-semibold text-[10.5px] uppercase">
                 <tr>
-                  <th className="px-3 py-2">GRN #</th>
-                  <th className="px-3 py-2">Date</th>
-                  <th className="px-3 py-2">Challan #</th>
-                  <th className="px-3 py-2 text-right">Lines</th>
-                  <th className="px-3 py-2 text-center">QC Status</th>
+                  <SortableTh sort={grnSort} sortKey="grn_number" className="px-3 py-2">GRN #</SortableTh>
+                  <SortableTh sort={grnSort} sortKey="receipt_date" className="px-3 py-2">Date</SortableTh>
+                  <SortableTh sort={grnSort} sortKey="supplier_challan_no" className="px-3 py-2">Challan #</SortableTh>
+                  <SortableTh sort={grnSort} sortKey="lines" className="px-3 py-2 text-right" align="right">Lines</SortableTh>
+                  <SortableTh sort={grnSort} sortKey="qc_status" className="px-3 py-2 text-center" align="center">QC Status</SortableTh>
                 </tr>
               </thead>
               <tbody className="divide-y divide-emerald-100 text-[11.5px]">
-                {existingGrns.map((g) => (
+                {grnSort.rows.map((g) => (
                   <tr key={g.id || g.grn_number} className="hover:bg-emerald-50/40">
                     <td className="px-3 py-2 font-mono font-bold text-emerald-700">{g.grn_number || g.id}</td>
                     <td className="px-3 py-2 text-slate-600">{g.receipt_date || g.date}</td>

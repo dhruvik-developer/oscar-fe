@@ -9,6 +9,8 @@ import { hrmsGuides } from "../../../data/hrms/hrmsGuides";
 import { Avatar } from "../../../components/hrms/Avatar";
 import MasterSourceLink from "../../../components/common/MasterSourceLink";
 import { localISODate, describeError } from "../../../services/hrmsSync";
+import { useTableSort } from "../../../hooks/useTableSort";
+import SortableTh from "../../../components/ui/SortableTh";
 
 const BASE_STATUSES = ["Pending", "Approved", "Rejected"];
 const REG_STATUSES = ["Present", "Half Day", "WFH"];
@@ -184,6 +186,10 @@ export default function Requests() {
       // Pending first; otherwise keep the server's (newest-first) order.
       .sort((a, b) => (b.status === "Pending") - (a.status === "Pending"));
   }, [requestsList, tab, search, deptFilter, typeFilter, statusFilter, dateFilter]);
+
+  const sort = useTableSort(filtered, {
+    accessors: { reqIn: (r) => r.reqIn || r.reqOut || "" },
+  });
 
   const countForTab = (t) => (t === "All" ? requestsList.length : requestsList.filter((r) => r.type === t).length);
   const pendingCount = requestsList.filter((r) => r.status === "Pending").length;
@@ -377,15 +383,15 @@ export default function Requests() {
           <table className="req-table">
             <thead>
               <tr>
-                <th>REQUEST</th>
-                <th>EMPLOYEE</th>
-                <th>REQUEST TYPE</th>
-                <th>DATE</th>
-                <th>REQUESTED TIME</th>
-                <th>REQ. STATUS</th>
-                <th>REASON</th>
-                <th>SUBMITTED</th>
-                <th>STATUS</th>
+                <SortableTh sort={sort} sortKey="id">REQUEST</SortableTh>
+                <SortableTh sort={sort} sortKey="employee">EMPLOYEE</SortableTh>
+                <SortableTh sort={sort} sortKey="type">REQUEST TYPE</SortableTh>
+                <SortableTh sort={sort} sortKey="isoDate">DATE</SortableTh>
+                <SortableTh sort={sort} sortKey="reqIn">REQUESTED TIME</SortableTh>
+                <SortableTh sort={sort} sortKey="requestedStatus">REQ. STATUS</SortableTh>
+                <SortableTh sort={sort} sortKey="reasonText">REASON</SortableTh>
+                <SortableTh sort={sort} sortKey="submitted">SUBMITTED</SortableTh>
+                <SortableTh sort={sort} sortKey="status">STATUS</SortableTh>
                 <th>ACTIONS</th>
               </tr>
             </thead>
@@ -397,7 +403,7 @@ export default function Requests() {
                   </td>
                 </tr>
               )}
-              {filtered.map((r) => (
+              {sort.rows.map((r) => (
                 <tr key={r.id}>
                   <td>
                     <button type="button" onClick={() => setSelectedReq(r)} className="req-id-link" title={r.id}>

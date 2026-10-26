@@ -24,6 +24,8 @@ import {
   todayISO,
   unwrapList,
 } from './accountingShared';
+import { useTableSort } from '../../hooks/useTableSort';
+import SortableTh from '../../components/ui/SortableTh';
 
 const generalLedgerGuide = {
   title: 'General Ledger & Journal Entries',
@@ -439,6 +441,13 @@ function LedgerTab({ accounts, accountsError }) {
   }, [load]);
 
   const entries = ledger?.entries || [];
+  const ledgerSort = useTableSort(entries, {
+    accessors: {
+      narration: (row) => row.narration || row.party,
+      debit: (row) => Number(row.debit) || null,
+      credit: (row) => Number(row.credit) || null,
+    },
+  });
 
   return (
     <Card title="Account Ledger" subtitle="Opening balance, every posted line and the running balance for one account.">
@@ -475,12 +484,12 @@ function LedgerTab({ accounts, accountsError }) {
           <table className="w-full min-w-[720px] text-left text-xs text-slate-600">
             <thead className="bg-slate-50 border-b border-[#dce5f4]">
               <tr>
-                <th className={thClass}>Date</th>
-                <th className={thClass}>Entry</th>
-                <th className={thClass}>Narration</th>
-                <th className={`${thClass} text-right`}>Debit</th>
-                <th className={`${thClass} text-right`}>Credit</th>
-                <th className={`${thClass} text-right`}>Balance</th>
+                <SortableTh sort={ledgerSort} sortKey="date" className={thClass}>Date</SortableTh>
+                <SortableTh sort={ledgerSort} sortKey="entryNumber" className={thClass}>Entry</SortableTh>
+                <SortableTh sort={ledgerSort} sortKey="narration" className={thClass}>Narration</SortableTh>
+                <SortableTh sort={ledgerSort} sortKey="debit" className={`${thClass} text-right`} align="right">Debit</SortableTh>
+                <SortableTh sort={ledgerSort} sortKey="credit" className={`${thClass} text-right`} align="right">Credit</SortableTh>
+                <SortableTh sort={ledgerSort} sortKey="balance" className={`${thClass} text-right`} align="right">Balance</SortableTh>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -489,7 +498,7 @@ function LedgerTab({ accounts, accountsError }) {
                 <td className="py-2 px-3 text-right font-mono">{formatINR(ledger.openingBalance)}</td>
               </tr>
               {entries.length === 0 && <EmptyRow colSpan={6} message="No postings in this period." />}
-              {entries.map((row, idx) => (
+              {ledgerSort.rows.map((row, idx) => (
                 <tr key={`${row.entryNumber}-${idx}`} className="hover:bg-slate-50">
                   <td className="py-1.5 px-3 font-mono whitespace-nowrap">{formatDate(row.date)}</td>
                   <td className="py-1.5 px-3 font-mono text-slate-800">{row.entryNumber}</td>
@@ -537,6 +546,7 @@ function TrialBalanceTab({ refreshKey }) {
 
   const rows = unwrapList(data);
   const agg = data?.aggregates || {};
+  const trialSort = useTableSort(rows, { accessors: { account: (r) => `${r.code ? `${r.code} - ` : ''}${r.name || ''}` } });
 
   return (
     <Card
@@ -557,16 +567,16 @@ function TrialBalanceTab({ refreshKey }) {
           <table className="w-full min-w-[640px] text-left text-xs text-slate-600">
             <thead className="bg-slate-50 border-b border-[#dce5f4]">
               <tr>
-                <th className={thClass}>Account</th>
-                <th className={thClass}>Type</th>
-                <th className={`${thClass} text-right`}>Debit</th>
-                <th className={`${thClass} text-right`}>Credit</th>
-                <th className={`${thClass} text-right`}>Net (Dr − Cr)</th>
+                <SortableTh sort={trialSort} sortKey="account" className={thClass}>Account</SortableTh>
+                <SortableTh sort={trialSort} sortKey="type" className={thClass}>Type</SortableTh>
+                <SortableTh sort={trialSort} sortKey="debit" className={`${thClass} text-right`} align="right">Debit</SortableTh>
+                <SortableTh sort={trialSort} sortKey="credit" className={`${thClass} text-right`} align="right">Credit</SortableTh>
+                <SortableTh sort={trialSort} sortKey="balance" className={`${thClass} text-right`} align="right">Net (Dr − Cr)</SortableTh>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {rows.length === 0 && <EmptyRow colSpan={5} message="No postings up to this date." />}
-              {rows.map((r) => (
+              {trialSort.rows.map((r) => (
                 <tr key={r.accountId} className="hover:bg-slate-50">
                   <td className="py-1.5 px-3 text-slate-800">{r.code ? `${r.code} - ` : ''}{r.name}</td>
                   <td className="py-1.5 px-3">{r.type}</td>

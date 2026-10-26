@@ -1,7 +1,7 @@
 import CrmKpiCard from '../common/CrmKpiCard';
 import PageHeader from "../../../components/ui/PageHeader";
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Users, UserPlus, Clock, TrendingUp, DollarSign, Search, Mail, Phone, CalendarDays, FileText, ClipboardList, Video, Send } from "lucide-react";
 import { useCrmStore } from "../../../stores/crmStore";
 import { initials, describeError, pullDashboard as pullCrmDashboard } from "../../../services/crmSync";
@@ -12,6 +12,8 @@ import { completeTaskWithOutcome, resolveLeadForTask, NEXT_ACTION_LABELS } from 
 import CompleteTaskModal from "../tasks/CompleteTaskModal";
 import CreateLeadModal from "../leads/CreateLeadModal";
 import { runLeadStageAutomation } from "../../../services/leadStageAutomation";
+import { emitCrmEvent, CRM_EVENT_TYPES } from "../../../services/crmEventNotifications";
+import { buildLeadPayload } from "../leads/leadPayload";
 const DEAL_STORAGE_KEY = "crm-deals-v1";
 const TASK_STORAGE_KEY = "crm-tasks-v1";
 const DEAL_STAGES = ["Draft", "Sent", "Open", "Revised", "Declined"];
@@ -86,6 +88,9 @@ export default function DashboardView() {
   const deals = useCrmStore((s) => s.deals);
   const tasks = useCrmStore((s) => s.tasks);
   const createLead = useCrmStore((s) => s.createLead);
+  const refreshCrm = useCrmStore((s) => s.refresh);
+  const showToast = useAppStore((s) => s.showToast);
+  const navigate = useNavigate();
   const completeCrmTask = useCrmStore((s) => s.completeTask);
   const firstStageId = useCrmStore((s) => (
     [...s.stages]
@@ -96,6 +101,8 @@ export default function DashboardView() {
   const [query, setQuery] = useState("");
   const [completeTarget, setCompleteTarget] = useState(null);
   const [isCreateLeadOpen, setIsCreateLeadOpen] = useState(false);
+  const [isCreatingLead, setIsCreatingLead] = useState(false);
+  const [createLeadError, setCreateLeadError] = useState('');
   const [crmDashboardKpis, setCrmDashboardKpis] = useState(null);
   useEffect(() => {
     let active = true;
@@ -105,32 +112,44 @@ export default function DashboardView() {
     return () => { active = false; };
   }, []);
 
-  async function handleCreateLead(data) {
+  // Quick action "Add Lead": the same modal and payload as the Leads page.
+  async function handleCreateLead(formData) {
+    if (isCreatingLead) return;
+    setIsCreatingLead(true);
+    setCreateLeadError('');
+    let created = null;
     try {
-      const newLead = await createLead({
-        // The server requires the lead to enter the pipeline at a stage.
-        stageId: data.stageId || firstStageId,
-        name: data.leadName || 'Untitled Lead',
-        company: data.company || '',
-        phone: data.phone || '',
-        email: data.email || '',
-        ownerId: data.ownerId || undefined,
-        sourceId: data.sourceId || undefined,
-        industryId: data.industryId || undefined,
-        jobTitle: data.titleValue || '',
-        createdOn: data.createdOn || undefined,
-      });
-      if (newLead) {
-        try {
-          runLeadStageAutomation(newLead, 'New');
-        } catch (err) {
-          console.error(err);
-        }
-      }
+      const payload = buildLeadPayload(formData, firstStageId);
+      // Always saved on the server; it picks the first stage when none is set.
+      created = await createLead(payload);
+      if (created && !payload.stageId) refreshCrm('stages');
     } catch (err) {
-      console.error('Error creating lead:', describeError(err));
+      const message = `Lead not created — ${describeError(err)}`;
+      setCreateLeadError(message);
+      showToast?.(message);
+      setIsCreatingLead(false);
+      return;
     }
+    setIsCreatingLead(false);
     setIsCreateLeadOpen(false);
+    if (!created) return;
+    try {
+      runLeadStageAutomation(created, 'New Lead');
+    } catch (err) {
+      console.error('[CRM Automation] Error generating stage tasks for new lead:', err);
+    }
+    emitCrmEvent({
+      type: CRM_EVENT_TYPES.LEAD_CREATED,
+      entityType: 'lead',
+      entityId: created.id,
+      payload: {
+        leadRef: created.leadNumber,
+        leadName: created.name,
+        ownerName: created.owner,
+        path: `/crm/leads/${created.id}`,
+      },
+    });
+    showToast?.(`Lead ${created.leadNumber || created.name || ''} created.`.trim());
   }
   const firstName = (currentUser?.name || "").split(" ")[0];
   const hour = new Date().getHours();
@@ -455,7 +474,7 @@ export default function DashboardView() {
           <h3 style={{ margin: 0, fontSize: 14, fontWeight: 800, color: "#0f1f3d" }}>Quick Actions</h3>
           <p style={{ margin: "2px 0 12px", fontSize: 11, color: "#64748b" }}>Perform tasks with one click | {deals.length} deals {invoices.length} invoices</p>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 10, textAlign: "center" }}>
-            <button type="button" onClick={() => setIsCreateLeadOpen(true)} style={{ display: "grid", gap: 6, placeItems: "center", border: "1px solid #eef2f7", borderRadius: 12, padding: "12px 6px", fontSize: 11, fontWeight: 700, color: "#334155", background: "none", cursor: "pointer", width: "100%" }}>
+            <button type="button" onClick={() => { setCreateLeadError(''); setIsCreateLeadOpen(true); }} style={{ display: "grid", gap: 6, placeItems: "center", border: "1px solid #eef2f7", borderRadius: 12, padding: "12px 6px", fontSize: 11, fontWeight: 700, color: "#334155", background: "none", cursor: "pointer", width: "100%" }}>
               <span style={{ width: 34, height: 34, borderRadius: 10, background: "#eef4ff", color: "#2f6fed", display: "grid", placeItems: "center" }}><UserPlus size={17} /></span> Add Lead
             </button>
             <Link to="/crm/tasks" style={{ display: "grid", gap: 6, placeItems: "center", border: "1px solid #eef2f7", borderRadius: 12, padding: "12px 6px", fontSize: 11, fontWeight: 700, color: "#334155" }}>
@@ -481,6 +500,14 @@ export default function DashboardView() {
           </div>
         </div>
       </div>
+      <CreateLeadModal
+        isOpen={isCreateLeadOpen}
+        submitting={isCreatingLead}
+        serverError={createLeadError}
+        onClose={() => { if (!isCreatingLead) setIsCreateLeadOpen(false); }}
+        onCreate={handleCreateLead}
+        onEditLayout={() => { setIsCreateLeadOpen(false); navigate('/crm/leads/form-builder'); }}
+      />
       <CompleteTaskModal
         open={Boolean(completeTarget)}
         task={completeTarget ? { ...completeTarget, stage: completeTarget.stage || 'New Lead', dueAt: completeTarget.dueDate || completeTarget.due || '', assignee: completeTarget.owner || 'Unassigned' } : null}

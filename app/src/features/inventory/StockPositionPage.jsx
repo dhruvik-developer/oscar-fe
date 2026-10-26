@@ -35,6 +35,7 @@ import { SignatureSlot, useDocumentSignatures } from '../../components/common/Si
 import { inventoryService } from '../../services/domainServices';
 import { useERP } from '../../context/ERPContext';
 import PageInfoButton from '../../components/ui/PageInfoButton';
+import AppPagination from '../../components/ui/AppPagination';
 import MasterSourceLink from '../../components/common/MasterSourceLink';
 
 // Indian Currency Helper
@@ -869,7 +870,6 @@ export function StockPositionPage() {
     filteredReturnRecords,
   ]);
 
-  const totalPages = Math.ceil(currentDataset.length / pageSize) || 1;
   const paginatedData = useMemo(() => {
     const start = (currentPage - 1) * pageSize;
     return currentDataset.slice(start, start + pageSize);
@@ -1801,76 +1801,14 @@ export function StockPositionPage() {
             </div>
 
             {/* Pagination footer (#16 - Page Size Dropdown & Page Numbers) */}
-            <div className="flex flex-col sm:flex-row items-center justify-between px-4 py-3 bg-slate-50 border-t border-slate-200 text-xs gap-3">
-              <span className="text-slate-500">
-                Showing{' '}
-                <strong className="text-slate-800">
-                  {currentDataset.length ? (currentPage - 1) * pageSize + 1 : 0}
-                </strong>{' '}
-                to{' '}
-                <strong className="text-slate-800">
-                  {Math.min(currentPage * pageSize, currentDataset.length)}
-                </strong>{' '}
-                of <strong className="text-slate-800">{currentDataset.length}</strong> entries
-              </span>
-
-              <div className="flex items-center gap-3">
-                {/* Page Size Selector (#16: 10, 25, 50, 100 per page) */}
-                <div className="flex items-center gap-1.5 text-slate-600">
-                  <select
-                    value={pageSize}
-                    onChange={(e) => {
-                      setPageSize(Number(e.target.value));
-                      setCurrentPage(1);
-                    }}
-                    className="h-7 px-2 bg-white border border-slate-200 rounded text-xs font-semibold focus:outline-none cursor-pointer"
-                  >
-                    <option value={10}>10</option>
-                    <option value={25}>25</option>
-                    <option value={50}>50</option>
-                    <option value={100}>100</option>
-                  </select>
-                  <span className="text-[11px] text-slate-500">per page</span>
-                </div>
-
-                {/* Page Numbers (#16: < 1 2 3 4 >) */}
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                    disabled={currentPage <= 1}
-                    className="w-7 h-7 grid place-items-center bg-white border border-slate-200 rounded text-slate-600 hover:bg-slate-100 disabled:opacity-40 cursor-pointer"
-                  >
-                    ‹
-                  </button>
-
-                  {Array.from({ length: Math.min(totalPages, 5) }).map((_, i) => {
-                    const pNum = i + 1;
-                    const isActive = pNum === currentPage;
-                    return (
-                      <button
-                        key={pNum}
-                        onClick={() => setCurrentPage(pNum)}
-                        className={`w-7 h-7 grid place-items-center rounded text-xs font-bold transition cursor-pointer ${
-                          isActive
-                            ? 'bg-blue-600 text-white shadow-xs'
-                            : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'
-                        }`}
-                      >
-                        {pNum}
-                      </button>
-                    );
-                  })}
-
-                  <button
-                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                    disabled={currentPage >= totalPages}
-                    className="w-7 h-7 grid place-items-center bg-white border border-slate-200 rounded text-slate-600 hover:bg-slate-100 disabled:opacity-40 cursor-pointer"
-                  >
-                    ›
-                  </button>
-                </div>
-              </div>
-            </div>
+            <AppPagination
+              total={currentDataset.length}
+              page={currentPage}
+              pageSize={pageSize}
+              onPageChange={setCurrentPage}
+              onPageSizeChange={setPageSize}
+              pageSizeOptions={[10, 25, 50, 100]}
+            />
           </>
         )}
       </div>

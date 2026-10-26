@@ -37,7 +37,6 @@ const DealsPage = lazy(() => import('../features/crm/deals/DealsPage'));
 //   Route `crm/user-allocation` and its sidebar entry were dropped; restore both if needed.
 // const UserAllocationPage = lazy(() => import('../features/crm/allocation/UserAllocationPage'));
 const CRMSystemSetupPage = lazy(() => import('../features/crm/setup/CRMSystemSetupPage'));
-const DealStagesPage = lazy(() => import('../features/crm/setup/DealStagesPage'));
 const LeadSourcesPage = lazy(() => import('../features/crm/setup/LeadSourcesPage'));
 // [REMOVED] CRM Reports concept removed from the CRM module.
 //   `features/crm/reports/CRMReportsPage.jsx` is kept per the no-delete rule.
@@ -382,7 +381,6 @@ const router = createBrowserRouter([
       { path: 'crm/deals', element: <Page component={DealsPage} /> },
       // [REMOVED] `crm/user-allocation` — User Tracking concept removed from the CRM module.
       { path: 'crm/system-setup', element: <Page component={CRMSystemSetupPage} /> },
-      { path: 'crm/deal-stages', element: <Page component={DealStagesPage} title="Deal Stages" /> },
       { path: 'crm/lead-sources', element: <Page component={LeadSourcesPage} title="Lead Sources" /> },
       // [REMOVED] `crm/reports` — CRM Reports concept removed from the CRM module.
       { path: 'crm/quotations', element: <Page component={QuotationsPage} /> },

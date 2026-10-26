@@ -7,7 +7,7 @@ import LeadsTable from './LeadsTable';
 import LeadCardGridView from './LeadCardGridView';
 import LeadGridView from './LeadGridView';
 import LeadMapView from './LeadMapView';
-import Pagination from '../../../components/ui/Pagination';
+import AppPagination from '../../../components/ui/AppPagination';
 import NotesDrawer from './NotesDrawer';
 import CreateLeadModal, { getActiveLeadFormSections, leadFormValuesToPayload } from './CreateLeadModal';
 import EditLeadModal from './EditLeadModal';
@@ -21,7 +21,7 @@ import {
   ConvertDealModal,
   ConvertPartyModal,
 } from './LeadRowActionModals';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { useAppStore } from '../../../stores/appStore';
 import { Users, UserPlus, Clock, TrendingUp, Plus, Upload, AlertTriangle, X } from 'lucide-react';
 import { fetchLiveLeadFormId, isLeadFormSwitchedOn } from '../../../services/crmForms';
@@ -32,6 +32,7 @@ import { partiesService } from '../../../services/domainServices';
 import { exportToCSV } from '../../../services/exportUtils';
 import { runLeadStageAutomation } from '../../../services/leadStageAutomation';
 import { emitCrmEvent, CRM_EVENT_TYPES } from '../../../services/crmEventNotifications';
+import { buildLeadPayload } from './leadPayload';
 
 const DEFAULT_FILTERS = { statuses: [], sources: [], systemDefined: [], search: '' };
 const DEFAULT_SORT = { field: '', direction: 'ascending' };
@@ -198,13 +199,15 @@ function importKeysFor(field) {
 
 export default function LeadsPage() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
   const leadRows = useCrmStore((s) => s.leads);
   const taskRows = useCrmStore((s) => s.tasks);
   const dealRows = useCrmStore((s) => s.deals);
   const crmLoading = useCrmStore((s) => s.status.loading);
   const crmError = useCrmStore((s) => s.status.error);
   const createLeadRecord = useCrmStore((s) => s.createLead);
-  const createLeadLocal = useCrmStore((s) => s.createLeadLocal);
+  const refreshCrm = useCrmStore((s) => s.refresh);
   const createTaskRecord = useCrmStore((s) => s.createTask);
   const createTaskLocal = useCrmStore((s) => s.createTaskLocal);
   const createDealRecord = useCrmStore((s) => s.createDeal);
@@ -735,6 +738,22 @@ export default function LeadsPage() {
     setIsModalOpen(true);
   }
 
+  // Automatically open the Create Lead modal when navigating back with ?create=1 or state.openCreateModal
+  useEffect(() => {
+    const shouldOpen = Boolean(location.state?.openCreateModal || searchParams.get('create') === '1');
+    if (shouldOpen) {
+      openCreateLeadModal();
+      if (searchParams.get('create') === '1') {
+        const next = new URLSearchParams(searchParams);
+        next.delete('create');
+        setSearchParams(next, { replace: true });
+      }
+      if (location.state?.openCreateModal) {
+        window.history.replaceState({}, document.title);
+      }
+    }
+  }, [location.state, searchParams]);
+
   function formatDisplayDate(value) {
     if (!value) return new Date().toLocaleDateString('en-GB');
     const parts = String(value).split('-');
@@ -743,53 +762,12 @@ export default function LeadsPage() {
   }
 
   async function saveLead(formData) {
-    const data = formData ?? {};
-    // The server owns the id, the lead number and the stage defaults, so the
-    // payload carries only what the user actually typed.
-    const payload = {
-      // A lead has to enter the pipeline somewhere; the first configured
-      // stage is where the automation expects it to start.
-      stageId: data.stageId || firstStageId,
-      name: data.leadName || 'Untitled Lead',
-      company: data.company || '',
-      phone: data.phone || '',
-      email: data.email || '',
-      owner: data.owner || '',
-      ownerId: data.ownerId || undefined,
-      source: data.source || '',
-      sourceId: data.sourceId || undefined,
-      industryId: data.industryId || undefined,
-      industry: data.industry || '',
-      jobTitle: data.titleValue || '',
-      createdOn: data.createdOn || undefined,
-      country: data.country || 'India',
-      // Avatar: shown immediately (optimistic row / local lead) and kept
-      // inside customValues so it survives the server round-trip.
-      photo: data.photoPreview || '',
-      // Extra capture (products, lead users, task schedule) has no
-      // dedicated columns — the server keeps it in `custom_values` so it
-      // survives refresh and renders on the lead detail page.
-      // `fields` carries every other dynamic builder value (keyed by field
-      // id) so the leads table can show + edit custom form fields.
-      customValues: {
-        products: data.products || [],
-        leadUsers: data.leadUsers || [],
-        taskDate: data.taskDate || '',
-        taskTime: data.taskTime || '',
-        photo: data.photoPreview || '',
-        fields: data.fieldValues || {},
-      },
-    };
-    let createdLead = null;
-    if (!payload.stageId) {
-      // Frontend-design mode: no pipeline stage exists to save under
-      // (stages not configured / unreachable), so keep the lead local
-      // instead of failing the save. It behaves like a real row until
-      // refresh — the server never saw it.
-      createdLead = createLeadLocal(payload);
-    } else {
-      createdLead = await createLeadRecord(payload);
-    }
+    const payload = buildLeadPayload(formData, firstStageId);
+    // Always saved on the server. Without a stage the server uses the first
+    // one (and seeds the default stages for a workspace that has none); a
+    // browser-only lead used to vanish on refresh with no warning.
+    const createdLead = await createLeadRecord(payload);
+    if (createdLead && !firstStageId) refreshCrm('stages');
 
     if (createdLead) {
       try {
@@ -1191,14 +1169,15 @@ export default function LeadsPage() {
                 onMarkLost={markLeadLost}
               />
               <div className="table-card pager-wrap" style={{ marginTop: 10 }}>
-                <Pagination
+                <AppPagination
                   total={rows.length}
                   page={page}
                   pageSize={pageSize}
-                  onChange={setPage}
-                  showTotalRecords
+                  onPageChange={setPage}
                   pageSizeOptions={[10, 20, 50]}
                   onPageSizeChange={handlePageSizeChange}
+                  bordered={false}
+                  className="px-4 py-3"
                 />
               </div>
             </>
@@ -1230,14 +1209,15 @@ export default function LeadsPage() {
                 onMarkLost={markLeadLost}
               />
               <div className="table-card pager-wrap" style={{ marginTop: 10 }}>
-                <Pagination
+                <AppPagination
                   total={rows.length}
                   page={page}
                   pageSize={pageSize}
-                  onChange={setPage}
-                  showTotalRecords
+                  onPageChange={setPage}
                   pageSizeOptions={[10, 20, 50]}
                   onPageSizeChange={handlePageSizeChange}
+                  bordered={false}
+                  className="px-4 py-3"
                 />
               </div>
             </>
@@ -1289,7 +1269,7 @@ export default function LeadsPage() {
         serverError={createError}
         onClose={() => { if (!isCreating) { setIsModalOpen(false); setShowLeadTour(false); } }}
         onCreate={handleCreateLead}
-        onEditLayout={() => { setIsModalOpen(false); setShowLeadTour(false); navigate('/crm/leads/form-builder'); }}
+        onEditLayout={() => { setIsModalOpen(false); setShowLeadTour(false); navigate('/crm/leads/form-builder', { state: { from: 'create-modal', returnTo: '/crm/leads', openCreateModal: true } }); }}
       />
       {showNoFormAlert && (
         <div className="modal-overlay" role="presentation" onClick={() => setShowNoFormAlert(false)}>

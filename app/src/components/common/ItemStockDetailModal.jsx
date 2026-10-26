@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { X, ArrowDownLeft, ArrowUpRight, AlertTriangle, Layers, Sliders, ShieldCheck, Award, QrCode, Eye } from 'lucide-react';
 import { useERP } from '../../context/ERPContext';
+import { useTableSort } from '../../hooks/useTableSort';
+import SortableTh from '../ui/SortableTh';
 import { formatDisplayDate, formatWarrantyPeriod, getWarrantyStatusStyle } from '../../utils/warrantyUtils';
 // Display unit without double-pluralizing ("Pcs" -> "Pcs", "Unit" -> "Units").
 const pluralizeUom = (uom) => {
@@ -19,10 +21,18 @@ export const ItemStockDetailModal = ({ item, isOpen, onClose, }) => {
         document.addEventListener('keydown', onKey);
         return () => document.removeEventListener('keydown', onKey);
     }, [isOpen, onClose]);
+    const movements = isOpen && item ? getItemMovements(item.id) : [];
+    const movementSort = useTableSort(movements, {
+        accessors: {
+            reference: (m) => m.referenceNumber || m.referenceType,
+            location: (m) => m.locationName || 'Main Warehouse',
+            details: (m) => (m.serials && m.serials.length > 0 ? m.serials.join(', ') : m.notes),
+        },
+    });
+    const serialSort = useTableSort(isOpen ? item?.serialNumbers || [] : [], { accessors: { serial: (sn) => sn } });
     if (!isOpen)
         return null;
     const stock = calculateItemStock(item.id);
-    const movements = getItemMovements(item.id);
     const handleApplyAdjustment = (e) => {
         e.preventDefault();
         if (adjAmount === 0)
@@ -223,13 +233,13 @@ export const ItemStockDetailModal = ({ item, isOpen, onClose, }) => {
                       <table className="w-full min-w-[560px] lg:min-w-0 text-left text-xs">
                         <thead className="bg-slate-50 font-semibold text-slate-500 text-[10px] uppercase border-b border-slate-200">
                           <tr>
-                            <th className="py-2 px-3">Serial #</th>
+                            <SortableTh sort={serialSort} sortKey="serial" className="py-2 px-3">Serial #</SortableTh>
                             <th className="py-2 px-3">Status</th>
                             <th className="py-2 px-3 text-right">Standard Duration</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
-                          {(item.serialNumbers || []).map((sn) => (
+                          {serialSort.rows.map((sn) => (
                             <tr key={sn} className="hover:bg-slate-50/60">
                               <td className="py-2 px-3 font-mono font-bold text-slate-900 flex items-center gap-1">
                                 <QrCode size={11} className="text-blue-600" />
@@ -271,12 +281,12 @@ export const ItemStockDetailModal = ({ item, isOpen, onClose, }) => {
               <table className="w-full min-w-[640px] lg:min-w-0 text-left text-xs text-slate-600">
                 <thead className="bg-slate-50 uppercase font-semibold text-slate-500 tracking-wider border-b border-slate-200">
                   <tr>
-                    <th className="py-2.5 px-3">Date</th>
-                    <th className="py-2.5 px-3">Type</th>
-                    <th className="py-2.5 px-3">Reference #</th>
-                    <th className="py-2.5 px-3 text-right">Qty Change</th>
-                    <th className="py-2.5 px-3">Location</th>
-                    <th className="py-2.5 px-3">Details / Serials</th>
+                    <SortableTh sort={movementSort} sortKey="date" className="py-2.5 px-3">Date</SortableTh>
+                    <SortableTh sort={movementSort} sortKey="type" className="py-2.5 px-3">Type</SortableTh>
+                    <SortableTh sort={movementSort} sortKey="reference" className="py-2.5 px-3">Reference #</SortableTh>
+                    <SortableTh sort={movementSort} sortKey="quantity" className="py-2.5 px-3 text-right" align="right">Qty Change</SortableTh>
+                    <SortableTh sort={movementSort} sortKey="location" className="py-2.5 px-3">Location</SortableTh>
+                    <SortableTh sort={movementSort} sortKey="details" className="py-2.5 px-3">Details / Serials</SortableTh>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 bg-white">
@@ -284,7 +294,7 @@ export const ItemStockDetailModal = ({ item, isOpen, onClose, }) => {
                       <td colSpan={6} className="py-6 text-center text-slate-400">
                         No ledger movements recorded for this item yet.
                       </td>
-                    </tr>) : (movements.map((m) => (<tr key={m.id} className="hover:bg-slate-50/70 transition-colors">
+                    </tr>) : (movementSort.rows.map((m) => (<tr key={m.id} className="hover:bg-slate-50/70 transition-colors">
                         <td className="py-2 px-3 text-slate-500 whitespace-nowrap">{m.date}</td>
                         <td className="py-2 px-3">{getMovementTypeBadge(m.type, m.quantity)}</td>
                         <td className="py-2 px-3 font-mono font-medium text-slate-800">

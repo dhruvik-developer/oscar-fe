@@ -23,6 +23,8 @@ import {
   errorMessage,
 } from '../../../../services/jobWorkSync';
 import { usePmsStore } from '../../../../stores/pmsStore';
+import { useTableSort } from '../../../../hooks/useTableSort';
+import { SortableTh } from '../../../../components/ui/SortableTh';
 
 const n = (v) => Number(v || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 });
 
@@ -123,6 +125,9 @@ export function CustomerProjectTab({ project }) {
   const processingTracking = data?.processingTracking || [];
   const qcAndFulfilment = data?.qcAndFulfilment || {};
   const dispatches = qcAndFulfilment.dispatches || [];
+  const allocationSort = useTableSort(allocations);
+  const processingSort = useTableSort(processingTracking);
+  const dispatchSort = useTableSort(dispatches);
 
   return (
     <div className="space-y-6">
@@ -252,18 +257,18 @@ export function CustomerProjectTab({ project }) {
             <table className="w-full text-left text-xs text-slate-700">
               <thead className="bg-slate-50 text-[11px] font-bold text-slate-600 uppercase border-b border-slate-200">
                 <tr>
-                  <th className="p-3">Source PO / GRN</th>
-                  <th className="p-3">Fabric Item / Quality</th>
-                  <th className="p-3">Lot Number</th>
-                  <th className="p-3">Taka / Roll</th>
-                  <th className="p-3 text-right">Allocated Qty</th>
-                  <th className="p-3 text-right">Available Qty</th>
-                  <th className="p-3">Warehouse Location</th>
-                  <th className="p-3 text-center">Status</th>
+                  <SortableTh sort={allocationSort} sortKey="sourcePo" className="p-3">Source PO / GRN</SortableTh>
+                  <SortableTh sort={allocationSort} sortKey="fabricItem" className="p-3">Fabric Item / Quality</SortableTh>
+                  <SortableTh sort={allocationSort} sortKey="lotNumber" className="p-3">Lot Number</SortableTh>
+                  <SortableTh sort={allocationSort} sortKey="takaNumber" className="p-3">Taka / Roll</SortableTh>
+                  <SortableTh sort={allocationSort} sortKey="allocatedQty" className="p-3 text-right" align="right">Allocated Qty</SortableTh>
+                  <SortableTh sort={allocationSort} sortKey="availableQty" className="p-3 text-right" align="right">Available Qty</SortableTh>
+                  <SortableTh sort={allocationSort} sortKey="location" className="p-3">Warehouse Location</SortableTh>
+                  <SortableTh sort={allocationSort} sortKey="status" className="p-3 text-center" align="center">Status</SortableTh>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {allocations.map((a, idx) => (
+                {allocationSort.rows.map((a, idx) => (
                   <tr key={a.id || idx} className="hover:bg-slate-50/50">
                     <td className="p-3 font-mono font-semibold text-blue-600">{a.sourcePo || 'Direct Stock'}</td>
                     <td className="p-3 font-semibold text-slate-900">{a.fabricItem} ({a.fabricQuality})</td>
@@ -296,21 +301,21 @@ export function CustomerProjectTab({ project }) {
             <table className="w-full text-left text-xs text-slate-700">
               <thead className="bg-slate-50 text-[11px] font-bold text-slate-600 uppercase border-b border-slate-200">
                 <tr>
-                  <th className="p-3">JWO Number</th>
-                  <th className="p-3">Process Type</th>
-                  <th className="p-3">Processor / Vendor B</th>
-                  <th className="p-3 text-right">Planned Qty</th>
-                  <th className="p-3 text-right">Outward Qty</th>
-                  <th className="p-3 text-right">Inward Qty</th>
-                  <th className="p-3 text-right">Pending Qty</th>
-                  <th className="p-3 text-right">Rate (₹/m)</th>
-                  <th className="p-3 text-center">Loss %</th>
-                  <th className="p-3">Return Due</th>
-                  <th className="p-3 text-center">Status</th>
+                  <SortableTh sort={processingSort} sortKey="jwoNo" className="p-3">JWO Number</SortableTh>
+                  <SortableTh sort={processingSort} sortKey="process" className="p-3">Process Type</SortableTh>
+                  <SortableTh sort={processingSort} sortKey="vendorName" className="p-3">Processor / Vendor B</SortableTh>
+                  <SortableTh sort={processingSort} sortKey="plannedQty" className="p-3 text-right" align="right">Planned Qty</SortableTh>
+                  <SortableTh sort={processingSort} sortKey="outwardQty" className="p-3 text-right" align="right">Outward Qty</SortableTh>
+                  <SortableTh sort={processingSort} sortKey="inwardQty" className="p-3 text-right" align="right">Inward Qty</SortableTh>
+                  <SortableTh sort={processingSort} sortKey="pendingQty" className="p-3 text-right" align="right">Pending Qty</SortableTh>
+                  <SortableTh sort={processingSort} sortKey="rate" className="p-3 text-right" align="right">Rate (₹/m)</SortableTh>
+                  <SortableTh sort={processingSort} sortKey="expectedLoss" className="p-3 text-center" align="center">Loss %</SortableTh>
+                  <SortableTh sort={processingSort} sortKey="expectedReturnDate" className="p-3">Return Due</SortableTh>
+                  <SortableTh sort={processingSort} sortKey="status" className="p-3 text-center" align="center">Status</SortableTh>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {processingTracking.map((p, idx) => (
+                {processingSort.rows.map((p, idx) => (
                   <tr key={p.jwoNo || idx} className="hover:bg-slate-50/50">
                     <td className="p-3 font-mono font-bold text-blue-600">{p.jwoNo}</td>
                     <td className="p-3 font-semibold text-slate-800">{p.process}</td>
@@ -365,17 +370,17 @@ export function CustomerProjectTab({ project }) {
             <table className="w-full text-left text-xs text-slate-700">
               <thead className="bg-slate-50 text-[11px] font-bold text-slate-600 uppercase border-b border-slate-200">
                 <tr>
-                  <th className="p-3">Delivery Challan</th>
-                  <th className="p-3">Dispatch Date</th>
-                  <th className="p-3 text-right">Dispatched Qty</th>
-                  <th className="p-3">Transporter</th>
-                  <th className="p-3">LR / Consignment No</th>
-                  <th className="p-3">Destination</th>
-                  <th className="p-3 text-center">Status</th>
+                  <SortableTh sort={dispatchSort} sortKey="challanNo" className="p-3">Delivery Challan</SortableTh>
+                  <SortableTh sort={dispatchSort} sortKey="date" className="p-3">Dispatch Date</SortableTh>
+                  <SortableTh sort={dispatchSort} sortKey="quantity" className="p-3 text-right" align="right">Dispatched Qty</SortableTh>
+                  <SortableTh sort={dispatchSort} sortKey="transporter" className="p-3">Transporter</SortableTh>
+                  <SortableTh sort={dispatchSort} sortKey="lrNumber" className="p-3">LR / Consignment No</SortableTh>
+                  <SortableTh sort={dispatchSort} sortKey="destination" className="p-3">Destination</SortableTh>
+                  <SortableTh sort={dispatchSort} sortKey="status" className="p-3 text-center" align="center">Status</SortableTh>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {dispatches.map((d, idx) => (
+                {dispatchSort.rows.map((d, idx) => (
                   <tr key={d.id || idx} className="hover:bg-slate-50/50">
                     <td className="p-3 font-mono font-bold text-blue-600">{d.challanNo}</td>
                     <td className="p-3 text-slate-600">{d.date || '—'}</td>
@@ -449,6 +454,8 @@ export function OwnProjectTab({ project }) {
     availableForFutureSales: summary.availableOwnStock,
     inventoryValuation: 0,
   };
+  const ownStockSort = useTableSort(ownStockDetails);
+  const ownPlanSort = useTableSort(ownProcessingPlans);
 
   return (
     <div className="space-y-6">
@@ -539,19 +546,19 @@ export function OwnProjectTab({ project }) {
             <table className="w-full text-left text-xs text-slate-700">
               <thead className="bg-slate-50 text-[11px] font-bold text-slate-600 uppercase border-b border-slate-200">
                 <tr>
-                  <th className="p-3">Source PO / GRN</th>
-                  <th className="p-3">Fabric Item / Quality</th>
-                  <th className="p-3">Lot Number</th>
-                  <th className="p-3">Taka / Roll</th>
-                  <th className="p-3 text-right">Allocated Qty</th>
-                  <th className="p-3 text-right">Available Qty</th>
-                  <th className="p-3 text-right">Standard Valuation</th>
-                  <th className="p-3">Godown Location</th>
-                  <th className="p-3 text-center">Stock Status</th>
+                  <SortableTh sort={ownStockSort} sortKey="sourcePo" className="p-3">Source PO / GRN</SortableTh>
+                  <SortableTh sort={ownStockSort} sortKey="fabricItem" className="p-3">Fabric Item / Quality</SortableTh>
+                  <SortableTh sort={ownStockSort} sortKey="lotNumber" className="p-3">Lot Number</SortableTh>
+                  <SortableTh sort={ownStockSort} sortKey="takaNumber" className="p-3">Taka / Roll</SortableTh>
+                  <SortableTh sort={ownStockSort} sortKey="allocatedQty" className="p-3 text-right" align="right">Allocated Qty</SortableTh>
+                  <SortableTh sort={ownStockSort} sortKey="availableQty" className="p-3 text-right" align="right">Available Qty</SortableTh>
+                  <SortableTh sort={ownStockSort} sortKey="valuation" className="p-3 text-right" align="right">Standard Valuation</SortableTh>
+                  <SortableTh sort={ownStockSort} sortKey="location" className="p-3">Godown Location</SortableTh>
+                  <SortableTh sort={ownStockSort} sortKey="status" className="p-3 text-center" align="center">Stock Status</SortableTh>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {ownStockDetails.map((s, idx) => (
+                {ownStockSort.rows.map((s, idx) => (
                   <tr key={s.id || idx} className="hover:bg-slate-50/50">
                     <td className="p-3 font-mono font-semibold text-blue-600">{s.sourcePo || 'Direct PO'}</td>
                     <td className="p-3 font-semibold text-slate-900">{s.fabricItem} ({s.fabricQuality})</td>
@@ -587,20 +594,20 @@ export function OwnProjectTab({ project }) {
             <table className="w-full text-left text-xs text-slate-700">
               <thead className="bg-slate-50 text-[11px] font-bold text-slate-600 uppercase border-b border-slate-200">
                 <tr>
-                  <th className="p-3">JWO Number</th>
-                  <th className="p-3">Process</th>
-                  <th className="p-3">Vendor / Processor</th>
-                  <th className="p-3 text-right">Planned Qty</th>
-                  <th className="p-3 text-right">Outward Qty</th>
-                  <th className="p-3 text-right">Inward Qty</th>
-                  <th className="p-3 text-right">Rate</th>
-                  <th className="p-3 text-center">Loss %</th>
-                  <th className="p-3">Expected Return</th>
-                  <th className="p-3 text-center">Status</th>
+                  <SortableTh sort={ownPlanSort} sortKey="jwoNo" className="p-3">JWO Number</SortableTh>
+                  <SortableTh sort={ownPlanSort} sortKey="process" className="p-3">Process</SortableTh>
+                  <SortableTh sort={ownPlanSort} sortKey="vendorName" className="p-3">Vendor / Processor</SortableTh>
+                  <SortableTh sort={ownPlanSort} sortKey="plannedQty" className="p-3 text-right" align="right">Planned Qty</SortableTh>
+                  <SortableTh sort={ownPlanSort} sortKey="outwardQty" className="p-3 text-right" align="right">Outward Qty</SortableTh>
+                  <SortableTh sort={ownPlanSort} sortKey="inwardQty" className="p-3 text-right" align="right">Inward Qty</SortableTh>
+                  <SortableTh sort={ownPlanSort} sortKey="rate" className="p-3 text-right" align="right">Rate</SortableTh>
+                  <SortableTh sort={ownPlanSort} sortKey="expectedLoss" className="p-3 text-center" align="center">Loss %</SortableTh>
+                  <SortableTh sort={ownPlanSort} sortKey="expectedReturnDate" className="p-3">Expected Return</SortableTh>
+                  <SortableTh sort={ownPlanSort} sortKey="status" className="p-3 text-center" align="center">Status</SortableTh>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {ownProcessingPlans.map((p, idx) => (
+                {ownPlanSort.rows.map((p, idx) => (
                   <tr key={p.jwoNo || idx} className="hover:bg-slate-50/50">
                     <td className="p-3 font-mono font-bold text-purple-600">{p.jwoNo}</td>
                     <td className="p-3 font-semibold text-slate-800">{p.process}</td>
@@ -803,6 +810,52 @@ export function PaymentDispatchTab({ project }) {
   const totalInvoicedAmount = finalInvoices.reduce((acc, inv) => acc + Number(inv.grandTotal || inv.total || 0), 0);
   const totalPaidAmount = finalInvoices.reduce((acc, inv) => acc + Number(inv.amountPaid || inv.amount_paid || 0), 0);
   const totalOutstandingBalance = Math.max(0, totalInvoicedAmount - totalPaidAmount);
+
+  const challanSort = useTableSort(challans, {
+    accessors: {
+      challanNumber: (ch) => ch.challanNumber || ch.challan_number,
+      dispatchDate: (ch) => ch.dispatchDate || ch.dispatch_date || ch.doc_date,
+      totalQty: (ch) => Number(ch.totalQty || ch.dispatchedQty || ch.quantity || 0),
+      lrNumber: (ch) => ch.lrNumber || ch.lr_number,
+      vehicleNumber: (ch) => ch.vehicleNumber || ch.vehicle_no,
+      destination: (ch) => ch.destination || project?.customerName,
+      status: (ch) => ch.status || 'Dispatched',
+    },
+  });
+  const finalInvoiceSort = useTableSort(finalInvoices, {
+    accessors: {
+      invoiceNumber: (inv) => inv.invoiceNumber || inv.invoice_number,
+      invoiceDate: (inv) => inv.invoiceDate || inv.date,
+      taxableAmount: (inv) => Number(inv.taxableAmount || inv.taxable_amount || 0),
+      taxAmount: (inv) => Number(inv.taxAmount || inv.tax_amount || 0),
+      grandTotal: (inv) => Number(inv.grandTotal || inv.total || 0),
+      amountPaid: (inv) => Number(inv.amountPaid || inv.amount_paid || 0),
+      outstanding: (inv) => Number(inv.outstandingBalance || inv.balance || (Number(inv.grandTotal || 0) - Number(inv.amountPaid || 0))),
+    },
+  });
+  const proformaSort = useTableSort(proformas, {
+    accessors: {
+      proformaNumber: (pi) => pi.proformaNumber || pi.proforma_number,
+      docDate: (pi) => pi.docDate || pi.date,
+      validUntil: (pi) => pi.validUntil || pi.valid_until,
+      taxableAmount: (pi) => Number(pi.taxableAmount || pi.taxable_amount || 0),
+      taxAmount: (pi) => Number(pi.taxAmount || pi.tax_amount || 0),
+      grandTotal: (pi) => Number(pi.grandTotal || pi.total || 0),
+      status: (pi) => pi.status || 'Draft',
+    },
+  });
+  const paymentSort = useTableSort(payments, {
+    accessors: {
+      paymentNumber: (p) => p.paymentNumber || p.payment_number || p.voucherNo,
+      paymentDate: (p) => p.paymentDate || p.date,
+      paymentMode: (p) => p.paymentMode || p.mode || 'Bank Transfer',
+      bankAccountName: (p) => p.bankAccountName || p.account || 'Primary Bank',
+      referenceNo: (p) => p.referenceNo || p.ref_no,
+      invoiceNumber: (p) => p.invoiceNumber || p.invoice_number || 'Direct Project',
+      amount: (p) => Number(p.amount || 0),
+      status: (p) => p.status || 'Received',
+    },
+  });
 
   const ownStockAllocated = Number(
     project?.ownProjectTotalMeters ||
@@ -1264,19 +1317,19 @@ export function PaymentDispatchTab({ project }) {
             <table className="w-full text-left text-xs border-collapse">
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-200 text-[10.5px] font-bold text-slate-500 uppercase tracking-wider">
-                  <th className="py-2.5 px-3">Challan #</th>
-                  <th className="py-2.5 px-3">Date</th>
-                  <th className="py-2.5 px-3 text-right">Dispatched Qty</th>
-                  <th className="py-2.5 px-3">Transporter</th>
-                  <th className="py-2.5 px-3">LR / Bilty #</th>
-                  <th className="py-2.5 px-3">Vehicle #</th>
-                  <th className="py-2.5 px-3">Destination</th>
-                  <th className="py-2.5 px-3 text-center">Status</th>
+                  <SortableTh sort={challanSort} sortKey="challanNumber" className="py-2.5 px-3">Challan #</SortableTh>
+                  <SortableTh sort={challanSort} sortKey="dispatchDate" className="py-2.5 px-3">Date</SortableTh>
+                  <SortableTh sort={challanSort} sortKey="totalQty" className="py-2.5 px-3 text-right" align="right">Dispatched Qty</SortableTh>
+                  <SortableTh sort={challanSort} sortKey="transporter" className="py-2.5 px-3">Transporter</SortableTh>
+                  <SortableTh sort={challanSort} sortKey="lrNumber" className="py-2.5 px-3">LR / Bilty #</SortableTh>
+                  <SortableTh sort={challanSort} sortKey="vehicleNumber" className="py-2.5 px-3">Vehicle #</SortableTh>
+                  <SortableTh sort={challanSort} sortKey="destination" className="py-2.5 px-3">Destination</SortableTh>
+                  <SortableTh sort={challanSort} sortKey="status" className="py-2.5 px-3 text-center" align="center">Status</SortableTh>
                   <th className="py-2.5 px-3 text-center">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {challans.map((ch, idx) => {
+                {challanSort.rows.map((ch, idx) => {
                   const dcNum = ch.challanNumber || ch.challan_number || `DC-${idx + 1}`;
                   const lrNum = ch.lrNumber || ch.lr_number || '—';
                   const dateStr = ch.dispatchDate || ch.dispatch_date || ch.doc_date || '—';
@@ -1397,20 +1450,20 @@ export function PaymentDispatchTab({ project }) {
                 <table className="w-full text-left text-xs border-collapse">
                   <thead>
                     <tr className="bg-slate-50 border-b border-slate-200 text-[10.5px] font-bold text-slate-500 uppercase tracking-wider">
-                      <th className="py-2.5 px-3">Invoice #</th>
-                      <th className="py-2.5 px-3">Date</th>
-                      <th className="py-2.5 px-3">Due Date</th>
-                      <th className="py-2.5 px-3 text-right">Taxable Amt</th>
-                      <th className="py-2.5 px-3 text-right">Tax (GST)</th>
-                      <th className="py-2.5 px-3 text-right">Grand Total</th>
-                      <th className="py-2.5 px-3 text-right">Amount Paid</th>
-                      <th className="py-2.5 px-3 text-right">Outstanding</th>
+                      <SortableTh sort={finalInvoiceSort} sortKey="invoiceNumber" className="py-2.5 px-3">Invoice #</SortableTh>
+                      <SortableTh sort={finalInvoiceSort} sortKey="invoiceDate" className="py-2.5 px-3">Date</SortableTh>
+                      <SortableTh sort={finalInvoiceSort} sortKey="dueDate" className="py-2.5 px-3">Due Date</SortableTh>
+                      <SortableTh sort={finalInvoiceSort} sortKey="taxableAmount" className="py-2.5 px-3 text-right" align="right">Taxable Amt</SortableTh>
+                      <SortableTh sort={finalInvoiceSort} sortKey="taxAmount" className="py-2.5 px-3 text-right" align="right">Tax (GST)</SortableTh>
+                      <SortableTh sort={finalInvoiceSort} sortKey="grandTotal" className="py-2.5 px-3 text-right" align="right">Grand Total</SortableTh>
+                      <SortableTh sort={finalInvoiceSort} sortKey="amountPaid" className="py-2.5 px-3 text-right" align="right">Amount Paid</SortableTh>
+                      <SortableTh sort={finalInvoiceSort} sortKey="outstanding" className="py-2.5 px-3 text-right" align="right">Outstanding</SortableTh>
                       <th className="py-2.5 px-3 text-center">Status</th>
                       <th className="py-2.5 px-3 text-center">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {finalInvoices.map((inv, idx) => {
+                    {finalInvoiceSort.rows.map((inv, idx) => {
                       const num = inv.invoiceNumber || inv.invoice_number || `INV-${idx + 1}`;
                       const isOverdue = inv.dueDate && new Date(inv.dueDate) < new Date() && Number(inv.outstandingBalance || inv.balance || 0) > 0;
                       const outstanding = Number(inv.outstandingBalance || inv.balance || (Number(inv.grandTotal || 0) - Number(inv.amountPaid || 0)));
@@ -1541,18 +1594,18 @@ export function PaymentDispatchTab({ project }) {
                 <table className="w-full text-left text-xs border-collapse">
                   <thead>
                     <tr className="bg-slate-50 border-b border-slate-200 text-[10.5px] font-bold text-slate-500 uppercase tracking-wider">
-                      <th className="py-2.5 px-3">PI #</th>
-                      <th className="py-2.5 px-3">Date</th>
-                      <th className="py-2.5 px-3">Valid Until</th>
-                      <th className="py-2.5 px-3 text-right">Taxable Amt</th>
-                      <th className="py-2.5 px-3 text-right">Tax</th>
-                      <th className="py-2.5 px-3 text-right">Grand Total</th>
-                      <th className="py-2.5 px-3 text-center">Status</th>
+                      <SortableTh sort={proformaSort} sortKey="proformaNumber" className="py-2.5 px-3">PI #</SortableTh>
+                      <SortableTh sort={proformaSort} sortKey="docDate" className="py-2.5 px-3">Date</SortableTh>
+                      <SortableTh sort={proformaSort} sortKey="validUntil" className="py-2.5 px-3">Valid Until</SortableTh>
+                      <SortableTh sort={proformaSort} sortKey="taxableAmount" className="py-2.5 px-3 text-right" align="right">Taxable Amt</SortableTh>
+                      <SortableTh sort={proformaSort} sortKey="taxAmount" className="py-2.5 px-3 text-right" align="right">Tax</SortableTh>
+                      <SortableTh sort={proformaSort} sortKey="grandTotal" className="py-2.5 px-3 text-right" align="right">Grand Total</SortableTh>
+                      <SortableTh sort={proformaSort} sortKey="status" className="py-2.5 px-3 text-center" align="center">Status</SortableTh>
                       <th className="py-2.5 px-3 text-center">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {proformas.map((pi, idx) => {
+                    {proformaSort.rows.map((pi, idx) => {
                       const num = pi.proformaNumber || pi.proforma_number || `PI-${idx + 1}`;
                       const isConverted = pi.status === 'Converted';
                       const isCancelled = pi.status === 'Cancelled';
@@ -1651,18 +1704,18 @@ export function PaymentDispatchTab({ project }) {
                 <table className="w-full text-left text-xs border-collapse">
                   <thead>
                     <tr className="bg-slate-50 border-b border-slate-200 text-[10.5px] font-bold text-slate-500 uppercase tracking-wider">
-                      <th className="py-2.5 px-3">Receipt #</th>
-                      <th className="py-2.5 px-3">Date</th>
-                      <th className="py-2.5 px-3">Payment Mode</th>
-                      <th className="py-2.5 px-3">Bank Account</th>
-                      <th className="py-2.5 px-3">Reference / UTR #</th>
-                      <th className="py-2.5 px-3">Allocated Invoice</th>
-                      <th className="py-2.5 px-3 text-right">Amount</th>
-                      <th className="py-2.5 px-3 text-center">Status</th>
+                      <SortableTh sort={paymentSort} sortKey="paymentNumber" className="py-2.5 px-3">Receipt #</SortableTh>
+                      <SortableTh sort={paymentSort} sortKey="paymentDate" className="py-2.5 px-3">Date</SortableTh>
+                      <SortableTh sort={paymentSort} sortKey="paymentMode" className="py-2.5 px-3">Payment Mode</SortableTh>
+                      <SortableTh sort={paymentSort} sortKey="bankAccountName" className="py-2.5 px-3">Bank Account</SortableTh>
+                      <SortableTh sort={paymentSort} sortKey="referenceNo" className="py-2.5 px-3">Reference / UTR #</SortableTh>
+                      <SortableTh sort={paymentSort} sortKey="invoiceNumber" className="py-2.5 px-3">Allocated Invoice</SortableTh>
+                      <SortableTh sort={paymentSort} sortKey="amount" className="py-2.5 px-3 text-right" align="right">Amount</SortableTh>
+                      <SortableTh sort={paymentSort} sortKey="status" className="py-2.5 px-3 text-center" align="center">Status</SortableTh>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {payments.map((p, idx) => {
+                    {paymentSort.rows.map((p, idx) => {
                       const num = p.paymentNumber || p.payment_number || p.voucherNo || `PAY-${idx + 1}`;
                       return (
                         <tr key={p.id || idx} className="hover:bg-slate-50/70 transition-colors">

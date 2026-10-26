@@ -206,7 +206,6 @@ export const NAV = [
         defaultOpen: false,
         children: [
           { label: 'Lead Stages', to: '/crm/system-setup' },
-          { label: 'Deal Stages', to: '/crm/deal-stages' },
           { label: 'Lead Sources', to: '/crm/lead-sources' },
         ],
       },

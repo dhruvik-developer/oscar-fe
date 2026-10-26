@@ -3,11 +3,11 @@ import { Link } from 'react-router-dom';
 import {
   FileText, Plus, Search, Eye, Pencil, Download, Check, Printer, Send,
   FileCheck2, Clock, AlertTriangle, XCircle, IndianRupee,
-  ChevronLeft, ChevronRight,
 } from 'lucide-react';
 import Modal from '../../../components/ui/Modal';
 import KpiCard from '../../../components/ui/KpiCard';
 import PageHeader from '../../../components/ui/PageHeader';
+import AppPagination from '../../../components/ui/AppPagination';
 import { loadDeals } from '../../../services/dealService';
 import { crmService } from '../../../services/domainServices';
 import {
@@ -21,7 +21,7 @@ import {
   getContractDisplayStatus,
 } from '../../../services/contractService';
 
-const PAGE_SIZE = 10;
+// PAGE_SIZE default
 const EMPTY_FORM = {
   dealId: '', customer: '', contractType: '', amount: '',
   startDate: '', endDate: '', template: '', description: '', terms: '', status: 'Active',
@@ -129,6 +129,7 @@ export default function ContractsPage() {
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [createOpen, setCreateOpen] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
   const [busy, setBusy] = useState(false);
@@ -167,7 +168,7 @@ export default function ContractsPage() {
     };
   }, []);
 
-  useEffect(() => { setPage(1); }, [search, statusFilter, typeFilter, customerFilter, fromDate, toDate]);
+  useEffect(() => { setPage(1); }, [search, statusFilter, typeFilter, customerFilter, fromDate, toDate, pageSize]);
 
   const customers = useMemo(() => [...new Set(contracts.map((contract) => contract.customer).filter(Boolean))].sort(), [contracts]);
 
@@ -193,9 +194,9 @@ export default function ContractsPage() {
     value: contracts.reduce((sum, contract) => sum + (Number(contract.amount) || 0), 0),
   }), [contracts]);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const safePage = Math.min(page, totalPages);
-  const pageRows = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+  const pageRows = filtered.slice((safePage - 1) * pageSize, safePage * pageSize);
 
   function resetFilters() {
     setSearch('');
@@ -299,7 +300,7 @@ export default function ContractsPage() {
               <tbody>
                 {pageRows.map((contract, index) => (
                   <tr key={contract.id} className="border-t border-slate-100 hover:bg-slate-50/60">
-                    <td className="px-3 py-3 text-slate-400">{(safePage - 1) * PAGE_SIZE + index + 1}</td>
+                    <td className="px-3 py-3 text-slate-400">{(safePage - 1) * pageSize + index + 1}</td>
                     <td className="px-3 py-3">
                       <Link className="font-bold text-blue-600 hover:underline whitespace-nowrap" to={`/crm/contracts/${encodeURIComponent(contract.id)}`}>
                         {contract.contractNumber}
@@ -341,24 +342,17 @@ export default function ContractsPage() {
           </div>
         )}
 
-        {filtered.length > 0 && (
-          <div className="mt-3 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500">
-            <p>Showing {(safePage - 1) * PAGE_SIZE + 1} to {Math.min(safePage * PAGE_SIZE, filtered.length)} of {filtered.length} contracts</p>
-            <div className="flex flex-wrap lg:flex-nowrap items-center justify-center gap-1.5">
-              <button type="button" disabled={safePage <= 1} onClick={() => setPage(safePage - 1)}
-                className="p-1.5 rounded-lg border border-slate-200 disabled:opacity-40 hover:bg-slate-100" aria-label="Previous page"><ChevronLeft size={14} /></button>
-              {Array.from({ length: totalPages }, (_, i) => i + 1).slice(0, 7).map((number) => (
-                <button key={number} type="button" onClick={() => setPage(number)}
-                  className={`min-w-[28px] h-7 rounded-lg border text-xs font-semibold ${number === safePage ? 'bg-blue-600 text-white border-blue-600' : 'border-slate-200 text-slate-600 hover:bg-slate-100'}`}>
-                  {number}
-                </button>
-              ))}
-              <button type="button" disabled={safePage >= totalPages} onClick={() => setPage(safePage + 1)}
-                className="p-1.5 rounded-lg border border-slate-200 disabled:opacity-40 hover:bg-slate-100" aria-label="Next page"><ChevronRight size={14} /></button>
-              <span className="ml-2 border border-slate-200 rounded-lg px-2 py-1.5">{PAGE_SIZE} / page</span>
-            </div>
-          </div>
-        )}
+        <div className="border-t border-slate-100 mt-4 pt-1">
+          <AppPagination
+            total={filtered.length}
+            page={safePage}
+            pageSize={pageSize}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+            pageSizeOptions={[10, 20, 50]}
+            bordered={false}
+          />
+        </div>
       </div>
 
       <Modal isOpen={createOpen} onClose={() => !busy && setCreateOpen(false)} title="Create Contract" subtitle="Fill in the contract details" size="lg">

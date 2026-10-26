@@ -5,6 +5,8 @@ import { numIN, toDDMMYYYY, purgeLegacyJobWorkCache } from './jobWorkOrdersStore
 import { fetchJWOs, fetchPlans, createJWORow, deleteJWORow, errorMessage } from '../../services/jobWorkSync';
 import PageHeader from '../../components/ui/PageHeader';
 import TablePagination from '../../components/ui/TablePagination';
+import SortableTh from '../../components/ui/SortableTh';
+import { useTableSort } from '../../hooks/useTableSort';
 import { PrintJobWorkChallanModal } from '../../components/common/PrintJobWorkChallanModal';
 import { ConfirmModal } from '../../components/ui/ConfirmModal';
 
@@ -121,10 +123,11 @@ export default function JobWorkOutwardPage() {
     setPage(1);
   }, [outwardNo, jwoNo, vendor, process, status, fromDate, toDate]);
 
+  const sort = useTableSort(filtered);
   const pagedFiltered = useMemo(() => {
     const start = (page - 1) * pageSize;
-    return filtered.slice(start, start + pageSize);
-  }, [filtered, page, pageSize]);
+    return sort.rows.slice(start, start + pageSize);
+  }, [sort.rows, page, pageSize]);
 
   const handleDelete = (r) => {
     setMenuId(null);
@@ -279,8 +282,8 @@ export default function JobWorkOutwardPage() {
             <thead>
               <tr className="border-b border-slate-100 text-[11px] font-bold text-slate-500">
                 <th className="px-3 py-2.5 w-10 text-center">#</th>
-                {['Outward No.', 'JWO No.', 'Date', 'Vendor / Processor', 'Process', 'Fabric Item', 'Fabric Quality', 'Shade / Colour', 'Lot No.', 'Taka / Roll', 'Quantity (M)', 'LR No.', 'Transporter', 'Status'].map((h, i) => (
-                  <th key={h} className={`px-3 py-2.5 whitespace-nowrap ${i === 10 ? 'text-right' : ''} ${i === 13 ? 'text-center' : ''}`}>{h}</th>
+                {[['Outward No.', 'no'], ['JWO No.', 'jwoNo'], ['Date', 'date'], ['Vendor / Processor', 'vendor'], ['Process', 'process'], ['Fabric Item', 'fabricItem'], ['Fabric Quality', 'fabricQuality'], ['Shade / Colour', 'shade'], ['Lot No.', 'lotNo'], ['Taka / Roll', 'takaRoll'], ['Quantity (M)', 'qty'], ['LR No.', 'lrNo'], ['Transporter', 'transporter'], ['Status', 'status']].map(([h, key], i) => (
+                  <SortableTh key={h} sort={sort} sortKey={key} align={i === 10 ? 'right' : i === 13 ? 'center' : 'left'} className={`px-3 py-2.5 whitespace-nowrap ${i === 10 ? 'text-right' : ''} ${i === 13 ? 'text-center' : ''}`}>{h}</SortableTh>
                 ))}
                 <th className="px-3 py-2.5 text-center">Actions</th>
               </tr>

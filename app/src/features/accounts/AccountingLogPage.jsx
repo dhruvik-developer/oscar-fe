@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ChevronDown, ChevronRight, Search } from 'lucide-react';
 import PageHeader from '../../components/ui/PageHeader';
+import AppPagination from '../../components/ui/AppPagination';
 import {
   Card,
   EmptyRow,
@@ -234,17 +235,15 @@ export default function AccountingLogPage() {
         )}
 
         {pages > 1 && (
-          <div className="flex items-center justify-end gap-2 pt-3 text-xs text-slate-600">
-            <button type="button" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}
-              className="px-3 py-1.5 rounded-lg border border-[#dce5f4] disabled:opacity-40 cursor-pointer">
-              Previous
-            </button>
-            <span>Page {page} of {pages}</span>
-            <button type="button" disabled={page >= pages} onClick={() => setPage((p) => p + 1)}
-              className="px-3 py-1.5 rounded-lg border border-[#dce5f4] disabled:opacity-40 cursor-pointer">
-              Next
-            </button>
-          </div>
+          <AppPagination
+            total={total}
+            page={page}
+            pageSize={PAGE_SIZE}
+            onPageChange={setPage}
+            loading={loading}
+            bordered={false}
+            className="pt-3"
+          />
         )}
       </Card>
     </div>

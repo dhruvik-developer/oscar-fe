@@ -43,6 +43,8 @@ import {
   describeApiError,
 } from './accountingShared';
 import { accountingService } from '../../services/domainServices';
+import { useTableSort } from '../../hooks/useTableSort';
+import SortableTh from '../../components/ui/SortableTh';
 
 const TABS = [
   { id: 'sales', label: 'Sales Invoices' },
@@ -92,6 +94,35 @@ export default function DayBookPage() {
   }, [fetchData]);
 
   const summary = dayBookData?.summary || {};
+
+  // Search-filtered rows per tab, sorted by the clicked column.
+  const matches = (value) => value?.toLowerCase().includes(search.toLowerCase());
+  const salesSort = useTableSort(
+    (dayBookData?.salesVouchers || []).filter((s) => !search || matches(s.voucherNumber) || matches(s.partyName)),
+  );
+  const collectionSort = useTableSort(
+    (dayBookData?.collectionVouchers || []).filter((c) => !search || matches(c.voucherNumber) || matches(c.partyName)),
+    { accessors: { mode: (row) => row.mode || 'Cash/Bank', bank: (row) => row.bank || 'Main Cash / Bank' } },
+  );
+  const purchaseSort = useTableSort(
+    (dayBookData?.purchaseVouchers || []).filter((p) => !search || matches(p.voucherNumber) || matches(p.partyName)),
+  );
+  const disbursementSort = useTableSort(
+    (dayBookData?.disbursementVouchers || []).filter((d) => !search || matches(d.voucherNumber) || matches(d.partyName)),
+    { accessors: { mode: (row) => row.mode || 'Direct', bank: (row) => row.bank || 'Main Bank' } },
+  );
+  const tripSort = useTableSort(
+    (dayBookData?.tripVouchers || []).filter((t) => !search || matches(t.voucherNumber) || matches(t.vehicleNumber)),
+  );
+  const salespersonOverdueSort = useTableSort(overdueData?.bySalesperson || []);
+  const brokerOverdueSort = useTableSort(overdueData?.byBroker || []);
+  const brokerLedgerSort = useTableSort(brokerSubLedger?.rows || []);
+  const incentiveLedgerSort = useTableSort(incentiveSubLedger?.rows || [], {
+    accessors: {
+      calculated: (row) => row.accrued || row.calculated,
+      posted: (row) => row.payable || row.posted,
+    },
+  });
 
   const handleDownload = async (download) => {
     setShowExportMenu(false);
@@ -306,18 +337,16 @@ export default function DayBookPage() {
                 <table className="w-full text-left text-xs">
                   <thead className="bg-slate-50 text-slate-500 border-b border-slate-200">
                     <tr>
-                      <th className={thClass}>Invoice #</th>
-                      <th className={thClass}>Customer</th>
-                      <th className={`${thClass} text-right`}>Taxable Value</th>
-                      <th className={`${thClass} text-right`}>GST Tax</th>
-                      <th className={`${thClass} text-right`}>Total Amount</th>
-                      <th className={`${thClass} text-center`}>Status</th>
+                      <SortableTh sort={salesSort} sortKey="voucherNumber" className={thClass}>Invoice #</SortableTh>
+                      <SortableTh sort={salesSort} sortKey="partyName" className={thClass}>Customer</SortableTh>
+                      <SortableTh sort={salesSort} sortKey="taxable" className={`${thClass} text-right`} align="right">Taxable Value</SortableTh>
+                      <SortableTh sort={salesSort} sortKey="tax" className={`${thClass} text-right`} align="right">GST Tax</SortableTh>
+                      <SortableTh sort={salesSort} sortKey="amount" className={`${thClass} text-right`} align="right">Total Amount</SortableTh>
+                      <SortableTh sort={salesSort} sortKey="status" className={`${thClass} text-center`} align="center">Status</SortableTh>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {(dayBookData?.salesVouchers || [])
-                      .filter((s) => !search || s.voucherNumber?.toLowerCase().includes(search.toLowerCase()) || s.partyName?.toLowerCase().includes(search.toLowerCase()))
-                      .map((row) => (
+                    {salesSort.rows.map((row) => (
                         <tr key={row.id} className="hover:bg-slate-50/70 transition">
                           <td className="py-2.5 px-3 font-semibold text-blue-600">{row.voucherNumber}</td>
                           <td className="py-2.5 px-3 font-medium text-slate-800">{row.partyName || '—'}</td>
@@ -345,17 +374,15 @@ export default function DayBookPage() {
                 <table className="w-full text-left text-xs">
                   <thead className="bg-slate-50 text-slate-500 border-b border-slate-200">
                     <tr>
-                      <th className={thClass}>Receipt #</th>
-                      <th className={thClass}>Customer</th>
-                      <th className={thClass}>Mode</th>
-                      <th className={thClass}>Deposited Bank</th>
-                      <th className={`${thClass} text-right`}>Amount Collected</th>
+                      <SortableTh sort={collectionSort} sortKey="voucherNumber" className={thClass}>Receipt #</SortableTh>
+                      <SortableTh sort={collectionSort} sortKey="partyName" className={thClass}>Customer</SortableTh>
+                      <SortableTh sort={collectionSort} sortKey="mode" className={thClass}>Mode</SortableTh>
+                      <SortableTh sort={collectionSort} sortKey="bank" className={thClass}>Deposited Bank</SortableTh>
+                      <SortableTh sort={collectionSort} sortKey="amount" className={`${thClass} text-right`} align="right">Amount Collected</SortableTh>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {(dayBookData?.collectionVouchers || [])
-                      .filter((c) => !search || c.voucherNumber?.toLowerCase().includes(search.toLowerCase()) || c.partyName?.toLowerCase().includes(search.toLowerCase()))
-                      .map((row) => (
+                    {collectionSort.rows.map((row) => (
                         <tr key={row.id} className="hover:bg-slate-50/70 transition">
                           <td className="py-2.5 px-3 font-semibold text-emerald-600">{row.voucherNumber}</td>
                           <td className="py-2.5 px-3 font-medium text-slate-800">{row.partyName || '—'}</td>
@@ -378,17 +405,15 @@ export default function DayBookPage() {
                 <table className="w-full text-left text-xs">
                   <thead className="bg-slate-50 text-slate-500 border-b border-slate-200">
                     <tr>
-                      <th className={thClass}>Bill #</th>
-                      <th className={thClass}>Vendor</th>
-                      <th className={`${thClass} text-right`}>Taxable Value</th>
-                      <th className={`${thClass} text-right`}>Total Bill Amount</th>
-                      <th className={`${thClass} text-center`}>Status</th>
+                      <SortableTh sort={purchaseSort} sortKey="voucherNumber" className={thClass}>Bill #</SortableTh>
+                      <SortableTh sort={purchaseSort} sortKey="partyName" className={thClass}>Vendor</SortableTh>
+                      <SortableTh sort={purchaseSort} sortKey="taxable" className={`${thClass} text-right`} align="right">Taxable Value</SortableTh>
+                      <SortableTh sort={purchaseSort} sortKey="amount" className={`${thClass} text-right`} align="right">Total Bill Amount</SortableTh>
+                      <SortableTh sort={purchaseSort} sortKey="status" className={`${thClass} text-center`} align="center">Status</SortableTh>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {(dayBookData?.purchaseVouchers || [])
-                      .filter((p) => !search || p.voucherNumber?.toLowerCase().includes(search.toLowerCase()) || p.partyName?.toLowerCase().includes(search.toLowerCase()))
-                      .map((row) => (
+                    {purchaseSort.rows.map((row) => (
                         <tr key={row.id} className="hover:bg-slate-50/70 transition">
                           <td className="py-2.5 px-3 font-semibold text-amber-700">{row.voucherNumber}</td>
                           <td className="py-2.5 px-3 font-medium text-slate-800">{row.partyName || '—'}</td>
@@ -415,17 +440,15 @@ export default function DayBookPage() {
                 <table className="w-full text-left text-xs">
                   <thead className="bg-slate-50 text-slate-500 border-b border-slate-200">
                     <tr>
-                      <th className={thClass}>Payment #</th>
-                      <th className={thClass}>Vendor / Beneficiary</th>
-                      <th className={thClass}>Mode</th>
-                      <th className={thClass}>Bank Account</th>
-                      <th className={`${thClass} text-right`}>Amount Paid</th>
+                      <SortableTh sort={disbursementSort} sortKey="voucherNumber" className={thClass}>Payment #</SortableTh>
+                      <SortableTh sort={disbursementSort} sortKey="partyName" className={thClass}>Vendor / Beneficiary</SortableTh>
+                      <SortableTh sort={disbursementSort} sortKey="mode" className={thClass}>Mode</SortableTh>
+                      <SortableTh sort={disbursementSort} sortKey="bank" className={thClass}>Bank Account</SortableTh>
+                      <SortableTh sort={disbursementSort} sortKey="amount" className={`${thClass} text-right`} align="right">Amount Paid</SortableTh>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {(dayBookData?.disbursementVouchers || [])
-                      .filter((d) => !search || d.voucherNumber?.toLowerCase().includes(search.toLowerCase()) || d.partyName?.toLowerCase().includes(search.toLowerCase()))
-                      .map((row) => (
+                    {disbursementSort.rows.map((row) => (
                         <tr key={row.id} className="hover:bg-slate-50/70 transition">
                           <td className="py-2.5 px-3 font-semibold text-rose-600">{row.voucherNumber}</td>
                           <td className="py-2.5 px-3 font-medium text-slate-800">{row.partyName || '—'}</td>
@@ -448,16 +471,14 @@ export default function DayBookPage() {
                 <table className="w-full text-left text-xs">
                   <thead className="bg-slate-50 text-slate-500 border-b border-slate-200">
                     <tr>
-                      <th className={thClass}>Trip #</th>
-                      <th className={thClass}>Vehicle Number</th>
-                      <th className={thClass}>Freight Paid By</th>
-                      <th className={`${thClass} text-right`}>Total Charges</th>
+                      <SortableTh sort={tripSort} sortKey="voucherNumber" className={thClass}>Trip #</SortableTh>
+                      <SortableTh sort={tripSort} sortKey="vehicleNumber" className={thClass}>Vehicle Number</SortableTh>
+                      <SortableTh sort={tripSort} sortKey="paidBy" className={thClass}>Freight Paid By</SortableTh>
+                      <SortableTh sort={tripSort} sortKey="amount" className={`${thClass} text-right`} align="right">Total Charges</SortableTh>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {(dayBookData?.tripVouchers || [])
-                      .filter((t) => !search || t.voucherNumber?.toLowerCase().includes(search.toLowerCase()) || t.vehicleNumber?.toLowerCase().includes(search.toLowerCase()))
-                      .map((row) => (
+                    {tripSort.rows.map((row) => (
                         <tr key={row.id} className="hover:bg-slate-50/70 transition">
                           <td className="py-2.5 px-3 font-semibold text-blue-700">{row.voucherNumber}</td>
                           <td className="py-2.5 px-3 font-mono text-slate-800">{row.vehicleNumber || '—'}</td>
@@ -497,14 +518,14 @@ export default function DayBookPage() {
                       <table className="w-full text-left text-xs">
                         <thead className="bg-slate-50/50 text-slate-500 border-b border-slate-200">
                           <tr>
-                            <th className={thClass}>Salesperson</th>
-                            <th className={`${thClass} text-center`}>Invoices</th>
-                            <th className={`${thClass} text-center`}>Max Overdue</th>
-                            <th className={`${thClass} text-right`}>Overdue Amount</th>
+                            <SortableTh sort={salespersonOverdueSort} sortKey="name" className={thClass}>Salesperson</SortableTh>
+                            <SortableTh sort={salespersonOverdueSort} sortKey="invoiceCount" className={`${thClass} text-center`} align="center">Invoices</SortableTh>
+                            <SortableTh sort={salespersonOverdueSort} sortKey="maxDaysOverdue" className={`${thClass} text-center`} align="center">Max Overdue</SortableTh>
+                            <SortableTh sort={salespersonOverdueSort} sortKey="totalOverdue" className={`${thClass} text-right`} align="right">Overdue Amount</SortableTh>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
-                          {(overdueData?.bySalesperson || []).map((sp) => (
+                          {salespersonOverdueSort.rows.map((sp) => (
                             <tr key={sp.id} className="hover:bg-slate-50">
                               <td className="py-2.5 px-3 font-semibold text-slate-800">{sp.name}</td>
                               <td className="py-2.5 px-3 text-center text-slate-600">{sp.invoiceCount}</td>
@@ -530,14 +551,14 @@ export default function DayBookPage() {
                       <table className="w-full text-left text-xs">
                         <thead className="bg-slate-50/50 text-slate-500 border-b border-slate-200">
                           <tr>
-                            <th className={thClass}>Broker</th>
-                            <th className={`${thClass} text-center`}>Invoices</th>
-                            <th className={`${thClass} text-center`}>Max Overdue</th>
-                            <th className={`${thClass} text-right`}>Overdue Amount</th>
+                            <SortableTh sort={brokerOverdueSort} sortKey="name" className={thClass}>Broker</SortableTh>
+                            <SortableTh sort={brokerOverdueSort} sortKey="invoiceCount" className={`${thClass} text-center`} align="center">Invoices</SortableTh>
+                            <SortableTh sort={brokerOverdueSort} sortKey="maxDaysOverdue" className={`${thClass} text-center`} align="center">Max Overdue</SortableTh>
+                            <SortableTh sort={brokerOverdueSort} sortKey="totalOverdue" className={`${thClass} text-right`} align="right">Overdue Amount</SortableTh>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
-                          {(overdueData?.byBroker || []).map((br) => (
+                          {brokerOverdueSort.rows.map((br) => (
                             <tr key={br.id} className="hover:bg-slate-50">
                               <td className="py-2.5 px-3 font-semibold text-slate-800">{br.name}</td>
                               <td className="py-2.5 px-3 text-center text-slate-600">{br.invoiceCount}</td>
@@ -572,16 +593,16 @@ export default function DayBookPage() {
                     <table className="w-full text-left text-xs">
                       <thead className="bg-slate-50/50 text-slate-500 border-b border-slate-200">
                         <tr>
-                          <th className={thClass}>Broker Name</th>
-                          <th className={`${thClass} text-right`}>Accrued</th>
-                          <th className={`${thClass} text-right`}>Approved</th>
-                          <th className={`${thClass} text-right`}>Payable (Hold)</th>
-                          <th className={`${thClass} text-right`}>Paid to Date</th>
-                          <th className={`${thClass} text-right`}>Net Outstanding</th>
+                          <SortableTh sort={brokerLedgerSort} sortKey="name" className={thClass}>Broker Name</SortableTh>
+                          <SortableTh sort={brokerLedgerSort} sortKey="accrued" className={`${thClass} text-right`} align="right">Accrued</SortableTh>
+                          <SortableTh sort={brokerLedgerSort} sortKey="approved" className={`${thClass} text-right`} align="right">Approved</SortableTh>
+                          <SortableTh sort={brokerLedgerSort} sortKey="payable" className={`${thClass} text-right`} align="right">Payable (Hold)</SortableTh>
+                          <SortableTh sort={brokerLedgerSort} sortKey="paid" className={`${thClass} text-right`} align="right">Paid to Date</SortableTh>
+                          <SortableTh sort={brokerLedgerSort} sortKey="balance" className={`${thClass} text-right`} align="right">Net Outstanding</SortableTh>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
-                        {(brokerSubLedger?.rows || []).map((row) => (
+                        {brokerLedgerSort.rows.map((row) => (
                           <tr key={row.id} className="hover:bg-slate-50">
                             <td className="py-2.5 px-3 font-semibold text-slate-800">{row.name}</td>
                             <td className="py-2.5 px-3 text-right font-mono text-slate-600">{formatINR(row.accrued)}</td>
@@ -612,16 +633,16 @@ export default function DayBookPage() {
                     <table className="w-full text-left text-xs">
                       <thead className="bg-slate-50/50 text-slate-500 border-b border-slate-200">
                         <tr>
-                          <th className={thClass}>Salesperson</th>
-                          <th className={`${thClass} text-right`}>Calculated</th>
-                          <th className={`${thClass} text-right`}>Approved</th>
-                          <th className={`${thClass} text-right`}>Posted to Ledger</th>
-                          <th className={`${thClass} text-right`}>Disbursed / Paid</th>
-                          <th className={`${thClass} text-right`}>Net Balance</th>
+                          <SortableTh sort={incentiveLedgerSort} sortKey="name" className={thClass}>Salesperson</SortableTh>
+                          <SortableTh sort={incentiveLedgerSort} sortKey="calculated" className={`${thClass} text-right`} align="right">Calculated</SortableTh>
+                          <SortableTh sort={incentiveLedgerSort} sortKey="approved" className={`${thClass} text-right`} align="right">Approved</SortableTh>
+                          <SortableTh sort={incentiveLedgerSort} sortKey="posted" className={`${thClass} text-right`} align="right">Posted to Ledger</SortableTh>
+                          <SortableTh sort={incentiveLedgerSort} sortKey="paid" className={`${thClass} text-right`} align="right">Disbursed / Paid</SortableTh>
+                          <SortableTh sort={incentiveLedgerSort} sortKey="balance" className={`${thClass} text-right`} align="right">Net Balance</SortableTh>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
-                        {(incentiveSubLedger?.rows || []).map((row) => (
+                        {incentiveLedgerSort.rows.map((row) => (
                           <tr key={row.id} className="hover:bg-slate-50">
                             <td className="py-2.5 px-3 font-semibold text-slate-800">{row.name}</td>
                             <td className="py-2.5 px-3 text-right font-mono text-slate-600">{formatINR(row.accrued || row.calculated)}</td>

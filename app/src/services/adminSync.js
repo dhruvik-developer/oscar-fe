@@ -47,7 +47,8 @@ export const ADMIN_RESOURCES = {
       department: u.department || undefined,
       employeeId: u.employeeId || undefined,
       location: u.location || undefined,
-      reportingManager: u.reportingManager || undefined,
+      // Only an explicit null clears the manager; '' (unset on a row) leaves it.
+      reportingManagerId: u.reportingManagerId === null ? null : (u.reportingManagerId || undefined),
       status: u.status || undefined,
       password: u.password || undefined,
       crmRoles: u.crmRoles || u.crm_roles || undefined,
@@ -68,6 +69,8 @@ export const ADMIN_RESOURCES = {
         'name', 'email', 'phone', 'role', 'department', 'designation',
         'employeeId', 'employeeStatus', 'location', 'reportingManager',
       ]),
+      roleId: row.roleId ? String(row.roleId) : '',
+      reportingManagerId: row.reportingManagerId ? String(row.reportingManagerId) : '',
       status: row.status || 'Active',
       isFromHrms: Boolean(row.isFromHrms),
       _synced: true,

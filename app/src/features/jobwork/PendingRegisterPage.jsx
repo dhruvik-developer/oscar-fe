@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { Eye, FileText } from 'lucide-react';
 import PageHeader from '../../components/ui/PageHeader';
 import TablePagination from '../../components/ui/TablePagination';
+import SortableTh from '../../components/ui/SortableTh';
+import { useTableSort } from '../../hooks/useTableSort';
 import { api } from '../../services/api';
 import { numIN, toDDMMYYYY } from './jobWorkOrdersStore';
 
@@ -72,10 +74,11 @@ export default function PendingRegisterPage() {
     setPage(1);
   }, [fJwo, fVendor, fProcess, fFabric, fStatus, fFrom, fTo]);
 
+  const sort = useTableSort(filtered);
   const paginated = useMemo(() => {
     const start = (page - 1) * pageSize;
-    return filtered.slice(start, start + pageSize);
-  }, [filtered, page, pageSize]);
+    return sort.rows.slice(start, start + pageSize);
+  }, [sort.rows, page, pageSize]);
 
   const selectCls = 'mt-1 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-[12px] font-medium text-slate-700 outline-none';
   const labelCls = 'text-[11px] font-semibold text-slate-400';
@@ -138,8 +141,8 @@ export default function PendingRegisterPage() {
             <thead>
               <tr className="border-b border-slate-100 text-[11px] font-bold text-slate-500">
                 <th className="px-3 py-2.5 w-10 text-center">#</th>
-                {['JWO No.', 'Vendor / Processor', 'Process', 'Fabric Item', 'Fabric Quality', 'Shade / Colour', 'Outward Qty (M)', 'Inward Qty (M)', 'Pending Qty (M)', 'Expected Return Date', 'Days Pending', 'Status'].map((h, i) => (
-                  <th key={h} className={`px-3 py-2.5 whitespace-nowrap ${(i >= 6 && i <= 8) || i === 10 ? 'text-right' : ''} ${i === 11 ? 'text-center' : ''}`}>{h}</th>
+                {[['JWO No.', 'jwoNo'], ['Vendor / Processor', 'vendor'], ['Process', 'process'], ['Fabric Item', 'fabricItem'], ['Fabric Quality', 'fabricQuality'], ['Shade / Colour', 'shade'], ['Outward Qty (M)', 'totalOutward'], ['Inward Qty (M)', 'totalInward'], ['Pending Qty (M)', 'pendingQty'], ['Expected Return Date', 'expectedReturnDate'], ['Days Pending', 'daysPending'], ['Status', 'status']].map(([h, key], i) => (
+                  <SortableTh key={h} sort={sort} sortKey={key} align={(i >= 6 && i <= 8) || i === 10 ? 'right' : i === 11 ? 'center' : 'left'} className={`px-3 py-2.5 whitespace-nowrap ${(i >= 6 && i <= 8) || i === 10 ? 'text-right' : ''} ${i === 11 ? 'text-center' : ''}`}>{h}</SortableTh>
                 ))}
                 <th className="px-3 py-2.5 text-center">Actions</th>
               </tr>

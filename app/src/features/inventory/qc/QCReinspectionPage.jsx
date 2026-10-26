@@ -8,7 +8,6 @@ import {
   Inbox,
   ClipboardCheck,
   ChevronRight,
-  ChevronLeft,
   Search,
   Plus,
   X,
@@ -18,6 +17,9 @@ import {
 import { api } from '../../../services/api';
 import { inventoryService } from '../../../services/domainServices';
 import PageInfoButton from '../../../components/ui/PageInfoButton';
+import AppPagination from '../../../components/ui/AppPagination';
+import { useTableSort } from '../../../hooks/useTableSort';
+import SortableTh from '../../../components/ui/SortableTh';
 
 /*
  * Reprocess cycle, as the requirement lays it out:
@@ -108,8 +110,8 @@ export default function QCReinspectionPage() {
     });
   }, [records, activeStep, search, vendorFilter]);
 
-  const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
-  const pageRows = rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const tableSort = useTableSort(rows, { accessors: { sentQty: (r) => Number(r.sentQty || 0) } });
+  const pageRows = tableSort.rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const moveTo = async (row, status, doneText) => {
     if (!row.jwoId) {
@@ -244,14 +246,14 @@ export default function QCReinspectionPage() {
           <table className="w-full text-xs text-left whitespace-nowrap">
             <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200">
               <tr>
-                <th className="p-3">Reprocess No.</th>
-                <th className="p-3">Date</th>
-                <th className="p-3">Source (GRN / Inward)</th>
-                <th className="p-3">Fabric</th>
-                <th className="p-3">Lot</th>
-                <th className="p-3">Processor</th>
-                <th className="p-3 text-right">Qty (m)</th>
-                <th className="p-3">Status</th>
+                <SortableTh sort={tableSort} sortKey="reprocessNo" className="p-3">Reprocess No.</SortableTh>
+                <SortableTh sort={tableSort} sortKey="date" className="p-3">Date</SortableTh>
+                <SortableTh sort={tableSort} sortKey="sourceQcNo" className="p-3">Source (GRN / Inward)</SortableTh>
+                <SortableTh sort={tableSort} sortKey="fabricItem" className="p-3">Fabric</SortableTh>
+                <SortableTh sort={tableSort} sortKey="lotNo" className="p-3">Lot</SortableTh>
+                <SortableTh sort={tableSort} sortKey="vendor" className="p-3">Processor</SortableTh>
+                <SortableTh sort={tableSort} sortKey="sentQty" className="p-3 text-right" align="right">Qty (m)</SortableTh>
+                <SortableTh sort={tableSort} sortKey="status" className="p-3">Status</SortableTh>
                 <th className="p-3 text-right">Next Step</th>
               </tr>
             </thead>
@@ -281,14 +283,13 @@ export default function QCReinspectionPage() {
           </table>
         </div>
 
-        <div className="flex items-center justify-between p-3 border-t border-slate-200 text-xs text-slate-500">
-          <span>{rows.length} record{rows.length === 1 ? '' : 's'}</span>
-          <div className="flex items-center gap-1">
-            <button type="button" disabled={page <= 1} onClick={() => setPage((p) => p - 1)} className="p-1.5 rounded border border-slate-200 bg-white disabled:opacity-40"><ChevronLeft className="w-4 h-4" /></button>
-            <span className="px-2 font-semibold text-slate-700">{page} / {totalPages}</span>
-            <button type="button" disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)} className="p-1.5 rounded border border-slate-200 bg-white disabled:opacity-40"><ChevronRight className="w-4 h-4" /></button>
-          </div>
-        </div>
+        <AppPagination
+          total={rows.length}
+          page={page}
+          pageSize={PAGE_SIZE}
+          onPageChange={setPage}
+          loading={loading}
+        />
       </div>
 
       {qcRow && (

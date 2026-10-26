@@ -2,6 +2,7 @@ import InfoBanner from '../../components/ui/InfoBanner';
 import PageHeader from '../../components/ui/PageHeader';
 import AdministrationGuideButton from './AdministrationGuideButton';
 import KpiCard from '../../components/ui/KpiCard';
+import AppPagination from '../../components/ui/AppPagination';
 import React, { useState, useMemo, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { adminSync, describeError, pullCustomerClients } from '../../services/adminSync';
@@ -37,8 +38,6 @@ import {
   CheckCircle2,
   AlertTriangle,
   ChevronDown,
-  ChevronLeft,
-  ChevronRight,
   Upload,
   Camera,
   Check,
@@ -606,42 +605,14 @@ export function ClientsPage() {
         </div>
       )}
 
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2 text-xs text-slate-500">
-        <span>
-          Showing {filteredClients.length === 0 ? 0 : (currentPage - 1) * CLIENTS_PER_PAGE + 1} to{' '}
-          {Math.min(currentPage * CLIENTS_PER_PAGE, filteredClients.length)} of {filteredClients.length} clients
-        </span>
-
-        <div className="flex items-center gap-1">
-          <button
-            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-            disabled={currentPage === 1}
-            className="w-7 h-7 flex items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 disabled:opacity-40"
-          >
-            <ChevronLeft size={14} />
-          </button>
-          {Array.from({ length: totalPages }, (_, i) => i + 1).map((pg) => (
-            <button
-              key={pg}
-              onClick={() => setCurrentPage(pg)}
-              className={`w-7 h-7 flex items-center justify-center rounded-lg text-xs font-semibold ${
-                currentPage === pg
-                  ? 'bg-[#1f6bff] text-white'
-                  : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
-              }`}
-            >
-              {pg}
-            </button>
-          ))}
-          <button
-            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-            disabled={currentPage === totalPages}
-            className="w-7 h-7 flex items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 disabled:opacity-40"
-          >
-            <ChevronRight size={14} />
-          </button>
-        </div>
-      </div>
+      <AppPagination
+        total={filteredClients.length}
+        page={currentPage}
+        pageSize={CLIENTS_PER_PAGE}
+        onPageChange={setCurrentPage}
+        bordered={false}
+        className="pt-2"
+      />
 
 
       {viewingClient && (

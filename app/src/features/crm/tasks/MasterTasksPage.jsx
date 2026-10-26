@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Search,
@@ -8,8 +8,6 @@ import {
   Copy,
   Trash2,
   MoreVertical,
-  ChevronLeft,
-  ChevronRight,
   RotateCcw,
   Phone,
   Monitor,
@@ -24,16 +22,19 @@ import {
 import MasterTasksGuideModal from './MasterTasksGuideModal';
 import InfoBanner from '../common/InfoBanner';
 import PageHeader from '../../../components/ui/PageHeader';
+import AppPagination from '../../../components/ui/AppPagination';
 import { useCrmStore } from '../../../stores/crmStore';
-import { isBackendEnabled, describeError } from '../../../services/crmSync';
+import { isBackendEnabled, describeError, pullAssignmentOptions } from '../../../services/crmSync';
+import MasterSourceLink, { useMasterDataRefresh } from '../../../components/common/MasterSourceLink';
 
 // ── Backend-first mode ──────────────────────────────────────────────
 // Master tasks live in Postgres (/crm/master-tasks/). Nothing is kept in
 // the browser: without a session the list is empty and saves are refused.
 
 
-const ROLES = ['Sales Support Executive', 'BDE', 'Area Sales Manager'];
-const DEPARTMENTS = ['Sales', 'Support', 'Marketing'];
+// Roles come from Administration → Roles and departments from HRMS →
+// Departments (GET /crm/assignment-options/), the same values the stage
+// automation matches users against when it assigns a generated task.
 const PRIORITIES = ['High', 'Medium', 'Low'];
 const STATUSES = ['Active', 'Inactive'];
 const ICONS = ['follow-up', 'demo', 'pending', 'meeting', 'formal', 'quotation'];
@@ -47,6 +48,15 @@ const ICON_STYLE = {
   formal: 'bg-blue-50 text-blue-600',
   quotation: 'bg-amber-50 text-amber-600',
 };
+
+/** The master's options, plus `extra` values (e.g. on saved tasks) it no longer lists. */
+function withExtras(options, extra) {
+  const out = [...options];
+  extra.forEach((value) => {
+    if (value && !out.includes(value)) out.push(value);
+  });
+  return out;
+}
 
 /** Lower-cased text, safe on a field the server left unset. */
 function text(value) {
@@ -69,8 +79,8 @@ const EMPTY_FORM = {
   name: '',
   icon: 'follow-up',
   stages: [],
-  role: 'BDE',
-  department: 'Sales',
+  role: '',
+  department: '',
   priority: 'Medium',
   dueIn: 0,
   status: 'Active',
@@ -88,7 +98,10 @@ export default function MasterTasksPage() {
   const updateRecord = useCrmStore((s) => s.updateRecord);
   const deleteRecord = useCrmStore((s) => s.deleteRecord);
   const backendOn = isBackendEnabled();
-  const tasks = backendOn && Array.isArray(storeTasks) ? storeTasks : [];
+  const tasks = useMemo(
+    () => (backendOn && Array.isArray(storeTasks) ? storeTasks : []),
+    [backendOn, storeTasks],
+  );
   /** Resolve the form's stage names to server stage ids so the links persist. */
   const withStageIds = (row) => {
     const byName = new Map((storeStages || []).map((s) => [String(s?.name || '').toLowerCase(), s?.id]));
@@ -114,6 +127,24 @@ export default function MasterTasksPage() {
   const [menuId, setMenuId] = useState(null);
   const [isGuideOpen, setIsGuideOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [assignment, setAssignment] = useState({ roles: [], departments: [] });
+
+  const loadAssignmentOptions = useCallback(() => {
+    pullAssignmentOptions().then(setAssignment);
+  }, []);
+  useEffect(loadAssignmentOptions, [loadAssignmentOptions]);
+  useMasterDataRefresh(loadAssignmentOptions, ['roles', 'departments']);
+
+  // Saved tasks may still carry a role/department the master no longer has;
+  // keep it in the filters so those tasks can still be found.
+  const roleOptions = useMemo(
+    () => withExtras(assignment.roles, tasks.map((t) => t.role)),
+    [assignment.roles, tasks],
+  );
+  const departmentOptions = useMemo(
+    () => withExtras(assignment.departments, tasks.map((t) => t.department)),
+    [assignment.departments, tasks],
+  );
 
   // Pull from GET /crm/master-tasks/ when logged in; offline keeps seed/cache.
   useEffect(() => {
@@ -167,12 +198,10 @@ export default function MasterTasksPage() {
   const totalPages = Math.max(1, Math.ceil(filtered.length / perPage));
   const safePage = Math.min(page, totalPages);
   const pageItems = filtered.slice((safePage - 1) * perPage, safePage * perPage);
-  const from = filtered.length === 0 ? 0 : (safePage - 1) * perPage + 1;
-  const to = Math.min(safePage * perPage, filtered.length);
 
   function openCreate() {
     setEditingId(null);
-    setForm(EMPTY_FORM);
+    setForm({ ...EMPTY_FORM, role: assignment.roles[0] || '' });
     setFormError('');
     setModalOpen(true);
   }
@@ -183,8 +212,8 @@ export default function MasterTasksPage() {
       name: task.name,
       icon: task.icon || 'follow-up',
       stages: [...(task.stages || [])],
-      role: task.role,
-      department: task.department,
+      role: task.role || '',
+      department: task.department || '',
       priority: task.priority,
       dueIn: task.dueIn,
       status: task.status,
@@ -199,6 +228,10 @@ export default function MasterTasksPage() {
     if (saving) return;
     if (!form.name.trim()) {
       setFormError('Task name is required.');
+      return;
+    }
+    if (!form.role) {
+      setFormError('Assigned role is required.');
       return;
     }
     const clean = {
@@ -339,13 +372,13 @@ export default function MasterTasksPage() {
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
             <select value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)} className="px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:border-blue-500 cursor-pointer">
               <option value="All">All Roles</option>
-              {ROLES.map((r) => (
+              {roleOptions.map((r) => (
                 <option key={r} value={r}>{r}</option>
               ))}
             </select>
             <select value={deptFilter} onChange={(e) => setDeptFilter(e.target.value)} className="px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:border-blue-500 cursor-pointer">
               <option value="All">All Departments</option>
-              {DEPARTMENTS.map((d) => (
+              {departmentOptions.map((d) => (
                 <option key={d} value={d}>{d}</option>
               ))}
             </select>
@@ -458,32 +491,14 @@ export default function MasterTasksPage() {
           </table>
         </div>
 
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 px-4 py-3 border-t border-slate-100 text-xs text-slate-500 pr-20 sm:pr-24">
-          <span>Showing {from} to {to} of {filtered.length} tasks</span>
-          <div className="flex items-center gap-2">
-            <button type="button" disabled={safePage <= 1} onClick={() => setPage(safePage - 1)} className="p-1.5 rounded-lg border border-slate-200 disabled:opacity-40 hover:bg-slate-50 transition cursor-pointer" aria-label="Previous page">
-              <ChevronLeft size={14} />
-            </button>
-            {Array.from({ length: totalPages }, (_, i) => i + 1).slice(0, 5).map((p) => (
-              <button
-                key={p}
-                type="button"
-                onClick={() => setPage(p)}
-                className={`min-w-7 h-7 px-2 rounded-lg border text-xs font-bold transition cursor-pointer ${p === safePage ? 'bg-blue-600 border-blue-600 text-white' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}
-              >
-                {p}
-              </button>
-            ))}
-            <button type="button" disabled={safePage >= totalPages} onClick={() => setPage(safePage + 1)} className="p-1.5 rounded-lg border border-slate-200 disabled:opacity-40 hover:bg-slate-50 transition cursor-pointer" aria-label="Next page">
-              <ChevronRight size={14} />
-            </button>
-            <select value={perPage} onChange={(e) => setPerPage(Number(e.target.value))} className="px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-600 cursor-pointer">
-              {PER_PAGE_OPTIONS.map((n) => (
-                <option key={n} value={n}>{n} per page</option>
-              ))}
-            </select>
-          </div>
-        </div>
+        <AppPagination
+          total={filtered.length}
+          page={safePage}
+          pageSize={perPage}
+          onPageChange={setPage}
+          onPageSizeChange={setPerPage}
+          pageSizeOptions={PER_PAGE_OPTIONS}
+        />
       </div>
 
       {modalOpen && (
@@ -502,17 +517,25 @@ export default function MasterTasksPage() {
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Assigned Role</label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block font-semibold text-slate-700">Assigned Role <span className="text-rose-500">*</span></label>
+                    <MasterSourceLink source="roles" />
+                  </div>
                   <select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })} className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-blue-500 text-slate-800">
-                    {ROLES.map((r) => (
+                    <option value="">Select role</option>
+                    {withExtras(assignment.roles, [form.role]).map((r) => (
                       <option key={r} value={r}>{r}</option>
                     ))}
                   </select>
                 </div>
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Department</label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block font-semibold text-slate-700">Department</label>
+                    <MasterSourceLink source="departments" />
+                  </div>
                   <select value={form.department} onChange={(e) => setForm({ ...form, department: e.target.value })} className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-blue-500 text-slate-800">
-                    {DEPARTMENTS.map((d) => (
+                    <option value="">Any department</option>
+                    {withExtras(assignment.departments, [form.department]).map((d) => (
                       <option key={d} value={d}>{d}</option>
                     ))}
                   </select>

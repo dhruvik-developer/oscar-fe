@@ -537,6 +537,23 @@ export async function pullTeamRoster() {
   }
 }
 
+/**
+ * `GET /crm/assignment-options/` — role names (Administration → Roles) and
+ * department names (HRMS → Departments) a task template can be assigned to.
+ */
+export async function pullAssignmentOptions() {
+  const empty = { roles: [], departments: [] };
+  if (!isBackendEnabled()) return empty;
+  try {
+    const body = await api.get('/crm/assignment-options/');
+    const names = (rows) => (Array.isArray(rows) ? rows : []).map((r) => r?.name).filter(Boolean);
+    return { roles: names(body?.roles), departments: names(body?.departments) };
+  } catch (err) {
+    console.warn('[crmSync] pull assignment options failed:', err?.message || err);
+    return empty;
+  }
+}
+
 /** `GET /crm/dashboard/` — the tiles, computed server-side. */
 export async function pullDashboard(query = {}) {
   if (!isBackendEnabled()) return null;

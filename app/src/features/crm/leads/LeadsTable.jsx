@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { Archive, Building2, ChevronDown, ChevronUp, ChevronsUpDown, ClipboardList, Handshake, MoreVertical, NotebookPen, Pencil, Pin, RotateCcw, Scissors } from "lucide-react";
+import { Archive, Building2, ChevronDown, ChevronUp, ClipboardList, Handshake, MoreVertical, NotebookPen, Pencil, Pin, RotateCcw, Scissors } from "lucide-react";
 import LeadAvatar from "./LeadAvatar";
 import { leadColumnPatch, leadColumnValue } from "./leadColumns";
 
@@ -78,16 +78,18 @@ function LeadColumnCell({ lead, column, onUpdateLead, onOpenLead, pinnedLeadIds,
         onUpdate={onUpdateLead}
         renderValue={(row) => (
           <div className="lead-name-cell">
+            {/* The photo opens a preview; only the name opens the lead. */}
+            <LeadAvatar
+              lead={row}
+              previewable
+              className={variant === "grid" ? "grid-lead-avatar" : "screenshot-avatar"}
+            />
             <button
               type="button"
               className="lead-link-btn"
               onClick={() => onOpenLead?.(row)}
               aria-label={`Open details for ${row.name}`}
             >
-              <LeadAvatar
-                lead={row}
-                className={variant === "grid" ? "grid-lead-avatar" : "screenshot-avatar"}
-              />
               <strong>{row.name}</strong>
             </button>
             <button
@@ -222,11 +224,11 @@ export default function LeadsTable({ rows = [], selected = [], pinnedLeadIds = [
                       aria-label={`Sort by ${column.label}${isActive ? (isAscending ? ", ascending" : ", descending") : ""}`}
                     >
                       <span className="th-inner">{column.label}
-                        {isActive ? (
-                          isAscending ? <ChevronUp size={13} className="sort-ico active" /> : <ChevronDown size={13} className="sort-ico active" />
-                        ) : (
-                          <ChevronsUpDown size={13} className="sort-ico" />
-                        )}
+                        {/* Both arrows always show; the active direction is highlighted. */}
+                        <span className="sort-arrows" aria-hidden="true">
+                          <ChevronUp size={12} strokeWidth={2.5} className={`sort-ico${isActive && isAscending ? " active" : ""}`} />
+                          <ChevronDown size={12} strokeWidth={2.5} className={`sort-ico${isActive && !isAscending ? " active" : ""}`} />
+                        </span>
                       </span>
                     </button>
                   </th>

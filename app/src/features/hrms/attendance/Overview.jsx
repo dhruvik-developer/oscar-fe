@@ -17,6 +17,8 @@ import {
   localISODate,
   describeError,
 } from "../../../services/hrmsSync";
+import { useTableSort } from "../../../hooks/useTableSort";
+import SortableTh from "../../../components/ui/SortableTh";
 
 const STATUS_FILTERS = ["All", "Present", "Late", "Half Day", "WFH", "Absent", "On Leave", "Not Marked", "Holiday", "Week Off"];
 const EDIT_STATUSES = ["Present", "Late", "Half Day", "WFH", "Absent", "On Leave"];
@@ -152,6 +154,8 @@ export default function AttendanceOverview() {
       return matchSearch && matchDept && matchStatus && matchShift && matchLoc && matchType;
     });
   }, [rows, search, deptFilter, statusFilter, shiftFilter, locFilter, typeFilter]);
+
+  const sort = useTableSort(filtered);
 
   const statsData = useMemo(() => {
     const total = summary.total || 0;
@@ -438,14 +442,14 @@ export default function AttendanceOverview() {
             <table className="att-table">
               <thead>
                 <tr>
-                  <th>EMPLOYEE</th>
-                  <th>EMPLOYEE ID</th>
-                  <th>DEPARTMENT</th>
-                  <th>CHECK IN</th>
-                  <th>CHECK OUT</th>
-                  <th>WORK HOURS</th>
-                  <th>SHIFT</th>
-                  <th>STATUS</th>
+                  <SortableTh sort={sort} sortKey="name">EMPLOYEE</SortableTh>
+                  <SortableTh sort={sort} sortKey="employeeCode">EMPLOYEE ID</SortableTh>
+                  <SortableTh sort={sort} sortKey="department">DEPARTMENT</SortableTh>
+                  <SortableTh sort={sort} sortKey="checkIn">CHECK IN</SortableTh>
+                  <SortableTh sort={sort} sortKey="checkOut">CHECK OUT</SortableTh>
+                  <SortableTh sort={sort} sortKey="hours">WORK HOURS</SortableTh>
+                  <SortableTh sort={sort} sortKey="shift">SHIFT</SortableTh>
+                  <SortableTh sort={sort} sortKey="status">STATUS</SortableTh>
                   <th>ACTIONS</th>
                 </tr>
               </thead>
@@ -457,7 +461,7 @@ export default function AttendanceOverview() {
                     </td>
                   </tr>
                 )}
-                {filtered.map((row) => (
+                {sort.rows.map((row) => (
                   <tr key={row.employeeId}>
                     <td>
                       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>

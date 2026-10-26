@@ -354,11 +354,11 @@ export function ConvertDealModal({ isOpen, lead, onClose, onSave }) {
 export function ConvertPartyModal({ isOpen, lead, onClose, onSave }) {
   const defaultName = lead?.company || lead?.name || '';
   const [name, setName] = useState(defaultName);
-  const [phone, setPhone] = useState(lead?.phone || '');
+  const [phone, setPhone] = useState(lead?.phone ? (String(lead.phone).startsWith('+91') ? lead.phone : `+91 ${lead.phone}`) : '+91 ');
   const [email, setEmail] = useState(lead?.email || '');
   useResetOnOpen(isOpen, () => {
     setName(lead?.company || lead?.name || '');
-    setPhone(lead?.phone || '');
+    setPhone(lead?.phone ? (String(lead.phone).startsWith('+91') ? lead.phone : `+91 ${lead.phone}`) : '+91 ');
     setEmail(lead?.email || '');
   });
   if (!isOpen) return null;

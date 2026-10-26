@@ -12,6 +12,8 @@ import {
 } from '../../services/authService';
 import { describeError } from '../../services/resourceSync';
 import { useAppStore } from '../../stores/appStore';
+import { useTableSort } from '../../hooks/useTableSort';
+import SortableTh from '../../components/ui/SortableTh';
 
 const EVENT_LABELS = {
   login: 'Signed in',
@@ -55,6 +57,12 @@ export default function AccountSecurityPage() {
   const [history, setHistory] = useState(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState('');
+  const historySort = useTableSort(history || [], {
+    accessors: {
+      at: (row) => (row.at ? new Date(row.at).getTime() : null),
+      event: (row) => EVENT_LABELS[row.action] || row.description || row.action,
+    },
+  });
 
   const load = useCallback(async () => {
     setError('');
@@ -211,13 +219,13 @@ export default function AccountSecurityPage() {
             <table className="w-full text-xs">
               <thead>
                 <tr className="text-left text-slate-500">
-                  <th className="py-1.5 pr-3 font-semibold">When</th>
-                  <th className="py-1.5 pr-3 font-semibold">Event</th>
-                  <th className="py-1.5 font-semibold">IP address</th>
+                  <SortableTh sort={historySort} sortKey="at" className="py-1.5 pr-3 font-semibold">When</SortableTh>
+                  <SortableTh sort={historySort} sortKey="event" className="py-1.5 pr-3 font-semibold">Event</SortableTh>
+                  <SortableTh sort={historySort} sortKey="ip" className="py-1.5 font-semibold">IP address</SortableTh>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {history.map((row) => (
+                {historySort.rows.map((row) => (
                   <tr key={row.id}>
                     <td className="py-2 pr-3 text-slate-600 whitespace-nowrap">{when(row.at)}</td>
                     <td className={`py-2 pr-3 font-semibold ${WARNING_EVENTS.has(row.action) ? 'text-rose-600' : 'text-slate-800'}`}>

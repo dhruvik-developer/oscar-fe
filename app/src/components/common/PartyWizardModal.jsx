@@ -89,7 +89,7 @@ const getInitialFormData = (party) => {
             vehicleCapacity: '',
             vehicleCapacityUnit: 'Tons',
             name: '',
-            phone: '',
+            phone: '+91 ',
             email: '',
             status: 'Active',
             gstTreatment: 'Registered Business',
@@ -127,7 +127,7 @@ const getInitialFormData = (party) => {
                 pincode: '',
             },
             contacts: [
-                { id: 'cnt-1', name: '', role: 'Primary POC', phone: '', email: '' },
+                { id: 'cnt-1', name: '', role: 'Primary POC', phone: '+91 ', email: '' },
             ],
         };
     }
@@ -195,7 +195,7 @@ const getInitialFormData = (party) => {
             pincode: '',
         },
         contacts: Array.isArray(party.contacts) && party.contacts.length > 0 ? party.contacts : [
-            { id: 'cnt-1', name: '', role: 'Primary POC', phone: '', email: '' },
+            { id: 'cnt-1', name: '', role: 'Primary POC', phone: '+91 ', email: '' },
         ],
     };
 };
@@ -287,7 +287,7 @@ export const PartyWizardModal = ({ isOpen, onClose, onSave, existingParty = null
             ...prev,
             contacts: [
                 ...prev.contacts,
-                { id: `cnt-${Date.now()}`, name: '', role: 'Accounts POC', phone: '', email: '' },
+                { id: `cnt-${Date.now()}`, name: '', role: 'Accounts POC', phone: '+91 ', email: '' },
             ],
         }));
     };

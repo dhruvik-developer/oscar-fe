@@ -287,12 +287,21 @@ function RootErrorBoundary() {
 
 const PublicQuotationPage = lazy(() => import('../features/sales/PublicQuotationPage'));
 const LoginPage = lazy(() => import('../features/auth/LoginPage'));
+const ResetPasswordPage = lazy(() => import('../features/auth/ResetPasswordPage'));
+const ChangePasswordPage = lazy(() => import('../features/auth/ChangePasswordPage'));
+const AccountSecurityPage = lazy(() => import('../features/auth/AccountSecurityPage'));
 
 const router = createBrowserRouter([
   // ── Authentication ────────────────────────────────────────
   {
     path: '/login',
     element: <Page component={LoginPage} />,
+    errorElement: <RootErrorBoundary />,
+  },
+  // ── Emailed password-reset link (no sign-in; the token is the credential) ──
+  {
+    path: '/reset-password',
+    element: <Page component={ResetPasswordPage} />,
     errorElement: <RootErrorBoundary />,
   },
   // ── Client-facing design approval link ────────────────────
@@ -320,6 +329,12 @@ const router = createBrowserRouter([
     element: <RequireAuth />,
     errorElement: <RootErrorBoundary />,
     children: [
+      // Signed in but outside the shell: RequireAuth holds users with an
+      // administrator-chosen password here until they set their own.
+      {
+        path: '/change-password',
+        element: <Page component={ChangePasswordPage} />,
+      },
       {
         path: '/',
         element: <MainLayout />,
@@ -334,6 +349,8 @@ const router = createBrowserRouter([
 
       // ── Main Dashboard ─────────────────────────────────────
       { path: 'dashboard', element: <Page component={DashboardPage} /> },
+      // Own account security: open to every signed-in user.
+      { path: 'account/security', element: <Page component={AccountSecurityPage} /> },
       { path: 'employee/portal', element: <Page component={EmployeePortal} /> },
       { path: 'employee-portal', element: <Navigate to="/employee/portal" replace /> },
       { path: 'portal', element: <Navigate to="/employee/portal" replace /> },

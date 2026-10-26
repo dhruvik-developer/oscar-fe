@@ -371,6 +371,7 @@ export function RolesPage() {
 
   const [editingRoleName, setEditingRoleName] = useState('');
   const [editingPermissions, setEditingPermissions] = useState([]);
+  const [editingTwoFactor, setEditingTwoFactor] = useState(false);
 
   useEffect(() => {
     const handleOutsideClick = (e) => {
@@ -390,6 +391,7 @@ export function RolesPage() {
     if (activeRole) {
       setEditingRoleName(activeRole.name);
       setEditingPermissions(activeRole.selectedPermissions || []);
+      setEditingTwoFactor(Boolean(activeRole.requiresTwoFactor));
     }
   }, [activeRole]);
 
@@ -523,11 +525,15 @@ export function RolesPage() {
     setRoles((prev) =>
       prev.map((r) =>
         r.id === activeRole.id
-          ? { ...r, name, selectedPermissions: editingPermissions }
+          ? { ...r, name, selectedPermissions: editingPermissions, requiresTwoFactor: editingTwoFactor }
           : r
       )
     );
-    adminSync.update('roles', activeRole.id, { name, permissions: editingPermissions })
+    adminSync.update('roles', activeRole.id, {
+      name,
+      permissions: editingPermissions,
+      requiresTwoFactor: editingTwoFactor,
+    })
       .catch((err) => showNotification(`Role not saved — ${describeError(err)}`));
     showNotification(`Role "${name}" updated successfully!`);
   };
@@ -536,6 +542,7 @@ export function RolesPage() {
     if (activeRole) {
       setEditingRoleName(activeRole.name);
       setEditingPermissions(activeRole.selectedPermissions || []);
+      setEditingTwoFactor(Boolean(activeRole.requiresTwoFactor));
       showNotification('Changes reverted.');
     }
   };
@@ -880,6 +887,22 @@ export function RolesPage() {
               Role name will be displayed across the system.
             </p>
           </div>
+
+          <label className="flex items-start gap-2.5 p-3 rounded-xl border border-slate-200 bg-slate-50/60 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={editingTwoFactor}
+              onChange={(e) => setEditingTwoFactor(e.target.checked)}
+              className="mt-0.5 w-4 h-4 accent-blue-600"
+            />
+            <span>
+              <span className="block text-xs font-semibold text-slate-800">Require two-step sign-in</span>
+              <span className="block text-[11px] text-slate-500 mt-0.5">
+                Everyone in this role must enter a 6-digit code emailed to them after their password.
+                Recommended for Owner, Admin and Accounts. Needs outbound email to be working.
+              </span>
+            </span>
+          </label>
 
           {/* Module Tabs Navigation Bar */}
           <div className="space-y-3 border-b border-slate-200/80 pb-3">

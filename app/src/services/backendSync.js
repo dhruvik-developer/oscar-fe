@@ -14,7 +14,7 @@
  * With no auth token the module is inert: every push resolves to `null` and the
  * app keeps behaving exactly as it did before it had a backend.
  */
-import { api, ApiError } from './api';
+import { api, ApiError, getAllPages } from './api';
 import { mapWithLimit } from './resourceSync';
 import { getStoredToken } from '../utils/authUtils';
 import { formatDateDDMMYYYY, toISODate } from '../utils/dateUtils';
@@ -908,8 +908,6 @@ export const PULL_ORDER = [
 
 // ── transport ───────────────────────────────────────────────────────────────
 
-const PAGE_SIZE = 200;
-
 /** One key per create attempt; `randomUUID` needs a secure context. */
 function newIdempotencyKey() {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
@@ -925,10 +923,8 @@ export async function pullResource(key) {
   const resource = RESOURCES[key];
   if (!resource) return null;
   try {
-    const body = await api.get(resource.pullPath || resource.path, {
-      query: { limit: PAGE_SIZE },
-    });
-    const rows = Array.isArray(body) ? body : (body?.results || []);
+    // Every page: one 200-row read used to leave the rest of the collection behind.
+    const rows = await getAllPages(resource.pullPath || resource.path);
     return rows.map(resource.fromApi || ((r) => r));
   } catch (err) {
     console.warn(`[backendSync] pull ${key} failed:`, err?.message || err);

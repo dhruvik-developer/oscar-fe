@@ -74,7 +74,7 @@ import { usePmsStore, computeNavBadges } from '../../stores/pmsStore';
 import { useERP } from '../../context/ERPContext';
 import { useModuleWhenIdle } from '../../hooks/useIdleReady';
 import { UserGuideModal } from '../common/UserGuideModal';
-import { clearStoredAuth } from '../../utils/authUtils';
+import { logout } from '../../services/authService';
 
 const SIDEBAR_THEMES = [
   { id: 'oscar', name: 'Oscar', icon: Waves, color: '#14b8a6' },
@@ -1267,6 +1267,14 @@ export default function Sidebar() {
                 <Settings size={13} className="text-purple-400 group-hover:scale-110 transition-transform" />
                 <span className="text-[11px] font-medium">System Preferences & Currency</span>
               </Link>
+              <Link
+                to="/account/security"
+                onClick={() => setIsProfileOpen(false)}
+                className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl hover:bg-white/10 text-slate-200 hover:text-white transition group"
+              >
+                <Lock size={13} className="text-sky-400 group-hover:scale-110 transition-transform" />
+                <span className="text-[11px] font-medium">Security & Signed-in Devices</span>
+              </Link>
               <button
                 type="button"
                 onClick={() => {
@@ -1282,9 +1290,10 @@ export default function Sidebar() {
               {/* Sign Out / Switch User Button in Person Profile */}
               <button
                 type="button"
-                onClick={() => {
+                onClick={async () => {
                   setIsProfileOpen(false);
-                  clearStoredAuth();
+                  // Revokes the refresh token on the server, then clears locally.
+                  await logout();
                   navigate('/login');
                 }}
                 className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-xl hover:bg-rose-500/15 text-rose-300 hover:text-rose-200 transition text-left cursor-pointer group mt-1"
@@ -1304,9 +1313,10 @@ export default function Sidebar() {
               <span className="text-[9px] text-slate-400">Evenmore Cloud v2.6</span>
               <button
                 type="button"
-                onClick={() => {
+                onClick={async () => {
                   setIsProfileOpen(false);
-                  clearStoredAuth();
+                  // Revokes the refresh token on the server, then clears locally.
+                  await logout();
                   navigate('/login');
                 }}
                 className="hover:text-rose-400 flex items-center gap-1 cursor-pointer transition text-slate-300"

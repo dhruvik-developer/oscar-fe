@@ -11,6 +11,37 @@ export const EVENMORE_AUTH_TOKEN_KEY =
 export const REFRESH_TOKEN_KEY = 'evenmore_refresh_token';
 export const TOKEN_EXPIRES_KEY = 'evenmore_token_expires_at';
 export const SAVED_USER_KEY = 'evenmore_saved_user';
+/** Why the last session ended ('expired' | 'revoked'); read once by the sign-in page. */
+export const AUTH_END_REASON_KEY = 'evenmore_auth_end_reason';
+
+const TOKEN_KEYS = [AUTH_TOKEN_KEY, EVENMORE_AUTH_TOKEN_KEY, REFRESH_TOKEN_KEY, TOKEN_EXPIRES_KEY];
+
+/**
+ * "Keep me signed in" decides where tokens live: localStorage survives the
+ * browser closing, sessionStorage ends with the tab. Reads look in both.
+ */
+function readAuthItem(key) {
+  try {
+    return localStorage.getItem(key) || sessionStorage.getItem(key) || null;
+  } catch {
+    return null;
+  }
+}
+
+/** The storage that currently holds the session (localStorage when none does). */
+function activeAuthStorage() {
+  try {
+    if (!localStorage.getItem(REFRESH_TOKEN_KEY) && sessionStorage.getItem(REFRESH_TOKEN_KEY)) {
+      return sessionStorage;
+    }
+  } catch {}
+  return localStorage;
+}
+
+/** The access token from whichever storage holds it, without expiry checks. */
+export function readStoredAccessToken() {
+  return readAuthItem(EVENMORE_AUTH_TOKEN_KEY) || readAuthItem(AUTH_TOKEN_KEY) || '';
+}
 
 /**
  * Validates whether a token exists and is unexpired.
@@ -44,7 +75,7 @@ export function isTokenValid(token) {
 
   // 2. Fallback / mock token: verify stored expiration timestamp if set
   try {
-    const exp = localStorage.getItem(TOKEN_EXPIRES_KEY);
+    const exp = readAuthItem(TOKEN_EXPIRES_KEY);
     if (exp) {
       const expNum = Number(exp);
       if (!Number.isNaN(expNum) && expNum <= Date.now()) {
@@ -58,11 +89,7 @@ export function isTokenValid(token) {
 
 /** The refresh token, if one was issued at sign-in. */
 export function getStoredRefreshToken() {
-  try {
-    return localStorage.getItem(REFRESH_TOKEN_KEY) || null;
-  } catch {
-    return null;
-  }
+  return readAuthItem(REFRESH_TOKEN_KEY);
 }
 
 /**
@@ -84,7 +111,7 @@ export function hasStoredSession() {
  */
 export function getStoredToken() {
   try {
-    const token = localStorage.getItem(AUTH_TOKEN_KEY) || localStorage.getItem(EVENMORE_AUTH_TOKEN_KEY);
+    const token = readAuthItem(AUTH_TOKEN_KEY) || readAuthItem(EVENMORE_AUTH_TOKEN_KEY);
     if (!token) return null;
 
     if (!isTokenValid(token) && !getStoredRefreshToken()) {
@@ -104,16 +131,21 @@ export function getStoredToken() {
 export function saveStoredAuth(token, { refreshToken = null, expiresInMs = null, remember = true } = {}) {
   try {
     if (!token) return;
-    localStorage.setItem(AUTH_TOKEN_KEY, token);
-    localStorage.setItem(EVENMORE_AUTH_TOKEN_KEY, token);
+    const store = remember ? localStorage : sessionStorage;
+    const other = remember ? sessionStorage : localStorage;
+    TOKEN_KEYS.forEach((key) => other.removeItem(key));
+    sessionStorage.removeItem(AUTH_END_REASON_KEY);
+
+    store.setItem(AUTH_TOKEN_KEY, token);
+    store.setItem(EVENMORE_AUTH_TOKEN_KEY, token);
 
     if (refreshToken) {
-      localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
+      store.setItem(REFRESH_TOKEN_KEY, refreshToken);
     }
 
     // Default duration: 30 days for remember-me, 24 hours otherwise
     const duration = expiresInMs || (remember ? 30 * 24 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000);
-    localStorage.setItem(TOKEN_EXPIRES_KEY, String(Date.now() + duration));
+    store.setItem(TOKEN_EXPIRES_KEY, String(Date.now() + duration));
 
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('evenmore:authorized', { detail: { token } }));
@@ -130,29 +162,47 @@ export function saveStoredAuth(token, { refreshToken = null, expiresInMs = null,
  */
 export function saveRefreshedTokens(accessToken, refreshToken = null) {
   try {
+    const store = activeAuthStorage();
     if (accessToken) {
-      localStorage.setItem(AUTH_TOKEN_KEY, accessToken);
-      localStorage.setItem(EVENMORE_AUTH_TOKEN_KEY, accessToken);
+      store.setItem(AUTH_TOKEN_KEY, accessToken);
+      store.setItem(EVENMORE_AUTH_TOKEN_KEY, accessToken);
     }
     if (refreshToken) {
-      localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
+      store.setItem(REFRESH_TOKEN_KEY, refreshToken);
     }
   } catch {}
 }
 
 /**
  * Completely clears stored authentication data.
+ *
+ * `reason` says why the session ended without the user asking ('expired' or
+ * 'revoked'), so the sign-in page can explain it. A deliberate sign-out passes
+ * nothing and clears any earlier reason.
  */
-export function clearStoredAuth() {
+export function clearStoredAuth({ reason = null } = {}) {
   try {
-    localStorage.removeItem(AUTH_TOKEN_KEY);
-    localStorage.removeItem(EVENMORE_AUTH_TOKEN_KEY);
-    localStorage.removeItem(REFRESH_TOKEN_KEY);
-    localStorage.removeItem(TOKEN_EXPIRES_KEY);
+    TOKEN_KEYS.forEach((key) => {
+      localStorage.removeItem(key);
+      sessionStorage.removeItem(key);
+    });
     localStorage.removeItem(SAVED_USER_KEY);
+    if (reason) sessionStorage.setItem(AUTH_END_REASON_KEY, reason);
+    else sessionStorage.removeItem(AUTH_END_REASON_KEY);
 
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('evenmore:unauthorized'));
     }
   } catch {}
+}
+
+/** Why the previous session ended, read once: the value is removed. */
+export function takeAuthEndReason() {
+  try {
+    const reason = sessionStorage.getItem(AUTH_END_REASON_KEY);
+    sessionStorage.removeItem(AUTH_END_REASON_KEY);
+    return reason;
+  } catch {
+    return null;
+  }
 }

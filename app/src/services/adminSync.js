@@ -8,7 +8,7 @@
  * drifts.
  */
 import { createSync, compact, asText, isBackendEnabled, isServerId, describeError } from './resourceSync';
-import { api } from './api';
+import { api, getAllPages } from './api';
 
 export { isBackendEnabled, isServerId, describeError };
 
@@ -81,10 +81,12 @@ export const ADMIN_RESOURCES = {
       code: r.code || undefined,
       description: r.description || undefined,
       permissions: Array.isArray(r.permissions) ? r.permissions : undefined,
+      requiresTwoFactor: typeof r.requiresTwoFactor === 'boolean' ? r.requiresTwoFactor : undefined,
     }),
     fromApi: (row) => ({
       ...asText(row, ['name', 'code', 'description']),
       permissions: row.permissions || [],
+      requiresTwoFactor: Boolean(row.requiresTwoFactor),
       _synced: true,
     }),
   },
@@ -121,15 +123,7 @@ export const adminSync = createSync(ADMIN_RESOURCES, { label: 'adminSync' });
 export async function pullCustomerClients() {
   if (!isBackendEnabled()) throw new Error('Sign in to view clients.');
   const resource = ADMIN_RESOURCES.customerClients;
-  const rows = [];
-  let page = 1;
-  let body;
-  do {
-    body = await api.get(resource.path, { query: { page, page_size: 200 } });
-    rows.push(...(body.results || []).map(resource.fromApi));
-    page += 1;
-  } while (body.next);
-  return rows;
+  return (await getAllPages(resource.path)).map(resource.fromApi);
 }
 
 /**

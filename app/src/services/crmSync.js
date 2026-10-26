@@ -145,6 +145,8 @@ function dealFromApi(row) {
   return {
     ...asText(row, ['title', 'name', 'client', 'phone', 'status', 'source', 'assignedUser', 'notes', 'stage']),
     id: row.id,
+    leadId: row.leadId || row.lead || undefined,
+    dealNumber: row.deal_number || row.dealNumber || undefined,
     name: row.title || row.name,
     title: row.title || row.name,
     client: row.customerName || row.client || '',

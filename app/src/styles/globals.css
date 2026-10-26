@@ -3303,13 +3303,79 @@ tr:hover .pinned-indicator,
   color: #2563eb;
   background: #eff6ff;
   border-color: #bfdbfe;
-  transform: rotate(45deg);
 }
 
 .pinned-indicator.active:hover {
   background: #dbeafe;
   color: #1d4ed8;
-  transform: rotate(45deg) scale(1.1);
+  transform: scale(1.1);
+}
+
+.col-pin {
+  width: 36px;
+  min-width: 36px;
+  max-width: 36px;
+  text-align: center;
+  padding: 0 4px !important;
+}
+
+.lead-pin-cell {
+  width: 36px;
+  min-width: 36px;
+  max-width: 36px;
+  padding: 0 4px !important;
+  text-align: center;
+}
+
+.lead-pin-btn {
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  background: transparent;
+  border: 1px solid transparent;
+  color: #94a3b8;
+  opacity: 0.35;
+  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+tr:hover .lead-pin-btn {
+  opacity: 0.85;
+  color: #64748b;
+}
+
+.lead-pin-btn:hover {
+  opacity: 1 !important;
+  background: #f1f5f9;
+  color: #2563eb;
+  border-color: #cbd5e1;
+  transform: scale(1.1);
+}
+
+.lead-pin-btn.is-pinned {
+  opacity: 1 !important;
+  background: #eff6ff;
+  border-color: #bfdbfe;
+  color: #2563eb;
+  box-shadow: 0 1px 2px rgba(37, 99, 235, 0.08);
+}
+
+.lead-pin-btn.is-pinned:hover {
+  background: #dbeafe;
+  color: #1d4ed8;
+  border-color: #93c5fd;
+  transform: scale(1.1);
+}
+
+.pinned-lead-row {
+  background-color: rgba(239, 246, 255, 0.35) !important;
+}
+
+.pinned-lead-row:hover {
+  background-color: rgba(239, 246, 255, 0.6) !important;
 }
 
 .table-inline-input {

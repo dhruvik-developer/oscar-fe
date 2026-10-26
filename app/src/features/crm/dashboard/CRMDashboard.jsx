@@ -16,7 +16,8 @@ import { emitCrmEvent, CRM_EVENT_TYPES } from "../../../services/crmEventNotific
 import { buildLeadPayload } from "../leads/leadPayload";
 const DEAL_STORAGE_KEY = "crm-deals-v1";
 const TASK_STORAGE_KEY = "crm-tasks-v1";
-const DEAL_STAGES = ["Draft", "Sent", "Open", "Revised", "Declined"];
+// Open pipeline stages shown on the dashboard (Revised / Declined are retired).
+const DEAL_STAGES = ["Draft", "Sent", "Open"];
 const SOURCE_COLORS = ["#2f6fed", "#7c3aed", "#f59e0b", "#10b981", "#ec4899", "#06b6d4", "#64748b"];
 const AVATAR_COLORS = ["#2f6fed", "#7c3aed", "#059669", "#ea580c", "#db2777", "#0891b2", "#4f46e5"];
 const PIPELINE_BG = ["#eef4ff", "#f5f0ff", "#fff7e8", "#eef4ff", "#ecfdf5"];
@@ -281,7 +282,7 @@ export default function DashboardView() {
             </div>
             <Link to="/crm/deals" style={{ fontSize: 12, fontWeight: 700, color: "#2f6fed" }}>View Pipeline</Link>
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(5,minmax(0,1fr))", gap: 6, marginTop: 12 }}>
+          <div style={{ display: "grid", gridTemplateColumns: `repeat(${pipeline.length},minmax(0,1fr))`, gap: 6, marginTop: 12 }}>
             {pipeline.map((p, i) => (
               <div key={p.label} title={p.label + ": " + p.value + " deals " + formatShortINR(p.total)} style={{ position: "relative", background: p.bg, color: p.fg, borderRadius: 8, padding: "10px 6px", textAlign: "center", clipPath: i === 0 ? "polygon(0 0,calc(100% - 10px) 0,100% 50%,calc(100% - 10px) 100%,0 100%)" : i === pipeline.length - 1 ? "polygon(10px 0,100% 0,100% 100%,10px 100%,0 50%)" : "polygon(10px 0,calc(100% - 10px) 0,100% 50%,calc(100% - 10px) 100%,10px 100%,0 50%)" }}>
                 <div style={{ fontSize: 10, fontWeight: 600, opacity: 0.85, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.label}</div>

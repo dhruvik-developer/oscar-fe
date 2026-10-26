@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import {
   Search,
@@ -124,7 +125,51 @@ export default function MasterTasksPage() {
   const [form, setForm] = useState(EMPTY_FORM);
   const [formError, setFormError] = useState('');
   const [deleteId, setDeleteId] = useState(null);
-  const [menuId, setMenuId] = useState(null);
+  const [menu, setMenu] = useState(null); // { task, top, left }
+  const MENU_WIDTH = 176;
+
+  function openMenu(event, task) {
+    event.stopPropagation();
+    if (menu?.task?.id === task.id) {
+      setMenu(null);
+      return;
+    }
+    const rect = event.currentTarget.getBoundingClientRect();
+    const openUp = rect.bottom + 140 > window.innerHeight;
+    setMenu({
+      task,
+      top: openUp ? Math.max(8, rect.top - 125) : rect.bottom + 4,
+      left: Math.max(8, rect.right - MENU_WIDTH),
+    });
+  }
+
+  function closeMenu() {
+    setMenu(null);
+  }
+
+  useEffect(() => {
+    if (!menu) return;
+    function handlePointerDown(event) {
+      if (!event.target.closest?.('.task-row-menu')) closeMenu();
+    }
+    function handleKeyDown(event) {
+      if (event.key === 'Escape') closeMenu();
+    }
+    function handleScroll(event) {
+      if (event.target?.closest?.('.task-row-menu')) return;
+      closeMenu();
+    }
+    document.addEventListener('mousedown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('scroll', handleScroll, true);
+    window.addEventListener('resize', handleScroll);
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('scroll', handleScroll, true);
+      window.removeEventListener('resize', handleScroll);
+    };
+  }, [menu]);
   const [isGuideOpen, setIsGuideOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [assignment, setAssignment] = useState({ roles: [], departments: [] });
@@ -398,7 +443,7 @@ export default function MasterTasksPage() {
           </div>
         </div>
 
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto min-h-[220px]">
           <table className="w-full text-left text-xs border-collapse min-w-[900px]">
             <thead>
               <tr className="border-b border-slate-100 bg-slate-50/60 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
@@ -458,22 +503,14 @@ export default function MasterTasksPage() {
                         <button type="button" onClick={() => setDeleteId(t.id)} title="Delete" className="p-1.5 text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition">
                           <Trash2 size={15} />
                         </button>
-                        <button type="button" onClick={() => setMenuId(menuId === t.id ? null : t.id)} title="More" className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition">
+                        <button
+                          type="button"
+                          onClick={(e) => openMenu(e, t)}
+                          title="More"
+                          className={`p-1.5 rounded-lg transition ${menu?.task?.id === t.id ? 'bg-slate-200 text-slate-700' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100'}`}
+                        >
                           <MoreVertical size={15} />
                         </button>
-                        {menuId === t.id && (
-                          <div className="absolute right-0 top-full mt-1 w-44 bg-white border border-slate-200 rounded-xl shadow-lg z-20 overflow-hidden">
-                            <button type="button" onClick={() => toggleStatus(t.id)} className="w-full text-left px-3.5 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50">
-                              Mark {t.status === 'Active' ? 'Inactive' : 'Active'}
-                            </button>
-                            <button type="button" onClick={() => duplicateTask(t.id)} className="w-full text-left px-3.5 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50">
-                              Duplicate task
-                            </button>
-                            <button type="button" onClick={() => navigate('/crm/leads/stage-tasks')} className="w-full text-left px-3.5 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50">
-                              Open Stage Tasks
-                            </button>
-                          </div>
-                        )}
                       </div>
                     </td>
                   </tr>
@@ -611,6 +648,49 @@ export default function MasterTasksPage() {
             </div>
           </div>
         </div>
+      )}
+
+            {menu && createPortal(
+        <div
+          className="task-row-menu fixed bg-white border border-slate-200 rounded-xl shadow-xl z-50 w-44 py-1 text-xs font-medium text-slate-700 animate-in fade-in zoom-in-95 duration-100"
+          style={{
+            top: menu.top,
+            left: menu.left,
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            type="button"
+            onClick={() => {
+              toggleStatus(menu.task.id);
+              closeMenu();
+            }}
+            className="w-full text-left px-3.5 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50 transition"
+          >
+            Mark {menu.task.status === 'Active' ? 'Inactive' : 'Active'}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              duplicateTask(menu.task.id);
+              closeMenu();
+            }}
+            className="w-full text-left px-3.5 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50 transition"
+          >
+            Duplicate task
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              navigate('/crm/leads/stage-tasks');
+              closeMenu();
+            }}
+            className="w-full text-left px-3.5 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50 transition"
+          >
+            Open Stage Tasks
+          </button>
+        </div>,
+        document.body
       )}
 
       <MasterTasksGuideModal isOpen={isGuideOpen} onClose={() => setIsGuideOpen(false)} />

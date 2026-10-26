@@ -161,7 +161,24 @@ export default function QuotationComposerPage({ embedded = null } = {}) {
   const initialLeadId = initialCustomerId
     ? ''
     : (editQuote?.leadId || prefill.leadId || '');
-  const [partyKind, setPartyKind] = useState(initialLeadId ? 'lead' : 'customer');
+  // A saved quotation with neither a customer nor a lead was typed by hand.
+  const initialManual = Boolean(editQuote && !editQuote.customerId && !editQuote.leadId && (editQuote.customer || editQuote.partyName));
+  const [partyKind, setPartyKind] = useState(initialManual ? 'manual' : (initialLeadId ? 'lead' : 'customer'));
+  // Manual entry: a quotation for anyone, without creating a customer or lead.
+  // On approval the server turns it into a customer (or reuses one by name).
+  const [manualParty, setManualParty] = useState(() => {
+    const addr = (initialManual && editQuote?.billingAddress) || {};
+    return {
+      name: initialManual ? (editQuote.customer || editQuote.partyName || '') : '',
+      phone: addr.phone || '',
+      email: addr.email || '',
+      gstin: initialManual ? (editQuote.customerGstin || editQuote.partyGstin || '') : '',
+      address: addr.line1 || '',
+      city: addr.city || '',
+      state: addr.state || (initialManual ? editQuote.placeOfSupply || '' : ''),
+    };
+  });
+  const setManualField = (key) => (e) => setManualParty((prev) => ({ ...prev, [key]: e.target.value }));
   const [customerId, setCustomerId] = useState(initialCustomerId);
   const [leadId, setLeadId] = useState(initialLeadId);
   const customer = customers.find((c) => c.id === customerId) || null;
@@ -221,11 +238,18 @@ export default function QuotationComposerPage({ embedded = null } = {}) {
     return [blankLine()];
   });
   const [itemSearch, setItemSearch] = useState('');
-  const [docDiscPct, setDocDiscPct] = useState(0);
-  const [freightType, setFreightType] = useState(editQuote && num(editQuote.freightCharges) > 0 ? 'Paid' : 'To Pay');
-  const [freightAmount, setFreightAmount] = useState(num(editQuote?.freightCharges));
-  const [loading, setLoading] = useState(num(editQuote?.loadingCharges));
-  const [otherCharges, setOtherCharges] = useState(num(editQuote?.otherCharges));
+  // Edit mode: the saved total discount minus the item discounts is the
+  // global part; turn it back into the % on the net value.
+  const [docDiscPct, setDocDiscPct] = useState(() => {
+    if (!editQuote || !Array.isArray(editQuote.items)) return 0;
+    let itemDisc = 0; let net = 0;
+    editQuote.items.forEach((it) => {
+      const t = lineTotals({ qty: it.qty ?? it.quantity, rate: it.rate ?? it.price, discPct: it.discount, gstPct: 0 });
+      itemDisc += t.disc; net += t.net;
+    });
+    const globalPart = num(editQuote.discountTotal) - itemDisc;
+    return net > 0 && globalPart > 0.01 ? Math.round((globalPart / net) * 10000) / 100 : 0;
+  });
   const [termsText, setTermsText] = useState(editQuote?.terms || editQuote?.termsAndConditions || defaultTerms(initValidityDays));
   const [paymentTerms, setPaymentTerms] = useState(editQuote?.paymentTerms || PAYMENT_TERMS[0]);
   const [deliveryDate, setDeliveryDate] = useState(() => toISODate(editQuote?.deliveryDate) || addDaysISO(initQuoteDate, 12));
@@ -268,10 +292,12 @@ export default function QuotationComposerPage({ embedded = null } = {}) {
     ? (leadId ? `lead:${leadId}` : '')
     : (customerId ? `customer:${customerId}` : '');
   const selectedParty = partyOptions.find((o) => o.key === selectedPartyKey) || null;
-  const party = partyKind === 'lead' ? lead : customer;
-  const partyLabel = partyKind === 'lead'
-    ? (lead?.company || lead?.name || '')
-    : (customer?.name || '');
+  const party = partyKind === 'lead' ? lead : partyKind === 'customer' ? customer : null;
+  const partyLabel = partyKind === 'manual'
+    ? manualParty.name.trim()
+    : partyKind === 'lead'
+      ? (lead?.company || lead?.name || '')
+      : (customer?.name || '');
 
   const filteredParties = useMemo(() => {
     const q = customerSearch.trim().toLowerCase();
@@ -309,18 +335,22 @@ export default function QuotationComposerPage({ embedded = null } = {}) {
         costLines += 1;
       }
     });
-    const docDisc = subtotal * (num(docDiscPct) / 100);
+    // Global discount comes off what is left after the item discounts, so a
+    // 10% item discount plus 5% global is 14.5% overall, not 15%.
+    const docDisc = lineNet * (num(docDiscPct) / 100);
     const netBase = Math.max(0, lineNet - docDisc);
     const factor = lineNet > 0 ? netBase / lineNet : 0;
     const gstTotal = lineGst * factor;
-    const freightNum = freightType === 'To Pay' ? 0 : num(freightAmount);
-    const loadingNum = num(loading);
-    const otherNum = num(otherCharges);
-    const taxable = netBase + freightNum + loadingNum + otherNum;
+    // Freight, loading and other charges are billed on the invoice, not quoted.
+    const taxable = netBase;
     const grand = withTax ? taxable + gstTotal : taxable;
     const hasCost = costLines > 0;
-    const profit = hasCost ? grand - costSum : null;
-    const marginPct = hasCost ? (grand > 0 ? (profit / grand) * 100 : 0) : null;
+    // Margin is on the goods value after discounts: GST is collected for the
+    // government and freight / loading (billed on the invoice) are pass-through, so counting them as
+    // revenue overstated profit.
+    const profit = hasCost ? netBase - costSum : null;
+    const marginPct = hasCost ? (netBase > 0 ? (profit / netBase) * 100 : 0) : null;
+    const effectiveDiscPct = subtotal > 0 ? ((lineDisc + docDisc) / subtotal) * 100 : 0;
     const ratesList = Array.from(rateSet);
     const effectiveGstPct = taxable > 0 ? ((gstTotal / taxable) * 100).toFixed(1) : (ratesList[0] ?? 5);
     const gstDisplayLabel = !withTax
@@ -331,15 +361,18 @@ export default function QuotationComposerPage({ embedded = null } = {}) {
           ? `Mixed (${ratesList.join('%, ')}%)`
           : `${effectiveGstPct}%`;
     return {
-      items: lines.length, totalQty, subtotal, docDisc, freight: freightNum,
-      loading: loadingNum, other: otherNum, taxable, gstTotal, grand,
+      items: lines.length, totalQty, subtotal, lineDisc, docDisc, effectiveDiscPct,
+      taxable, gstTotal, grand,
       hasCost, costSum, profit, marginPct, ratesList, gstDisplayLabel,
     };
-  }, [lines, docDiscPct, freightType, freightAmount, loading, otherCharges, withTax]);
+  }, [lines, docDiscPct, withTax]);
 
   // Effective max discount across all lines and global discount
+  // Approval follows the larger of any single item's discount and the overall
+  // discount (item + global combined), so splitting a large discount between
+  // the two no longer slips under the limit.
   const effectiveMaxDiscount = Math.max(
-    num(docDiscPct),
+    totals.effectiveDiscPct,
     ...lines.map((l) => num(l.discPct))
   );
   // Whose approval this discount needs (the server makes the same decision
@@ -365,17 +398,18 @@ export default function QuotationComposerPage({ embedded = null } = {}) {
     }
   }
 
-  const creditLimit = num(customer?.creditLimit);
-  const outstanding = num(customer?.balance ?? customer?.outstanding);
+  // Credit belongs to an existing customer only; a lead or a manual name has none.
+  const creditCustomer = partyKind === 'customer' ? customer : null;
+  const creditLimit = num(creditCustomer?.creditLimit);
+  const outstanding = num(creditCustomer?.balance ?? creditCustomer?.outstanding);
   const available = creditLimit - outstanding;
 
   // Unsaved-changes detection for embedded Cancel (random row `key`
   // excluded — it differs per mount, not per edit).
   function formSignature() {
     return JSON.stringify({
-      partyKind, customerId, leadId, contactPerson, salesPerson, broker, quoteDate, validUntil,
-      validityDays, dealRef, docDiscPct, freightType, freightAmount, loading,
-      otherCharges, termsText, paymentTerms, deliveryDate, withTax,
+      partyKind, customerId, leadId, manualParty, contactPerson, salesPerson, broker, quoteDate, validUntil,
+      validityDays, dealRef, docDiscPct, termsText, paymentTerms, deliveryDate, withTax,
       lines: (lines || []).map(({ key, ...rest }) => rest),
     });
   }
@@ -443,8 +477,23 @@ export default function QuotationComposerPage({ embedded = null } = {}) {
 
   function buildPayload(status) {
     return {
-      customerId: customer?.id || '',
+      customerId: partyKind === 'customer' ? (customer?.id || '') : '',
       customer: partyLabel || '',
+      ...(partyKind === 'manual' ? {
+        manualParty: {
+          name: manualParty.name.trim(),
+          gstin: manualParty.gstin.trim().toUpperCase(),
+          state: manualParty.state.trim(),
+          billingAddress: {
+            line1: manualParty.address.trim(),
+            city: manualParty.city.trim(),
+            state: manualParty.state.trim(),
+            contactPerson: contactPerson.trim(),
+            phone: manualParty.phone.trim(),
+            email: manualParty.email.trim(),
+          },
+        },
+      } : {}),
       contactPerson: contactPerson.trim(),
       salesPerson,
       broker: broker.trim(),
@@ -455,14 +504,20 @@ export default function QuotationComposerPage({ embedded = null } = {}) {
       dealReference: dealRef.trim(),
       // The picked lead wins over the embedded one: the picker is what the
       // user actually chose on this form.
-      leadId: partyKind === 'lead' && leadId ? String(leadId) : (prefill.leadId ? String(prefill.leadId) : ''),
+      leadId: partyKind === 'manual' ? '' : (partyKind === 'lead' && leadId ? String(leadId) : (prefill.leadId ? String(prefill.leadId) : '')),
       leadName: partyKind === 'lead' && leadId ? partyLabel : (prefill.leadName || ''),
       amount: Math.round(totals.grand * 100) / 100,
       status,
-      discountTotal: Math.round(totals.docDisc * 100) / 100,
-      freightCharges: totals.freight,
-      otherCharges: totals.other + totals.loading,
-      loadingCharges: totals.loading,
+      // The server reads this as the document's *whole* discount and replaces
+      // the item discounts with it, so it must include them; with no global
+      // discount it is null and the server sums the item discounts itself.
+      // (Sending the global part alone dropped every item discount: 10% off
+      // ₹10,000 was saved as ₹10,450 instead of ₹9,450.)
+      discountTotal: totals.docDisc > 0 ? Math.round((totals.lineDisc + totals.docDisc) * 100) / 100 : null,
+      // Charges are billed on the invoice; zero clears any an older quotation carried.
+      freightCharges: 0,
+      otherCharges: 0,
+      loadingCharges: 0,
       terms: termsText.trim(),
       paymentTerms,
       deliveryDate,
@@ -484,7 +539,11 @@ export default function QuotationComposerPage({ embedded = null } = {}) {
   function validate() {
     // Either kind is a valid addressee: a customer is a saved account, a lead
     // is a saved CRM row. Both must already exist server-side.
-    if (partyKind === 'lead') {
+    if (partyKind === 'manual') {
+      if (!manualParty.name.trim()) return 'Enter the name this quotation is for.';
+      if (manualParty.email.trim() && !/^\S+@\S+\.\S+$/.test(manualParty.email.trim())) return 'Enter a valid email address.';
+      if (manualParty.gstin.trim() && !/^[0-9A-Z]{15}$/i.test(manualParty.gstin.trim())) return 'GSTIN must be 15 letters and digits.';
+    } else if (partyKind === 'lead') {
       if (!lead) return 'Select a customer or a lead.';
       if (!isServerId(lead.id)) return 'This lead is still being saved to the server. Please wait a moment and try again.';
     } else {
@@ -646,7 +705,69 @@ export default function QuotationComposerPage({ embedded = null } = {}) {
               </div>
             )}
             <div className="space-y-4">
+              {/* Who the quotation is for: an existing customer / lead, or typed by hand */}
+              <div className="inline-flex p-0.5 rounded-lg bg-slate-100 border border-slate-200 text-[11px] font-semibold" role="tablist">
+                {[
+                  { key: 'existing', label: 'Customer / Lead', active: partyKind !== 'manual' },
+                  { key: 'manual', label: 'Manual entry (any name)', active: partyKind === 'manual' },
+                ].map((tab) => (
+                  <button
+                    key={tab.key}
+                    type="button"
+                    role="tab"
+                    aria-selected={tab.active}
+                    onClick={() => setPartyKind(tab.key === 'manual' ? 'manual' : (leadId ? 'lead' : 'customer'))}
+                    className={`px-3 py-1.5 rounded-md transition ${tab.active ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+
+              {partyKind === 'manual' && (
+                <div className="space-y-3">
+                  <p className="text-[11px] text-slate-500">
+                    For anyone who is not yet a customer or lead. Nothing is created now; when the quotation is approved, a customer is made from these details (or an existing customer with the same name is used).
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+                    <div className="sm:col-span-2">
+                      <label className={labelCls}>Name (company or person) *</label>
+                      <input value={manualParty.name} onChange={setManualField('name')} placeholder="e.g. Shree Ganesh Textiles" className={inputCls} />
+                    </div>
+                    <div>
+                      <label className={labelCls}>Contact Person</label>
+                      <input value={contactPerson} onChange={(e) => setContactPerson(e.target.value)} placeholder="Person to address" className={inputCls} />
+                    </div>
+                    <div>
+                      <label className={labelCls}>Phone</label>
+                      <input value={manualParty.phone} onChange={setManualField('phone')} placeholder="+91 98765 43210" className={inputCls} />
+                    </div>
+                    <div>
+                      <label className={labelCls}>Email</label>
+                      <input type="email" value={manualParty.email} onChange={setManualField('email')} placeholder="name@company.com" className={inputCls} />
+                    </div>
+                    <div>
+                      <label className={labelCls}>GSTIN</label>
+                      <input value={manualParty.gstin} onChange={setManualField('gstin')} placeholder="24ABCDE1234F1Z5" maxLength={15} className={`${inputCls} uppercase`} />
+                    </div>
+                    <div className="sm:col-span-3">
+                      <label className={labelCls}>Address</label>
+                      <input value={manualParty.address} onChange={setManualField('address')} placeholder="Shop / street / area" className={inputCls} />
+                    </div>
+                    <div>
+                      <label className={labelCls}>City</label>
+                      <input value={manualParty.city} onChange={setManualField('city')} placeholder="Surat" className={inputCls} />
+                    </div>
+                    <div>
+                      <label className={labelCls}>State (place of supply)</label>
+                      <input value={manualParty.state} onChange={setManualField('state')} placeholder="Gujarat" className={inputCls} />
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Row 1: Customer / Lead & Contact Person */}
+              {partyKind !== 'manual' && (
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
                 <div className="sm:col-span-2 relative">
                   <div className="flex items-center justify-between mb-1">
@@ -714,6 +835,7 @@ export default function QuotationComposerPage({ embedded = null } = {}) {
                   />
                 </div>
               </div>
+              )}
 
               {/* Selected Party Summary Card (spans full width cleanly) */}
               {party && (
@@ -961,32 +1083,12 @@ export default function QuotationComposerPage({ embedded = null } = {}) {
               <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-blue-50 text-blue-600"><FileText size={13} /></span>
               Price &amp; Commercial Details
             </h3>
-            <p className="text-[11px] text-slate-500 mb-3">Configure additional charges, discount, freight and other commercial terms.</p>
+            <p className="text-[11px] text-slate-500 mb-3">Configure the discount and commercial terms. Freight and other charges are added on the invoice.</p>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                 <div>
                   <label className={labelCls}>Global Discount (%)</label>
                   <input type="number" min="0" max="100" step="any" value={docDiscPct} onChange={(e) => setDocDiscPct(e.target.value)} className={inputCls} />
-                </div>
-                <div>
-                  <label className={labelCls}>Freight Charges</label>
-                  <select value={freightType} onChange={(e) => setFreightType(e.target.value)} className={inputCls}>
-                    <option>To Pay</option>
-                    <option>Paid</option>
-                    <option>Included</option>
-                  </select>
-                </div>
-                <div>
-                  <label className={labelCls}>Freight Amount (₹)</label>
-                  <input type="number" min="0" step="any" value={freightAmount} onChange={(e) => setFreightAmount(e.target.value)}  className={`${inputCls} disabled:bg-slate-50 disabled:text-slate-400`} />
-                </div>
-                <div>
-                  <label className={labelCls}>Loading &amp; Unloading (₹)</label>
-                  <input type="number" min="0" step="any" value={loading} onChange={(e) => setLoading(e.target.value)} className={inputCls} />
-                </div>
-                <div>
-                  <label className={labelCls}>Other Charges (₹)</label>
-                  <input type="number" min="0" step="any" value={otherCharges} onChange={(e) => setOtherCharges(e.target.value)} className={inputCls} />
                 </div>
               </div>
               <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-3">
@@ -1052,12 +1154,12 @@ export default function QuotationComposerPage({ embedded = null } = {}) {
               <div className="flex justify-between text-slate-600"><dt>Total Quantity</dt><dd className="font-bold text-slate-900">{totals.totalQty.toLocaleString('en-IN')} M</dd></div>
               <div className="border-t border-slate-100 my-2" />
               <div className="flex justify-between text-slate-600"><dt>Subtotal</dt><dd className="font-mono font-semibold">{inr(totals.subtotal)}</dd></div>
+              {totals.lineDisc > 0 && (
+                <div className="flex justify-between text-slate-600"><dt>Item Discounts</dt><dd className="font-mono font-semibold">− {inr(totals.lineDisc)}</dd></div>
+              )}
               <div className="flex justify-between text-slate-600"><dt>Global Discount ({num(docDiscPct)}%)</dt><dd className="font-mono font-semibold">− {inr(totals.docDisc)}</dd></div>
-              <div className="flex justify-between text-slate-600"><dt>Freight Charges</dt><dd className="font-mono font-semibold">{inr(totals.freight)}</dd></div>
-              <div className="flex justify-between text-slate-600"><dt>Loading &amp; Unloading</dt><dd className="font-mono font-semibold">{inr(totals.loading)}</dd></div>
-              <div className="flex justify-between text-slate-600"><dt>Other Charges</dt><dd className="font-mono font-semibold">{inr(totals.other)}</dd></div>
               <div className="border-t border-slate-100 my-2" />
-              <div className="flex justify-between text-slate-600"><dt>Taxable Amount</dt><dd className="font-mono font-semibold">{inr(totals.taxable)}</dd></div>
+              <div className="flex justify-between text-slate-600"><dt title="Goods after discounts. Freight and other charges are added on the invoice.">Amount before GST</dt><dd className="font-mono font-semibold">{inr(totals.taxable)}</dd></div>
               <div className="flex justify-between items-center text-slate-600">
                 <dt className="flex items-center gap-1.5">
                   <span>GST</span>

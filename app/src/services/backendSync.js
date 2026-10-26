@@ -152,7 +152,18 @@ function documentToApi(doc, { partyField = 'partyId', partyKeys = [] } = {}, { p
     freightCharges: !partial || doc.freightCharges !== undefined ? (doc.freightCharges !== undefined ? num(doc.freightCharges) : undefined) : undefined,
     otherCharges: !partial || doc.otherCharges !== undefined ? (doc.otherCharges !== undefined ? num(doc.otherCharges) : undefined) : undefined,
     roundOff: !partial || doc.roundOff !== undefined ? (doc.roundOff !== undefined ? num(doc.roundOff) : undefined) : undefined,
-    discountOverride: !partial || doc.discountTotal !== undefined ? (doc.discountTotal !== undefined ? num(doc.discountTotal) : undefined) : undefined,
+    // A quotation addressed by hand (no customer or lead row): the name and
+    // details typed on the form. Only quotations accept a typed name.
+    ...(doc.manualParty ? {
+      partyName: doc.manualParty.name,
+      partyGstin: doc.manualParty.gstin || null,
+      placeOfSupply: doc.manualParty.state || null,
+      billingAddress: doc.manualParty.billingAddress || {},
+    } : {}),
+    // null clears an earlier override (the server then sums the line discounts).
+    discountOverride: doc.discountTotal === null
+      ? null
+      : (!partial || doc.discountTotal !== undefined ? (doc.discountTotal !== undefined ? num(doc.discountTotal) : undefined) : undefined),
     lineItems: !partial || doc.lineItems !== undefined || doc.items !== undefined ? lines.map(lineToApi) : undefined,
   });
 }

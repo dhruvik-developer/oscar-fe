@@ -1024,9 +1024,10 @@ export const ERPProvider = ({ children, }) => {
             sgst = Math.round((totalTax - cgst) * 100) / 100;
         }
 
+        const freightCharges = Number(newInvoice.freightCharges || 0);
         const otherCharges = Number(newInvoice.otherCharges || 0);
         const roundOff = Number(newInvoice.roundOff || 0);
-        const calculatedGrandTotal = Math.round((taxableAmount + totalTax + otherCharges + roundOff) * 100) / 100;
+        const calculatedGrandTotal = Math.round((taxableAmount + totalTax + freightCharges + otherCharges + roundOff) * 100) / 100;
         const total = Number(newInvoice.grandTotal || newInvoice.total) || calculatedGrandTotal;
 
         const defaultAddresses = resolvePartyAddresses(newInvoice.customerId, newInvoice.customer);
@@ -1066,6 +1067,7 @@ export const ERPProvider = ({ children, }) => {
             customerGstin: newInvoice.customerGstin || cust?.gstin || party?.gstin || 'URP / Unregistered',
             placeOfSupply: newInvoice.placeOfSupply || pos,
             placeOfSupplyState: newInvoice.placeOfSupplyState || String(pos).match(/(\d{2})/)?.[1] || '',
+            freightCharges,
             otherCharges,
             roundOff,
             total,
@@ -1175,9 +1177,10 @@ export const ERPProvider = ({ children, }) => {
                 sgst = Math.round((totalTax - cgst) * 100) / 100;
             }
 
+            const freightCharges = Number(updates.freightCharges !== undefined ? updates.freightCharges : (inv.freightCharges || 0));
             const otherCharges = Number(updates.otherCharges !== undefined ? updates.otherCharges : (inv.otherCharges || 0));
             const roundOff = Number(updates.roundOff !== undefined ? updates.roundOff : (inv.roundOff || 0));
-            const calculatedGrandTotal = Math.round((taxableAmount + totalTax + otherCharges + roundOff) * 100) / 100;
+            const calculatedGrandTotal = Math.round((taxableAmount + totalTax + freightCharges + otherCharges + roundOff) * 100) / 100;
             const total = Number(updates.grandTotal || updates.total) || calculatedGrandTotal;
 
             updatedInv = {
@@ -1192,6 +1195,7 @@ export const ERPProvider = ({ children, }) => {
                 sgst,
                 igst,
                 tax: totalTax,
+                freightCharges,
                 otherCharges,
                 roundOff,
                 total,
@@ -2135,6 +2139,8 @@ export const ERPProvider = ({ children, }) => {
             date: formatDateDDMMYYYY(quote.date || 'Today'),
             leadId: quote.leadId || '',
             leadName: quote.leadName || '',
+            // Quotation typed by hand (no customer / lead): sent as partyName etc.
+            manualParty: quote.manualParty || undefined,
             validUntil: quote.validUntil || 'In 30 days',
             amount: totalAmount,
             status: quote.status || 'Draft',

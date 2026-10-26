@@ -122,7 +122,9 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSave }) {
     const productsField = fieldBy('products', /products?/);
     const rawSource = sourceField ? String(get(sourceField.id) || '') : '';
     // Only a real store row may travel as sourceId (the API field is a PK).
-    const storeSource = (sources || []).find((s) => String(s.id) === rawSource) || null;
+    const storeSource = (sources || []).find(
+      (s) => String(s.id) === rawSource || String(s?.name || "").trim().toLowerCase() === rawSource.trim().toLowerCase()
+    ) || null;
     const ownerId = ownerField ? get(ownerField.id) : '';
     const fieldValues = { ...values };
     if (photoField?.id) delete fieldValues[photoField.id];

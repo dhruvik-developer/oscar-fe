@@ -4,6 +4,7 @@ import Modal from '../../../components/ui/Modal';
 import PageHeader from '../../../components/ui/PageHeader';
 import MasterSourceLink from '../../../components/common/MasterSourceLink';
 import React, { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Plus,
@@ -250,7 +251,26 @@ export default function DealsPage() {
   const [listPageSize, setListPageSize] = useState(10);
 
   const [expandedColumns, setExpandedColumns] = useState({});
-  const [openMenuDealId, setOpenMenuDealId] = useState(null);
+  const [dealMenu, setDealMenu] = useState(null); // { deal, top, left }
+  const DEAL_MENU_WIDTH = 180;
+
+  const handleToggleDealMenu = (e, deal) => {
+    e.stopPropagation();
+    if (dealMenu?.deal?.id === deal.id) {
+      setDealMenu(null);
+      return;
+    }
+    const rect = e.currentTarget.getBoundingClientRect();
+    const menuHeight = 185;
+    const openUp = rect.bottom + menuHeight > window.innerHeight;
+    setDealMenu({
+      deal,
+      top: openUp ? Math.max(8, rect.top - menuHeight) : rect.bottom + 6,
+      left: Math.max(8, Math.min(rect.right - DEAL_MENU_WIDTH, window.innerWidth - DEAL_MENU_WIDTH - 8)),
+    });
+  };
+
+  const closeDealMenu = () => setDealMenu(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [editingDeal, setEditingDeal] = useState(null);
   const [dealToDelete, setDealToDelete] = useState(null);
@@ -261,14 +281,30 @@ export default function DealsPage() {
   const [showFilters, setShowFilters] = useState(false);
 
   useEffect(() => {
-    const handleOutsideClick = (e) => {
-      if (!e.target.closest('.deal-action-menu-container')) {
-        setOpenMenuDealId(null);
+    if (!dealMenu) return;
+    const handleOutside = (e) => {
+      if (!e.target.closest?.('.deal-floating-menu') && !e.target.closest?.('.deal-menu-trigger-btn')) {
+        closeDealMenu();
       }
     };
-    document.addEventListener('mousedown', handleOutsideClick);
-    return () => document.removeEventListener('mousedown', handleOutsideClick);
-  }, []);
+    const handleKey = (e) => {
+      if (e.key === 'Escape') closeDealMenu();
+    };
+    const handleScroll = (e) => {
+      if (e.target?.closest?.('.deal-floating-menu')) return;
+      closeDealMenu();
+    };
+    document.addEventListener('mousedown', handleOutside);
+    document.addEventListener('keydown', handleKey);
+    document.addEventListener('scroll', handleScroll, true);
+    window.addEventListener('resize', handleScroll);
+    return () => {
+      document.removeEventListener('mousedown', handleOutside);
+      document.removeEventListener('keydown', handleKey);
+      document.removeEventListener('scroll', handleScroll, true);
+      window.removeEventListener('resize', handleScroll);
+    };
+  }, [dealMenu]);
 
   const showNotification = (msg) => {
     setToastMessage(msg);
@@ -279,6 +315,36 @@ export default function DealsPage() {
   // so the filter can still find deals assigned to someone no longer listed.
   const crmSources = useCrmStore((s) => s.sources);
   const { items = [], fabrics = [] } = useERP() || {};
+
+  const getDealSource = (deal) => {
+    if (deal?.source) return deal.source;
+    const linkedLead = (allLeads || []).find(
+      (l) => (deal?.leadId && String(l.id) === String(deal.leadId)) ||
+             (deal?.name && String(l.name).trim().toLowerCase() === String(deal.name).trim().toLowerCase())
+    );
+    return linkedLead?.source || linkedLead?.customValues?.fields?.['lead-source'] || linkedLead?.customValues?.source || '';
+  };
+
+  const getDealProduct = (deal) => {
+    if (deal?.product) return deal.product;
+    const linkedLead = (allLeads || []).find(
+      (l) => (deal?.leadId && String(l.id) === String(deal.leadId)) ||
+             (deal?.name && String(l.name).trim().toLowerCase() === String(deal.name).trim().toLowerCase())
+    );
+    const prods = linkedLead?.products || linkedLead?.customValues?.products || linkedLead?.customValues?.fields?.products;
+    if (Array.isArray(prods) && prods.length > 0) return prods[0];
+    return (typeof prods === 'string' ? prods : '');
+  };
+
+  const getDealUser = (deal) => {
+    if (deal?.assignedUser) return deal.assignedUser;
+    if (deal?.ownerName) return deal.ownerName;
+    const linkedLead = (allLeads || []).find(
+      (l) => (deal?.leadId && String(l.id) === String(deal.leadId)) ||
+             (deal?.name && String(l.name).trim().toLowerCase() === String(deal.name).trim().toLowerCase())
+    );
+    return linkedLead?.ownerName || linkedLead?.owner || '';
+  };
 
   const productOptions = useMemo(() => {
     const list = new Set();
@@ -291,14 +357,20 @@ export default function DealsPage() {
       if (name) list.add(String(name).trim());
     });
     (deals || []).forEach((d) => {
-      if (d.product) list.add(String(d.product).trim());
+      const prod = getDealProduct(d);
+      if (prod) list.add(String(prod).trim());
       if (Array.isArray(d.products)) d.products.forEach((p) => p && list.add(String(p).trim()));
+    });
+    (allLeads || []).forEach((l) => {
+      const prods = l.products || l.customValues?.products || l.customValues?.fields?.products;
+      if (Array.isArray(prods)) prods.forEach((p) => p && list.add(String(p).trim()));
+      else if (typeof prods === 'string' && prods) list.add(prods.trim());
     });
     if (list.size === 0) {
       (TEXTILE_FABRIC_OPTIONS || []).forEach((p) => list.add(p));
     }
     return ['All Products', ...Array.from(list).sort((a, b) => a.localeCompare(b))];
-  }, [items, fabrics, deals]);
+  }, [items, fabrics, deals, allLeads]);
 
   const sourceOptions = useMemo(() => {
     const list = new Set();
@@ -307,30 +379,37 @@ export default function DealsPage() {
       if (name) list.add(String(name).trim());
     });
     (deals || []).forEach((d) => {
-      if (d.source) list.add(String(d.source).trim());
+      const s = getDealSource(d);
+      if (s) list.add(String(s).trim());
     });
     (allLeads || []).forEach((l) => {
-      if (l.source) list.add(String(l.source).trim());
+      const s = l.source || l.customValues?.fields?.['lead-source'] || l.customValues?.source;
+      if (s) list.add(String(s).trim());
     });
     return ['All Sources', ...Array.from(list).sort((a, b) => a.localeCompare(b))];
   }, [crmSources, deals, allLeads]);
 
-  // Assignable users from the CRM team roster, plus any name already on a deal
-  // so the filter can still find deals assigned to someone no longer listed.
   const usersList = useMemo(() => {
     const names = new Set();
     (Array.isArray(teamMembers) ? teamMembers : []).forEach((m) => m?.name && names.add(m.name));
-    deals.forEach((d) => d.assignedUser && names.add(d.assignedUser));
+    (deals || []).forEach((d) => {
+      const u = getDealUser(d);
+      if (u) names.add(u);
+    });
     return ['All Users', ...[...names].sort((a, b) => a.localeCompare(b))];
-  }, [teamMembers, deals]);
+  }, [teamMembers, deals, allLeads]);
 
   const filteredDeals = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     return deals.filter((d) => {
-      if (selectedProduct !== 'All Products' && d.product !== selectedProduct) return false;
+      const dealProduct = getDealProduct(d);
+      const dealSource = getDealSource(d);
+      const dealUser = getDealUser(d);
+
+      if (selectedProduct !== 'All Products' && dealProduct !== selectedProduct) return false;
       if (selectedStage !== 'All Stages' && d.stage !== selectedStage) return false;
-      if (selectedSource !== 'All Sources' && d.source !== selectedSource) return false;
-      if (selectedUser !== 'All Users' && d.assignedUser !== selectedUser) return false;
+      if (selectedSource !== 'All Sources' && dealSource !== selectedSource) return false;
+      if (selectedUser !== 'All Users' && dealUser !== selectedUser) return false;
       if (dateRange !== 'All Time') {
         const dealDateStr = d.createdAt || d.date;
         if (dealDateStr) {
@@ -350,10 +429,10 @@ export default function DealsPage() {
           }
         }
       }
-      if (q && !`${d.name} ${d.client} ${d.phone} ${d.product}`.toLowerCase().includes(q)) return false;
+      if (q && !`${d.name} ${d.client} ${d.phone} ${dealProduct} ${dealSource} ${dealUser}`.toLowerCase().includes(q)) return false;
       return true;
     });
-  }, [deals, searchQuery, selectedProduct, selectedStage, selectedSource, selectedUser, dateRange]);
+  }, [deals, allLeads, searchQuery, selectedProduct, selectedStage, selectedSource, selectedUser, dateRange]);
 
   /**
    * Board columns come from the DealStage catalogue, not a hardcoded array, so
@@ -438,13 +517,20 @@ export default function DealsPage() {
       Open: [],
       Won: [],
       Lost: [],
-    };
-
-    (allLeads || []).forEach((lead) => {
+    };    (allLeads || []).forEach((lead) => {
       if (!lead) return;
       if (leadsWithDeals.has(String(lead.id))) return;
 
-      if (q && !`${lead.name} ${lead.company} ${lead.phone} ${lead.email}`.toLowerCase().includes(q)) {
+      const leadSource = lead.source || lead.customValues?.fields?.['lead-source'] || lead.customValues?.source || '';
+      const leadProds = lead.products || lead.customValues?.products || lead.customValues?.fields?.products;
+      const leadProd = Array.isArray(leadProds) && leadProds.length > 0 ? leadProds[0] : (typeof leadProds === 'string' ? leadProds : '');
+      const leadUser = lead.ownerName || lead.owner || '';
+
+      if (selectedProduct !== 'All Products' && leadProd !== selectedProduct) return;
+      if (selectedSource !== 'All Sources' && leadSource !== selectedSource) return;
+      if (selectedUser !== 'All Users' && leadUser !== selectedUser) return;
+
+      if (q && !`${lead.name} ${lead.company} ${lead.phone} ${lead.email} ${leadSource} ${leadProd}`.toLowerCase().includes(q)) {
         return;
       }
 
@@ -484,7 +570,7 @@ export default function DealsPage() {
     });
 
     return result;
-  }, [allLeads, deals, leadStages, quotations, searchQuery]);
+  }, [allLeads, deals, leadStages, quotations, searchQuery, selectedProduct, selectedSource, selectedUser]);
 
   const visibleLostLeads = useMemo(() => leadsByStage.Lost || [], [leadsByStage]);
 
@@ -569,9 +655,9 @@ export default function DealsPage() {
               ${escapeHtml(deal.stage || 'Draft')}
             </span>
           </td>
-          <td>${escapeHtml(deal.product || '—')}</td>
-          <td>${escapeHtml(deal.source || '—')}</td>
-          <td>${escapeHtml(deal.assignedUser || '—')}</td>
+          <td>${escapeHtml(deal.product || getDealProduct(deal) || '—')}</td>
+          <td>${escapeHtml(deal.source || getDealSource(deal) || '—')}</td>
+          <td>${escapeHtml(deal.assignedUser || getDealUser(deal) || '—')}</td>
           <td>${escapeHtml(deal.date || '—')}</td>
           <td class="text-right font-bold">${escapeHtml(formatPriceINR(deal.price))}</td>
         </tr>
@@ -797,14 +883,14 @@ export default function DealsPage() {
       tag: deal.tag || '',
     });
     setFormError('');
-    setOpenMenuDealId(null);
+    closeDealMenu();
     setIsCreateModalOpen(true);
   };
 
   const handleOpenDealDetail = (deal) => {
     setIsCreateModalOpen(false);
     setEditingDeal(null);
-    setOpenMenuDealId(null);
+    closeDealMenu();
     setSearchParams({ deal: String(deal.id) });
   };
 
@@ -889,7 +975,7 @@ export default function DealsPage() {
           : d
       )
     );
-    setOpenMenuDealId(null);
+    closeDealMenu();
     useCrmStore.getState().updateRecord('deals', dealId, { stage: targetStage }).catch((err) => {
       console.warn('[CRM Deals] Server stage update error:', err);
     });
@@ -927,7 +1013,7 @@ export default function DealsPage() {
       notes: `Created from CRM Deal: ${deal.name} (${deal.stage || 'Draft'})`,
     });
 
-    setOpenMenuDealId(null);
+    closeDealMenu();
     showNotification(`Quotation ${quote?.quoteNumber || ''} created in ERP!`);
     if (quote?.id) {
       navigate('/sales/quotations');
@@ -965,7 +1051,7 @@ export default function DealsPage() {
       notes: `Created from CRM Deal: ${deal.name}`,
     });
 
-    setOpenMenuDealId(null);
+    closeDealMenu();
     showNotification(`Sales Order ${order?.orderNumber || ''} created in ERP!`);
     if (order?.id) {
       navigate('/sales/orders');
@@ -1020,14 +1106,6 @@ export default function DealsPage() {
             >
               <Printer size={16} />
               <span>Print</span>
-            </button>
-
-            <button
-              onClick={() => handleOpenCreateModal()}
-              className="btn-primary"
-            >
-              <Plus size={16} strokeWidth={2.5} />
-              <span>Add Deal</span>
             </button>
           </div>
         }
@@ -1292,8 +1370,7 @@ export default function DealsPage() {
                     </div>
                   ) : (
                     visibleItems.map((deal) => {
-                      const isMenuOpen = openMenuDealId === deal.id;
-                      return (
+                                            return (
                         <div
                           key={deal.id}
                           tabIndex={0}
@@ -1313,70 +1390,18 @@ export default function DealsPage() {
                               <Link to={`?deal=${encodeURIComponent(deal.id)}`} className="hover:text-blue-600 hover:underline">{deal.name}</Link>
                             </h4>
 
-                            <div className="relative deal-action-menu-container flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+                            <div className="relative flex-shrink-0" onClick={(e) => e.stopPropagation()}>
                               <button
                                 type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setOpenMenuDealId((prev) => (prev === deal.id ? null : deal.id));
-                                }}
-                                className={`w-6 h-6 rounded-lg flex items-center justify-center transition-colors cursor-pointer ${
-                                  isMenuOpen
-                                    ? 'bg-slate-200 text-slate-800'
-                                    : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'
+                                onClick={(e) => handleToggleDealMenu(e, deal)}
+                                className={`deal-menu-trigger-btn w-6 h-6 rounded-lg flex items-center justify-center transition-colors cursor-pointer ${
+                                  dealMenu?.deal?.id === deal.id
+                                    ? "bg-slate-200 text-slate-800"
+                                    : "text-slate-400 hover:text-slate-700 hover:bg-slate-100"
                                 }`}
                               >
                                 <MoreVertical size={14} />
                               </button>
-
-                              {isMenuOpen && (
-                                <div className="absolute right-0 top-full mt-1.5 w-44 bg-white border border-slate-200 rounded-xl shadow-xl z-30 py-1.5 animate-in fade-in zoom-in-95 duration-150">
-                                  <button
-                                    type="button"
-                                    onClick={() => handleOpenDealDetail(deal)}
-                                    className="w-full px-3.5 py-2 text-left text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-2.5 cursor-pointer"
-                                  >
-                                    <Edit2 size={13} className="text-blue-600" />
-                                    <span>View Deal</span>
-                                  </button>
-
-
-
-                                  <div className="px-3.5 py-1 text-[10px] uppercase font-bold text-slate-400 border-t border-slate-100 mt-1">
-                                    ERP Conversion
-                                  </div>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleCreateErpQuotation(deal)}
-                                    className="w-full px-3.5 py-1.5 text-left text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-2 cursor-pointer"
-                                  >
-                                    <FileText size={12} className="text-blue-600" />
-                                    <span>Create Quotation</span>
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleCreateErpSalesOrder(deal)}
-                                    className="w-full px-3.5 py-1.5 text-left text-xs font-semibold text-emerald-700 hover:bg-emerald-50 flex items-center gap-2 cursor-pointer"
-                                  >
-                                    <ShoppingCart size={12} className="text-emerald-600" />
-                                    <span>Create Sales Order</span>
-                                  </button>
-
-                                  <div className="my-1 border-t border-slate-100" />
-
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setDealToDelete(deal);
-                                      setOpenMenuDealId(null);
-                                    }}
-                                    className="w-full px-3.5 py-2 text-left text-xs font-semibold text-rose-600 hover:bg-rose-50 flex items-center gap-2.5 cursor-pointer"
-                                  >
-                                    <Trash2 size={13} className="text-rose-500" />
-                                    <span>Delete Deal</span>
-                                  </button>
-                                </div>
-                              )}
                             </div>
                           </div>
 
@@ -1402,11 +1427,11 @@ export default function DealsPage() {
                           </div>
 
                           {/* Product Pill */}
-                          {deal.product && (
+                          {(deal.product || getDealProduct(deal)) && (
                             <div>
                               <span className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-500 bg-slate-50 border border-slate-200 px-2 py-0.5 rounded-md truncate max-w-full">
                                 <Tag size={10} className="text-slate-400 flex-shrink-0" />
-                                <span className="truncate">{deal.product}</span>
+                                <span className="truncate">{deal.product || getDealProduct(deal)}</span>
                               </span>
                             </div>
                           )}
@@ -1560,7 +1585,7 @@ export default function DealsPage() {
                         <span className="font-medium text-slate-700">{deal.client}</span>
                       </div>
                     </td>
-                    <td className="py-3.5 px-4 text-slate-600">{deal.product}</td>
+                    <td className="py-3.5 px-4 text-slate-600">{deal.product || getDealProduct(deal)}</td>
                     <td className="py-3.5 px-4">
                       <span
                         className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-full border ${
@@ -1684,6 +1709,70 @@ export default function DealsPage() {
 
       </>}
 
+
+            {dealMenu && createPortal(
+        <div
+          className="deal-floating-menu fixed bg-white border border-slate-200 rounded-xl shadow-2xl z-[9999] py-1.5 w-48 text-xs font-semibold text-slate-700 animate-in fade-in zoom-in-95 duration-100"
+          style={{
+            top: dealMenu.top,
+            left: dealMenu.left,
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            type="button"
+            onClick={() => {
+              handleOpenDealDetail(dealMenu.deal);
+              closeDealMenu();
+            }}
+            className="w-full px-3.5 py-2 text-left text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-2.5 cursor-pointer"
+          >
+            <Edit2 size={13} className="text-blue-600" />
+            <span>View Deal</span>
+          </button>
+
+          <div className="px-3.5 py-1 text-[10px] uppercase font-bold text-slate-400 border-t border-slate-100 mt-1">
+            ERP Conversion
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              handleCreateErpQuotation(dealMenu.deal);
+              closeDealMenu();
+            }}
+            className="w-full px-3.5 py-1.5 text-left text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-2 cursor-pointer"
+          >
+            <FileText size={12} className="text-blue-600" />
+            <span>Create Quotation</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              handleCreateErpSalesOrder(dealMenu.deal);
+              closeDealMenu();
+            }}
+            className="w-full px-3.5 py-1.5 text-left text-xs font-semibold text-emerald-700 hover:bg-emerald-50 flex items-center gap-2 cursor-pointer"
+          >
+            <ShoppingCart size={12} className="text-emerald-600" />
+            <span>Create Sales Order</span>
+          </button>
+
+          <div className="my-1 border-t border-slate-100" />
+
+          <button
+            type="button"
+            onClick={() => {
+              setDealToDelete(dealMenu.deal);
+              closeDealMenu();
+            }}
+            className="w-full px-3.5 py-2 text-left text-xs font-semibold text-rose-600 hover:bg-rose-50 flex items-center gap-2.5 cursor-pointer"
+          >
+            <Trash2 size={13} className="text-rose-500" />
+            <span>Delete Deal</span>
+          </button>
+        </div>,
+        document.body
+      )}
 
       {isCreateModalOpen && (
         <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 overflow-y-auto">

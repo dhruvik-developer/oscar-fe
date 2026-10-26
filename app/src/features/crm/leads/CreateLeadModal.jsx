@@ -48,8 +48,13 @@ function withFabricDefaults(sections) {
 /** Resolve the active form sections from the store, falling back to defaults. */
 function useFormSections() {
   // Subscribe so the modal re-renders when the builder saves a new layout.
-  useCrmStore((s) => s.forms);
-  return getActiveLeadFormSections();
+  const forms = useCrmStore((s) => s.forms);
+  // Memoised: getActiveLeadFormSections() builds a new array on every call,
+  // and effects keyed on `sections` then ran on every render. With the modal
+  // mounted (even closed) on the Leads page that looped forever ("Maximum
+  // update depth exceeded") and froze navigation, e.g. clicking a Lead No.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  return useMemo(() => getActiveLeadFormSections(), [forms]);
 }
 
 /**
@@ -671,7 +676,9 @@ export function leadFormValuesToPayload(values, sections, { sources = [], userOp
   // Only a real store row may travel as sourceId (the API field is a PK —
   // a shipped-default name would 400). Unknown names still ride along as
   // `source` for local rows; the backend seed covers server rows.
-  const storeSource = (sources || []).find((s) => String(s.id) === rawSource) || null;
+  const storeSource = (sources || []).find(
+    (s) => String(s.id) === rawSource || String(s?.name || "").trim().toLowerCase() === rawSource.trim().toLowerCase()
+  ) || null;
   const rawOwner = ownerField ? String(get(ownerField.id) || "") : "";
   const storeOwner = (userOptions || []).find((m) => String(m.id) === rawOwner) || null;
   // Every captured value, keyed by field id — the leads table renders
@@ -753,7 +760,8 @@ export default function CreateLeadModal({ isOpen, onClose, onCreate, onEditLayou
 
   useEffect(() => {
     if (!isOpen) {
-      setValues({});
+      // Keep the same object when already empty, so this cannot re-render.
+      setValues((prev) => (Object.keys(prev).length ? {} : prev));
     } else {
       const initVals = {};
       sections.forEach((sec) => {
@@ -763,7 +771,12 @@ export default function CreateLeadModal({ isOpen, onClose, onCreate, onEditLayou
           }
         });
       });
-      setValues((prev) => ({ ...initVals, ...prev }));
+      // Only fill phone prefixes that are missing; unchanged → same object.
+      setValues((prev) => {
+        const missing = Object.keys(initVals).filter((id) => !(id in prev));
+        if (missing.length === 0) return prev;
+        return { ...initVals, ...prev };
+      });
     }
   }, [isOpen, sections]);
 

@@ -62,6 +62,7 @@ import {
   Spool,
   CircleCheck,
   Tag,
+  QrCode,
   Warehouse,
   Lock,
   Truck,
@@ -258,9 +259,9 @@ export const NAV = [
     icon: BarChart3,
     permission: 'menu_sales',
     children: [
-      { label: 'Quotations', icon: FileText, to: '/sales/quotations' },
+      // { label: 'Quotations', icon: FileText, to: '/sales/quotations' },
       { label: 'Sales Orders', icon: ShoppingCart, to: '/sales/orders' },
-      { label: 'Proforma Invoices', icon: FileSpreadsheet, to: '/sales/proforma' },
+      // { label: 'Proforma Invoices', icon: FileSpreadsheet, to: '/sales/proforma' },
       { label: 'Sales Invoices', icon: Receipt, to: '/sales/invoices' },
       { label: 'Delivery Challans', icon: Send, to: '/sales/delivery' },
       // [DISABLED] Warranty Cards concept commented out
@@ -346,6 +347,8 @@ export const NAV = [
           { label: 'QC Reports', to: '/inventory/qc/reports' },
         ],
       },
+      { label: 'Batch Registry', icon: QrCode, to: '/inventory/batches' },
+      { label: 'Production Runs (In-house)', icon: Factory, to: '/inventory/production-runs' },
       { label: 'Lot / Taka Register', icon: FileText, to: '/inventory/lot-register' },
       { label: 'Taka Tag Print', icon: Tag, to: '/inventory/taka-tags' },
       { label: 'Sample Management', icon: FlaskConical, to: '/inventory/samples' },

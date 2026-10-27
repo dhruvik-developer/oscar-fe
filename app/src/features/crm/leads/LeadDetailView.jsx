@@ -196,7 +196,7 @@ const DETAIL_TABS = [
 
   'Tasks',
 
-  'Quotations',
+  // 'Quotations', // [Quotation & Proforma Invoice modules are commented out]
 
   'Delivery Challans',
 
@@ -8678,52 +8678,12 @@ export default function LeadDetailView({ lead, onBackToLeads }) {
 
 
 
-    const metrics = [
-    {
-      label: 'Requirements',
-      value: detailCounts.products,
-      subtitle: 'Fabric & items needed',
-      icon: ShoppingBag,
-      accentColor: '#e11d48',
-      iconBg: '#fff1f2',
-      iconBorder: '#ffe4e6',
-    },
-    {
-      label: 'Source',
-      value: detailCounts.sources,
-      subtitle: 'Channels & contacts',
-      icon: Globe,
-      accentColor: '#059669',
-      iconBg: '#ecfdf5',
-      iconBorder: '#d1fae5',
-    },
-    {
-      label: 'Files',
-      value: detailCounts.files,
-      subtitle: 'Attached documents',
-      icon: FileStack,
-      accentColor: '#6366f1',
-      iconBg: '#eef2ff',
-      iconBorder: '#e0e7ff',
-    },
-    {
-      label: 'Open Tasks',
-      value: detailCounts.openTasks,
-      subtitle: 'Pending follow-ups',
-      icon: ListChecks,
-      accentColor: '#d97706',
-      iconBg: '#fffbeb',
-      iconBorder: '#fef3c7',
-    },
-    {
-      label: 'Delivery Challans',
-      value: detailCounts.challans,
-      subtitle: 'Outward shipments',
-      icon: Truck,
-      accentColor: '#0284c7',
-      iconBg: '#f0f9ff',
-      iconBorder: '#e0f2fe',
-    },
+      const metrics = [
+    { label: 'Requirements', value: detailCounts.products, subtitle: 'Fabric & items needed', icon: ShoppingBag, color: '#e11d48', bg: '#fff1f2' },
+    { label: 'Source', value: detailCounts.sources, subtitle: 'Channels & contacts', icon: Globe, color: '#059669', bg: '#ecfdf5' },
+    { label: 'Files', value: detailCounts.files, subtitle: 'Attached documents', icon: FileStack, color: '#6366f1', bg: '#eef2ff' },
+    { label: 'Open Tasks', value: detailCounts.openTasks, subtitle: 'Pending follow-ups', icon: ListChecks, color: '#d97706', bg: '#fffbeb' },
+    { label: 'Delivery Challans', value: detailCounts.challans, subtitle: 'Outward shipments', icon: Truck, color: '#0284c7', bg: '#f0f9ff' },
   ];
 
 
@@ -9263,59 +9223,19 @@ export default function LeadDetailView({ lead, onBackToLeads }) {
         </div>
 
       </div>
-
-
-
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5 my-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5 my-4">
         {metrics.map((m) => (
-          <article
+          <CrmKpiCard
             key={m.label}
-            className="group relative overflow-hidden rounded-xl border border-slate-200/90 bg-white p-3.5 sm:p-4 shadow-xs transition-all duration-200 hover:shadow-md hover:border-slate-300 hover:-translate-y-0.5 flex flex-col justify-between"
-          >
-            {/* Top decorative accent line */}
-            <div
-              className="absolute top-0 left-0 right-0 h-[3px]"
-              style={{ background: m.accentColor }}
-            />
-
-            {/* Soft radial corner glow */}
-            <div
-              aria-hidden="true"
-              className="pointer-events-none absolute -right-6 -top-6 h-24 w-24 rounded-full opacity-35 transition-opacity duration-200 group-hover:opacity-60"
-              style={{ background: `radial-gradient(circle, ${m.accentColor} 0%, transparent 70%)` }}
-            />
-
-            {/* Top Row: Label on left, Icon badge on right */}
-            <div className="relative flex items-center justify-between gap-2">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 truncate" title={m.label}>
-                {m.label}
-              </span>
-              <span
-                className="grid h-9 w-9 shrink-0 place-items-center rounded-lg transition-transform duration-200 group-hover:scale-105"
-                style={{
-                  backgroundColor: m.iconBg,
-                  color: m.accentColor,
-                  border: `1px solid ${m.iconBorder}`,
-                }}
-              >
-                <m.icon size={18} strokeWidth={2.2} />
-              </span>
-            </div>
-
-            {/* Bottom Row: Large Number + Subtitle */}
-            <div className="relative mt-2">
-              <div className="text-2xl font-bold font-mono tracking-tight text-slate-800 leading-none">
-                {m.value}
-              </div>
-              <p className="mt-1 text-[11px] font-medium text-slate-400 truncate" title={m.subtitle}>
-                {m.subtitle}
-              </p>
-            </div>
-          </article>
+            label={m.label}
+            value={m.value}
+            sub={m.subtitle}
+            icon={m.icon}
+            color={m.color}
+            badgeBg={m.bg}
+          />
         ))}
       </div>
-
-
 
       <div className="flex items-center gap-1 overflow-x-auto rounded-xl border border-slate-200 bg-slate-50/80 p-1.5 shadow-xs scrollbar-none">
 
@@ -9373,7 +9293,9 @@ export default function LeadDetailView({ lead, onBackToLeads }) {
 
       {activeTab === 'Tasks' && <LeadTasksTab lead={activeLeadData} onCountsChange={updateDetailCounts} onActivity={logActivity} />}
 
+      {/* [Quotation & Proforma Invoice modules are commented out]
       {activeTab === 'Quotations' && <QuotationsTab lead={activeLeadData} onActivity={logActivity} />}
+      */}
 
       {activeTab === 'Delivery Challans' && <DeliveryChallansTab lead={activeLeadData} onCountsChange={updateDetailCounts} onActivity={logActivity} />}
 

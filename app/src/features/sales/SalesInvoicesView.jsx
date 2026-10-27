@@ -223,6 +223,7 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
         }
     };
 
+    // [Quotation & Proforma Invoice modules are commented out] — the Source Proforma picker is hidden; kept for later.
     const handlePiSelect = (piId) => {
         setLinkedPiId(piId);
         if (piId !== 'None') {
@@ -848,6 +849,7 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
                                     </select>
                                 </div>
 
+                                {/* [Quotation & Proforma Invoice modules are commented out]
                                 <div className="flex flex-col gap-1">
                                     <label className="font-semibold text-slate-700">Source Proforma (PI)</label>
                                     <select value={linkedPiId} onChange={(e) => handlePiSelect(e.target.value)} className="border border-slate-300 rounded-xl px-3 py-2 bg-white text-slate-800 font-medium">
@@ -859,6 +861,7 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
                                         ))}
                                     </select>
                                 </div>
+                                */}
 
                                 <div className="flex flex-col gap-1">
                                     <label className="font-semibold text-slate-700">Linked Sales Order</label>

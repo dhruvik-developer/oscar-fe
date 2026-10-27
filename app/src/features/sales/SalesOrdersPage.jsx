@@ -175,6 +175,7 @@ export const SalesOrdersPage = () => {
             return true;
         return o.stage === stageFilter;
     });
+    // [Quotation & Proforma Invoice modules are commented out] — kept for when the module returns; no button calls it now.
     const handleGenerateProforma = (order) => {
         const lines = order.items || order.lineItems || [];
         if (lines.length === 0) {
@@ -409,11 +410,13 @@ export const SalesOrdersPage = () => {
             <button onClick={() => handleCloneOrder(o)} className="p-1 text-muted hover:text-primary hover:bg-soft rounded-lg cursor-pointer transition-colors" title="Clone / Duplicate this Sales Order">
               <Copy size={13}/>
             </button>
+            {/* [Quotation & Proforma Invoice modules are commented out]
             {!isCancelled && (
               <button onClick={() => handleGenerateProforma(o)} className="p-1 text-muted hover:text-blue-600 hover:bg-blue-50 rounded-lg cursor-pointer transition-colors" title="Generate Proforma Invoice for advance payment milestone collection">
                 <FileSpreadsheet size={13}/>
               </button>
             )}
+            */}
 
             {o.stage === 'Draft' && (<button onClick={() => advanceStage(o.id, 'Draft')} className="px-2.5 py-1 bg-primary text-white rounded-md text-xs font-semibold hover:bg-primary-hover cursor-pointer shadow-xs transition-colors whitespace-nowrap inline-flex items-center gap-1">
                 Confirm Order
@@ -755,9 +758,11 @@ export const SalesOrdersPage = () => {
                     <Button variant="outline" onClick={() => setPickingListOrder({ id: selectedOrder.id, orderNumber: selectedOrder.orderNumber })}>
                       <Boxes size={13} className="mr-1 text-indigo-600"/> Picking List
                     </Button>
+                    {/* [Quotation & Proforma Invoice modules are commented out]
                     <Button variant="outline" onClick={() => { handleGenerateProforma(selectedOrder); setSelectedOrder(null); }}>
                       <FileSpreadsheet size={13} className="mr-1 text-blue-600"/> Generate Proforma
                     </Button>
+                    */}
                     {selectedOrder.stage === 'Draft' && (<Button onClick={() => { advanceStage(selectedOrder.id, 'Draft'); setSelectedOrder(null); }}>
                         Confirm Order
                       </Button>)}

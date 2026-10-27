@@ -556,6 +556,21 @@ export async function pullAssignmentOptions() {
   }
 }
 
+/**
+ * `GET /crm/incentive-schemes/` — the active salesperson incentive schemes
+ * (PDF §12), shown on the lead form when a salesperson is attributed.
+ */
+export async function pullIncentiveSchemes() {
+  if (!isBackendEnabled()) return [];
+  try {
+    const body = await api.get('/crm/incentive-schemes/');
+    return Array.isArray(body?.schemes) ? body.schemes : [];
+  } catch (err) {
+    console.warn('[crmSync] pull incentive schemes failed:', err?.message || err);
+    return [];
+  }
+}
+
 /** `GET /crm/dashboard/` — the tiles, computed server-side. */
 export async function pullDashboard(query = {}) {
   if (!isBackendEnabled()) return null;

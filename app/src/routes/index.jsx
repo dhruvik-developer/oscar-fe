@@ -123,11 +123,11 @@ const ProcessPlanListPage = lazy(() => import('../features/jobwork/ProcessPlanLi
 const ProcessPlanDetailPage = lazy(() => import('../features/jobwork/ProcessPlanDetailPage'));
 
 // ── ERP — Sales (Lazy Loaded) ─────────────────────────────────
-const QuotationsPage = lazy(() => import('../features/sales/QuotationsPage').then(m => ({ default: m.QuotationsPage })));
-const QuotationComposerPage = lazy(() => import('../features/sales/QuotationComposerPage'));
-const QuotationDetailPage = lazy(() => import('../features/sales/QuotationDetailPage'));
+// const QuotationsPage = lazy(() => import('../features/sales/QuotationsPage').then(m => ({ default: m.QuotationsPage })));
+// const QuotationComposerPage = lazy(() => import('../features/sales/QuotationComposerPage'));
+// const QuotationDetailPage = lazy(() => import('../features/sales/QuotationDetailPage'));
 const SalesOrdersPage = lazy(() => import('../features/sales/SalesOrdersPage').then(m => ({ default: m.SalesOrdersPage })));
-const ProformaInvoicesPage = lazy(() => import('../features/sales/ProformaInvoicesPage').then(m => ({ default: m.ProformaInvoicesPage })));
+// const ProformaInvoicesPage = lazy(() => import('../features/sales/ProformaInvoicesPage').then(m => ({ default: m.ProformaInvoicesPage })));
 const SalesInvoicesPage = lazy(() => import('../features/sales/SalesInvoicesPage').then(m => ({ default: m.SalesInvoicesPage })));
 const SalesReturnsPage = lazy(() => import('../features/sales/SalesReturnsPage').then(m => ({ default: m.SalesReturnsPage })));
 const PaymentInPage = lazy(() => import('../features/sales/PaymentInPage').then(m => ({ default: m.PaymentInPage })));
@@ -178,6 +178,9 @@ const QCReinspectionPage = lazy(() => import('../features/inventory/qc/QCReinspe
 const QCReportsPage = lazy(() => import('../features/inventory/qc/QCReportsPage'));
 const LotTakaRegisterPage = lazy(() => import('../features/inventory/LotTakaRegisterPage'));
 const TakaTagPrintPage = lazy(() => import('../features/inventory/TakaTagPrintPage'));
+const BatchRegistryPage = lazy(() => import('../features/inventory/batches/BatchRegistryPage'));
+const BatchTraceabilityPage = lazy(() => import('../features/inventory/batches/BatchTraceabilityPage'));
+const ProductionRunsPage = lazy(() => import('../features/inventory/batches/ProductionRunsPage'));
 const SampleListPage = lazy(() => import('../features/inventory/samples/SampleListPage'));
 const TripListPage = lazy(() => import('../features/inventory/logistics/TripListPage'));
 
@@ -284,7 +287,7 @@ function RootErrorBoundary() {
   );
 }
 
-const PublicQuotationPage = lazy(() => import('../features/sales/PublicQuotationPage'));
+// const PublicQuotationPage = lazy(() => import('../features/sales/PublicQuotationPage'));
 const LoginPage = lazy(() => import('../features/auth/LoginPage'));
 const ResetPasswordPage = lazy(() => import('../features/auth/ResetPasswordPage'));
 const ChangePasswordPage = lazy(() => import('../features/auth/ChangePasswordPage'));
@@ -318,11 +321,12 @@ const router = createBrowserRouter([
     errorElement: <RootErrorBoundary />,
   },
   // ── Public quotation link (shared with customers, no sign-in) ──
-  {
-    path: '/quote/:quotationNumber/:secureToken',
-    element: <Page component={PublicQuotationPage} />,
-    errorElement: <RootErrorBoundary />,
-  },
+  // [Quotation & Proforma Invoice modules are commented out]
+  // {
+    // path: '/quote/:quotationNumber/:secureToken',
+    // element: <Page component={PublicQuotationPage} />,
+    // errorElement: <RootErrorBoundary />,
+  // },
   // ── Protected Application Shell (Guarded by RequireAuth) ─
   {
     element: <RequireAuth />,
@@ -383,7 +387,7 @@ const router = createBrowserRouter([
       { path: 'crm/system-setup', element: <Page component={CRMSystemSetupPage} /> },
       { path: 'crm/lead-sources', element: <Page component={LeadSourcesPage} title="Lead Sources" /> },
       // [REMOVED] `crm/reports` — CRM Reports concept removed from the CRM module.
-      { path: 'crm/quotations', element: <Page component={QuotationsPage} /> },
+      // { path: 'crm/quotations', element: <Page component={QuotationsPage} /> },
 
       // ── PMS — Project Management ──────────────────────────
       { path: 'pms', element: <Page component={PMSDashboard} /> },
@@ -418,12 +422,13 @@ const router = createBrowserRouter([
       { path: 'job-work/itc-04', element: <Page component={ITC04ReportPage} title="ITC-04 Job Work Report" /> },
 
       // ── Sales ─────────────────────────────────────────────
-      { path: 'sales', element: <Navigate to="/sales/quotations" replace /> },
-      { path: 'sales/quotations/create', element: <Page component={QuotationComposerPage} /> },
-      { path: 'sales/quotations/:id', element: <Page component={QuotationDetailPage} /> },
-      { path: 'sales/quotations', element: <Page component={QuotationsPage} /> },
+      // [Quotation & Proforma Invoice modules are commented out] — Sales opens on Sales Orders.
+      { path: 'sales', element: <Navigate to="/sales/orders" replace /> },
+      // { path: 'sales/quotations/create', element: <Page component={QuotationComposerPage} /> },
+      // { path: 'sales/quotations/:id', element: <Page component={QuotationDetailPage} /> },
+      // { path: 'sales/quotations', element: <Page component={QuotationsPage} /> },
       { path: 'sales/orders', element: <Page component={SalesOrdersPage} /> },
-      { path: 'sales/proforma', element: <Page component={ProformaInvoicesPage} /> },
+      // { path: 'sales/proforma', element: <Page component={ProformaInvoicesPage} /> },
       { path: 'sales/invoices', element: <Page component={SalesInvoicesPage} /> },
       { path: 'sales/returns', element: <Page component={SalesReturnsPage} /> },
       { path: 'sales/payments', element: <Page component={PaymentInPage} /> },
@@ -475,6 +480,10 @@ const router = createBrowserRouter([
       { path: 'inventory/lot-register', element: <Page component={LotTakaRegisterPage} title="Lot / Taka Register" /> },
       { path: 'inventory/lots-takas', element: <Navigate to="/inventory/lot-register" replace /> },
       { path: 'inventory/taka-tags', element: <Page component={TakaTagPrintPage} title="Taka Tag Print" /> },
+      { path: 'inventory/batches', element: <Page component={BatchRegistryPage} title="Batch Registry" /> },
+      { path: 'inventory/production-runs', element: <Page component={ProductionRunsPage} title="Production Runs" /> },
+      // A batch QR tag opens this (signed in; cost shown only with ledger access).
+      { path: 'inventory/batches/:code', element: <Page component={BatchTraceabilityPage} title="Batch Traceability" /> },
       { path: 'inventory/samples', element: <Page component={SampleListPage} title="Sample Management" /> },
       { path: 'inventory/trips', element: <Page component={TripListPage} title="Logistics & Tempo Trips" /> },
       { path: 'inventory/items', element: <Page component={ItemsMasterPage} /> },

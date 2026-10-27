@@ -315,6 +315,26 @@ export const inventoryService = {
       throw err;
     }
   },
+  // Fabric batches: permanent batch ID, registry and traceability workspace
+  getBatches: (query) => api.get('/inventory/batches/', { query }),
+  // `code` may be a batch code, a taka ID or a lot number.
+  getBatch: (code) => api.get(`/inventory/batches/${encodeURIComponent(code)}/`),
+  // { ownership: OSCAR|CUSTOMER|THIRD_PARTY, ownerPartyId?, reason? }
+  setBatchOwnership: (code, data) => api.patch(`/inventory/batches/${encodeURIComponent(code)}/`, data),
+  // Rejections: classify by cause (normal loss vs supplier / job worker / process fault) and track claims.
+  recordBatchLoss: (code, data) => api.post(`/inventory/batches/${encodeURIComponent(code)}/losses/`, data),
+  updateBatchLoss: (id, data) => api.patch(`/inventory/batch-losses/${id}/`, data),
+  // { rolls: [{lotTakaId, qty}], reason, lossId? } -> debit note(s) for QC-rejected purchased rolls
+  returnRejectedToSupplier: (data) => api.post('/inventory/qc/purchase-return/', data),
+  // { itemId, locationId?, batch?, orderId? } -> sellable stock grouped by batch
+  getEligibleBatchStock: (query) => api.get('/inventory/batches/eligible/', { query }),
+  // { batches: [code], amount, costType, basis: METER|TAKA|MANUAL, manual?, reference?, remarks? }
+  allocateBatchCharge: (data) => api.post('/inventory/batches/allocate-charge/', data),
+  // In-house production runs (yarn -> grey fabric batch)
+  getProductionRuns: (query) => api.get('/inventory/production-runs/', { query }),
+  createProductionRun: (data) => api.post('/inventory/production-runs/', data),
+  // action: issue | output | expense | qc | complete
+  productionRunAction: (id, action, data) => api.post(`/inventory/production-runs/${id}/${action}/`, data),
   // Phase 2.3 Traceability & Ageing
   getLotTraceability: (target) => api.get('/inventory/traceability/', { query: { target } }),
   getStockAgeing: (query) => api.get('/inventory/stock/ageing/', { query }),

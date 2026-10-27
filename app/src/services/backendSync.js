@@ -85,6 +85,9 @@ function lineToApi(line, index) {
     // Lot/taka items: [{ lotTakaId, qty }] -- empty means FIFO on dispatch.
     takaAllocations: Array.isArray(line.takaAllocations) && line.takaAllocations.length
       ? line.takaAllocations : undefined,
+    // On a sales order the picked takas are the reservation (Available -> Reserved).
+    reservedTakas: Array.isArray(line.takaAllocations) && line.takaAllocations.length
+      ? line.takaAllocations : undefined,
   });
 }
 
@@ -909,7 +912,8 @@ export const RESOURCES = {
 export const PULL_ORDER = [
   'categories', 'units', 'locations', 'fabrics', 'items',
   'parties', 'customers', 'vendors',
-  'quotations', 'salesOrders', 'proformaInvoices',
+  // [Quotation & Proforma Invoice modules are commented out] — 'quotations' and 'proformaInvoices' are not pulled.
+  /* 'quotations', */ 'salesOrders', /* 'proformaInvoices', */
   'deliveryChallans', 'invoices', 'paymentIns', 'salesReturns',
   'purchaseOrders', 'purchaseBills', 'vendorBills', 'paymentOuts', 'purchaseReturns', 'expenses',
   'transfers', 'serviceUsages', 'valuationItems', 'monthEndAudits',

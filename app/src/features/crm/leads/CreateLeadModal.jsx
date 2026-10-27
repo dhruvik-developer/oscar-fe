@@ -6,7 +6,9 @@ import { defaultLeadFormSections, TEXTILE_FABRIC_OPTIONS, LEGACY_FABRIC_OPTIONS 
 import { matchKnownLeadField } from './leadColumns';
 import { CalendarDays, ChevronDown, Clock3, ImagePlus, Plus, X, Building2, ShieldCheck, Percent } from "lucide-react";
 import { salesService } from "../../../services/domainServices";
-import MasterSourceLink from "../../../components/common/MasterSourceLink";
+import MasterSourceLink, { useMasterDataRefresh } from "../../../components/common/MasterSourceLink";
+import SalespersonSelect from "../../../components/common/SalespersonSelect";
+import { pullIncentiveSchemes } from "../../../services/crmSync";
 
 /**
  * Options for the Lead Source dropdown: exactly the sources under CRM Setup →
@@ -15,6 +17,32 @@ import MasterSourceLink from "../../../components/common/MasterSourceLink";
  * source, so a lead saved with it lost its source. The lead's current value
  * is kept so an existing row never renders blank.
  */
+/** "Sales Person", "Salesperson", "sales-person" … all name the same source. */
+function isSalespersonSource(name) {
+  return String(name || '').toLowerCase().replace(/[^a-z]/g, '') === 'salesperson';
+}
+
+const PERIOD_LABEL = { Monthly: 'Monthly', Quarterly: 'Quarterly (3 months)', Custom: 'Custom period' };
+const BASIS_LABEL = { INVOICE: 'Net sales (invoice value)', COLLECTION: 'Collections', GROSS_PROFIT: 'Gross profit' };
+
+/** One line describing how a scheme pays, e.g. "Flat 2% of Net sales". */
+function describeScheme(scheme) {
+  const basis = BASIS_LABEL[scheme.basis] || scheme.basis;
+  const slabs = Array.isArray(scheme.slabs) ? scheme.slabs : [];
+  if (slabs.length > 0) {
+    const tiers = slabs
+      .map((sl) => {
+        const rate = sl.rate_pct ?? sl.rate ?? 0;
+        const min = Number(sl.min || 0).toLocaleString('en-IN');
+        const max = sl.max === null || sl.max === undefined || sl.max === '' ? '+' : `–${Number(sl.max).toLocaleString('en-IN')}`;
+        return `₹${min}${max}: ${rate}%`;
+      })
+      .join(', ');
+    return `${scheme.slabType === 'TIERED' ? 'Tiered' : 'Slab'} on ${basis} (${tiers})`;
+  }
+  return `Flat ${Number(scheme.ratePct || 0)}% of ${basis}`;
+}
+
 export function leadSourceOptions(sources, current) {
   // Sources deactivated under CRM Setup -> Lead Sources are not offered for
   // new selection (a lead already carrying one keeps it, see below).
@@ -717,6 +745,11 @@ export function leadFormValuesToPayload(values, sections, { sources = [], userOp
       commission_basis: values.commission_basis || undefined,
       commission_rate: values.commission_rate || undefined,
       commission_notes: values.commission_notes || undefined,
+      salesperson_id: values.salesperson_id || undefined,
+      salesperson_name: values.salesperson_name || undefined,
+      salesperson_notes: values.salesperson_notes || undefined,
+      salesperson_commission_basis: values.salesperson_commission_rate ? (values.salesperson_commission_basis || 'percent') : undefined,
+      salesperson_commission_rate: values.salesperson_commission_rate || undefined,
       expected_meters: values.expected_meters || undefined,
       expected_takas: values.expected_takas || undefined,
       fabric_quality: values.fabric_quality || undefined,
@@ -735,6 +768,9 @@ export default function CreateLeadModal({ isOpen, onClose, onCreate, onEditLayou
   // Flat map of fieldId → value
   const [values, setValues] = useState({});
   const [brokers, setBrokers] = useState([]);
+  const [incentiveSchemes, setIncentiveSchemes] = useState([]);
+  const loadIncentiveSchemes = () => { pullIncentiveSchemes().then(setIncentiveSchemes); };
+  useMasterDataRefresh(loadIncentiveSchemes, ['incentiveSchemes']);
 
   useEffect(() => {
     if (isOpen) {
@@ -742,6 +778,7 @@ export default function CreateLeadModal({ isOpen, onClose, onCreate, onEditLayou
         const rows = res?.data || res?.results || res || [];
         if (Array.isArray(rows)) setBrokers(rows);
       }).catch(() => {});
+      pullIncentiveSchemes().then(setIncentiveSchemes);
     }
   }, [isOpen]);
 
@@ -919,6 +956,106 @@ export default function CreateLeadModal({ isOpen, onClose, onCreate, onEditLayou
                       className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg bg-white focus:ring-2 focus:ring-indigo-500 text-slate-800"
                     />
                   </div>
+                </div>
+              </div>
+            );
+          })()}
+          {(() => {
+            // Salesperson attribution (PDF §11 "ownership and commission
+            // linkage"); the pick flows to the quotation, order and invoice as
+            // salesperson. An agreed rate pays this lead's invoices at that
+            // rate instead of the incentive scheme (PDF §12); blank = scheme.
+            const sourceField = fieldBy('lead-source', /source/);
+            const currentSourceVal = String(values[sourceField?.id] ?? '');
+            const matchedSource = (sources || []).find((s) => String(s.id) === currentSourceVal || String(s.name).toLowerCase() === currentSourceVal.toLowerCase());
+            if (!isSalespersonSource(matchedSource?.name || currentSourceVal) && !values.salesperson_id) return null;
+
+            return (
+              <div className="col-span-full bg-emerald-50/70 p-4 rounded-xl border border-emerald-200 mb-2 space-y-3">
+                <div className="text-xs font-bold text-emerald-950 uppercase tracking-wide flex items-center gap-1.5">
+                  <Percent size={15} className="text-emerald-600" />
+                  Salesperson Attribution & Incentive
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-xs font-semibold text-slate-700">
+                        Select Salesperson <span className="text-rose-500">*</span>
+                      </label>
+                      <MasterSourceLink source="salespeople" />
+                    </div>
+                    <SalespersonSelect
+                      value={values.salesperson_id || ''}
+                      name={values.salesperson_name || ''}
+                      onChange={(person) => setValues((prev) => ({
+                        ...prev,
+                        salesperson_id: person.id,
+                        salesperson_name: person.name,
+                      }))}
+                      className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg bg-white focus:ring-2 focus:ring-emerald-500 font-medium text-slate-800"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">Commission Basis</label>
+                    <select
+                      value={values.salesperson_commission_basis || 'percent'}
+                      onChange={(e) => setValues((prev) => ({ ...prev, salesperson_commission_basis: e.target.value }))}
+                      className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg bg-white focus:ring-2 focus:ring-emerald-500 font-medium text-slate-800"
+                    >
+                      <option value="percent">Percentage of Net Value (%)</option>
+                      <option value="per_meter">Fixed per Meter (₹/m)</option>
+                      <option value="per_taka">Fixed per Taka (₹/taka)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">Agreed Rate</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="any"
+                      placeholder="e.g. 2.0 or 2.50"
+                      value={values.salesperson_commission_rate ?? ''}
+                      onChange={(e) => setValues((prev) => ({ ...prev, salesperson_commission_rate: e.target.value }))}
+                      className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg bg-white focus:ring-2 focus:ring-emerald-500 font-semibold text-slate-800"
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">Notes</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Referred by the salesperson at the trade fair"
+                      value={values.salesperson_notes ?? ''}
+                      onChange={(e) => setValues((prev) => ({ ...prev, salesperson_notes: e.target.value }))}
+                      className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg bg-white focus:ring-2 focus:ring-emerald-500 text-slate-800"
+                    />
+                  </div>
+                </div>
+                <div className="rounded-lg border border-emerald-200 bg-white p-3">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-xs font-semibold text-slate-700">
+                      {values.salesperson_commission_rate
+                        ? 'Incentive scheme (not applied to this lead — the agreed rate above is used instead)'
+                        : 'Incentive terms (applied when no agreed rate is set)'}
+                    </span>
+                    <MasterSourceLink source="incentiveSchemes" />
+                  </div>
+                  {incentiveSchemes.length === 0 ? (
+                    <p className="text-[11px] text-slate-500">
+                      No active incentive scheme. Set one under HRMS → Incentives; until then this lead only records who brought it.
+                    </p>
+                  ) : (
+                    <ul className="space-y-1">
+                      {incentiveSchemes.map((scheme) => (
+                        <li key={scheme.id} className="text-[11px] text-slate-600">
+                          <span className="font-semibold text-slate-800">{scheme.name}</span>
+                          {' — '}{PERIOD_LABEL[scheme.periodType] || scheme.periodType}, {describeScheme(scheme)}
+                          {scheme.payoutAfterDays ? `, paid ${scheme.payoutAfterDays} days after the customer pays` : ''}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
               </div>
             );

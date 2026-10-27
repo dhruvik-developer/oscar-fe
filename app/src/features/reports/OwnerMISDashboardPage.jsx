@@ -435,50 +435,23 @@ export default function OwnerMISDashboardPage() {
     });
   }, [serverBrokers, invoices]);
 
-  // 10. Party Profitability
-  const partyProfitability = useMemo(() => {
-    if (serverParties && serverParties.length) return serverParties;
-    const partyMap = {};
-    invoices.forEach((inv) => {
-      const party = inv.customer || 'Retail Party';
-      const code = inv.customerId || 'CUST-001';
-      const sales = Number(inv.grandTotal || inv.total || inv.amount) || 0;
-      const disc = Number(inv.discountTotal) || 0;
-      if (!partyMap[party]) {
-        partyMap[party] = { party_name: party, code, sales_value: 0, discount: 0 };
-      }
-      partyMap[party].sales_value += sales;
-      partyMap[party].discount += disc;
-    });
-
-    const sourceList = Object.values(partyMap).length ? Object.values(partyMap) : [
-      { party_name: 'Metro Sarees & Dress Materials', code: 'CUST-101', sales_value: 1250000, discount: 25000 },
-      { party_name: 'Surat Fashion Hub Pvt Ltd', code: 'CUST-102', sales_value: 940000, discount: 18000 },
-      { party_name: 'Radhika Textiles Delhi', code: 'CUST-103', sales_value: 780000, discount: 12000 },
-      { party_name: 'Vogue Silk & Cotton Mumbai', code: 'CUST-104', sales_value: 620000, discount: 22000 },
-      { party_name: 'Jaipur Ethnic Collection', code: 'CUST-105', sales_value: 410000, discount: 8000 },
-    ];
-
-    return sourceList.map((p) => {
-      const cogs = Math.round(p.sales_value * 0.72);
-      const brokerage = Math.round(p.sales_value * 0.02);
-      const incentive = Math.round(p.sales_value * 0.01);
-      const freight = Math.round(p.sales_value * 0.015);
-      const returns = 0;
-      const net_contribution = Math.max(0, p.sales_value - cogs - p.discount - brokerage - incentive - freight);
-      const margin_pct = p.sales_value > 0 ? ((net_contribution / p.sales_value) * 100).toFixed(1) : '18.5';
-      return {
-        ...p,
-        cogs,
-        brokerage,
-        incentive,
-        freight,
-        returns,
-        net_contribution,
-        margin_pct,
-      };
-    });
-  }, [serverParties, invoices]);
+  // 10. Party Profitability -- from /reports/party-profitability/ only:
+  // COGS is the ledger's actual cost of the stock sold, never a fixed ratio,
+  // and nothing is invented when the server has no rows.
+  const partyProfitability = useMemo(() => (serverParties || []).map((p) => ({
+    party_name: p.partyName,
+    code: p.partyId,
+    sales_value: p.netSales ?? p.sales,
+    cogs: p.cogs,
+    gross_profit: p.grossProfit,
+    discount: p.discount,
+    brokerage: p.brokerage,
+    freight: p.transport,
+    net_contribution: p.netContribution,
+    margin_pct: Number(p.marginPct || 0).toFixed(1),
+    cost_status: p.costStatus,
+    missing_cost_invoices: p.invoicesWithoutActualCost || [],
+  })), [serverParties]);
 
   // 11. Stock Ageing MIS
   const stockAgeing = useMemo(() => {
@@ -2250,7 +2223,7 @@ export default function OwnerMISDashboardPage() {
                     <th className="py-3 px-3 text-right">COGS (₹)</th>
                     <th className="py-3 px-3 text-right">Discounts</th>
                     <th className="py-3 px-3 text-right">Brokerage</th>
-                    <th className="py-3 px-3 text-right">Incentive</th>
+                    <th className="py-3 px-3 text-right">Gross Profit</th>
                     <th className="py-3 px-3 text-right">Freight</th>
                     <th className="py-3 px-3 text-right font-bold text-slate-900">Contribution (₹)</th>
                     <th className="py-3 px-3 text-right font-bold text-slate-900">Margin %</th>
@@ -2264,10 +2237,20 @@ export default function OwnerMISDashboardPage() {
                         <div className="text-[11px] text-slate-400">{p.code || ''}</div>
                       </td>
                       <td className="py-2.5 px-3 text-right font-semibold">{inr(p.sales_value)}</td>
-                      <td className="py-2.5 px-3 text-right text-slate-500">{inr(p.cogs)}</td>
+                      <td className="py-2.5 px-3 text-right text-slate-500">
+                        {inr(p.cogs)}
+                        {p.cost_status && p.cost_status !== 'actual' && (
+                          <span
+                            className="block text-[10px] font-semibold text-amber-700"
+                            title={`Invoices without full actual cost: ${p.missing_cost_invoices.join(', ')}`}
+                          >
+                            {p.cost_status === 'incomplete' ? 'Cost incomplete' : 'Partly estimated'}
+                          </span>
+                        )}
+                      </td>
                       <td className="py-2.5 px-3 text-right text-rose-600">{inr(p.discount)}</td>
                       <td className="py-2.5 px-3 text-right text-slate-600">{inr(p.brokerage)}</td>
-                      <td className="py-2.5 px-3 text-right text-slate-600">{inr(p.incentive)}</td>
+                      <td className="py-2.5 px-3 text-right text-slate-600">{inr(p.gross_profit)}</td>
                       <td className="py-2.5 px-3 text-right text-slate-600">{inr(p.freight)}</td>
                       <td className="py-2.5 px-3 text-right font-bold text-emerald-700">{inr(p.net_contribution)}</td>
                       <td className="py-2.5 px-3 text-right font-bold">

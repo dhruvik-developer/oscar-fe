@@ -982,6 +982,7 @@ export default function DealsPage() {
     showNotification(`Deal moved to ${targetStage}`);
   };
 
+  // [Quotation & Proforma Invoice modules are commented out] — kept for when the module returns; no button calls it now.
   const handleCreateErpQuotation = (deal) => {
     const matchedCustomer = (customers || []).find((c) => 
       c.name?.toLowerCase() === deal.client?.toLowerCase() ||
@@ -1044,6 +1045,9 @@ export default function DealsPage() {
       customer: deal.client || matchedCustomer?.name || '',
       dealId: String(deal.id || ''),
       dealName: deal.name || '',
+      // The order links the lead itself (no quotation), so the lead's agreed
+      // broker / salesperson terms reach its invoices.
+      leadId: deal.leadId ? String(deal.leadId) : undefined,
       amount: dealAmount,
       stage: deal.stage === 'Won' ? 'Confirmed' : 'Draft',
       status: deal.stage === 'Won' ? 'Confirmed' : 'Draft',
@@ -1601,6 +1605,7 @@ export default function DealsPage() {
                     <td className="py-3.5 px-4 text-slate-500">{deal.date}</td>
                     <td className="py-3.5 px-4 text-right">
                       <div className="flex items-center justify-end gap-1.5">
+                        {/* [Quotation & Proforma Invoice modules are commented out]
                         <button
                           type="button"
                           onClick={() => handleCreateErpQuotation(deal)}
@@ -1610,6 +1615,7 @@ export default function DealsPage() {
                         >
                           <FileText size={13} />
                         </button>
+                        */}
                         <button
                           type="button"
                           onClick={() => handleCreateErpSalesOrder(deal)}
@@ -1734,6 +1740,7 @@ export default function DealsPage() {
           <div className="px-3.5 py-1 text-[10px] uppercase font-bold text-slate-400 border-t border-slate-100 mt-1">
             ERP Conversion
           </div>
+          {/* [Quotation & Proforma Invoice modules are commented out]
           <button
             type="button"
             onClick={() => {
@@ -1745,6 +1752,7 @@ export default function DealsPage() {
             <FileText size={12} className="text-blue-600" />
             <span>Create Quotation</span>
           </button>
+          */}
           <button
             type="button"
             onClick={() => {

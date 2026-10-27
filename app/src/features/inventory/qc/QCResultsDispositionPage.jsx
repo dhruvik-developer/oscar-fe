@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import {
   CheckCircle2,
   AlertTriangle,
@@ -766,6 +767,15 @@ export default function QCResultsDispositionPage() {
                   <span className="text-xs font-semibold text-red-700">m</span>
                 </div>
                 <div className="text-[11px] font-semibold text-red-600">{pctRejected}%</div>
+                {isLocked && numRejected > 0 && lotNo && (
+                  <Link
+                    to={`/inventory/batches/${encodeURIComponent(lotNo)}?returnRejected=1`}
+                    className="inline-block text-[11px] font-bold text-red-700 underline"
+                    title="Raise a purchase return / debit note for rejected rolls (partial allowed)"
+                  >
+                    Return rejected to supplier →
+                  </Link>
+                )}
               </div>
             </div>
 

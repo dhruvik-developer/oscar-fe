@@ -60,6 +60,8 @@ export const MASTER_SOURCES = {
   policyCategories: { to: '/hrms/company-policy/categories', menu: 'HRMS → Company Policy → Categories' },
   assets: { to: '/hrms/assets', menu: 'HRMS → Asset Setup' },
   kpiIndicators: { to: '/hrms/performance/indicators', menu: 'HRMS → Performance → Indicators' },
+  incentiveSchemes: { to: '/hrms/incentives', menu: 'HRMS → Incentives' },
+  salespeople: { to: '/hrms/employees', menu: 'HRMS → Employees' },
 
   // Administration
   users: { to: '/administration/users', menu: 'Administration → Users' },

@@ -4,6 +4,7 @@ import { useERP } from '../../context/ERPContext';
 import { Button } from '../ui/Button';
 import UomSelect from './UomSelect';
 import MasterSourceLink from './MasterSourceLink';
+import BatchPickerModal from './BatchPickerModal';
 import useUnits from '../../hooks/useUnits';
 import { factorToStock, formatQty, resolveUnit, unitDecimals } from '../../utils/uom';
 
@@ -22,7 +23,9 @@ const createEmptyLine = () => ({
   isUserModified: false,
 });
 
-export const LineItemEditor = ({ items = [], onChange, type = 'sales', readOnly = false, onRequestPO }) => {
+export const LineItemEditor = ({ items = [], onChange, type = 'sales', readOnly = false, onRequestPO, orderId }) => {
+    // Sales lines of lot/taka items can be drawn from chosen batches.
+    const [batchPickerIndex, setBatchPickerIndex] = useState(null);
     const {
       items: masterItems = [],
       categories = [],
@@ -232,6 +235,8 @@ export const LineItemEditor = ({ items = [], onChange, type = 'sales', readOnly 
 
         const updatedMain = {
             ...current,
+            // Batches picked for the previous item do not apply to this one.
+            takaAllocations: [],
             id: lineId,
             itemId: selected.id,
             sku: selected.sku,
@@ -328,6 +333,10 @@ export const LineItemEditor = ({ items = [], onChange, type = 'sales', readOnly 
         
         const prevQty = current.qty || 1;
         current[field] = value;
+        // A new quantity no longer matches the batches picked for the old one.
+        if (field === 'qty' && Array.isArray(current.takaAllocations) && current.takaAllocations.length) {
+            current.takaAllocations = [];
+        }
 
         // If user changed rate/discount/tax/qty directly on a BOM part, mark as user modified
         if (current.isBomGenerated && (field === 'qty' || field === 'rate' || field === 'discount' || field === 'tax')) {
@@ -418,6 +427,22 @@ export const LineItemEditor = ({ items = [], onChange, type = 'sales', readOnly 
 
     return (
     <div className="space-y-4 font-sans text-xs">
+      {batchPickerIndex !== null && items[batchPickerIndex] && (
+        <BatchPickerModal
+          itemId={items[batchPickerIndex].itemId}
+          itemName={items[batchPickerIndex].name}
+          qty={items[batchPickerIndex].qty}
+          value={items[batchPickerIndex].takaAllocations || []}
+          orderId={orderId}
+          onClose={() => setBatchPickerIndex(null)}
+          onSave={(allocations) => {
+            const updated = [...items];
+            updated[batchPickerIndex] = { ...updated[batchPickerIndex], takaAllocations: allocations };
+            onChange(updated);
+            setBatchPickerIndex(null);
+          }}
+        />
+      )}
       {/* Scrolls sideways on narrow screens instead of clipping columns. */}
       <div className="border border-border rounded-xl bg-card shadow-xs overflow-x-auto custom-scrollbar">
         <table className="w-full min-w-[720px] lg:min-w-0 border-collapse text-xs">
@@ -578,6 +603,21 @@ export const LineItemEditor = ({ items = [], onChange, type = 'sales', readOnly 
                                   </button>
                                 </div>
                               )}
+                              {type === 'sales' && item.itemId && ['LOT', 'TAKA'].includes(String(masterItems.find((mi) => String(mi.id) === String(item.itemId))?.trackingType || '').toUpperCase()) && (() => {
+                                const picked = Array.isArray(item.takaAllocations) ? item.takaAllocations : [];
+                                const batchCodes = [...new Set(picked.map((a) => a.batchCode).filter(Boolean))];
+                                return (
+                                  <button
+                                    type="button"
+                                    onClick={() => setBatchPickerIndex(index)}
+                                    className="mt-1.5 inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold rounded-md text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 transition cursor-pointer"
+                                    title="Choose the batches this line is sold from, or scan a batch tag"
+                                  >
+                                    <Layers size={10} />
+                                    <span>{batchCodes.length ? `Batch: ${batchCodes.join(', ')}` : 'Batch: auto (oldest first) — choose'}</span>
+                                  </button>
+                                );
+                              })()}
                               <input
                                 type="text"
                                 placeholder="Custom line description / serial notes..."

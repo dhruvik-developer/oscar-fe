@@ -8,6 +8,7 @@ import {
   Inbox,
   ClipboardCheck,
   ChevronRight,
+  ChevronLeft,
   Search,
   Plus,
   X,
@@ -16,10 +17,7 @@ import {
 } from 'lucide-react';
 import { api } from '../../../services/api';
 import { inventoryService } from '../../../services/domainServices';
-import PageInfoButton from '../../../components/ui/PageInfoButton';
-import AppPagination from '../../../components/ui/AppPagination';
-import { useTableSort } from '../../../hooks/useTableSort';
-import SortableTh from '../../../components/ui/SortableTh';
+import QCPageHeader from './QCPageHeader';
 
 /*
  * Reprocess cycle, as the requirement lays it out:
@@ -110,8 +108,8 @@ export default function QCReinspectionPage() {
     });
   }, [records, activeStep, search, vendorFilter]);
 
-  const tableSort = useTableSort(rows, { accessors: { sentQty: (r) => Number(r.sentQty || 0) } });
-  const pageRows = tableSort.rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+  const pageRows = rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const moveTo = async (row, status, doneText) => {
     if (!row.jwoId) {
@@ -170,24 +168,19 @@ export default function QCReinspectionPage() {
         </div>
       )}
 
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-xl font-bold text-slate-900">Reinspection / Reprocess</h1>
-            <PageInfoButton title="Reinspection / Reprocess" />
-          </div>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Fabric that failed QC goes to the processor, comes back, and is inspected again: Pass, Repeat or Reject.
-          </p>
-        </div>
-        <Link
-          to="/job-work/reprocess"
-          className="inline-flex items-center gap-1.5 self-start md:self-auto rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-100"
-        >
-          <Plus className="w-4 h-4" /> New Reprocess Order
-        </Link>
-      </div>
+      {/* ── Standard QC Page Header ─────────────────────────────── */}
+      <QCPageHeader
+        title="Reinspection / Reprocess"
+        subtitle="Secondary quality audit of disputed lots, re-rolled fabric, or reprocessed batches: Pass, Repeat or Reject."
+        actions={
+          <Link
+            to="/job-work/reprocess"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-100 transition shadow-2xs"
+          >
+            <Plus className="w-4 h-4" /> New Reprocess Order
+          </Link>
+        }
+      />
 
       {/* Step tabs: the reprocess cycle, left to right */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -246,14 +239,14 @@ export default function QCReinspectionPage() {
           <table className="w-full text-xs text-left whitespace-nowrap">
             <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200">
               <tr>
-                <SortableTh sort={tableSort} sortKey="reprocessNo" className="p-3">Reprocess No.</SortableTh>
-                <SortableTh sort={tableSort} sortKey="date" className="p-3">Date</SortableTh>
-                <SortableTh sort={tableSort} sortKey="sourceQcNo" className="p-3">Source (GRN / Inward)</SortableTh>
-                <SortableTh sort={tableSort} sortKey="fabricItem" className="p-3">Fabric</SortableTh>
-                <SortableTh sort={tableSort} sortKey="lotNo" className="p-3">Lot</SortableTh>
-                <SortableTh sort={tableSort} sortKey="vendor" className="p-3">Processor</SortableTh>
-                <SortableTh sort={tableSort} sortKey="sentQty" className="p-3 text-right" align="right">Qty (m)</SortableTh>
-                <SortableTh sort={tableSort} sortKey="status" className="p-3">Status</SortableTh>
+                <th className="p-3">Reprocess No.</th>
+                <th className="p-3">Date</th>
+                <th className="p-3">Source (GRN / Inward)</th>
+                <th className="p-3">Fabric</th>
+                <th className="p-3">Lot</th>
+                <th className="p-3">Processor</th>
+                <th className="p-3 text-right">Qty (m)</th>
+                <th className="p-3">Status</th>
                 <th className="p-3 text-right">Next Step</th>
               </tr>
             </thead>
@@ -283,13 +276,14 @@ export default function QCReinspectionPage() {
           </table>
         </div>
 
-        <AppPagination
-          total={rows.length}
-          page={page}
-          pageSize={PAGE_SIZE}
-          onPageChange={setPage}
-          loading={loading}
-        />
+        <div className="flex items-center justify-between p-3 border-t border-slate-200 text-xs text-slate-500">
+          <span>{rows.length} record{rows.length === 1 ? '' : 's'}</span>
+          <div className="flex items-center gap-1">
+            <button type="button" disabled={page <= 1} onClick={() => setPage((p) => p - 1)} className="p-1.5 rounded border border-slate-200 bg-white disabled:opacity-40"><ChevronLeft className="w-4 h-4" /></button>
+            <span className="px-2 font-semibold text-slate-700">{page} / {totalPages}</span>
+            <button type="button" disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)} className="p-1.5 rounded border border-slate-200 bg-white disabled:opacity-40"><ChevronRight className="w-4 h-4" /></button>
+          </div>
+        </div>
       </div>
 
       {qcRow && (

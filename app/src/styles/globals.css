@@ -1232,27 +1232,55 @@ img { display: block; max-width: 100%; }
   position: sticky;
   top: 0;
   z-index: 30;
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   transition: background 0.3s ease, border-color 0.3s ease;
 }
 
 .top-search {
-  width: min(680px, 48vw);
-  height: 40px;
+  width: min(640px, 46vw);
+  height: 38px;
   display: flex;
   align-items: center;
   gap: 10px;
-  background: var(--soft);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 0 12px;
-  transition: all 0.15s ease;
+  background: rgba(241, 245, 249, 0.72);
+  border: 1px solid rgba(210, 222, 240, 0.85);
+  border-radius: 9999px;
+  padding: 0 14px 0 12px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03), inset 0 1px 1px rgba(255, 255, 255, 0.75);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
 }
 
-.top-search:hover, .top-search:focus-within {
-  border-color: var(--primary);
-  box-shadow: 0 0 0 3px var(--primary-subtle);
+.dark .top-search {
+  background: rgba(30, 41, 59, 0.65);
+  border-color: rgba(51, 65, 85, 0.75);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.top-search:hover {
+  background: rgba(255, 255, 255, 0.95);
+  border-color: rgba(147, 197, 253, 0.9);
+  box-shadow: 0 2px 10px rgba(37, 99, 235, 0.08);
+}
+
+.dark .top-search:hover {
+  background: rgba(30, 41, 59, 0.9);
+  border-color: rgba(96, 165, 250, 0.6);
+  box-shadow: 0 2px 10px rgba(37, 99, 235, 0.15);
+}
+
+.top-search:focus-within {
+  background: #ffffff;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.16), 0 2px 12px rgba(37, 99, 235, 0.1);
+}
+
+.dark .top-search:focus-within {
+  background: #0f172a;
+  border-color: #60a5fa;
+  box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.2), 0 2px 12px rgba(37, 99, 235, 0.2);
 }
 
 .top-search input {
@@ -1261,10 +1289,19 @@ img { display: block; max-width: 100%; }
   outline: 0;
   background: transparent;
   color: var(--text);
-  font-size: 0.88rem;
+  font-size: 0.84rem;
+  letter-spacing: -0.01em;
 }
 
-.top-search-ico { color: var(--muted); }
+.top-search-ico {
+  color: var(--muted);
+  transition: color 0.15s ease;
+}
+
+.top-search:hover .top-search-ico,
+.top-search:focus-within .top-search-ico {
+  color: var(--primary);
+}
 
 /* Topbar mobile controls (hamburger + compact search) — hidden by default */
 .topbar-hamburger,
@@ -1275,16 +1312,26 @@ img { display: block; max-width: 100%; }
   flex-shrink: 0;
   align-items: center;
   justify-content: center;
-  border-radius: 10px;
-  border: 1px solid var(--border);
-  background: var(--card);
+  border-radius: 9999px;
+  border: 1px solid rgba(210, 222, 240, 0.85);
+  background: rgba(255, 255, 255, 0.9);
   color: var(--text);
-  transition: background 0.15s ease;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  transition: all 0.2s ease;
+}
+
+.dark .topbar-hamburger,
+.dark .top-search-compact {
+  border-color: rgba(51, 65, 85, 0.75);
+  background: rgba(30, 41, 59, 0.8);
 }
 
 .topbar-hamburger:hover,
 .top-search-compact:hover {
-  background: var(--soft);
+  background: #ffffff;
+  border-color: rgba(147, 197, 253, 0.9);
+  color: var(--primary);
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.1);
 }
 
 .top-actions {
@@ -1387,6 +1434,35 @@ img { display: block; max-width: 100%; }
     max-height: calc(100dvh - 72px);
     overflow-y: auto;
     margin-top: 4px;
+  }
+}
+
+/* ── Notification center rows: actions replace the time on hover / focus;
+   on touch screens (no hover) they stay visible and the time moves to the meta line. */
+.notif-panel {
+  max-height: min(640px, calc(100dvh - 88px));
+}
+.notif-row-actions { display: none; }
+.notif-row-meta-time { display: none; }
+.notif-row:hover .notif-row-actions,
+.notif-row:focus-within .notif-row-actions { display: flex; }
+.notif-row:hover .notif-row-time,
+.notif-row:focus-within .notif-row-time { visibility: hidden; }
+@media (hover: none) {
+  /* No hover on touch: read / dismiss stay visible top-right; the time moves to the chip line. */
+  .notif-row-actions {
+    display: flex;
+    border: 0;
+    box-shadow: none;
+    background: transparent;
+  }
+  .notif-row-time { display: none; }
+  .notif-row-meta-time { display: inline; }
+}
+@media (max-width: 640px) {
+  .notif-panel {
+    overflow: hidden;
+    max-height: calc(100dvh - 72px);
   }
 }
 

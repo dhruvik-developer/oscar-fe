@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useERP } from '../context/ERPContext';
 import { useIdleReady } from './useIdleReady';
-import { loadEventNotifications, NOTIFICATION_EVENT } from '../services/crmEventNotifications';
+import { loadEventNotifications, isNotificationRead, NOTIFICATION_EVENT } from '../services/crmEventNotifications';
+import { routeForNotification } from '../services/notificationCenter';
 
 const CRM_EVENT = 'crm:data-updated';
 const LEADS_STORAGE_KEY = 'evenmore-crm-leads-v1';
@@ -49,17 +50,26 @@ function formatEventTime(value, now) {
 function buildEventNotifications({ eventItems, now }) {
   return (eventItems || [])
     .filter((entry) => entry && entry.title)
+    // The server sends `read` and `body` (rows raised locally carry `status` and `message`).
     .map((entry) => ({
       id: `crm-event-${entry.id}`,
       eventId: entry.id,
       title: entry.title,
       subtitle: EVENT_ENTITY_LABELS[entry.entityType] || 'CRM',
-      desc: entry.message || entry.title,
+      desc: entry.body || entry.message || '',
       time: formatEventTime(entry.createdAt, now),
+      createdAt: parseCrmDate(entry.createdAt),
       tone: 'info',
-      unread: entry.status !== 'read',
-      path: entry.path || '/crm',
+      unread: !isNotificationRead(entry),
+      path: routeForNotification(entry),
       bucket: 'crm-event',
+      type: entry.type || '',
+      category: entry.category || 'crm',
+      entityType: entry.entityType || '',
+      entityId: entry.entityId || '',
+      // Live state of the subject (a task's status / due date) and who raised it.
+      meta: entry.meta || null,
+      actorName: entry.actorName || '',
     }));
 }
 
@@ -202,7 +212,8 @@ function buildWorkflowNotifications({ leadRows, quotations, deliveryChallans }) 
       time: 'Follow-up',
       tone: 'info',
       unread: draftQuotes.length > 2,
-      path: '/crm/quotations',
+      // The quotation screens are switched off in routes/index.jsx; no link until they return.
+      path: null,
       bucket: 'quotation',
     });
   }

@@ -33,6 +33,17 @@ const invoiceGuide = {
     workflow: ['Proforma / SO Draft Created', 'Adjust Line Items & Addresses', 'Finalize Commercial Invoice', 'Collect Payment', 'Receipt Voucher Issued'],
 };
 
+// Offered on the invoice form; mirrors PAYMENT_TERM_OPTIONS in oscar-be/apps/sales/early_payment.py.
+const INVOICE_TERM_OPTIONS = [
+    { label: 'Immediate Payment', days: 0 },
+    { label: '7 Days', days: 7 },
+    { label: '15 Days', days: 15 },
+    { label: '30 Days', days: 30 },
+    { label: '45 Days', days: 45 },
+    { label: '60 Days', days: 60 },
+    { label: 'Custom', days: null },
+];
+
 export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: globalSearch = '', }) => {
     const {
         customers = [],
@@ -166,6 +177,30 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
     const [linkedPiId, setLinkedPiId] = useState('None');
     const [invoiceDate, setInvoiceDate] = useState(getCurrentDateFormatted());
     const [dueDate, setDueDate] = useState(() => addDaysISO(getCurrentISODate(), 30));
+    // Payment terms: a preset or custom days. The customer's own credit days
+    // are only a starting point; the due date follows the terms until edited.
+    const [termChoice, setTermChoice] = useState('30 Days');
+    const [customDays, setCustomDays] = useState('');
+    const termDays = termChoice === 'Custom'
+        ? (customDays === '' ? null : Number(customDays))
+        : (INVOICE_TERM_OPTIONS.find((o) => o.label === termChoice)?.days ?? null);
+    const applyTermDays = (days, fromDate = invoiceDate) => {
+        if (days === null || days === undefined || Number.isNaN(Number(days)) || !fromDate) return;
+        setDueDate(addDaysISO(fromDate, Number(days)));
+    };
+    const chooseTerms = (label, days) => {
+        const preset = INVOICE_TERM_OPTIONS.find((o) => o.label === label && o.label !== 'Custom');
+        setTermChoice(preset ? preset.label : 'Custom');
+        setCustomDays(preset ? '' : String(days ?? ''));
+        applyTermDays(preset ? preset.days : days);
+    };
+    const applyCustomerTerms = (custId) => {
+        const party = parties.find((p) => p.id === custId);
+        const days = party?.creditDays ?? customers.find((c) => c.id === custId)?.creditDays;
+        if (days === undefined || days === null || days === '') return;
+        const preset = INVOICE_TERM_OPTIONS.find((o) => o.days === Number(days));
+        chooseTerms(preset ? preset.label : 'Custom', Number(days));
+    };
     const [notes, setNotes] = useState('');
     const [lineItems, setLineItems] = useState([]);
     // Freight and other charges are billed here (the quotation no longer
@@ -193,6 +228,7 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
 
         setBillingAddress(bill);
         setShippingAddress(sameAsBilling ? bill : ship);
+        applyCustomerTerms(custId);
     };
 
     const handleCustomerChange = (custId) => {
@@ -276,6 +312,13 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
         setLinkedPiId(inv.proformaInvoiceId || inv.linkedPi || 'None');
         setInvoiceDate(inv.date || new Date().toISOString().split('T')[0]);
         setDueDate(inv.dueDate || '30 Days');
+        if (inv.paymentTerms && INVOICE_TERM_OPTIONS.some((o) => o.label === inv.paymentTerms)) {
+            setTermChoice(inv.paymentTerms);
+            setCustomDays('');
+        } else if (inv.creditDays !== undefined && inv.creditDays !== null) {
+            setTermChoice('Custom');
+            setCustomDays(String(inv.creditDays));
+        }
         setNotes(inv.notes || '');
         setLineItems(inv.items || []);
         setFreightCharges(Number(inv.freightCharges) > 0 ? String(Number(inv.freightCharges)) : '');
@@ -367,6 +410,8 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
                 notes,
                 salespersonId: salesperson.id,
                 salesperson: salesperson.name,
+                paymentTerms: termDays === null ? undefined : (termChoice === 'Custom' ? `Custom (${termDays} days)` : termChoice),
+                creditDays: termDays === null ? undefined : termDays,
             });
             setShowCreateModal(false);
             setEditingDraftTarget(null);
@@ -409,6 +454,8 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
             dispatchedViaChallan: hasChallan,
             salespersonId: salesperson.id,
             salesperson: salesperson.name,
+            paymentTerms: termDays === null ? undefined : (termChoice === 'Custom' ? `Custom (${termDays} days)` : termChoice),
+            creditDays: termDays === null ? undefined : termDays,
         };
 
         const created = onCreateInvoice(newInvoicePayload);
@@ -877,7 +924,19 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
 
                                 <div className="flex flex-col gap-1">
                                     <label className="font-semibold text-slate-700">Invoice Issue Date</label>
-                                    <input type="date" value={invoiceDate} onChange={(e) => setInvoiceDate(e.target.value)} className="border border-slate-300 rounded-xl px-3 py-2 bg-white text-slate-800"/>
+                                    <input type="date" value={invoiceDate} onChange={(e) => { setInvoiceDate(e.target.value); applyTermDays(termDays, e.target.value); }} className="border border-slate-300 rounded-xl px-3 py-2 bg-white text-slate-800"/>
+                                </div>
+
+                                <div className="flex flex-col gap-1">
+                                    <label htmlFor="invoice-terms" className="font-semibold text-slate-700">Payment Terms</label>
+                                    <div className="flex gap-2">
+                                        <select id="invoice-terms" value={termChoice} onChange={(e) => chooseTerms(e.target.value, customDays === '' ? null : Number(customDays))} className="flex-1 border border-slate-300 rounded-xl px-3 py-2 bg-white text-slate-800">
+                                            {INVOICE_TERM_OPTIONS.map((o) => <option key={o.label} value={o.label}>{o.label}</option>)}
+                                        </select>
+                                        {termChoice === 'Custom' && (
+                                            <input type="number" min="0" aria-label="Custom credit days" placeholder="Days" value={customDays} onChange={(e) => { setCustomDays(e.target.value); if (e.target.value !== '') applyTermDays(Number(e.target.value)); }} className="w-20 border border-slate-300 rounded-xl px-2 py-2 bg-white text-slate-800"/>
+                                        )}
+                                    </div>
                                 </div>
 
                                 <div className="flex flex-col gap-1">

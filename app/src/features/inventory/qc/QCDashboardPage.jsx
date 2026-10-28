@@ -29,9 +29,7 @@ import {
 } from 'lucide-react';
 import { inventoryService } from '../../../services/domainServices';
 import { useERP } from '../../../context/ERPContext';
-import PageInfoButton from '../../../components/ui/PageInfoButton';
-import { useTableSort } from '../../../hooks/useTableSort';
-import SortableTh from '../../../components/ui/SortableTh';
+import QCPageHeader from './QCPageHeader';
 
 export default function QCDashboardPage({ defaultTab = 'All' }) {
   const { purchaseBills = [], vendors = [], items = [], formatCurrency } = useERP();
@@ -215,25 +213,6 @@ export default function QCDashboardPage({ defaultTab = 'All' }) {
 
   const suppliersList = dashboardData?.filters?.suppliers || vendors.map((v) => v.name);
 
-  const qualitySort = useTableSort(qualityBreakdown, {
-    accessors: {
-      inspected: (q) => Number(q.inspected),
-      rejected: (q) => Number(q.rejected),
-      rejectionPct: (q) => Number(q.rejectionPct),
-    },
-  });
-  const num = (key) => (r) => Number(r[key]) || 0;
-  const recordSort = useTableSort(filteredRecords, {
-    accessors: {
-      received: num('received'),
-      inspected: num('inspected'),
-      good: num('good'),
-      hold: num('hold'),
-      reprocess: num('reprocess'),
-      rejected: num('rejected'),
-    },
-  });
-
   // Update Disposition Action
   // A whole-lot verdict can only move stock still at QC Hold (backend
   // qc.dispose_all); job-work inwards have no receipt to post against here.
@@ -318,90 +297,82 @@ export default function QCDashboardPage({ defaultTab = 'All' }) {
 
   return (
     <div className="w-full space-y-4 pb-12 font-sans text-slate-800">
-      {/* ── Top Header & Filter Controls ─────────────────────────── */}
-      <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3 pt-1">
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-xl sm:text-2xl font-bold text-[#0f172a] tracking-tight">
-              QC Dashboard
-            </h1>
-            <PageInfoButton title="QC Dashboard" />
-            {loading && (
-              <RefreshCw className="w-4 h-4 text-blue-600 animate-spin" />
-            )}
+      {/* ── Standard QC Page Header & Filter Controls ────────────── */}
+      <QCPageHeader
+        title="QC Dashboard"
+        subtitle="Real-time overview of fabric inspection, quality status, and stock impact."
+        isDashboard={true}
+        titleExtra={
+          loading && <RefreshCw className="w-4 h-4 text-blue-600 animate-spin" />
+        }
+        actions={
+          <div className="flex items-center gap-2 flex-wrap text-xs">
+            {/* Supplier Dropdown */}
+            <select
+              value={supplierFilter}
+              onChange={(e) => setSupplierFilter(e.target.value)}
+              className="px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-700 font-medium shadow-2xs focus:outline-none focus:border-blue-500 cursor-pointer"
+            >
+              <option value="All">All Suppliers</option>
+              {suppliersList.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
+
+            {/* Date Range From */}
+            <div className="relative flex items-center">
+              <input
+                type="date"
+                value={dateFrom}
+                onChange={(e) => setDateFrom(e.target.value)}
+                className="pl-3 pr-2 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-700 font-medium shadow-2xs focus:outline-none focus:border-blue-500"
+              />
+            </div>
+
+            {/* Date Range To */}
+            <div className="relative flex items-center">
+              <input
+                type="date"
+                value={dateTo}
+                onChange={(e) => setDateTo(e.target.value)}
+                className="pl-3 pr-2 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-700 font-medium shadow-2xs focus:outline-none focus:border-blue-500"
+              />
+            </div>
+
+            {/* Source Type / Status Filter */}
+            <select
+              value={sourceTypeFilter}
+              onChange={(e) => setSourceTypeFilter(e.target.value)}
+              className="px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-700 font-medium shadow-2xs focus:outline-none focus:border-blue-500 cursor-pointer"
+            >
+              <option value="All">All Sources</option>
+              <option value="Purchase">Purchase (GRN)</option>
+              <option value="Job Work">Job Work Inward</option>
+              <option value="Internal">Internal Production</option>
+            </select>
+
+            {/* Apply Button */}
+            <button
+              type="button"
+              onClick={handleApplyFilters}
+              className="px-4 py-1.5 bg-[#2563eb] hover:bg-[#1d4ed8] text-white font-semibold rounded-lg shadow-xs transition cursor-pointer"
+            >
+              Apply
+            </button>
+
+            {/* Quick Intake Button */}
+            <Link
+              to="/purchase/receipts"
+              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-lg shadow-xs transition flex items-center gap-1"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Intake GRN</span>
+            </Link>
           </div>
-          <p className="text-xs text-slate-500 font-medium mt-0.5">
-            Real-time overview of fabric inspection, quality status and stock impact
-          </p>
-        </div>
-
-        {/* Global Filter Bar */}
-        <div className="flex items-center gap-2 flex-wrap text-xs">
-          {/* Supplier Dropdown */}
-          <select
-            value={supplierFilter}
-            onChange={(e) => setSupplierFilter(e.target.value)}
-            className="px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-700 font-medium shadow-2xs focus:outline-none focus:border-blue-500 cursor-pointer"
-          >
-            <option value="All">All Suppliers</option>
-            {suppliersList.map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </select>
-
-          {/* Date Range From */}
-          <div className="relative flex items-center">
-            <input
-              type="date"
-              value={dateFrom}
-              onChange={(e) => setDateFrom(e.target.value)}
-              className="pl-3 pr-2 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-700 font-medium shadow-2xs focus:outline-none focus:border-blue-500"
-            />
-          </div>
-
-          {/* Date Range To */}
-          <div className="relative flex items-center">
-            <input
-              type="date"
-              value={dateTo}
-              onChange={(e) => setDateTo(e.target.value)}
-              className="pl-3 pr-2 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-700 font-medium shadow-2xs focus:outline-none focus:border-blue-500"
-            />
-          </div>
-
-          {/* Source Type / Status Filter */}
-          <select
-            value={sourceTypeFilter}
-            onChange={(e) => setSourceTypeFilter(e.target.value)}
-            className="px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-700 font-medium shadow-2xs focus:outline-none focus:border-blue-500 cursor-pointer"
-          >
-            <option value="All">All Sources</option>
-            <option value="Purchase">Purchase (GRN)</option>
-            <option value="Job Work">Job Work Inward</option>
-            <option value="Internal">Internal Production</option>
-          </select>
-
-          {/* Apply Button */}
-          <button
-            type="button"
-            onClick={handleApplyFilters}
-            className="px-4 py-1.5 bg-[#2563eb] hover:bg-[#1d4ed8] text-white font-semibold rounded-lg shadow-xs transition cursor-pointer"
-          >
-            Apply
-          </button>
-
-          {/* Quick Intake Button */}
-          <Link
-            to="/purchase/receipts"
-            className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-lg shadow-xs transition flex items-center gap-1"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>Intake GRN</span>
-          </Link>
-        </div>
-      </div>
+        }
+      />
 
       {/* ── 6 Top Metric Cards ───────────────────────────────────── */}
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
@@ -709,14 +680,14 @@ export default function QCDashboardPage({ defaultTab = 'All' }) {
               <table className="w-full text-left text-[11px]">
                 <thead>
                   <tr className="border-b border-slate-100 text-slate-400 font-medium">
-                    <SortableTh sort={qualitySort} sortKey="quality" className="pb-1.5">Quality</SortableTh>
-                    <SortableTh sort={qualitySort} sortKey="inspected" className="pb-1.5 text-right" align="right">Inspected ({cards.inspected.uom})</SortableTh>
-                    <SortableTh sort={qualitySort} sortKey="rejected" className="pb-1.5 text-right" align="right">Rejected</SortableTh>
-                    <SortableTh sort={qualitySort} sortKey="rejectionPct" className="pb-1.5 text-right" align="right">Rejection %</SortableTh>
+                    <th className="pb-1.5">Quality</th>
+                    <th className="pb-1.5 text-right">Inspected ({cards.inspected.uom})</th>
+                    <th className="pb-1.5 text-right">Rejected</th>
+                    <th className="pb-1.5 text-right">Rejection %</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50 text-slate-700">
-                  {qualitySort.rows.map((q, idx) => (
+                  {qualityBreakdown.map((q, idx) => (
                     <tr key={q.quality || idx}>
                       <td className="py-1 font-medium text-slate-800">{q.quality}</td>
                       <td className="py-1 text-right font-mono">{Number(q.inspected).toLocaleString('en-IN')}</td>
@@ -985,28 +956,28 @@ export default function QCDashboardPage({ defaultTab = 'All' }) {
           <table className="w-full text-left text-xs whitespace-nowrap">
             <thead>
               <tr className="bg-slate-50/80 border-b border-slate-200 text-[10.5px] font-bold text-slate-500 uppercase tracking-wider">
-                <SortableTh sort={recordSort} sortKey="id" className="py-2.5 px-3">QC No.</SortableTh>
-                <SortableTh sort={recordSort} sortKey="date" className="py-2.5 px-3">Date</SortableTh>
-                <SortableTh sort={recordSort} sortKey="sourceType" className="py-2.5 px-3">Source Type</SortableTh>
-                <SortableTh sort={recordSort} sortKey="refNo" className="py-2.5 px-3">GRN / JWI No.</SortableTh>
-                <SortableTh sort={recordSort} sortKey="supplier" className="py-2.5 px-3">Supplier</SortableTh>
-                <SortableTh sort={recordSort} sortKey="itemCode" className="py-2.5 px-3">Item Code</SortableTh>
-                <SortableTh sort={recordSort} sortKey="itemName" className="py-2.5 px-3">Item Name</SortableTh>
-                <SortableTh sort={recordSort} sortKey="lotNo" className="py-2.5 px-3">Lot No.</SortableTh>
-                <SortableTh sort={recordSort} sortKey="takaRoll" className="py-2.5 px-3 text-center" align="center">Taka/Roll</SortableTh>
-                <SortableTh sort={recordSort} sortKey="received" className="py-2.5 px-3 text-right" align="right">Received ({cards.totalReceived.uom})</SortableTh>
-                <SortableTh sort={recordSort} sortKey="inspected" className="py-2.5 px-3 text-right" align="right">Inspected ({cards.inspected.uom})</SortableTh>
-                <SortableTh sort={recordSort} sortKey="good" className="py-2.5 px-3 text-right" align="right">Good ({cards.good.uom})</SortableTh>
-                <SortableTh sort={recordSort} sortKey="hold" className="py-2.5 px-3 text-right" align="right">Hold ({cards.hold.uom})</SortableTh>
-                <SortableTh sort={recordSort} sortKey="reprocess" className="py-2.5 px-3 text-right" align="right">Reprocess ({cards.reprocess.uom})</SortableTh>
-                <SortableTh sort={recordSort} sortKey="rejected" className="py-2.5 px-3 text-right" align="right">Rejected ({cards.rejected.uom})</SortableTh>
-                <SortableTh sort={recordSort} sortKey="status" className="py-2.5 px-3 text-center" align="center">Status</SortableTh>
+                <th className="py-2.5 px-3">QC No.</th>
+                <th className="py-2.5 px-3">Date</th>
+                <th className="py-2.5 px-3">Source Type</th>
+                <th className="py-2.5 px-3">GRN / JWI No.</th>
+                <th className="py-2.5 px-3">Supplier</th>
+                <th className="py-2.5 px-3">Item Code</th>
+                <th className="py-2.5 px-3">Item Name</th>
+                <th className="py-2.5 px-3">Lot No.</th>
+                <th className="py-2.5 px-3 text-center">Taka/Roll</th>
+                <th className="py-2.5 px-3 text-right">Received ({cards.totalReceived.uom})</th>
+                <th className="py-2.5 px-3 text-right">Inspected ({cards.inspected.uom})</th>
+                <th className="py-2.5 px-3 text-right">Good ({cards.good.uom})</th>
+                <th className="py-2.5 px-3 text-right">Hold ({cards.hold.uom})</th>
+                <th className="py-2.5 px-3 text-right">Reprocess ({cards.reprocess.uom})</th>
+                <th className="py-2.5 px-3 text-right">Rejected ({cards.rejected.uom})</th>
+                <th className="py-2.5 px-3 text-center">Status</th>
                 <th className="py-2.5 px-3 text-center">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-slate-700">
               {filteredRecords.length > 0 ? (
-                recordSort.rows.map((r, idx) => (
+                filteredRecords.map((r, idx) => (
                   <tr key={r.id || idx} className="hover:bg-slate-50/80 transition-colors">
                     <td className="py-2 px-3 font-semibold text-blue-600">{r.id}</td>
                     <td className="py-2 px-3 text-slate-500">{r.date}</td>

@@ -424,6 +424,19 @@ export const LocationsPage = () => {
       errors.parent = 'Parent location is required for sub-locations';
     }
 
+    if (formData.contact_number && formData.contact_number.trim()) {
+      const cleanContact = formData.contact_number.replace(/\D/g, '');
+      if (cleanContact.length !== 10) {
+        errors.contact_number = 'Contact number must be exactly 10 digits';
+      }
+    }
+    if (formData.pin_code && formData.pin_code.trim()) {
+      const cleanPin = formData.pin_code.replace(/\D/g, '');
+      if (cleanPin.length !== 6) {
+        errors.pin_code = 'PIN code must be exactly 6 digits';
+      }
+    }
+
     if (Object.keys(errors).length > 0) {
       setFormErrors(errors);
       return;

@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Link } from 'react-router-dom';
 import {
   CheckCircle2,
   AlertTriangle,
@@ -23,7 +22,7 @@ import {
 import { inventoryService } from '../../../services/domainServices';
 import { api } from '../../../services/api';
 import { useERP } from '../../../context/ERPContext';
-import PageInfoButton from '../../../components/ui/PageInfoButton';
+import QCPageHeader from './QCPageHeader';
 
 export default function QCResultsDispositionPage() {
   const { vendors = [], items = [] } = useERP();
@@ -331,31 +330,11 @@ export default function QCResultsDispositionPage() {
         </div>
       )}
 
-      {/* TOP HEADER */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
-        <div>
-          <div className="flex items-center space-x-3">
-            <div className="w-8 h-8 rounded-full bg-blue-600 text-white font-bold flex items-center justify-center text-sm shadow-xs">
-              4
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-xl font-bold text-slate-900">QC Results & Disposition</h1>
-                <PageInfoButton title="QC Results & Disposition" />
-              </div>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Record final result and update stock to Good / Hold / Reprocess / Reject.
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex items-center space-x-2 text-xs text-slate-500 font-medium">
-          <span>QC (Quality Check)</span>
-          <span>&gt;</span>
-          <span className="text-blue-600 font-semibold">QC Results & Disposition</span>
-        </div>
-      </div>
+      {/* ── Standard QC Page Header ─────────────────────────────── */}
+      <QCPageHeader
+        title="QC Results & Disposition"
+        subtitle="Record commercial dispositioning: Accepted, Debit Note to Vendor, Concession, Reprocess, or Reject."
+      />
 
       {/* MAIN CARD: FORM CONTAINER */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 space-y-6">
@@ -489,7 +468,7 @@ export default function QCResultsDispositionPage() {
                     placeholder="COT-60S-001"
                     className="w-full pl-2.5 pr-7 py-1.5 border border-slate-200 rounded-lg bg-slate-50 text-slate-800 font-mono"
                   />
-                  <Search className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-2.5" />
+                  <Search className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2" />
                 </div>
               </div>
 
@@ -767,15 +746,6 @@ export default function QCResultsDispositionPage() {
                   <span className="text-xs font-semibold text-red-700">m</span>
                 </div>
                 <div className="text-[11px] font-semibold text-red-600">{pctRejected}%</div>
-                {isLocked && numRejected > 0 && lotNo && (
-                  <Link
-                    to={`/inventory/batches/${encodeURIComponent(lotNo)}?returnRejected=1`}
-                    className="inline-block text-[11px] font-bold text-red-700 underline"
-                    title="Raise a purchase return / debit note for rejected rolls (partial allowed)"
-                  >
-                    Return rejected to supplier →
-                  </Link>
-                )}
               </div>
             </div>
 

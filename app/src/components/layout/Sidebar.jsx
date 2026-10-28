@@ -22,6 +22,7 @@ import {
   FilePlus2,
   Receipt,
   ArrowDownLeft,
+  BadgePercent,
   RotateCcw,
   Boxes,
   MapPin,
@@ -237,6 +238,7 @@ export const NAV = [
         icon: Wrench,
         defaultOpen: false,
         children: [
+          { label: 'Dyeing Service Orders', icon: Palette, to: '/job-work/service-orders' },
           { label: 'Process Plan', icon: ClipboardList, to: '/job-work/process-plan' },
           { label: 'Job Work Orders (JWO)', icon: FileText, to: '/job-work/orders' },
           { label: 'Job Work Outward', icon: Send, to: '/job-work/outward' },
@@ -269,6 +271,7 @@ export const NAV = [
       { label: 'Broker Commissions', icon: DollarSign, to: '/sales/broker-commissions' },
       { label: 'Sales Returns', icon: RotateCcw, to: '/sales/returns' },
       { label: 'Payment In', icon: ArrowDownLeft, to: '/sales/payments' },
+      { label: 'Payments & Discounts', icon: BadgePercent, to: '/sales/receivables', permission: 'view_sales' },
     ],
   },
 
@@ -336,14 +339,14 @@ export const NAV = [
         ],
       },
       {
-        label: 'QC (Quality Check)', icon: CircleCheck, to: '/inventory/qc',
+        label: 'QC (Quality Control)', icon: CircleCheck, to: '/inventory/qc',
         navigateOnOpen: true,
         children: [
           { label: 'QC Dashboard', to: '/inventory/qc', dot: true },
           { label: 'Pending Inspections', to: '/inventory/qc/pending' },
           { label: 'QC Inspection Register', to: '/inventory/qc/register' },
           { label: 'QC Results & Disposition', to: '/inventory/qc/results' },
-          { label: 'Reinspection / Reprocess', to: '/inventory/qc/reinspection' },
+          { label: 'Rework / Reprocess', to: '/inventory/qc/reinspection' },
           { label: 'QC Reports', to: '/inventory/qc/reports' },
         ],
       },

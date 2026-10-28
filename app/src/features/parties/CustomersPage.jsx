@@ -31,7 +31,7 @@ export const CustomersPage = () => {
         code: '',
         contactPerson: '',
         email: '',
-        phone: '+91 ',
+        phone: '',
         creditLimit: 50000,
         balance: 0,
         status: 'Active',
@@ -208,7 +208,27 @@ export const CustomersPage = () => {
                 </div>
                 <div>
                   <label className="font-semibold text-slate-700 block mb-1">Phone</label>
-                  <input type="text" value={newCust.phone} onChange={(e) => setNewCust({ ...newCust, phone: e.target.value })} className="w-full p-2 border border-slate-300 rounded bg-white text-slate-800"/>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-[10px] text-slate-400 font-mono ml-auto">
+                      {newCust.phone ? `${newCust.phone.replace(/\D/g, '').length}/10` : '10 digits'}
+                    </span>
+                  </div>
+                  <input
+                    type="tel"
+                    inputMode="numeric"
+                    maxLength={10}
+                    value={newCust.phone}
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/\D/g, '').slice(0, 10);
+                      setNewCust({ ...newCust, phone: val });
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Backspace' || e.key === 'Delete' || e.key === 'Tab' || e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.ctrlKey || e.metaKey) return;
+                      if (!/^[0-9]$/.test(e.key)) e.preventDefault();
+                    }}
+                    placeholder="e.g. 9825012345"
+                    className="w-full p-2 border border-slate-300 rounded bg-white text-slate-800 font-mono text-xs"
+                  />
                 </div>
               </div>
 

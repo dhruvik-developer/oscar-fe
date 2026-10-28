@@ -643,12 +643,26 @@ export default function EmployeeProfileModal({ isOpen, employee, onClose, onEmpl
                   <label className="block text-[11.5px] font-semibold text-slate-700 mb-1">
                     Phone Number
                   </label>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-[10px] text-slate-400 font-mono ml-auto">
+                      {form.phone ? `${form.phone.replace(/\D/g, '').length}/10` : '10 digits'}
+                    </span>
+                  </div>
                   <input
                     type="tel"
+                    inputMode="numeric"
+                    maxLength={10}
                     value={form.phone}
-                    onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                    className="w-full h-9 px-3 bg-white border border-[#cbd5e1] rounded-xl text-xs text-slate-900 focus:outline-none focus:border-slate-800"
-                    placeholder="e.g. +91 98765 43210"
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/\D/g, '').slice(0, 10);
+                      setForm({ ...form, phone: val });
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Backspace' || e.key === 'Delete' || e.key === 'Tab' || e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.ctrlKey || e.metaKey) return;
+                      if (!/^[0-9]$/.test(e.key)) e.preventDefault();
+                    }}
+                    className="w-full h-9 px-3 bg-white border border-[#cbd5e1] rounded-xl text-xs text-slate-900 focus:outline-none focus:border-slate-800 font-mono"
+                    placeholder="e.g. 9876543210"
                   />
                 </div>
                 <div>

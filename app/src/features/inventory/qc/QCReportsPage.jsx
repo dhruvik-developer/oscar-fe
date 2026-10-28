@@ -24,7 +24,7 @@ import {
   FileSpreadsheet
 } from 'lucide-react';
 import { inventoryService } from '../../../services/domainServices';
-import PageInfoButton from '../../../components/ui/PageInfoButton';
+import QCPageHeader from './QCPageHeader';
 
 const fmtQty = (val, fallback = '—') => {
   if (val === null || val === undefined || val === '') return fallback;
@@ -182,46 +182,31 @@ export default function QCReportsPage() {
 
   return (
     <div className="space-y-6">
-      {/* ── HEADER ── */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
-        <div>
-          <div className="flex items-center gap-2 text-xs font-semibold text-blue-600 uppercase tracking-wider mb-1">
-            <span>Inventory</span>
-            <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
-            <span>Quality Check</span>
-            <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
-            <span className="text-slate-900 font-bold">QC Reports</span>
-          </div>
+      {/* ── Standard QC Page Header ─────────────────────────────── */}
+      <QCPageHeader
+        title="Quality Check Reports & Analytics"
+        subpage="QC Reports"
+        subtitle="Real-time audit summaries, supplier rejection metrics, defect analysis, and reprocess recovery tracking."
+        actions={
           <div className="flex items-center gap-2.5">
-            <h1 className="text-xl md:text-2xl font-bold text-slate-900 flex items-center gap-2.5">
-              <FileText className="w-6 h-6 text-blue-600" />
-              Quality Check Reports & Analytics
-            </h1>
-            <PageInfoButton title="QC Reports" />
+            <button
+              onClick={loadReports}
+              className="flex items-center gap-1.5 px-3.5 py-2 text-xs md:text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition cursor-pointer"
+              title="Refresh Report Data"
+            >
+              <RefreshCw className={`w-4 h-4 text-slate-600 ${loading ? 'animate-spin' : ''}`} />
+              <span>Refresh</span>
+            </button>
+            <button
+              onClick={() => setShowExportModal(true)}
+              className="flex items-center gap-1.5 px-4 py-2 text-xs md:text-sm font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition shadow-xs cursor-pointer"
+            >
+              <Download className="w-4 h-4" />
+              <span>Export Report</span>
+            </button>
           </div>
-          <p className="text-xs md:text-sm text-slate-500 mt-1">
-            Real-time audit summaries, supplier rejection metrics, defect analysis, and reprocess recovery tracking.
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2.5">
-          <button
-            onClick={loadReports}
-            className="flex items-center gap-1.5 px-3.5 py-2 text-xs md:text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition"
-            title="Refresh Report Data"
-          >
-            <RefreshCw className={`w-4 h-4 text-slate-600 ${loading ? 'animate-spin' : ''}`} />
-            <span>Refresh</span>
-          </button>
-          <button
-            onClick={() => setShowExportModal(true)}
-            className="flex items-center gap-1.5 px-4 py-2 text-xs md:text-sm font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition shadow-sm"
-          >
-            <Download className="w-4 h-4" />
-            <span>Export Report</span>
-          </button>
-        </div>
-      </div>
+        }
+      />
 
       {/* ── KPI METRICS CARDS ── */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3.5">

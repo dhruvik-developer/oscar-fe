@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   AlertTriangle,
   Bell,
@@ -84,7 +85,9 @@ const formatAlertText = (text) => {
 };
 
 export default function AlertCenterPage() {
-  const [activeTab, setActiveTab] = useState('incidents'); // 'incidents' | 'settings'
+  const [searchParams] = useSearchParams();
+  // The notification bell's settings button opens straight onto the settings tab.
+  const [activeTab, setActiveTab] = useState(() => (searchParams.get('tab') === 'settings' ? 'settings' : 'incidents')); // 'incidents' | 'settings'
   const [incidents, setIncidents] = useState([]);
   const [settings, setSettings] = useState([]);
   const [loading, setLoading] = useState(true);

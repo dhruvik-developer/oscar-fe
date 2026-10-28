@@ -614,6 +614,7 @@ export const RESOURCES = {
       mode: p.mode || 'Bank Transfer',
       bankAccountId: p.bankAccountId || undefined,
       referenceNumber: p.reference || p.referenceNumber || undefined,
+      transactionReference: p.transactionReference || undefined,
       notes: p.notes || undefined,
       invoiceId: p.invoiceId || p.linkedInvoiceId || undefined,
     }),

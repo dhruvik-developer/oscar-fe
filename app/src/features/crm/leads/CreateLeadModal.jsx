@@ -116,29 +116,34 @@ function useSources() {
 // ---------------------------------------------------------------------------
 
 function PhoneField({ field, value, onChange }) {
-  const displayVal = value !== undefined && value !== null && value !== '' ? value : '+91 ';
+  const digits = String(value || '').replace(/\D/g, '').slice(0, 10);
 
   const handleChange = (e) => {
-    let v = e.target.value;
-    if (!v || v === '+' || v.trim() === '') {
-      onChange('+91 ');
-      return;
-    }
-    if (!v.startsWith('+91')) {
-      const cleaned = v.replace(/^\+?91\s*/, '');
-      onChange(`+91 ${cleaned}`);
-      return;
-    }
-    onChange(v);
+    const cleaned = e.target.value.replace(/\D/g, '').slice(0, 10);
+    onChange(cleaned);
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Backspace' || e.key === 'Delete' || e.key === 'Tab' || e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.ctrlKey || e.metaKey) return;
+    if (!/^[0-9]$/.test(e.key)) e.preventDefault();
   };
 
   return (
-    <input
-      type="tel"
-      placeholder={field.placeholder || "+91 98765 43210"}
-      value={displayVal}
-      onChange={handleChange}
-    />
+    <div className="relative">
+      <input
+        type="tel"
+        inputMode="numeric"
+        maxLength={10}
+        placeholder={field.placeholder || "Enter 10-digit number"}
+        value={digits}
+        onChange={handleChange}
+        onKeyDown={handleKeyDown}
+        className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-700 placeholder:text-slate-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 font-mono"
+      />
+      <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 font-mono pointer-events-none">
+        {digits ? `${digits.length}/10` : '10 digits'}
+      </span>
+    </div>
   );
 }
 

@@ -4,15 +4,13 @@ import { Headphones, X, Clock } from 'lucide-react';
 import './LoginPage.css';
 
 const INFINITY_PATH = 'M32 18c-5-8-10-12-16-12C9 6 4 11 4 18s5 12 12 12c6 0 11-4 16-12zm0 0c5 8 10 12 16 12 7 0 12-5 12-12S55 6 48 6c-6 0-11 4-16 12z';
-// Visual only: not sent with the sign-in request.
-const ROLE_CHIPS = ['Owner', 'Production', 'Godown', 'QC', 'Sales', 'Accounts'];
 
 const SESSION_END_NOTICES = {
   expired: 'Your session expired. Please sign in again to continue.',
   revoked: 'You were signed out because your password changed or an administrator ended your session.',
 };
 import { useAppStore } from '../../stores/appStore';
-import { login as loginRequest, getSupportInfo } from '../../services/authService';
+import { login as loginRequest, getSupportInfo, getLoginRoles } from '../../services/authService';
 import { describeError } from '../../services/resourceSync';
 import { getStoredToken, takeAuthEndReason } from '../../utils/authUtils';
 import { capsLockOn } from './passwordRules';
@@ -55,7 +53,12 @@ export default function LoginPage() {
   const [rememberMe, setRememberMe] = useState(true);
   const [capsOn, setCapsOn] = useState(false);
   const [notice, setNotice] = useState('');
-  const [roleChip, setRoleChip] = useState('Owner');
+  // "Select Your Role": options come from GET /auth/login-roles/ and the
+  // server checks the pick against the account on sign-in.
+  const [roles, setRoles] = useState([]);
+  const [rolesState, setRolesState] = useState('loading'); // loading | ready | error
+  const [rolesReload, setRolesReload] = useState(0);
+  const [role, setRole] = useState('');
 
   // Filled only when the server answers TENANT_REQUIRED: the same email and
   // password open accounts in more than one workspace.
@@ -79,6 +82,26 @@ export default function LoginPage() {
       .then((info) => setSupport(info || {}))
       .catch(() => setSupport({}));
   }, [isHelpOpen, support]);
+
+  // Re-read when a workspace is chosen: its roles may differ.
+  useEffect(() => {
+    let cancelled = false;
+    setRolesState('loading');
+    getLoginRoles(tenant || undefined)
+      .then((list) => {
+        if (cancelled) return;
+        setRoles(list);
+        setRole((current) => {
+          if (list.some((r) => r.code === current)) return current;
+          return list.length === 1 ? list[0].code : '';
+        });
+        setRolesState('ready');
+      })
+      .catch(() => {
+        if (!cancelled) setRolesState('error');
+      });
+    return () => { cancelled = true; };
+  }, [tenant, rolesReload]);
 
   useEffect(() => {
     const existingToken = getStoredToken();
@@ -110,6 +133,10 @@ export default function LoginPage() {
 
   const handleLoginSubmit = async (e) => {
     e?.preventDefault();
+    if (!role) {
+      setError('Please select your role.');
+      return;
+    }
     if (!email.trim()) {
       setError('Please enter your email address.');
       return;
@@ -131,6 +158,7 @@ export default function LoginPage() {
       const result = await loginRequest({
         email,
         password,
+        role,
         tenant: workspaces.length > 0 ? tenant : undefined,
         remember: rememberMe,
       });
@@ -233,30 +261,53 @@ export default function LoginPage() {
               </div>
             ) : (
               <>
-                <div className="oscar-login__chips" role="group" aria-label="Your role">
-                  {ROLE_CHIPS.map((chip) => (
-                    <button
-                      key={chip}
-                      type="button"
-                      className="oscar-login__chip"
-                      aria-pressed={roleChip === chip}
-                      onClick={() => setRoleChip(chip)}
-                    >
-                      {chip}
-                    </button>
-                  ))}
-                </div>
-
                 <form onSubmit={handleLoginSubmit} className="oscar-login__form">
                   <div>
-                    <label htmlFor="login-username" className="oscar-login__label">Username</label>
+                    <label htmlFor="login-role" className="oscar-login__label">Select Your Role</label>
+                    <select
+                      id="login-role"
+                      required
+                      value={role}
+                      onChange={(e) => setRole(e.target.value)}
+                      disabled={rolesState !== 'ready' || roles.length === 0}
+                      aria-busy={rolesState === 'loading'}
+                      aria-describedby="login-role-hint"
+                      className="oscar-login__input"
+                    >
+                      {rolesState === 'loading' && <option value="">Loading roles…</option>}
+                      {rolesState === 'error' && <option value="">Roles unavailable</option>}
+                      {rolesState === 'ready' && roles.length === 0 && <option value="">No roles available</option>}
+                      {rolesState === 'ready' && roles.length > 0 && (
+                        <>
+                          <option value="">Choose your role…</option>
+                          {roles.map((r) => (
+                            <option key={r.code} value={r.code}>{r.name}</option>
+                          ))}
+                        </>
+                      )}
+                    </select>
+                    <span id="login-role-hint" className="oscar-login__hint" aria-live="polite">
+                      {rolesState === 'error' && (
+                        <>
+                          Could not load roles.{' '}
+                          <button type="button" className="oscar-login__link" onClick={() => setRolesReload((n) => n + 1)}>
+                            Try again
+                          </button>
+                        </>
+                      )}
+                      {rolesState === 'ready' && roles.length === 0 && 'No active user has a role yet. Ask your administrator to assign one.'}
+                    </span>
+                  </div>
+
+                  <div>
+                    <label htmlFor="login-username" className="oscar-login__label">Email</label>
                     <input
                       id="login-username"
-                      type="text"
+                      type="email"
                       required
                       value={email}
                       onChange={(e) => handleEmailChange(e.target.value)}
-                      placeholder="Your username"
+                      placeholder="you@company.com"
                       autoComplete="username"
                       className="oscar-login__input"
                     />
@@ -325,7 +376,7 @@ export default function LoginPage() {
                     </button>
                   </div>
 
-                  <button type="submit" disabled={isLoading} className="oscar-login__submit">
+                  <button type="submit" disabled={isLoading || !role} className="oscar-login__submit">
                     {isLoading ? (
                       <>
                         <span className="oscar-login__spinner" aria-hidden="true" />

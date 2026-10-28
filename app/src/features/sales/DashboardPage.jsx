@@ -4,7 +4,7 @@ import { api } from '../../services/api';
 import { useAppStore } from '../../stores/appStore';
 import {
   BarChart3, Banknote, ShoppingCart, Settings, Truck, FileText,
-  Landmark, Database, Package, TrendingUp, TrendingDown, Minus,
+  Landmark, Database, Package,
   Factory, ShieldCheck, Users, TriangleAlert, ArrowRight, ChevronDown,
   Layers, ClipboardList, Cog, Boxes, RotateCcw, Ban, HelpCircle, Loader2, RefreshCw,
 } from 'lucide-react';
@@ -69,23 +69,6 @@ function Donut({ pct, size = 128, stroke = 13, color = '#22c55e', track = '#e6ec
   );
 }
 
-function ChangeBadge({ pct }) {
-  if (pct === null) {
-    return (
-      <span className="flex items-center gap-1 text-slate-400">
-        <Minus size={13} /> —
-      </span>
-    );
-  }
-  const up = pct >= 0;
-  return (
-    <span className={`flex items-center gap-1 ${up ? 'text-emerald-600' : 'text-rose-500'}`}>
-      {up ? <TrendingUp size={13} /> : <TrendingDown size={13} />}
-      {up ? '↑' : '↓'} {Math.abs(pct).toFixed(1)}%
-    </span>
-  );
-}
-
 function KpiTile({ icon: Icon, label, value, pct, vs, tileBg, iconBg, iconColor }) {
   const up = pct >= 0;
   const trendText = pct !== null ? `${up ? '+' : ''}${pct.toFixed(1)}% vs ${vs}` : undefined;
@@ -143,6 +126,7 @@ export const DashboardPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [reloadKey, setReloadKey] = useState(0);
+  const [batchView, setBatchView] = useState('worst');
 
   const retry = useCallback(() => setReloadKey((k) => k + 1), []);
 
@@ -252,8 +236,9 @@ export const DashboardPage = () => {
   const trend = Array.isArray(data.salesTrend) ? data.salesTrend : [];
   const ageingData = data.receivableAgeing || {};
   const attention = Array.isArray(data.attention) ? data.attention : [];
-  const gp = kpis.grossProfit || { current: 0, previous: 0 };
-  const gpPct = pctChange(gp.current, gp.previous);
+  // null when the viewer may not see batch cost (view_ledger).
+  const bp = data.batchProfit;
+  const bpRows = bp ? (batchView === 'best' ? bp.best : bp.worst) || [] : [];
 
   /* inventory position */
   const lotSub = (row) => `${meters(row?.qty)}${row?.lots ? ` · ${num(row.lots).toLocaleString('en-IN')} lot${num(row.lots) === 1 ? '' : 's'}` : ''}`;
@@ -347,20 +332,93 @@ export const DashboardPage = () => {
             </div>
           </div>
         ))}
-        <div className="flex items-center gap-3 rounded-xl border border-[#e2eaf5] bg-white p-4 shadow-[0_1px_2px_rgba(16,42,82,0.05)]">
-          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-[#efe9fd] text-violet-600">
-            <BarChart3 size={21} />
-          </span>
-          <div className="min-w-0 flex-1">
-            <p className="text-[11px] font-semibold text-slate-500">Gross Profit ({periodLabel})</p>
-            <p className={`truncate text-[18px] font-extrabold tracking-tight ${num(gp.current) < 0 ? 'text-rose-600' : 'text-[#17294e]'}`}>{inr(gp.current)}</p>
+        {bp && (
+          <div className="flex items-center gap-3 rounded-xl border border-[#e2eaf5] bg-white p-4 shadow-[0_1px_2px_rgba(16,42,82,0.05)]">
+            <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl ${num(bp.lossMaking) > 0 ? 'bg-[#fdeeee] text-rose-600' : 'bg-[#efe9fd] text-violet-600'}`}>
+              <Boxes size={21} />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-[11px] font-semibold text-slate-500">Batch Profit / Loss</p>
+              <p className={`truncate text-[18px] font-extrabold tracking-tight ${num(bp.net) < 0 ? 'text-rose-600' : 'text-[#17294e]'}`}>{inr(bp.net)}</p>
+              <p className="truncate text-[11px] text-slate-400">
+                {num(bp.batches)} batch{num(bp.batches) === 1 ? '' : 'es'} sold · last {bp.windowDays} days
+              </p>
+            </div>
+            <div className="flex flex-col items-end text-right text-[11px] font-bold">
+              <span className="text-emerald-600">{num(bp.profitable)} profit</span>
+              <span className={num(bp.lossMaking) > 0 ? 'text-rose-600' : 'text-slate-400'}>{num(bp.lossMaking)} loss</span>
+            </div>
           </div>
-          <div className="flex flex-col items-end text-right text-[11px] font-bold">
-            <ChangeBadge pct={gpPct} />
-            <span className="font-medium text-slate-400">vs. {inr(gp.previous)}</span>
-          </div>
-        </div>
+        )}
       </div>
+
+      {bp && (
+        <SectionCard icon={Boxes} title="Batch-wise Profit / Loss" linkTo="/inventory/batches" linkLabel="Batch Registry">
+          <div className="-mt-1 mb-3 flex flex-wrap items-center justify-between gap-2">
+            <p className="text-[11px] text-slate-400">
+              Batches sold in the last {bp.windowDays} days · each batch&apos;s full result to date (revenue − cost − written-off claims)
+            </p>
+            <div className="flex rounded-lg border border-slate-200 p-0.5 text-[11px] font-bold">
+              {[['worst', `Loss first${num(bp.lossMaking) ? ` (${num(bp.lossMaking)})` : ''}`], ['best', 'Top profit']].map(([key, label]) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setBatchView(key)}
+                  className={`rounded-md px-2.5 py-1 cursor-pointer ${batchView === key ? 'bg-[#2563eb] text-white' : 'text-slate-500 hover:text-slate-700'}`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+          {num(bp.lossMaking) > 0 && batchView === 'worst' && (
+            <div className="mb-3 flex items-center gap-1.5 rounded-lg bg-[#fdeeee] px-3 py-2 text-[12px] font-bold text-[#dc2626]">
+              <TriangleAlert size={14} /> {num(bp.lossMaking)} batch{num(bp.lossMaking) === 1 ? '' : 'es'} in loss · total {inr(bp.totalLoss)}
+            </div>
+          )}
+          {bpRows.length === 0 ? (
+            <EmptyNote>{batchView === 'best' ? 'No profitable batches yet.' : `No batches sold in the last ${bp.windowDays} days.`}</EmptyNote>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[640px] text-[12px]">
+                <thead>
+                  <tr className="border-b border-slate-100 text-left text-[10.5px] font-bold uppercase tracking-wide text-slate-400">
+                    <th className="py-2 pr-3">Batch</th>
+                    <th className="py-2 pr-3">Fabric</th>
+                    <th className="py-2 pr-3 text-right">Sold</th>
+                    <th className="py-2 pr-3 text-right">Revenue</th>
+                    <th className="py-2 pr-3 text-right">Cost</th>
+                    <th className="py-2 pr-3 text-right">Written off</th>
+                    <th className="py-2 pr-3 text-right">Profit / Loss</th>
+                    <th className="py-2 text-right">Margin</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {bpRows.map((r) => {
+                    const loss = num(r.netResult) < 0;
+                    return (
+                      <tr key={r.id} className={loss ? 'bg-[#fff7f7]' : ''}>
+                        <td className="py-2 pr-3 font-bold">
+                          <Link to={`/inventory/batches/${encodeURIComponent(r.batchCode)}`} className="text-[#2563eb] hover:underline">{r.batchCode}</Link>
+                        </td>
+                        <td className="max-w-[180px] truncate py-2 pr-3 text-slate-600" title={r.item || ''}>{r.item || '—'}</td>
+                        <td className="py-2 pr-3 text-right text-slate-600">{meters(r.soldQty)}</td>
+                        <td className="py-2 pr-3 text-right text-slate-600">{inr(r.revenue)}</td>
+                        <td className="py-2 pr-3 text-right text-slate-600">{inr(r.cost)}</td>
+                        <td className="py-2 pr-3 text-right text-slate-600">{num(r.writtenOffLoss) ? inr(r.writtenOffLoss) : '—'}</td>
+                        <td className={`py-2 pr-3 text-right font-extrabold ${loss ? 'text-rose-600' : 'text-emerald-600'}`}>{inr(r.netResult)}</td>
+                        <td className={`py-2 text-right font-bold ${loss ? 'text-rose-600' : 'text-slate-600'}`}>
+                          {r.marginPct === null || r.marginPct === undefined ? '—' : `${num(r.marginPct).toFixed(1)}%`}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </SectionCard>
+      )}
 
       {/* production / inventory / qc */}
       <div className="grid grid-cols-1 gap-3 xl:grid-cols-3">

@@ -381,6 +381,35 @@ export const inventoryService = {
   issueSample: (data) => api.post('/inventory/stock/', { ...data, action: 'issue_sample' }),
   returnSample: (data) => api.post('/inventory/stock/', { ...data, action: 'return_sample' }),
   getTransfers: (query) => api.get('/inventory/transfers/', { query }),
+  getTransfer: (id) => api.get(`/inventory/transfers/${id}/`),
+  // Transfer workflow: request (reserve) -> approve -> dispatch -> receive -> complete.
+  transferAction: (id, action, data = {}) => api.post(`/inventory/transfers/${id}/${action}/`, data),
+  deleteTransfer: (id) => api.delete(`/inventory/transfers/${id}/`),
+  // Warehouses: top-level locations only (no zones / racks / bins).
+  getWarehouses: (query) => api.get('/inventory/warehouses/', { query }),
+  createWarehouse: (data) => api.post('/inventory/warehouses/', data),
+  updateWarehouse: (id, data) => api.patch(`/inventory/warehouses/${id}/`, data),
+  getWarehouseDashboard: () => api.get('/inventory/warehouses/dashboard/'),
+  getWarehouseStock: (query) => api.get('/inventory/warehouses/stock/', { query }),
+  exportWarehouseStock: async (query = {}) => {
+    const params = new URLSearchParams({ ...Object.fromEntries(Object.entries(query).filter(([, v]) => v !== '' && v != null)), export: 'csv' });
+    const token = getAuthToken();
+    const res = await fetch(`${API_BASE}/inventory/warehouses/stock/?${params}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!res.ok) throw new Error(`Export failed (HTTP ${res.status}).`);
+    const url = URL.createObjectURL(await res.blob());
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'warehouse-stock.csv';
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 30000);
+  },
+  getWarehouseAvailability: (query) => api.get('/inventory/warehouses/availability/', { query }),
+  createShortageTransfer: (data) => api.post('/inventory/warehouses/shortage-transfer/', data),
+  getWarehouseStockLevels: (query) => api.get('/inventory/warehouses/stock-levels/', { query }),
+  setWarehouseStockLevel: (data) => api.post('/inventory/warehouses/stock-levels/', data),
+  getWarehouseLedger: (query) => api.get('/inventory/warehouses/ledger/', { query }),
   getLocations: (query) => api.get('/inventory/locations/', { query }),
   getLocationsSummary: () => api.get('/inventory/locations/summary/'),
   getLocationsHierarchy: () => api.get('/inventory/locations/hierarchy/'),

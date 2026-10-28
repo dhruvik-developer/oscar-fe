@@ -3,7 +3,7 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
-  --font-sans: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-sans: "Manrope", "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --color-primary: var(--primary);
   --color-primary-dark: var(--primary-dark);
   --color-primary-hover: var(--primary-hover);
@@ -87,7 +87,7 @@
 
 /* ── CSS Custom Properties (Multi-Theme System) ─────────── */
 :root, [data-theme="light"] {
-  font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: "Manrope", "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --primary: #1f6bff;
   --primary-dark: #1456d9;
   --primary-hover: #1456d9;
@@ -230,15 +230,15 @@
   --body-bg: radial-gradient(circle at top left, rgba(16, 185, 129, 0.12), transparent 35%), linear-gradient(180deg, #051611 0%, #030e0b 100%);
 }
 
-/* ── Oscar Textile theme: light pages + dark-teal sidebar ─── */
+/* ── Oscar theme: light pages + navy sidebar, matching the login page ─── */
 [data-theme="oscar"] {
-  --primary: #14b8a6;
-  --primary-dark: #0f766e;
-  --primary-hover: #0d9488;
-  --primary-subtle: rgba(20, 184, 166, 0.14);
+  --primary: #1B5FD6;
+  --primary-dark: #1747C4;
+  --primary-hover: #1450C8;
+  --primary-subtle: rgba(27, 95, 214, 0.12);
   --page: #f6f9ff;
-  --text: #183153;
-  --text-secondary: #58709a;
+  --text: #0F1B33;
+  --text-secondary: #5B6B8C;
   --muted: #60708d;
   --border: #dce5f4;
   --border-subtle: #eef3fc;
@@ -247,18 +247,18 @@
   --card-hover: #f8fbff;
   --card-alt: #f8fbff;
   --topbar-bg: rgba(255, 255, 255, 0.94);
-  --sidebar-bg-from: #0e3547;
-  --sidebar-bg-to: #071f2b;
-  --sidebar-text: #c3d4dc;
-  --sidebar-active-bg: linear-gradient(90deg, #1cb3b3 0%, #129191 100%);
+  --sidebar-bg-from: #1C2A44;
+  --sidebar-bg-to: #0E1627;
+  --sidebar-text: #C9D5EC;
+  --sidebar-active-bg: linear-gradient(110deg, #1747C4 0%, #2B9BE8 60%, #27C7EA 100%);
   --sidebar-active-text: #ffffff;
-  --sidebar-border: rgba(45, 212, 191, 0.14);
+  --sidebar-border: rgba(255, 255, 255, 0.08);
   --table-head-bg: #f8fafc;
   --table-row-hover: rgba(241, 245, 249, 0.7);
   --danger: #ef4444;
   --success: #10b981;
   --warning: #f59e0b;
-  --info: #0ea5e9;
+  --info: #2B9BE8;
   --radius: 8px;
   --radius-lg: 12px;
   --radius-xl: 16px;
@@ -269,44 +269,48 @@
   --body-bg: radial-gradient(circle at top left, rgba(202, 222, 255, 0.35), transparent 28%), linear-gradient(180deg, #fbfdff 0%, #f3f7ff 100%);
 }
 
-/* ── Oscar sidebar: teal active pill + teal accents ───────── */
+/* ── Oscar sidebar: login-page blue gradient pill + blue accents ───────── */
+/* The login page's fabric photo under a slate-navy veil, so the shell
+   carries the same texture and tone as the sign-in screen. */
 [data-theme="oscar"] .sidebar {
   background:
-    radial-gradient(circle at 85% -5%, var(--brand-tint, rgba(45, 212, 191, 0.16)), transparent 45%),
+    radial-gradient(circle at 85% -5%, var(--brand-tint, rgba(43, 155, 232, 0.16)), transparent 45%),
+    linear-gradient(180deg, rgba(28, 42, 68, 0.78) 0%, rgba(14, 22, 39, 0.9) 100%),
+    url("/images/login-bg.jpg") 30% center / cover no-repeat,
     linear-gradient(180deg, var(--sidebar-bg-from) 0%, var(--sidebar-bg-to) 100%);
 }
 /* --brand-* vars are only set when a custom brand colour is saved
-   (utils/branding.js); the fallbacks are the stock Oscar teal. */
+   (utils/branding.js); the fallbacks are the stock Oscar blue. */
 [data-theme="oscar"] .brand-logo {
-  color: var(--brand-accent, #2dd4bf);
+  color: var(--brand-accent, #7DB4F6);
 }
 [data-theme="oscar"] .brand-tag {
-  color: #7fa3b0;
+  color: #8493B2;
 }
 [data-theme="oscar"] .nav-row.section-active {
   background: var(--sidebar-active-bg);
   color: #ffffff;
   font-weight: 700;
-  box-shadow: 0 4px 14px var(--brand-glow, rgba(20, 184, 166, 0.35));
+  box-shadow: 0 8px 18px -8px var(--brand-glow, rgba(27, 95, 214, 0.9));
   border-left: 0;
   padding-left: 10px;
   border-radius: 10px;
 }
 [data-theme="oscar"] .sub-group-row.section-active,
 [data-theme="oscar"] .sub-group-row.active {
-  background: var(--brand-active-bg, linear-gradient(90deg, rgba(28, 179, 179, 0.9) 0%, rgba(18, 145, 145, 0.9) 100%));
+  background: var(--brand-active-bg, linear-gradient(110deg, rgba(23, 71, 196, 0.9) 0%, rgba(43, 155, 232, 0.9) 100%));
   color: #ffffff;
   border: 0;
-  box-shadow: 0 4px 14px var(--brand-glow, rgba(20, 184, 166, 0.3));
+  box-shadow: 0 6px 14px -6px var(--brand-glow, rgba(27, 95, 214, 0.8));
 }
 [data-theme="oscar"] .sub-item.section-active,
 [data-theme="oscar"] .sub-item.active {
-  background: var(--brand-tint, rgba(45, 212, 191, 0.14));
+  background: var(--brand-tint, rgba(125, 180, 246, 0.14));
   color: #ffffff;
-  border-left: 3px solid var(--brand-accent, #2dd4bf);
+  border-left: 3px solid var(--brand-accent, #7DB4F6);
 }
 [data-theme="oscar"] .side-top::-webkit-scrollbar-thumb {
-  background: var(--brand-tint, rgba(45, 212, 191, 0.25));
+  background: var(--brand-tint, rgba(125, 180, 246, 0.25));
 }
 }
 
@@ -719,6 +723,8 @@ body {
    this reset overrode every font size set on an input, select or button. */
 @layer base {
   button, input, select, textarea { font: inherit; }
+  /* Page and card titles use the login page's display face. */
+  h1, h2, h3 { font-family: "Sora", "Manrope", system-ui, sans-serif; letter-spacing: -0.01em; }
 }
 button { cursor: pointer; }
 a { text-decoration: none; color: inherit; }

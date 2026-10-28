@@ -155,7 +155,8 @@ const TextileMastersPage = lazy(() => import('../features/masters/TextileMasters
 const ItemsMasterPage = lazy(() => import('../features/inventory/ItemsMasterPage').then(m => ({ default: m.ItemsMasterPage })));
 const AddEditItemPage = lazy(() => import('../features/inventory/AddEditItemPage').then(m => ({ default: m.AddEditItemPage })));
 const CategoriesPage = lazy(() => import('../features/inventory/CategoriesPage').then(m => ({ default: m.CategoriesPage })));
-const StockPositionPage = lazy(() => import('../features/inventory/StockPositionPage').then(m => ({ default: m.StockPositionPage })));
+// Redesigned Stock Position: six screens selected by ?type= (the sidebar's links).
+const StockPositionPage = lazy(() => import('../features/inventory/stock-position/StockPositionScreens'));
 const TransfersPage = lazy(() => import('../features/inventory/TransfersPage').then(m => ({ default: m.TransfersPage })));
 const ERPLocationsPage = lazy(() => import('../features/inventory/LocationsPage').then(m => ({ default: m.LocationsPage })));
 const FaultyPartsPage = lazy(() => import('../features/inventory/FaultyPartsPage').then(m => ({ default: m.FaultyPartsPage })));

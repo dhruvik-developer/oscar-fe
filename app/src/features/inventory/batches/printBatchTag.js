@@ -29,6 +29,7 @@ export async function printBatchTags(batches) {
             <div class="brand">OSCAR</div>
             <div class="code">${escapeHtml(b.batchCode)}</div>
             <div class="row"><b>${escapeHtml(b.item || '')}</b></div>
+            ${b.hsnCode ? `<div class="row">HSN: ${escapeHtml(b.hsnCode)}</div>` : ''}
             ${spec ? `<div class="row">${escapeHtml(spec)}</div>` : ''}
             <div class="row">Received: ${escapeHtml(b.createdOn || '')}</div>
             <div class="row">Lot: ${escapeHtml((b.lots || []).join(', '))}</div>

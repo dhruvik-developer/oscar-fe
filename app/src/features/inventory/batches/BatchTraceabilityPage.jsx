@@ -7,9 +7,12 @@ import { useERP } from '../../../context/ERPContext';
 import { formatINR, formatNumberIN, describeApiError } from '../../accounts/accountingShared';
 import { printBatchTags } from './printBatchTag';
 import RejectReturnModal from './RejectReturnModal';
+import { DeliverToOwnerForm } from './CustomerMaterialPanels';
+import RegisterTakasForm from './RegisterTakasForm';
 
 const QTY_TILES = [
   ['received', 'Received'],
+  ['unregistered', 'Not yet in takas'],
   ['available', 'Available'],
   ['reserved', 'Reserved'],
   ['qcHold', 'QC Hold'],
@@ -161,9 +164,17 @@ export default function BatchTraceabilityPage() {
         )}
       />
 
+      {(batch.hsnMissingFor || []).length > 0 && (
+        <div role="alert" className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-800">
+          HSN is missing for {batch.hsnMissingFor.join(', ')}. Add it in the item master (Inventory → Total Inventory) —
+          the batch, POs and invoices take HSN from there.
+        </div>
+      )}
+
       <section className="bg-white border border-slate-200 rounded-xl p-4 grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
         {[
           ['Fabric', batch.item],
+          ['HSN (from item master)', batch.hsnCode],
           ['Quality / Shade', [batch.fabricQuality, batch.shade].filter(Boolean).join(' · ')],
           ['Width / GSM', [batch.width && `${batch.width}"`, batch.gsm && `${batch.gsm} GSM`].filter(Boolean).join(' · ')],
           ['Ownership', batch.ownership === 'OSCAR' ? 'OSCAR' : `${batch.ownership} — ${batch.ownerPartyName || ''}`],
@@ -206,7 +217,21 @@ export default function BatchTraceabilityPage() {
         )}
       </section>
 
-      <section className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-9 gap-2">
+      {Number(batch.quantities?.unregistered) > 0 && (
+        <section className="bg-white border border-blue-200 rounded-xl p-4">
+          <h3 className="text-sm font-bold text-slate-900 mb-2">Register takas</h3>
+          <RegisterTakasForm batch={batch} onDone={setBatch} />
+        </section>
+      )}
+
+      {batch.ownership !== 'OSCAR' && (
+        <section className="bg-white border border-slate-200 rounded-xl p-4">
+          <h3 className="text-sm font-bold text-slate-900 mb-2">Deliver to owner ({batch.ownerPartyName})</h3>
+          <DeliverToOwnerForm batch={batch} onDone={setBatch} />
+        </section>
+      )}
+
+      <section className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-10 gap-2">
         {QTY_TILES.map(([key, label]) => (
           <div key={key} className="bg-white border border-slate-200 rounded-xl p-3">
             <div className="text-[10px] uppercase tracking-wide text-slate-400">{label}</div>

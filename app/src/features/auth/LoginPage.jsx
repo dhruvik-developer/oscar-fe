@@ -1,19 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import {
-  Infinity as InfinityIcon,
-  Mail,
-  Lock,
-  Eye,
-  EyeOff,
-  ArrowRight,
-  AlertCircle,
-  Headphones,
-  X,
-  Clock,
-  Building2,
-  Info,
-} from 'lucide-react';
+import { Headphones, X, Clock } from 'lucide-react';
+import './LoginPage.css';
+
+const INFINITY_PATH = 'M32 18c-5-8-10-12-16-12C9 6 4 11 4 18s5 12 12 12c6 0 11-4 16-12zm0 0c5 8 10 12 16 12 7 0 12-5 12-12S55 6 48 6c-6 0-11 4-16 12z';
+// Visual only: not sent with the sign-in request.
+const ROLE_CHIPS = ['Owner', 'Production', 'Godown', 'QC', 'Sales', 'Accounts'];
 
 const SESSION_END_NOTICES = {
   expired: 'Your session expired. Please sign in again to continue.',
@@ -63,6 +55,7 @@ export default function LoginPage() {
   const [rememberMe, setRememberMe] = useState(true);
   const [capsOn, setCapsOn] = useState(false);
   const [notice, setNotice] = useState('');
+  const [roleChip, setRoleChip] = useState('Owner');
 
   // Filled only when the server answers TENANT_REQUIRED: the same email and
   // password open accounts in more than one workspace.
@@ -177,275 +170,192 @@ export default function LoginPage() {
 
 
   return (
-    <div className="relative min-h-screen w-full overflow-hidden font-sans bg-[#f3f4f6] text-slate-900 select-none">
-      {/* ── 1. FULL-BLEED TEXTILE SHOWROOM BACKGROUND ── */}
-      <div className="absolute inset-0 z-0">
-        <img
-          src="/login-bg.png"
-          alt="Oscar Textile Architecture"
-          className="w-full h-full object-cover object-[30%_center]"
-        />
-
-        {/* Ambient bottom-left vignette for text legibility */}
-        <div className="absolute inset-0 bg-gradient-to-tr from-[#051326]/95 via-[#071a33]/65 to-transparent to-55% pointer-events-none" />
-
-        {/* Subtle top left ambient shadow */}
-        <div className="absolute top-0 left-0 w-1/3 h-1/3 bg-gradient-to-br from-black/25 to-transparent pointer-events-none" />
-
-        {/* Soft right readability veil for tablet/laptop if window is narrow */}
-        <div className="absolute inset-y-0 right-0 w-full sm:w-1/2 bg-gradient-to-l from-white/30 via-transparent to-transparent pointer-events-none" />
+    <div className="oscar-login">
+      {/* ── Background: base gradient, photo, side overlay, vignette ── */}
+      <div className="oscar-login__bg" aria-hidden="true">
+        <img src="/images/login-bg.jpg" alt="" className="oscar-login__photo" draggable={false} />
+        <div className="oscar-login__side" />
+        <div className="oscar-login__vignette" />
       </div>
 
-      {/* ── 2. FOREGROUND CONTENT GRID ── */}
-      <div className="relative z-10 min-h-screen w-full flex flex-col p-6 sm:p-10 lg:p-14 xl:p-20">
-        {/* Top spacer (can host mobile branding if needed) */}
-        <div className="w-full flex items-center justify-between md:hidden">
-          <div className="flex items-center gap-2.5 bg-slate-900/40 backdrop-blur-md px-3.5 py-1.5 rounded-full border border-white/20">
-            <BrandLogo size={22} strokeWidth={2.4} className="text-[var(--brand-accent,#38bdf8)]" />
-            <span className="text-xs font-bold uppercase tracking-[0.2em] text-white">
-              {brandName}
-            </span>
+      <div className="oscar-login__wrap">
+        {/* ── Left hero text ── */}
+        <div className="oscar-login__hero">
+          <div className="oscar-login__brandrow">
+            <BrandLogo
+              size={20}
+              fallback={
+                <svg width="34" height="20" viewBox="0 0 64 36" fill="none" aria-hidden="true">
+                  <path d={INFINITY_PATH} stroke="#5FA8F2" strokeWidth="5" strokeLinejoin="round" />
+                </svg>
+              }
+            />
+            <span className="oscar-login__brandname">{heroBrandName}</span>
           </div>
-          <div />
+          <h1 className="oscar-login__headline">
+            Every thread.<br />
+            <span>One vision.</span>
+          </h1>
+          <p className="oscar-login__tagline">Your workspace for smarter operations.</p>
         </div>
 
-        {/* Main Stage: Left Branding Typography + Right Login Card */}
-        <div className="w-full flex-1 flex flex-col md:flex-row items-center justify-center md:justify-end gap-10 py-4">
-          {/* ── LEFT HERO: OSCAR TEXTILES BRANDING (pinned bottom-left on desktop) ── */}
-          <div className="order-2 md:order-none w-full md:absolute md:left-10 md:bottom-10 lg:left-14 lg:bottom-14 xl:left-20 xl:bottom-16 md:max-w-[46%] xl:max-w-xl text-left text-white">
-            {/* Small Brand Header */}
-            <div className="flex items-center gap-2.5 mb-3">
-              <BrandLogo
-                size={26}
-                fallback={
-                  <div className="relative inline-flex items-center justify-center">
-                    <InfinityIcon size={26} strokeWidth={2.6} className="text-[var(--brand-accent,#38bdf8)]" />
-                    <span className="absolute -right-0.5 top-0.5 flex gap-[1.5px]">
-                      <i className="w-[3px] h-[3px] rounded-full bg-[var(--brand-accent,#38bdf8)] block" />
-                      <i className="w-[2.5px] h-[2.5px] rounded-full bg-[var(--brand-accent,#38bdf8)]/70 block mt-[3px]" />
-                    </span>
-                    <span className="absolute right-[1px] top-[10px] flex gap-[1.5px]">
-                      <i className="w-[2.5px] h-[2.5px] rounded-full bg-[var(--brand-accent,#38bdf8)]/80 block" />
-                      <i className="w-[2px] h-[2px] rounded-full bg-[var(--brand-accent,#38bdf8)]/60 block" />
-                    </span>
-                  </div>
-                }
-              />
-              <span className="text-[12px] font-black uppercase tracking-[0.32em] text-white/95 font-sans">
-                {heroBrandName}
-              </span>
+        {/* ── Right: login card ── */}
+        <div className="oscar-login__side-col">
+          <div className="oscar-login__card">
+            <div className="oscar-login__logo">
+              <svg width="52" height="30" viewBox="0 0 64 36" fill="none" aria-hidden="true">
+                <defs>
+                  <linearGradient id="oscarLoginMark" x1="0" y1="0" x2="64" y2="0" gradientUnits="userSpaceOnUse">
+                    <stop offset="0" stopColor="#1B4FD0" />
+                    <stop offset=".6" stopColor="#1E8BE0" />
+                    <stop offset="1" stopColor="#22C8E8" />
+                  </linearGradient>
+                </defs>
+                <path d={INFINITY_PATH} stroke="url(#oscarLoginMark)" strokeWidth="5" strokeLinejoin="round" />
+              </svg>
+              <div className="oscar-login__wordmark" role="img" aria-label="Evenmore Infotech Pvt Ltd">
+                <span className="oscar-login__wordmark-main" aria-hidden="true">EVEN<b>M</b>ORE</span>
+                <span className="oscar-login__wordmark-sub" aria-hidden="true">INFOTECH PVT LTD</span>
+              </div>
             </div>
 
-            {/* Headline */}
-            <h1 className="text-4xl sm:text-5xl lg:text-[58px] xl:text-[64px] font-serif font-normal leading-[1.06] text-white tracking-tight drop-shadow-md">
-              Every thread.<br />
-              <span className="text-[var(--brand-accent,#60a5fa)]">One vision.</span>
-            </h1>
+            <h2 className="oscar-login__title">Welcome to {brandName} ERP</h2>
+            <p className="oscar-login__subtitle">Sign in to continue to your workspace.</p>
 
-            {/* Supporting Subtitle */}
-            <p className="mt-4 text-sm sm:text-base lg:text-[17px] text-slate-200/90 font-normal leading-relaxed drop-shadow-sm max-w-md">
-              Your workspace for smarter operations.
-            </p>
-          </div>
-
-          {/* ── RIGHT HERO: THE CLEAN, FLOATING LOGIN CARD ── */}
-          <div className="w-full max-w-[460px] md:w-[44%] md:mr-[2%] xl:mr-[4%] bg-white/95 backdrop-blur-sm rounded-[28px] sm:rounded-[32px] p-7 sm:p-10 xl:p-11 shadow-[0_24px_70px_rgba(15,35,70,0.18)] border border-white/80">
-            {/* Brand Logo & Welcome Headings */}
-            <div className="text-center">
-              {/* Infinity Logo with signature 4 dots */}
-              <div className="flex justify-center mb-1">
-                <BrandLogo
-                  size={54}
-                  fallback={
-                    <div className="relative inline-flex items-center justify-center">
-                      <InfinityIcon size={54} strokeWidth={2.6} className="text-[var(--brand-primary,#1e6cfb)]" />
-                      <span className="absolute -right-0.5 top-0.5 flex gap-[2px]">
-                        <i className="w-[4px] h-[4px] rounded-full bg-[var(--brand-primary,#1e6cfb)] block" />
-                        <i className="w-[3px] h-[3px] rounded-full bg-[var(--brand-primary,#1e6cfb)]/70 block mt-[4px]" />
-                      </span>
-                      <span className="absolute right-[2px] top-[14px] flex gap-[2px]">
-                        <i className="w-[3px] h-[3px] rounded-full bg-[var(--brand-primary,#1e6cfb)]/80 block" />
-                        <i className="w-[2.5px] h-[2.5px] rounded-full bg-[var(--brand-primary,#1e6cfb)]/60 block" />
-                      </span>
-                    </div>
-                  }
+            {twoFactor ? (
+              <div className="oscar-login__twofactor">
+                <TwoFactorStep
+                  challenge={twoFactor}
+                  remember={rememberMe}
+                  onSignedIn={finishSignIn}
+                  onCancel={() => { setTwoFactor(null); setError(''); }}
                 />
               </div>
-
-              {/* Wordmark */}
-              <div className="text-[26px] leading-none font-extrabold tracking-tight text-[#0f2743]">
-                {brandName}
-              </div>
-
-              <h2 className="mt-4 text-2xl font-black tracking-tight text-[#0f2743]">
-                Welcome back
-              </h2>
-              <p className="mt-1 text-xs sm:text-[13px] text-slate-500 font-medium">
-                Sign in to continue to your workspace.
-              </p>
-            </div>
-
-            {/* Why the last session ended (expired / revoked) */}
-            {notice && !error && (
-              <div className="mt-4 p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs flex items-start gap-2.5">
-                <Info size={15} className="shrink-0 mt-0.5 text-amber-600" />
-                <div className="flex-1 leading-relaxed font-semibold">{notice}</div>
-              </div>
-            )}
-
-            {/* Error Banner (the code step shows its own) */}
-            {error && !twoFactor && (
-              <div className="mt-4 p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-start gap-2.5">
-                <AlertCircle size={15} className="shrink-0 mt-0.5 text-rose-600" />
-                <div className="flex-1 leading-relaxed font-semibold">{error}</div>
-              </div>
-            )}
-
-            {/* Sign-in Form */}
-            {twoFactor ? (
-              <TwoFactorStep
-                challenge={twoFactor}
-                remember={rememberMe}
-                onSignedIn={finishSignIn}
-                onCancel={() => { setTwoFactor(null); setError(''); }}
-              />
             ) : (
-            <form onSubmit={handleLoginSubmit} className="mt-5 space-y-3.5">
-              {/* Email Address */}
-              <div>
-                <label className="block text-[12.5px] font-medium text-slate-700 mb-1.5">
-                  Email address
-                </label>
-                <div className="relative flex items-center">
-                  <Mail size={16} className="absolute left-3.5 text-slate-400 pointer-events-none" />
-                  <input
-                    type="text"
-                    required
-                    value={email}
-                    onChange={(e) => handleEmailChange(e.target.value)}
-                    placeholder="you@company.com"
-                    autoComplete="username"
-                    className="w-full h-11 bg-[#f0f4f9] hover:bg-[#eaf0f7] focus:bg-white border border-transparent focus:border-[var(--brand-primary,#1e6cfb)] rounded-xl py-2 pl-10 pr-3.5 text-xs sm:text-[13px] font-medium text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition"
-                  />
-                </div>
-              </div>
-
-              {/* Password */}
-              <div>
-                <label className="block text-[12.5px] font-medium text-slate-700 mb-1.5">
-                  Password
-                </label>
-                <div className="relative flex items-center">
-                  <Lock size={16} className="absolute left-3.5 text-slate-400 pointer-events-none" />
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    required
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    onKeyUp={(e) => setCapsOn(capsLockOn(e))}
-                    onKeyDown={(e) => setCapsOn(capsLockOn(e))}
-                    onBlur={() => setCapsOn(false)}
-                    placeholder="••••••••••••"
-                    autoComplete="current-password"
-                    className="w-full h-11 bg-[#f0f4f9] hover:bg-[#eaf0f7] focus:bg-white border border-transparent focus:border-[var(--brand-primary,#1e6cfb)] rounded-xl py-2 pl-10 pr-10 text-xs sm:text-[13px] font-medium text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition font-mono"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 text-slate-400 hover:text-slate-700 p-1 cursor-pointer transition"
-                    title={showPassword ? 'Hide password' : 'Show password'}
-                  >
-                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                  </button>
-                </div>
-
-                {/* Caps Lock warning + Forgot Password link */}
-                <div className="flex items-center justify-between mt-1.5">
-                  <span className="text-[11.5px] font-semibold text-amber-700" aria-live="polite">
-                    {capsOn ? 'Caps Lock is on' : ''}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={openForgotModal}
-                    className="text-[11.5px] font-semibold text-[var(--brand-primary,#1e6cfb)] hover:underline cursor-pointer"
-                  >
-                    Forgot password?
-                  </button>
-                </div>
-              </div>
-
-              {/* Workspace picker: only when the account exists in several */}
-              {workspaces.length > 0 && (
-                <div>
-                  <label className="block text-[12.5px] font-medium text-slate-700 mb-1.5">
-                    Workspace
-                  </label>
-                  <div className="relative flex items-center">
-                    <Building2 size={16} className="absolute left-3.5 text-slate-400 pointer-events-none" />
-                    <select
-                      required
-                      value={tenant}
-                      onChange={(e) => setTenant(e.target.value)}
-                      className="w-full h-11 bg-[#f0f4f9] hover:bg-[#eaf0f7] focus:bg-white border border-transparent focus:border-[var(--brand-primary,#1e6cfb)] rounded-xl py-2 pl-10 pr-3.5 text-xs sm:text-[13px] font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition cursor-pointer"
+              <>
+                <div className="oscar-login__chips" role="group" aria-label="Your role">
+                  {ROLE_CHIPS.map((chip) => (
+                    <button
+                      key={chip}
+                      type="button"
+                      className="oscar-login__chip"
+                      aria-pressed={roleChip === chip}
+                      onClick={() => setRoleChip(chip)}
                     >
-                      <option value="">Choose a workspace…</option>
-                      {workspaces.map((w) => (
-                        <option key={w.slug} value={w.slug}>{w.name || w.slug}</option>
-                      ))}
-                    </select>
-                  </div>
+                      {chip}
+                    </button>
+                  ))}
                 </div>
-              )}
 
-              {/* Remember Me Checkbox */}
-              <div className="pt-0.5">
-                <label className="flex items-center gap-2 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={rememberMe}
-                    onChange={(e) => setRememberMe(e.target.checked)}
-                    className="w-4 h-4 rounded border-slate-300 text-[var(--brand-primary,#1e6cfb)] focus:ring-blue-500 cursor-pointer accent-[var(--brand-primary,#1e6cfb)]"
-                  />
-                  <span className="text-[12px] font-medium text-slate-700">
-                    Keep me signed in on this device
-                  </span>
-                </label>
-              </div>
+                <form onSubmit={handleLoginSubmit} className="oscar-login__form">
+                  <div>
+                    <label htmlFor="login-username" className="oscar-login__label">Username</label>
+                    <input
+                      id="login-username"
+                      type="text"
+                      required
+                      value={email}
+                      onChange={(e) => handleEmailChange(e.target.value)}
+                      placeholder="Your username"
+                      autoComplete="username"
+                      className="oscar-login__input"
+                    />
+                  </div>
 
-              {/* Primary Sign In Button */}
-              <button
-                type="submit"
-                disabled={isLoading}
-                className="w-full h-11 px-4 rounded-xl bg-[var(--brand-primary,#1e6cfb)] hover:bg-[var(--brand-primary-dark,#155de0)] active:scale-[0.99] text-white font-semibold text-[13.5px] sm:text-sm shadow-md shadow-blue-500/25 flex items-center justify-center gap-2 cursor-pointer transition duration-150 disabled:opacity-60 disabled:cursor-not-allowed select-none mt-2"
-              >
-                {isLoading ? (
-                  <>
-                    <div className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
-                    <span>Signing in...</span>
-                  </>
-                ) : (
-                  <>
-                    <span>Sign in to Workspace</span>
-                    <ArrowRight size={17} />
-                  </>
-                )}
-              </button>
-            </form>
+                  <div>
+                    <label htmlFor="login-password" className="oscar-login__label">Password</label>
+                    <div className="oscar-login__field">
+                      <input
+                        id="login-password"
+                        type={showPassword ? 'text' : 'password'}
+                        required
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        onKeyUp={(e) => setCapsOn(capsLockOn(e))}
+                        onKeyDown={(e) => setCapsOn(capsLockOn(e))}
+                        onBlur={() => setCapsOn(false)}
+                        placeholder="Your password"
+                        autoComplete="current-password"
+                        className="oscar-login__input oscar-login__input--pw"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="oscar-login__toggle"
+                        aria-label={showPassword ? 'Hide password' : 'Show password'}
+                      >
+                        {showPassword ? 'Hide' : 'Show'}
+                      </button>
+                    </div>
+                    <span className="oscar-login__caps" aria-live="polite">
+                      {capsOn ? 'Caps Lock is on' : ''}
+                    </span>
+                  </div>
+
+                  {/* Workspace picker: only when the account exists in several */}
+                  {workspaces.length > 0 && (
+                    <div>
+                      <label htmlFor="login-workspace" className="oscar-login__label">Workspace</label>
+                      <select
+                        id="login-workspace"
+                        required
+                        value={tenant}
+                        onChange={(e) => setTenant(e.target.value)}
+                        className="oscar-login__input"
+                      >
+                        <option value="">Choose a workspace…</option>
+                        {workspaces.map((w) => (
+                          <option key={w.slug} value={w.slug}>{w.name || w.slug}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  <div className="oscar-login__row">
+                    <label className="oscar-login__remember">
+                      <input
+                        type="checkbox"
+                        checked={rememberMe}
+                        onChange={(e) => setRememberMe(e.target.checked)}
+                      />
+                      <span>Keep me signed in</span>
+                    </label>
+                    <button type="button" onClick={openForgotModal} className="oscar-login__link">
+                      Forgot password?
+                    </button>
+                  </div>
+
+                  <button type="submit" disabled={isLoading} className="oscar-login__submit">
+                    {isLoading ? (
+                      <>
+                        <span className="oscar-login__spinner" aria-hidden="true" />
+                        <span>Signing in...</span>
+                      </>
+                    ) : (
+                      <span>Sign in</span>
+                    )}
+                  </button>
+                </form>
+
+                {/* Error, or why the last session ended (expired / revoked) */}
+                <div
+                  className={`oscar-login__status${error ? ' oscar-login__status--error' : ''}`}
+                  role={error ? 'alert' : 'status'}
+                  aria-live="polite"
+                >
+                  {error || notice}
+                </div>
+              </>
             )}
 
-            {/* Card Footer: Need assistance + IT Helpdesk */}
-            <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between text-[11.5px] text-slate-500">
-              <span>Need access assistance?</span>
-              <button
-                type="button"
-                onClick={() => setIsHelpOpen(true)}
-                className="text-[var(--brand-primary,#1e6cfb)] font-semibold hover:underline flex items-center gap-1.5 cursor-pointer"
-              >
-                <Headphones size={14} className="text-[var(--brand-primary,#1e6cfb)]" />
-                <span>IT Helpdesk</span>
+            <div className="oscar-login__card-footer">
+              Need access?{' '}
+              <button type="button" onClick={() => setIsHelpOpen(true)} className="oscar-login__link">
+                Ask your administrator.
               </button>
             </div>
           </div>
+          <div className="oscar-login__footer">Oscar Creation · Surat</div>
         </div>
       </div>
 

@@ -7,6 +7,8 @@ import { inventoryService } from '../../../services/domainServices';
 import { formatINR, formatNumberIN, describeApiError } from '../../accounts/accountingShared';
 import { printBatchTags } from './printBatchTag';
 import BatchChargeModal from './BatchChargeModal';
+import { CustomerReceiptModal, PhysicalStockSummary } from './CustomerMaterialPanels';
+import AddBatchModal from './AddBatchModal';
 
 const ORIGINS = [
   ['', 'All origins'],
@@ -43,6 +45,9 @@ export default function BatchRegistryPage() {
   const [selected, setSelected] = useState({});
   const [chargeOpen, setChargeOpen] = useState(false);
   const [notice, setNotice] = useState('');
+  const [receiving, setReceiving] = useState(false);
+  const [adding, setAdding] = useState(false);
+  const [showPhysical, setShowPhysical] = useState(false);
   const selectedRows = Object.values(selected);
   const toggle = (b) => setSelected((prev) => {
     const next = { ...prev };
@@ -102,7 +107,40 @@ export default function BatchRegistryPage() {
       <PageHeader
         title="Batch Registry"
         subtitle="Every fabric batch with its permanent ID, live quantities and status. Scan a batch tag to open its full history."
+        actions={(
+          <div className="flex gap-2">
+            <button type="button" onClick={() => setShowPhysical((v) => !v)} className="h-9 px-3 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer">
+              {showPhysical ? 'Hide' : 'Physical stock'} (own vs customer)
+            </button>
+            <button type="button" onClick={() => setReceiving(true)} className="h-9 px-3 rounded-lg border border-blue-200 bg-white text-blue-700 text-xs font-semibold hover:bg-blue-50 cursor-pointer">
+              Receive customer material
+            </button>
+            <button type="button" onClick={() => setAdding(true)} className="h-9 px-3 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold cursor-pointer">
+              + Add Batch
+            </button>
+          </div>
+        )}
       />
+      {showPhysical && <PhysicalStockSummary />}
+      {adding && (
+        <AddBatchModal
+          onClose={() => setAdding(false)}
+          onCustomerMaterial={() => { setAdding(false); setReceiving(true); }}
+          onDone={(batch) => {
+            setAdding(false);
+            navigate(`/inventory/batches/${encodeURIComponent(batch.batchCode)}`);
+          }}
+        />
+      )}
+      {receiving && (
+        <CustomerReceiptModal
+          onClose={() => setReceiving(false)}
+          onDone={(batch) => {
+            setReceiving(false);
+            navigate(`/inventory/batches/${encodeURIComponent(batch.batchCode)}`);
+          }}
+        />
+      )}
 
       <form onSubmit={openScanned} className="bg-white border border-slate-200 rounded-xl p-3 flex flex-col sm:flex-row gap-2 sm:items-center">
         <label htmlFor="batch-scan" className="text-xs font-semibold text-slate-700 flex items-center gap-1.5 shrink-0">
@@ -228,6 +266,9 @@ export default function BatchRegistryPage() {
                     <td className="px-3 py-2.5">
                       <div className="font-semibold text-slate-800">{b.item || '—'}</div>
                       <div className="text-[10px] text-slate-500">{[b.fabricQuality, b.shade].filter(Boolean).join(' · ')}</div>
+                      <div className={`text-[10px] font-mono ${b.hsnCode ? 'text-slate-500' : 'text-amber-700 font-semibold'}`}>
+                        {b.hsnCode ? `HSN ${b.hsnCode}` : 'HSN missing in item master'}
+                      </div>
                     </td>
                     <td className="px-3 py-2.5 text-slate-600">{b.origin}<div className="text-[10px] text-slate-400">{b.sourceDocumentNumber}</div></td>
                     <td className="px-3 py-2.5 text-slate-600">{b.ownership === 'OSCAR' ? (b.supplierName || '—') : `${b.ownerPartyName || b.ownership} (owned)`}</td>

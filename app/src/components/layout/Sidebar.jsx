@@ -78,7 +78,7 @@ import { UserGuideModal } from '../common/UserGuideModal';
 import { logout } from '../../services/authService';
 
 const SIDEBAR_THEMES = [
-  { id: 'oscar', name: 'Oscar', icon: Waves, color: '#14b8a6' },
+  { id: 'oscar', name: 'Oscar', icon: Waves, color: '#2B9BE8' },
   { id: 'light', name: 'Light', icon: Sun, color: '#1f6bff' },
   { id: 'dark', name: 'Dark', icon: Moon, color: '#3b82f6' },
   { id: 'midnight', name: 'Midnight', icon: Sparkles, color: '#818cf8' },
@@ -734,7 +734,7 @@ function SubList({ items, depth = 1, badges }) {
 // ── Oscar Vector Textile Brand Card & Footer (Pure SVG/CSS — No Raster Images) ──
 function FabricFooter() {
   return (
-    <div className="relative mx-0.5 mb-2 p-2.5 rounded-xl border border-teal-500/25 bg-gradient-to-r from-teal-950/60 via-[#071f2b]/90 to-teal-950/40 overflow-hidden select-none shadow-xs group">
+    <div className="relative mx-0.5 mb-2 p-2.5 rounded-xl border border-sky-400/20 bg-gradient-to-r from-blue-950/60 via-[#0E1627]/80 to-blue-950/40 overflow-hidden select-none shadow-xs group">
       {/* Dynamic Vector Textile Weave Waves */}
       <svg
         viewBox="0 0 260 65"
@@ -744,14 +744,14 @@ function FabricFooter() {
       >
         <defs>
           <linearGradient id="weaveGrad1" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor="#2dd4bf" stopOpacity="0.8" />
-            <stop offset="50%" stopColor="#0d9488" stopOpacity="0.4" />
-            <stop offset="100%" stopColor="#14b8a6" stopOpacity="0.9" />
+            <stop offset="0%" stopColor="#7DB4F6" stopOpacity="0.8" />
+            <stop offset="50%" stopColor="#1747C4" stopOpacity="0.4" />
+            <stop offset="100%" stopColor="#2B9BE8" stopOpacity="0.9" />
           </linearGradient>
           <linearGradient id="weaveGrad2" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor="#5eead4" stopOpacity="0.7" />
-            <stop offset="60%" stopColor="#0f766e" stopOpacity="0.3" />
-            <stop offset="100%" stopColor="#2dd4bf" stopOpacity="0.6" />
+            <stop offset="0%" stopColor="#9CC7FA" stopOpacity="0.7" />
+            <stop offset="60%" stopColor="#1B4FD0" stopOpacity="0.3" />
+            <stop offset="100%" stopColor="#27C7EA" stopOpacity="0.6" />
           </linearGradient>
         </defs>
         <path
@@ -767,29 +767,29 @@ function FabricFooter() {
         />
         <path
           d="M0 50 C 65 28, 115 60, 170 38 S 220 26, 260 46"
-          stroke="#2dd4bf"
+          stroke="#7DB4F6"
           strokeWidth="0.8"
           strokeOpacity="0.35"
         />
       </svg>
 
       {/* Decorative ambient radial glow */}
-      <div className="absolute -right-6 -bottom-6 w-20 h-20 rounded-full bg-teal-400/10 blur-xl pointer-events-none" />
+      <div className="absolute -right-6 -bottom-6 w-20 h-20 rounded-full bg-sky-400/10 blur-xl pointer-events-none" />
 
       {/* Oscar ERP Textile Tagline & Icon */}
       <div className="relative z-10 flex items-center justify-between min-w-0">
         <div className="flex items-center gap-2 min-w-0">
-          <div className="w-1 h-6 rounded-full bg-gradient-to-b from-teal-300 to-teal-500 shadow-sm shadow-teal-400/50 shrink-0" />
+          <div className="w-1 h-6 rounded-full bg-gradient-to-b from-sky-300 to-blue-500 shadow-sm shadow-sky-400/50 shrink-0" />
           <div className="min-w-0">
             <p className="text-[10px] font-black tracking-[0.22em] text-white/95 uppercase truncate leading-tight font-mono">
               WEAVE • PROCESS • GROW
             </p>
-            <p className="text-[9px] font-semibold text-teal-300/80 tracking-wider truncate mt-0.5">
+            <p className="text-[9px] font-semibold text-sky-300/80 tracking-wider truncate mt-0.5">
               OSCAR TEXTILE ERP
             </p>
           </div>
         </div>
-        <Waves size={15} className="text-teal-400/70 shrink-0 ml-1.5" />
+        <Waves size={15} className="text-sky-400/70 shrink-0 ml-1.5" />
       </div>
     </div>
   );
@@ -1150,7 +1150,7 @@ export default function Sidebar() {
       <div
         className={
           theme === 'oscar'
-            ? 'mt-auto pt-2 px-2 pb-2 border-t border-teal-500/20 bg-gradient-to-b from-transparent via-[#071f2b]/40 to-[#071f2b]/90 relative'
+            ? 'mt-auto pt-2 px-2 pb-2 border-t border-white/10 bg-gradient-to-b from-transparent via-[#0E1627]/40 to-[#0E1627]/90 relative'
             : 'mt-auto pt-2 px-1 pb-1 border-t border-white/10 relative'
         }
         ref={profileRef}

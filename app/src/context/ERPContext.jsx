@@ -4116,13 +4116,14 @@ export const ERPProvider = ({ children, }) => {
         try {
             const created = await api.post(resource.path, resource.toApi(tr));
             let saved = created;
-            if (tr.dispatchNow !== false && created?.id) {
+            // Transfers now need approval before dispatch; dispatch only on request.
+            if (tr.dispatchNow === true && created?.id) {
                 saved = await api.post(`/inventory/transfers/${created.id}/dispatch/`, {});
             }
             const row = resource.fromApi ? resource.fromApi(saved) : saved;
             setTransfers((prev) => [row, ...prev.filter((t) => t.id !== row.id)]);
             refreshCollections(['transfers', 'inventoryMovements', 'items']);
-            showToast(`Transfer ${row.transferNumber || row.transfer_number || ''} ${tr.dispatchNow !== false ? 'dispatched' : 'created'}.`);
+            showToast(`Transfer ${row.transferNumber || row.transfer_number || ''} ${tr.dispatchNow === true ? 'dispatched' : 'requested'}.`);
             return row;
         } catch (err) {
             showToast(`Transfer not saved — ${describeError(err)}`);

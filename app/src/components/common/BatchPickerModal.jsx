@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ScanLine, X } from 'lucide-react';
 import { inventoryService } from '../../services/domainServices';
+import WarehouseAvailabilityPanel from '../../features/inventory/warehouses/WarehouseAvailabilityPanel';
 
 const num = (v) => {
   const n = Number(v);
@@ -21,6 +22,13 @@ export default function BatchPickerModal({ itemId, itemName, qty, value = [], or
   const [error, setError] = useState('');
   const [perBatch, setPerBatch] = useState({});
   const [scan, setScan] = useState('');
+  const [warehouses, setWarehouses] = useState([]);
+  const [dispatchFrom, setDispatchFrom] = useState('');
+  const [showWarehouses, setShowWarehouses] = useState(false);
+  useEffect(() => {
+    if (!showWarehouses || warehouses.length) return;
+    inventoryService.getWarehouses().then((r) => setWarehouses(r?.results || [])).catch(() => setWarehouses([]));
+  }, [showWarehouses, warehouses.length]);
 
   useEffect(() => {
     let alive = true;
@@ -141,6 +149,22 @@ export default function BatchPickerModal({ itemId, itemName, qty, value = [], or
               </tbody>
             </table>
           )}
+          <div className="mt-4 border-t border-border pt-3">
+            <button type="button" onClick={() => setShowWarehouses((v) => !v)} aria-expanded={showWarehouses} className="text-xs font-semibold text-primary cursor-pointer">
+              {showWarehouses ? '▾' : '▸'} Stock by warehouse & shortage
+            </button>
+            {showWarehouses && (
+              <div className="mt-2 space-y-2">
+                <label className="flex items-center gap-2 text-xs">Dispatch warehouse
+                  <select value={dispatchFrom} onChange={(e) => setDispatchFrom(e.target.value)} className="h-8 px-2 rounded-md border border-border bg-card">
+                    <option value="">Select…</option>
+                    {warehouses.map((w) => <option key={w.id} value={w.id}>{w.name} ({w.code})</option>)}
+                  </select>
+                </label>
+                <WarehouseAvailabilityPanel itemId={itemId} qty={qty} warehouseId={dispatchFrom} salesOrderId={/^[0-9a-f-]{36}$/i.test(String(orderId || '')) ? orderId : undefined} />
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="flex flex-wrap items-center justify-between gap-2 px-5 py-3 border-t border-border">

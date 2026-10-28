@@ -158,7 +158,7 @@ const CategoriesPage = lazy(() => import('../features/inventory/CategoriesPage')
 // Redesigned Stock Position: six screens selected by ?type= (the sidebar's links).
 const StockPositionPage = lazy(() => import('../features/inventory/stock-position/StockPositionScreens'));
 const TransfersPage = lazy(() => import('../features/inventory/TransfersPage').then(m => ({ default: m.TransfersPage })));
-const ERPLocationsPage = lazy(() => import('../features/inventory/LocationsPage').then(m => ({ default: m.LocationsPage })));
+const WarehousesPage = lazy(() => import('../features/inventory/warehouses/WarehousesPage'));
 const FaultyPartsPage = lazy(() => import('../features/inventory/FaultyPartsPage').then(m => ({ default: m.FaultyPartsPage })));
 const ServiceUsagePage = lazy(() => import('../features/inventory/ServiceUsagePage').then(m => ({ default: m.ServiceUsagePage })));
 const ZoneRequestsPage = lazy(() => import('../features/inventory/ZoneRequestsPage').then(m => ({ default: m.ZoneRequestsPage })));
@@ -501,7 +501,9 @@ const router = createBrowserRouter([
       { path: 'inventory/stock-position', element: <Page component={StockPositionPage} /> },
       { path: 'inventory/stock', element: <Navigate to="/inventory/stock-position" replace /> },
       { path: 'inventory/transfers', element: <Page component={TransfersPage} /> },
-      { path: 'inventory/locations', element: <Page component={ERPLocationsPage} /> },
+      // Simple warehouses only: the old zone / rack / bin screen now opens the warehouse list.
+      { path: 'inventory/locations', element: <Navigate to="/inventory/warehouses?tab=warehouses" replace /> },
+      { path: 'inventory/warehouses', element: <Page component={WarehousesPage} /> },
       { path: 'inventory/faulty-parts', element: <Page component={FaultyPartsPage} /> },
       { path: 'inventory/service-usage', element: <Page component={ServiceUsagePage} /> },
       { path: 'inventory/zone-requests', element: <Page component={ZoneRequestsPage} /> },

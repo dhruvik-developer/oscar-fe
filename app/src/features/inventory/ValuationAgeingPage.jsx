@@ -225,7 +225,7 @@ export const ValuationAgeingPage = () => {
     },
     {
       key: 'location',
-      header: 'Godown / Rack',
+      header: 'Warehouse',
       width: '14%',
       render: (r) => <span className="text-xs text-slate-600">{r.location_name || r.location?.name || '—'}</span>,
     },

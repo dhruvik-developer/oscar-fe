@@ -19,7 +19,7 @@ export const MASTER_SOURCES = {
   machineCategories: { to: '/inventory/categories/machines', menu: 'Inventory → Categories (Machines)' },
   fabricTypes: { to: '/inventory/categories/fabric-type', menu: 'Inventory → Categories → Fabric Type / Classification' },
   uom: { to: '/inventory/categories/uom', menu: 'Inventory → Categories → Units of Measurement (UOM)' },
-  godowns: { to: '/inventory/locations', menu: 'Inventory → Godown / Rack' },
+  godowns: { to: '/inventory/warehouses?tab=warehouses', menu: 'Inventory → Warehouses' },
 
   // Textile Operations Masters (one page, deep-linked by ?tab=)
   agencies: { to: '/inventory/masters/textile?tab=agencies', menu: 'Inventory → Textile Operations Masters → Agencies' },

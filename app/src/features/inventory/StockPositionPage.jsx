@@ -209,7 +209,7 @@ export function StockPositionPage() {
   const rawType = searchParams.get('type');
   const activeTab = useMemo(() => {
     if (rawType === 'sample') return 'sample';
-    if (rawType === 'wastage') return 'wastage';
+    if (rawType === 'wastage' || rawType === 'shortage') return 'shortage';
     if (rawType === 'good') return 'good';
     if (rawType === 'reprocess') return 'reprocess';
     if (rawType === 'customer-return') return 'customer-return';
@@ -584,7 +584,7 @@ export function StockPositionPage() {
       },
       {
         id: 'wastage',
-        label: 'Wastage Stock',
+        label: 'Short Stock',
         qty: resolveQty(sc.wastageStock),
         uom: resolveUom(sc.wastageStock),
         val: sc.wastageStock?.value ?? 0,
@@ -593,7 +593,7 @@ export function StockPositionPage() {
         color: 'text-rose-600',
         bg: 'bg-rose-50',
         border: 'border-rose-200',
-        tabKey: 'wastage',
+        tabKey: 'shortage',
       },
       {
         id: 'reprocess',
@@ -645,7 +645,7 @@ export function StockPositionPage() {
         color: 'text-red-700',
         bg: 'bg-red-50',
         border: 'border-red-200',
-        tabKey: 'wastage',
+        tabKey: 'shortage',
       },
     ];
   }, [data]);
@@ -855,7 +855,7 @@ export function StockPositionPage() {
   const currentDataset = useMemo(() => {
     if (activeTab === 'overview') return filteredQualityStock;
     if (activeTab === 'sample') return filteredSampleRecords;
-    if (activeTab === 'wastage') return filteredWastageRecords;
+    if (activeTab === 'shortage' || activeTab === 'wastage') return filteredWastageRecords;
     if (activeTab === 'good') return filteredGoodRecords;
     if (activeTab === 'reprocess') return filteredReprocessRecords;
     if (activeTab === 'customer-return') return filteredReturnRecords;
@@ -917,10 +917,11 @@ export function StockPositionPage() {
           iconBg: 'bg-teal-50 border-teal-200',
           iconColor: 'text-teal-600',
         };
+      case 'shortage':
       case 'wastage':
         return {
-          title: 'Wastage Stock',
-          badge: 'Scrap & Waste',
+          title: 'Short Stock',
+          badge: 'Short Stock',
           badgeStyle: 'bg-rose-50 text-rose-700 border-rose-200',
           subtitle: 'Track damaged rolls, scraps, and recorded fabric wastage.',
           icon: Trash2,
@@ -1080,7 +1081,7 @@ export function StockPositionPage() {
         {[
           { key: 'overview', label: 'Fabric Stock Overview', icon: Layers },
           { key: 'sample', label: 'Sample Stock (Sample Inventory)', icon: FlaskConical },
-          { key: 'wastage', label: 'Wastage Stock (Scrap & Waste)', icon: Trash2 },
+          { key: 'shortage', label: 'Short Stock', icon: Trash2 },
           { key: 'good', label: 'Good Fabric Stock (Usable Fabric)', icon: CheckCircle2 },
           { key: 'reprocess', label: 'Reprocessing Stock', icon: RefreshCw },
           { key: 'customer-return', label: 'Customer Return Stock', icon: Undo2 },
@@ -1564,7 +1565,7 @@ export function StockPositionPage() {
               )}
 
               {/* 3. WASTAGE STOCK */}
-              {activeTab === 'wastage' && (
+              {(activeTab === 'shortage' || activeTab === 'wastage') && (
                 <table className="w-full text-left text-xs border-collapse">
                   <thead>
                     <tr className="bg-slate-50 border-b border-slate-200 text-[10.5px] font-bold text-slate-600 uppercase tracking-wider">
@@ -1608,7 +1609,7 @@ export function StockPositionPage() {
                     {paginatedData.length === 0 && (
                       <tr>
                         <td colSpan={11} className="py-10 text-center text-slate-400 font-sans text-xs">
-                          No wastage or scrap stock movements found in the ledger.
+                          No short stock movements found in the ledger.
                         </td>
                       </tr>
                     )}

@@ -9,16 +9,19 @@ export const MASTER_SOURCES = {
   vendors: { to: '/parties?type=vendor', menu: 'Parties → Vendor' },
 
   // Inventory masters
-  items: { to: '/inventory/items', menu: 'Inventory → Total Inventory' },
-  machines: { to: '/inventory/items/machines', menu: 'Inventory → Total Inventory → Machines' },
-  fabricVariants: { to: '/inventory/fabric/variants', menu: 'Inventory → Fabric Item / Variant Master' },
-  fabricQualities: { to: '/inventory/fabric/quality', menu: 'Inventory → Fabric Quality Master' },
-  designs: { to: '/inventory/fabric/design', menu: 'Inventory → Design Master' },
-  shades: { to: '/inventory/fabric/colour', menu: 'Inventory → Colour / Shade Master' },
-  categories: { to: '/inventory/categories', menu: 'Inventory → Categories → Fabric Categories' },
+  items: { to: '/inventory/grey', menu: 'Inventory → Grey Inventory' },
+  greyInventory: { to: '/inventory/grey', menu: 'Inventory → Grey Inventory' },
+  dyeingInventory: { to: '/inventory/dyeing', menu: 'Inventory → Dyeing Inventory' },
+  machines: { to: '/inventory/items/machines', menu: 'Inventory → Inventory → Machines' },
+  // Fabric Masters (one page, deep-linked by ?tab=)
+  fabricVariants: { to: '/inventory/fabric-masters?tab=variants', menu: 'Inventory → Fabric Masters → Item / Variant' },
+  fabricQualities: { to: '/inventory/fabric-masters?tab=quality', menu: 'Inventory → Fabric Masters → Fabric Quality' },
+  designs: { to: '/inventory/fabric-masters?tab=design', menu: 'Inventory → Fabric Masters → Design' },
+  shades: { to: '/inventory/fabric-masters?tab=colour', menu: 'Inventory → Fabric Masters → Colour / Shade' },
+  categories: { to: '/inventory/fabric-masters?tab=categories', menu: 'Inventory → Fabric Masters → Categories' },
   machineCategories: { to: '/inventory/categories/machines', menu: 'Inventory → Categories (Machines)' },
-  fabricTypes: { to: '/inventory/categories/fabric-type', menu: 'Inventory → Categories → Fabric Type / Classification' },
-  uom: { to: '/inventory/categories/uom', menu: 'Inventory → Categories → Units of Measurement (UOM)' },
+  fabricTypes: { to: '/inventory/fabric-masters?tab=fabric-type', menu: 'Inventory → Fabric Masters → Fabric Type' },
+  uom: { to: '/inventory/fabric-masters?tab=uom', menu: 'Inventory → Fabric Masters → UOM' },
   godowns: { to: '/inventory/warehouses?tab=warehouses', menu: 'Inventory → Warehouses' },
 
   // Textile Operations Masters (one page, deep-linked by ?tab=)

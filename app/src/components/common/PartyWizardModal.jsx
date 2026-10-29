@@ -89,7 +89,7 @@ const getInitialFormData = (party) => {
             vehicleCapacity: '',
             vehicleCapacityUnit: 'Tons',
             name: '',
-            phone: '+91 ',
+            phone: '',
             email: '',
             status: 'Active',
             gstTreatment: 'Registered Business',

@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Printer, RotateCcw, ScanLine, IndianRupee } from 'lucide-react';
+import { Search, Printer, RotateCcw, ScanLine, IndianRupee, Eye } from 'lucide-react';
 import PageHeader from '../../../components/ui/PageHeader';
 import AppPagination from '../../../components/ui/AppPagination';
 import { inventoryService } from '../../../services/domainServices';
@@ -8,7 +8,8 @@ import { formatINR, formatNumberIN, describeApiError } from '../../accounts/acco
 import { printBatchTags } from './printBatchTag';
 import BatchChargeModal from './BatchChargeModal';
 import { CustomerReceiptModal, PhysicalStockSummary } from './CustomerMaterialPanels';
-import AddBatchModal from './AddBatchModal';
+import AddBatchModal, { useTextileMasters } from './AddBatchModal';
+import { useERP } from '../../../context/ERPContext';
 
 const ORIGINS = [
   ['', 'All origins'],
@@ -17,6 +18,33 @@ const ORIGINS = [
   ['JOB_WORK', 'Job work'],
   ['MERGE', 'Merge'],
   ['MANUAL', 'Manual'],
+];
+const FABRIC_TYPES = [
+  ['', 'Grey & dyed'],
+  ['GREY', 'Grey fabric'],
+  ['DYED', 'Dyed fabric'],
+];
+/** Where the rolls are now -- answers "how much is in QC / at the dyer / free to sell". */
+const HOLDINGS = [
+  ['', 'Any stock state'],
+  ['available', 'Available to sell / use'],
+  ['reserved', 'Reserved'],
+  ['qcHold', 'In QC hold'],
+  ['rework', 'In rework / reprocess'],
+  ['secondQuality', 'Second quality'],
+  ['rejected', 'Rejected'],
+  ['withJobWorker', 'At job worker / dyer'],
+];
+/** Stock tiles: [summary key, label, holding filter it opens]. */
+const STOCK_TILES = [
+  ['totalPhysical', 'Total physical', ''],
+  ['available', 'Available (OSCAR)', 'available'],
+  ['reserved', 'Reserved', 'reserved'],
+  ['qcHold', 'QC hold', 'qcHold'],
+  ['rework', 'Rework', 'rework'],
+  ['rejected', 'Rejected', 'rejected'],
+  ['withJobWorker', 'At job worker', 'withJobWorker'],
+  ['customerMaterial', 'Customer material', ''],
 ];
 const STATUSES = ['', 'In Stock', 'QC Hold', 'At Job Worker', 'Blocked', 'Sold Out', 'Closed'];
 const STATUS_STYLE = {
@@ -32,7 +60,11 @@ const inputCls = 'h-9 px-3 bg-white border border-slate-200 rounded-lg text-xs t
 /** Batch Registry: every permanent batch ID with its live quantities. */
 export default function BatchRegistryPage() {
   const navigate = useNavigate();
-  const [filters, setFilters] = useState({ q: '', origin: '', status: '', from: '', to: '' });
+  const { items = [], locations = [] } = useERP() || {};
+  const { designs, shades } = useTextileMasters();
+  const fabrics = items.filter((i) => ['LOT', 'TAKA'].includes(String(i.trackingType || '').toUpperCase()) || /fabric/i.test(i.itemKind || ''));
+  const godowns = locations.filter((l) => !String(l.code || '').startsWith('SYS-'));
+  const [filters, setFilters] = useState({ q: '', origin: '', fabricType: '', status: '', from: '', to: '', itemId: '', designId: '', shadeId: '', locationId: '', holding: '' });
   const [query, setQuery] = useState(filters);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
@@ -62,7 +94,7 @@ export default function BatchRegistryPage() {
       const params = { page, page_size: pageSize, ...(withCost ? { withCost: 1 } : {}) };
       Object.entries(query).forEach(([k, v]) => { if (v) params[k] = v; });
       const res = await inventoryService.getBatches(params);
-      setData({ results: res?.results || [], count: res?.count || 0, canSeeCost: Boolean(res?.canSeeCost) });
+      setData({ results: res?.results || [], count: res?.count || 0, canSeeCost: Boolean(res?.canSeeCost), summary: res?.summary || null });
     } catch (err) {
       setError(describeApiError(err) || 'Batches could not be loaded.');
       setData({ results: [], count: 0 });
@@ -79,7 +111,7 @@ export default function BatchRegistryPage() {
     setQuery(filters);
   };
   const reset = () => {
-    const blank = { q: '', origin: '', status: '', from: '', to: '' };
+    const blank = { q: '', origin: '', fabricType: '', status: '', from: '', to: '', itemId: '', designId: '', shadeId: '', locationId: '', holding: '' };
     setFilters(blank);
     setQuery(blank);
     setPage(1);
@@ -106,7 +138,7 @@ export default function BatchRegistryPage() {
     <div className="space-y-4">
       <PageHeader
         title="Batch Registry"
-        subtitle="Every fabric batch with its permanent ID, live quantities and status. Scan a batch tag to open its full history."
+        subtitle="Every grey and dyed fabric batch with its permanent ID, QR, live quantities and status. Scan a tag or open a batch for its Batch 360° view."
         actions={(
           <div className="flex gap-2">
             <button type="button" onClick={() => setShowPhysical((v) => !v)} className="h-9 px-3 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer">
@@ -116,7 +148,7 @@ export default function BatchRegistryPage() {
               Receive customer material
             </button>
             <button type="button" onClick={() => setAdding(true)} className="h-9 px-3 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold cursor-pointer">
-              + Add Batch
+              + Create Batch
             </button>
           </div>
         )}
@@ -126,9 +158,9 @@ export default function BatchRegistryPage() {
         <AddBatchModal
           onClose={() => setAdding(false)}
           onCustomerMaterial={() => { setAdding(false); setReceiving(true); }}
-          onDone={(batch) => {
+          onDone={(batch, tab) => {
             setAdding(false);
-            navigate(`/inventory/batches/${encodeURIComponent(batch.batchCode)}`);
+            navigate(`/inventory/batches/${encodeURIComponent(batch.batchCode)}${tab && tab !== 'overview' ? `?tab=${tab}` : ''}`);
           }}
         />
       )}
@@ -157,6 +189,27 @@ export default function BatchRegistryPage() {
         <button type="submit" className="h-9 px-4 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold cursor-pointer">Open</button>
       </form>
 
+      {data.summary && (
+        <section className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2" aria-label="Stock of the batches shown">
+          {STOCK_TILES.map(([key, label, holding]) => {
+            const active = holding && query.holding === holding;
+            return (
+              <button
+                key={key}
+                type="button"
+                disabled={!holding}
+                onClick={() => { const next = { ...filters, holding: active ? '' : holding }; setFilters(next); setQuery(next); setPage(1); }}
+                title={holding ? (active ? 'Show all batches' : `Show batches with ${label.toLowerCase()} stock`) : undefined}
+                className={`text-left bg-white border rounded-xl p-3 ${active ? 'border-blue-500 ring-1 ring-blue-500' : 'border-slate-200'} ${holding ? 'hover:border-blue-300 cursor-pointer' : 'cursor-default'}`}
+              >
+                <div className="text-[10px] uppercase tracking-wide text-slate-400">{label}</div>
+                <div className={`text-base font-bold tabular-nums ${key === 'available' ? 'text-emerald-700' : 'text-slate-900'}`}>{formatNumberIN(data.summary[key])}</div>
+              </button>
+            );
+          })}
+        </section>
+      )}
+
       <form onSubmit={apply} className="bg-white border border-slate-200 rounded-xl p-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-2">
         <div className="relative lg:col-span-2">
           <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -169,6 +222,28 @@ export default function BatchRegistryPage() {
         </div>
         <select value={filters.origin} onChange={(e) => setFilters({ ...filters, origin: e.target.value })} className={inputCls} aria-label="Origin">
           {ORIGINS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+        </select>
+        <select value={filters.fabricType} onChange={(e) => setFilters({ ...filters, fabricType: e.target.value })} className={inputCls} aria-label="Fabric type">
+          {FABRIC_TYPES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+        </select>
+        <select value={filters.itemId} onChange={(e) => setFilters({ ...filters, itemId: e.target.value })} className={inputCls} aria-label="Fabric">
+          <option value="">All fabrics</option>
+          {fabrics.map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}
+        </select>
+        <select value={filters.designId} onChange={(e) => setFilters({ ...filters, designId: e.target.value })} className={inputCls} aria-label="Design">
+          <option value="">All designs</option>
+          {designs.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+        </select>
+        <select value={filters.shadeId} onChange={(e) => setFilters({ ...filters, shadeId: e.target.value })} className={inputCls} aria-label="Colour / shade">
+          <option value="">All colours</option>
+          {shades.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+        </select>
+        <select value={filters.locationId} onChange={(e) => setFilters({ ...filters, locationId: e.target.value })} className={inputCls} aria-label="Godown">
+          <option value="">All godowns</option>
+          {godowns.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
+        </select>
+        <select value={filters.holding} onChange={(e) => setFilters({ ...filters, holding: e.target.value })} className={inputCls} aria-label="Stock state">
+          {HOLDINGS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
         </select>
         <select value={filters.status} onChange={(e) => setFilters({ ...filters, status: e.target.value })} className={inputCls} aria-label="Status">
           {STATUSES.map((s) => <option key={s} value={s}>{s || 'All statuses'}</option>)}
@@ -223,6 +298,7 @@ export default function BatchRegistryPage() {
                 <th className="px-3 py-2.5 w-8"><span className="sr-only">Select</span></th>
                 <th className="px-3 py-2.5 text-left">Batch ID</th>
                 <th className="px-3 py-2.5 text-left">Fabric</th>
+                <th className="px-3 py-2.5 text-left">Type</th>
                 <th className="px-3 py-2.5 text-left">Origin / Source</th>
                 <th className="px-3 py-2.5 text-left">Supplier / Owner</th>
                 <th className="px-3 py-2.5 text-right">Received</th>
@@ -240,15 +316,15 @@ export default function BatchRegistryPage() {
                   </>
                 )}
                 <th className="px-3 py-2.5 text-left">Status</th>
-                <th className="px-3 py-2.5 text-right">Tag</th>
+                <th className="px-3 py-2.5 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {loading && (
-                <tr><td colSpan={withCost ? 17 : 12} className="px-3 py-10 text-center text-slate-400">Loading batches…</td></tr>
+                <tr><td colSpan={withCost ? 18 : 13} className="px-3 py-10 text-center text-slate-400">Loading batches…</td></tr>
               )}
               {!loading && data.results.length === 0 && (
-                <tr><td colSpan={withCost ? 17 : 12} className="px-3 py-10 text-center text-slate-400">No batches match these filters.</td></tr>
+                <tr><td colSpan={withCost ? 18 : 13} className="px-3 py-10 text-center text-slate-400">No batches match these filters.</td></tr>
               )}
               {!loading && data.results.map((b) => {
                 const q = b.quantities || {};
@@ -270,6 +346,10 @@ export default function BatchRegistryPage() {
                         {b.hsnCode ? `HSN ${b.hsnCode}` : 'HSN missing in item master'}
                       </div>
                     </td>
+                    <td className="px-3 py-2.5">
+                      <span className={`px-2 py-0.5 rounded-full border text-[10px] font-semibold ${b.fabricType === 'DYED' ? 'bg-sky-50 text-sky-700 border-sky-200' : 'bg-stone-50 text-stone-700 border-stone-200'}`}>{b.fabricType === 'DYED' ? 'Dyed' : 'Grey'}</span>
+                      {b.processed && b.fabricType !== 'DYED' && <div className="text-[10px] text-sky-700 mt-0.5">+ dyed rolls</div>}
+                    </td>
                     <td className="px-3 py-2.5 text-slate-600">{b.origin}<div className="text-[10px] text-slate-400">{b.sourceDocumentNumber}</div></td>
                     <td className="px-3 py-2.5 text-slate-600">{b.ownership === 'OSCAR' ? (b.supplierName || '—') : `${b.ownerPartyName || b.ownership} (owned)`}</td>
                     <td className="px-3 py-2.5 text-right tabular-nums">{formatNumberIN(q.received)}</td>
@@ -289,7 +369,10 @@ export default function BatchRegistryPage() {
                     <td className="px-3 py-2.5">
                       <span className={`px-2 py-0.5 rounded-full border text-[10px] font-semibold ${STATUS_STYLE[b.status] || STATUS_STYLE.Closed}`}>{b.status}</span>
                     </td>
-                    <td className="px-3 py-2.5 text-right">
+                    <td className="px-3 py-2.5 text-right whitespace-nowrap space-x-1">
+                      <button type="button" onClick={() => navigate(`/inventory/batches/${encodeURIComponent(b.batchCode)}`)} title="View details (Batch 360°)" aria-label={`View details of ${b.batchCode}`} className="p-1.5 rounded-md border border-slate-200 text-blue-700 hover:bg-blue-50 cursor-pointer">
+                        <Eye size={13} />
+                      </button>
                       <button type="button" onClick={() => printTag(b)} title="Print batch QR tag" aria-label={`Print tag for ${b.batchCode}`} className="p-1.5 rounded-md border border-slate-200 text-slate-600 hover:bg-slate-50 cursor-pointer">
                         <Printer size={13} />
                       </button>

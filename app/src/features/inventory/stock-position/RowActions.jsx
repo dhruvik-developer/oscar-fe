@@ -5,7 +5,7 @@ import { inventoryService } from '../../../services/domainServices';
 import { describeApiError, formatNumberIN } from '../../accounts/accountingShared';
 
 const TEXT = {
-  rework: { title: 'Route rejected stock to rework', help: 'The metres move to the Reprocess store and leave Scrap & Waste.', button: 'Route to rework', max: 'quantity' },
+  rework: { title: 'Route rejected stock to rework', help: 'The metres move to the Reprocess store and leave Short Stock.', button: 'Route to rework', max: 'quantity' },
   dispose: { title: 'Approved disposal', help: 'Stock leaves at the roll’s cost (Dr Stock Adjustment, Cr Inventory). Give the approval reason.', button: 'Dispose', max: 'quantity' },
   sampleReturn: { title: 'Record sample return', help: 'Good returns go back to stock; Hold goes to QC; Reject / damaged goes to Reject stock.', button: 'Record return', max: 'outstanding' },
   sampleConsume: { title: 'Mark sample consumed', help: 'The outstanding quantity is written off as sample expense.', button: 'Mark consumed', max: 'outstanding' },

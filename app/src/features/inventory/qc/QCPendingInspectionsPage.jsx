@@ -28,14 +28,15 @@ import {
   Plus,
   Users,
   Play,
+  ChevronLeft,
+  ChevronRight,
   Scale,
   Maximize2,
   Trash2,
 } from 'lucide-react';
 import { inventoryService } from '../../../services/domainServices';
 import { useERP } from '../../../context/ERPContext';
-import PageInfoButton from '../../../components/ui/PageInfoButton';
-import AppPagination from '../../../components/ui/AppPagination';
+import QCPageHeader from './QCPageHeader';
 
 export default function QCPendingInspectionsPage() {
   const { purchaseBills = [], vendors = [], items = [], fabrics = [] } = useERP();
@@ -152,6 +153,7 @@ export default function QCPendingInspectionsPage() {
   }, [pendingList, searchQuery]);
 
   // Pagination calculations
+  const totalPages = Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE));
   const paginatedRows = useMemo(() => {
     const start = (currentPage - 1) * PAGE_SIZE;
     return filteredRows.slice(start, start + PAGE_SIZE);
@@ -251,6 +253,40 @@ export default function QCPendingInspectionsPage() {
   const diffQty = Number((awaitingQcQty - totalAllocated).toFixed(4));
   const isQcBalanced = Math.abs(diffQty) < 0.001 && totalAllocated > 0;
   const measurementsSum = takaMeasurements.reduce((acc, t) => acc + (Number(t.actualQty) || 0), 0);
+
+  // Auto-deduct from Good Qty when Hold, Reprocess, or Rejected is entered
+  const handleHoldChange = (val) => {
+    setQcHoldQty(val);
+    if (awaitingQcQty > 0) {
+      const h = Number(val) || 0;
+      const rep = Number(qcReprocessQty) || 0;
+      const rej = Number(qcRejectedQty) || 0;
+      const rem = Math.max(0, Number((awaitingQcQty - h - rep - rej).toFixed(4)));
+      setQcGoodQty(String(rem));
+    }
+  };
+
+  const handleReprocessChange = (val) => {
+    setQcReprocessQty(val);
+    if (awaitingQcQty > 0) {
+      const h = Number(qcHoldQty) || 0;
+      const rep = Number(val) || 0;
+      const rej = Number(qcRejectedQty) || 0;
+      const rem = Math.max(0, Number((awaitingQcQty - h - rep - rej).toFixed(4)));
+      setQcGoodQty(String(rem));
+    }
+  };
+
+  const handleRejectedChange = (val) => {
+    setQcRejectedQty(val);
+    if (awaitingQcQty > 0) {
+      const h = Number(qcHoldQty) || 0;
+      const rep = Number(qcReprocessQty) || 0;
+      const rej = Number(val) || 0;
+      const rem = Math.max(0, Number((awaitingQcQty - h - rep - rej).toFixed(4)));
+      setQcGoodQty(String(rem));
+    }
+  };
 
   const handlePassAll = () => {
     if (awaitingQcQty > 0) {
@@ -417,62 +453,48 @@ export default function QCPendingInspectionsPage() {
         </div>
       )}
 
-      {/* ── Header: Title & Action Buttons (Panel 2 & Reference Image) ── */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pt-1">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-full bg-[#10b981] text-white flex items-center justify-center font-bold text-base shrink-0 shadow-xs">
-            2
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-xl sm:text-2xl font-bold text-[#0f172a] tracking-tight">
-                Pending Inspections
-              </h1>
-              <PageInfoButton title="Pending Inspections" />
-            </div>
-            <p className="text-xs text-slate-500 font-medium mt-0.5">
-              Fabric received from GRN or Job Work Inward, pending for QC inspection.
-            </p>
-          </div>
-        </div>
+      {/* ── Standard QC Page Header ─────────────────────────────── */}
+      <QCPageHeader
+        title="Pending Inspections"
+        subtitle="Fabric received from GRN or Job Work Inward, pending for QC inspection."
+        actions={
+          <div className="flex items-center gap-2.5">
+            <button
+              type="button"
+              disabled={selectedIds.size === 0}
+              onClick={() => setShowBulkAssignModal(true)}
+              className={`inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-lg shadow-xs transition cursor-pointer ${
+                selectedIds.size > 0
+                  ? 'bg-[#2563eb] hover:bg-[#1d4ed8] text-white'
+                  : 'bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200'
+              }`}
+            >
+              <Users className="w-4 h-4" />
+              <span>Bulk Assign {selectedIds.size > 0 ? `(${selectedIds.size})` : ''}</span>
+            </button>
 
-        {/* Action Buttons: Bulk Assign & Start Inspection */}
-        <div className="flex items-center gap-2.5">
-          <button
-            type="button"
-            disabled={selectedIds.size === 0}
-            onClick={() => setShowBulkAssignModal(true)}
-            className={`inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-lg shadow-xs transition cursor-pointer ${
-              selectedIds.size > 0
-                ? 'bg-[#2563eb] hover:bg-[#1d4ed8] text-white'
-                : 'bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200'
-            }`}
-          >
-            <Users className="w-4 h-4" />
-            <span>Bulk Assign {selectedIds.size > 0 ? `(${selectedIds.size})` : ''}</span>
-          </button>
-
-          <button
-            type="button"
-            disabled={selectedIds.size === 0}
-            onClick={() => {
-              const firstSelected = pendingList.find((r) => selectedIds.has(r.id));
-              if (firstSelected) {
-                setStartModalItem(firstSelected);
-                setShowStartModal(true);
-              }
-            }}
-            className={`inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-lg shadow-xs transition cursor-pointer ${
-              selectedIds.size > 0
-                ? 'bg-[#059669] hover:bg-[#047857] text-white'
-                : 'bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200'
-            }`}
-          >
-            <Play className="w-4 h-4" />
-            <span>Start Inspection</span>
-          </button>
-        </div>
-      </div>
+            <button
+              type="button"
+              disabled={selectedIds.size === 0}
+              onClick={() => {
+                const firstSelected = pendingList.find((r) => selectedIds.has(r.id));
+                if (firstSelected) {
+                  setStartModalItem(firstSelected);
+                  setShowStartModal(true);
+                }
+              }}
+              className={`inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-lg shadow-xs transition cursor-pointer ${
+                selectedIds.size > 0
+                  ? 'bg-[#059669] hover:bg-[#047857] text-white'
+                  : 'bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200'
+              }`}
+            >
+              <Play className="w-4 h-4" />
+              <span>Start Inspection</span>
+            </button>
+          </div>
+        }
+      />
 
       {/* ── Filter Bar: Date, Source, Supplier, Quality, Design, Shade (Panel 1) ── */}
       <div className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-2xs">
@@ -733,16 +755,25 @@ export default function QCPendingInspectionsPage() {
                         </span>
                       </td>
                       <td className="py-2 px-3 text-center">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setStartModalItem(r);
-                            setShowStartModal(true);
-                          }}
-                          className="px-3 py-1 bg-[#2563eb] hover:bg-[#1d4ed8] text-white font-semibold text-xs rounded-lg shadow-2xs transition cursor-pointer"
-                        >
-                          Inspect
-                        </button>
+                        <div className="flex items-center justify-center gap-1.5">
+                          <Link
+                            to={`/inventory/qc/results?receiptId=${r.receiptId || r.id}`}
+                            className="px-2 py-1 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 font-semibold text-xs rounded-lg transition inline-flex items-center gap-1"
+                            title="Open in QC Results and Disposition"
+                          >
+                            Full QC
+                          </Link>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setStartModalItem(r);
+                              setShowStartModal(true);
+                            }}
+                            className="px-3 py-1 bg-[#2563eb] hover:bg-[#1d4ed8] text-white font-semibold text-xs rounded-lg shadow-2xs transition cursor-pointer"
+                          >
+                            Inspect
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -765,12 +796,50 @@ export default function QCPendingInspectionsPage() {
         </div>
 
         {/* ── Pagination (Panel 8) ─────────────────────────────────── */}
-        <AppPagination
-          total={filteredRows.length}
-          page={currentPage}
-          pageSize={PAGE_SIZE}
-          onPageChange={setCurrentPage}
-        />
+        <div className="p-3.5 border-t border-slate-200 flex items-center justify-between text-xs text-slate-500">
+          <span>
+            Showing {filteredRows.length > 0 ? (currentPage - 1) * PAGE_SIZE + 1 : 0} to{' '}
+            {Math.min(currentPage * PAGE_SIZE, filteredRows.length)} of {filteredRows.length} entries
+          </span>
+
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              disabled={currentPage <= 1}
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              className="p-1.5 border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+
+            {Array.from({ length: totalPages }).map((_, i) => {
+              const p = i + 1;
+              return (
+                <button
+                  key={p}
+                  type="button"
+                  onClick={() => setCurrentPage(p)}
+                  className={`w-7 h-7 rounded-lg font-semibold text-xs ${
+                    currentPage === p
+                      ? 'bg-blue-600 text-white'
+                      : 'border border-slate-200 text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  {p}
+                </button>
+              );
+            })}
+
+            <button
+              type="button"
+              disabled={currentPage >= totalPages}
+              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              className="p-1.5 border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* ── Modal 1: Start QC Inspection (Single Row) (Panel 2) ───── */}
@@ -1176,8 +1245,8 @@ export default function QCPendingInspectionsPage() {
                       min="0"
                       placeholder="0"
                       value={qcHoldQty}
-                      onChange={(e) => setQcHoldQty(e.target.value)}
-                      onFocus={(e) => { if (e.target.value === '0') setQcHoldQty(''); }}
+                      onChange={(e) => handleHoldChange(e.target.value)}
+                      onFocus={(e) => { if (e.target.value === '0') handleHoldChange(''); }}
                       className="w-full bg-white border border-amber-300 rounded px-2 py-1 text-sm font-bold text-amber-800 font-mono focus:outline-none"
                     />
                     <span className="text-xs text-amber-700 font-semibold">{measuringItem.uom}</span>
@@ -1194,8 +1263,8 @@ export default function QCPendingInspectionsPage() {
                       min="0"
                       placeholder="0"
                       value={qcReprocessQty}
-                      onChange={(e) => setQcReprocessQty(e.target.value)}
-                      onFocus={(e) => { if (e.target.value === '0') setQcReprocessQty(''); }}
+                      onChange={(e) => handleReprocessChange(e.target.value)}
+                      onFocus={(e) => { if (e.target.value === '0') handleReprocessChange(''); }}
                       className="w-full bg-white border border-purple-300 rounded px-2 py-1 text-sm font-bold text-purple-800 font-mono focus:outline-none"
                     />
                     <span className="text-xs text-purple-700 font-semibold">{measuringItem.uom}</span>
@@ -1212,8 +1281,8 @@ export default function QCPendingInspectionsPage() {
                       min="0"
                       placeholder="0"
                       value={qcRejectedQty}
-                      onChange={(e) => setQcRejectedQty(e.target.value)}
-                      onFocus={(e) => { if (e.target.value === '0') setQcRejectedQty(''); }}
+                      onChange={(e) => handleRejectedChange(e.target.value)}
+                      onFocus={(e) => { if (e.target.value === '0') handleRejectedChange(''); }}
                       className="w-full bg-white border border-rose-300 rounded px-2 py-1 text-sm font-bold text-rose-800 font-mono focus:outline-none"
                     />
                     <span className="text-xs text-rose-700 font-semibold">{measuringItem.uom}</span>
@@ -1396,6 +1465,12 @@ export default function QCPendingInspectionsPage() {
             </div>
 
             <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+              <Link
+                to={`/inventory/qc/results?receiptId=${viewDetailsItem.receiptId || viewDetailsItem.id}`}
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs rounded-lg transition inline-flex items-center gap-1.5"
+              >
+                Full QC Disposition
+              </Link>
               <button
                 type="button"
                 onClick={() => {

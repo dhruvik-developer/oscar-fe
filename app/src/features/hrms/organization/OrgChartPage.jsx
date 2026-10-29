@@ -462,7 +462,7 @@ export function OrgChartPage() {
                 type="text"
                 value={newDept.code}
                 onChange={(e) => setNewDept({ ...newDept, code: e.target.value })}
-                placeholder="e.g. DYE"
+                placeholder="Auto from name if blank"
                 className="w-full px-3.5 py-2 bg-off border border-bdr rounded-xl text-[13.5px] text-slate-800 placeholder:text-muted focus:outline-none focus:border-navy focus:ring-2 focus:ring-navy/10"
               />
             </div>

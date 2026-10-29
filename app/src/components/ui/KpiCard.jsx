@@ -6,64 +6,33 @@ export function Wave() {
   return null;
 }
 
+// Tones resolve to the active theme's tokens (globals.css), so cards follow
+// light / oscar / dark / midnight / emerald and any saved brand colour.
+const PRIMARY = 'var(--primary, #1B5FD6)';
+const INFO = 'var(--info, #2B9BE8)';
+const SUCCESS = 'var(--success, #10b981)';
+const WARNING = 'var(--warning, #f59e0b)';
+const DANGER = 'var(--danger, #ef4444)';
+const MUTED = 'var(--muted, #60708d)';
+
 const tones = {
-  blue: '#2563eb',
-  primary: 'var(--primary, #2563eb)',
-  emerald: '#059669',
-  green: '#059669',
-  amber: '#d97706',
-  yellow: '#d97706',
-  purple: '#6366f1',
-  violet: '#6366f1',
-  rose: '#e11d48',
-  red: '#e11d48',
-  indigo: '#4f46e5',
-  sky: '#0284c7',
-  cyan: '#0284c7',
-  teal: '#0d9488',
-  orange: '#ea580c',
-  slate: '#64748b',
-  gray: '#64748b',
-};
-
-const toneBg = {
-  blue: '#eff6ff',
-  primary: 'color-mix(in srgb, var(--primary, #2563eb) 12%, transparent)',
-  emerald: '#ecfdf5',
-  green: '#ecfdf5',
-  amber: '#fffbeb',
-  yellow: '#fffbeb',
-  purple: '#eef2ff',
-  violet: '#eef2ff',
-  rose: '#fff1f2',
-  red: '#fff1f2',
-  indigo: '#eef2ff',
-  sky: '#f0f9ff',
-  cyan: '#f0f9ff',
-  teal: '#f0fdfa',
-  orange: '#fff7ed',
-  slate: '#f8fafc',
-  gray: '#f8fafc',
-};
-
-const toneBorder = {
-  blue: '#dbeafe',
-  primary: 'color-mix(in srgb, var(--primary, #2563eb) 22%, transparent)',
-  emerald: '#d1fae5',
-  green: '#d1fae5',
-  amber: '#fef3c7',
-  yellow: '#fef3c7',
-  purple: '#e0e7ff',
-  violet: '#e0e7ff',
-  rose: '#ffe4e6',
-  red: '#ffe4e6',
-  indigo: '#e0e7ff',
-  sky: '#e0f2fe',
-  cyan: '#e0f2fe',
-  teal: '#ccfbf1',
-  orange: '#ffedd5',
-  slate: '#e2e8f0',
-  gray: '#e2e8f0',
+  blue: PRIMARY,
+  primary: PRIMARY,
+  indigo: PRIMARY,
+  purple: PRIMARY,
+  violet: PRIMARY,
+  sky: INFO,
+  cyan: INFO,
+  teal: INFO,
+  emerald: SUCCESS,
+  green: SUCCESS,
+  amber: WARNING,
+  yellow: WARNING,
+  orange: WARNING,
+  rose: DANGER,
+  red: DANGER,
+  slate: MUTED,
+  gray: MUTED,
 };
 
 export default function KpiCard({
@@ -90,8 +59,9 @@ export default function KpiCard({
   const accent = customIconColor || (color && !tones[normTone] ? color : (tones[normTone] || tones.blue));
   const isRawColor = /^(#|rgb|hsl|var\()/.test(String(accent));
 
-  const iconBg = customIconBg || badgeBg || (toneBg[normTone] || (isRawColor ? `color-mix(in srgb, ${accent} 12%, transparent)` : '#eff6ff'));
-  const iconBorder = toneBorder[normTone] || (isRawColor ? `color-mix(in srgb, ${accent} 22%, transparent)` : '#dbeafe');
+  const tint = isRawColor ? accent : PRIMARY;
+  const iconBg = customIconBg || badgeBg || `color-mix(in srgb, ${tint} 12%, transparent)`;
+  const iconBorder = `color-mix(in srgb, ${tint} 22%, transparent)`;
 
   const trendDown = typeof trend === 'string' && trend.trim().startsWith('↓');
   const trendText = trendDown ? trend.trim().slice(1).trim() : trend;
@@ -119,7 +89,7 @@ export default function KpiCard({
       {/* Soft radial corner glow */}
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute -right-6 -top-6 h-24 w-24 rounded-full opacity-35 transition-opacity duration-200 group-hover:opacity-60"
+        className="pointer-events-none absolute -right-6 -top-6 h-24 w-24 rounded-full opacity-20 transition-opacity duration-200 group-hover:opacity-35"
         style={{ background: `radial-gradient(circle, ${accent} 0%, transparent 70%)` }}
       />
 
@@ -163,7 +133,7 @@ export default function KpiCard({
         {trend && (
           <p
             className="mt-1 flex items-center gap-1 text-[11px] font-semibold leading-none truncate"
-            style={{ color: trendDown ? '#ef4444' : '#10b981' }}
+            style={{ color: trendDown ? DANGER : SUCCESS }}
           >
             <span className="inline-block">{trendDown ? '↘' : '↗'}</span> {trendText}
           </p>

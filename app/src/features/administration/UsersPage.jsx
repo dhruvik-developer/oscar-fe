@@ -448,19 +448,30 @@ export function UsersPage() {
     return (
       <div>
         <label htmlFor="user-phone" className="block font-semibold text-slate-700 mb-1">Phone Number</label>
+        <div className="flex items-center justify-between mb-1">
+          <span className="text-[10px] text-slate-400 font-mono ml-auto">
+            {userForm.phone ? `${userForm.phone.replace(/\D/g, '').length}/10` : '10 digits'}
+          </span>
+        </div>
         <input
           id="user-phone"
           type="tel"
-          inputMode="tel"
+          inputMode="numeric"
           autoComplete="tel"
-          maxLength={18}
-          placeholder="+91 98765 43210"
-          value={userForm.phone || ''}
-          onChange={(e) => setUserForm({ ...userForm, phone: e.target.value })}
-          onBlur={() => setUserForm((prev) => ({ ...prev, phone: formatPhone(prev.phone) }))}
+          maxLength={10}
+          placeholder="e.g. 9876543210"
+          value={userForm.phone ? userForm.phone.replace(/\D/g, '').slice(0, 10) : ''}
+          onChange={(e) => {
+            const val = e.target.value.replace(/\D/g, '').slice(0, 10);
+            setUserForm({ ...userForm, phone: val });
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Backspace' || e.key === 'Delete' || e.key === 'Tab' || e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.ctrlKey || e.metaKey) return;
+            if (!/^[0-9]$/.test(e.key)) e.preventDefault();
+          }}
           aria-invalid={Boolean(error)}
           aria-describedby={error ? 'user-phone-error' : undefined}
-          className={`${inputClass} ${error ? 'border-rose-400 focus:ring-rose-400' : ''}`}
+          className={`${inputClass} font-mono ${error ? 'border-rose-400 focus:ring-rose-400' : ''}`}
         />
         {error && (
           <p id="user-phone-error" className="mt-1 text-[11px] text-rose-600">{error}</p>

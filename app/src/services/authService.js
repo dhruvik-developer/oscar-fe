@@ -72,10 +72,11 @@ function completeSignIn(response, remember) {
  * the result is `{ twoFactor: { challengeId, email, expiresIn } }` and no
  * tokens are stored until `verifyLoginOtp` succeeds.
  */
-export async function login({ email, password, tenant, remember = true }) {
+export async function login({ email, password, role, tenant, remember = true }) {
   const response = await api.post('/auth/login/', {
     email: String(email || '').trim().toLowerCase(),
     password,
+    role,
     tenant: String(tenant || '').trim() || undefined,
   });
   if (response?.twoFactorRequired) {
@@ -107,6 +108,18 @@ export async function resendLoginOtp(challengeId) {
 /** Helpdesk contact shown on the sign-in page (empty strings when unset). */
 export async function getSupportInfo() {
   return api.get('/auth/support/');
+}
+
+/**
+ * Roles for the sign-in dropdown: `[{ code, name }]`, only roles held by
+ * active users (plus an administrator entry while a superuser exists).
+ * The server decides the list; the page keeps no copy of its own.
+ */
+export async function getLoginRoles(tenant) {
+  const body = await api.get('/auth/login-roles/', {
+    query: tenant ? { tenant } : undefined,
+  });
+  return Array.isArray(body?.roles) ? body.roles : [];
 }
 
 export async function listSessions() {

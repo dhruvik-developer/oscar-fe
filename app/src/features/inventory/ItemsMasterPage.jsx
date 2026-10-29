@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useERP } from '../../context/ERPContext';
 import { StatusBadge } from '../../components/ui/StatusBadge';
 import { Button } from '../../components/ui/Button';
@@ -87,7 +88,57 @@ export const ItemsMasterPage = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [selectedIds, setSelectedIds] = useState(new Set());
-  const [activeMenuId, setActiveMenuId] = useState(null);
+  const [menuAnchor, setMenuAnchor] = useState(null); // { item, top, left }
+
+  const handleToggleMenu = (e, item) => {
+    e.stopPropagation();
+    if (menuAnchor?.item?.id === item.id) {
+      setMenuAnchor(null);
+      return;
+    }
+    const rect = e.currentTarget.getBoundingClientRect();
+    const MENU_WIDTH = 180;
+    const MENU_HEIGHT = 195;
+    const openUp = rect.bottom + MENU_HEIGHT > window.innerHeight;
+
+    let left = rect.right - MENU_WIDTH;
+    if (left < 10) left = 10;
+    if (left + MENU_WIDTH > window.innerWidth - 10) {
+      left = window.innerWidth - MENU_WIDTH - 10;
+    }
+
+    const top = openUp ? Math.max(10, rect.top - MENU_HEIGHT - 4) : rect.bottom + 4;
+
+    setMenuAnchor({
+      item,
+      top,
+      left,
+    });
+  };
+
+  const closeRowMenu = useCallback(() => {
+    setMenuAnchor(null);
+  }, []);
+
+  useEffect(() => {
+    if (!menuAnchor) return;
+    const handlePointerDown = (e) => {
+      if (!e.target.closest?.('.item-row-action-menu')) {
+        closeRowMenu();
+      }
+    };
+    const handleScrollOrResize = () => {
+      closeRowMenu();
+    };
+    window.addEventListener('pointerdown', handlePointerDown);
+    window.addEventListener('scroll', handleScrollOrResize, true);
+    window.addEventListener('resize', handleScrollOrResize);
+    return () => {
+      window.removeEventListener('pointerdown', handlePointerDown);
+      window.removeEventListener('scroll', handleScrollOrResize, true);
+      window.removeEventListener('resize', handleScrollOrResize);
+    };
+  }, [menuAnchor, closeRowMenu]);
 
   // Live Authoritative Combined Grey Stock from backend
   const [combinedStockData, setCombinedStockData] = useState({
@@ -557,12 +608,12 @@ export const ItemsMasterPage = () => {
             <ChevronRight size={12} className="text-slate-300" />
             <span>Inventory</span>
             <ChevronRight size={12} className="text-slate-300" />
-            <span className="text-slate-700 font-semibold">Total Inventory</span>
+            <span className="text-slate-700 font-semibold">Inventory</span>
           </div>
 
           <div className="flex items-center gap-2">
             <h1 className="text-xl sm:text-2xl font-black text-slate-800 tracking-tight">
-              Total Inventory – Grey Fabric
+              Inventory – Grey Fabric
             </h1>
             <button
               type="button"
@@ -591,7 +642,7 @@ export const ItemsMasterPage = () => {
           <button
             type="button"
             className="btn-outline flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 shadow-2xs cursor-pointer transition-colors"
-            onClick={() => navigate('/inventory/categories')}
+            onClick={() => navigate('/inventory/fabric-masters?tab=categories')}
           >
             <Layers size={14} />
             Categories
@@ -1069,62 +1120,18 @@ export const ItemsMasterPage = () => {
                             Create PO
                           </button>
 
-                          <div className="relative">
-                            <button
-                              type="button"
-                              onClick={() => setActiveMenuId(activeMenuId === item.id ? null : item.id)}
-                              className="w-7 h-7 rounded-lg border border-slate-200 text-slate-400 hover:text-slate-700 hover:bg-slate-50 flex items-center justify-center transition cursor-pointer"
-                            >
-                              <MoreVertical size={14} />
-                            </button>
-
-                            {activeMenuId === item.id && (
-                              <div
-                                className="absolute right-0 top-8 z-30 w-44 bg-white border border-slate-200 rounded-xl shadow-xl py-1 text-xs animate-in fade-in duration-100"
-                                onMouseLeave={() => setActiveMenuId(null)}
-                              >
-                                <Link
-                                  to={`/inventory/items/edit/${item.id}`}
-                                  className="flex items-center gap-2 px-3 py-2 text-slate-700 hover:bg-slate-50"
-                                >
-                                  Edit Item Master
-                                </Link>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setSelectedBarcodeItem(item);
-                                    setActiveMenuId(null);
-                                  }}
-                                  className="w-full text-left flex items-center gap-2 px-3 py-2 text-slate-700 hover:bg-slate-50"
-                                >
-                                  <Tag size={13} /> Barcode Label
-                                </button>
-                                <Link
-                                  to="/inventory/lot-register"
-                                  className="flex items-center gap-2 px-3 py-2 text-slate-700 hover:bg-slate-50"
-                                >
-                                  View Takas in Register
-                                </Link>
-                                <Link
-                                  to="/inventory/transfers"
-                                  className="flex items-center gap-2 px-3 py-2 text-slate-700 hover:bg-slate-50"
-                                >
-                                  Stock Transfer
-                                </Link>
-                                <div className="border-t border-slate-100 my-1" />
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setActiveMenuId(null);
-                                    handleDeleteItem(item);
-                                  }}
-                                  className="w-full text-left flex items-center gap-2 px-3 py-2 text-rose-600 hover:bg-rose-50 cursor-pointer font-medium"
-                                >
-                                  <Trash2 size={13} /> Delete Item
-                                </button>
-                              </div>
-                            )}
-                          </div>
+                          <button
+                            type="button"
+                            onClick={(e) => handleToggleMenu(e, item)}
+                            className={`w-7 h-7 rounded-lg border flex items-center justify-center transition cursor-pointer ${
+                              menuAnchor?.item?.id === item.id
+                                ? 'border-blue-500 text-blue-600 bg-blue-50'
+                                : 'border-slate-200 text-slate-400 hover:text-slate-700 hover:bg-slate-50'
+                            }`}
+                            title="More actions"
+                          >
+                            <MoreVertical size={14} />
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -1145,6 +1152,63 @@ export const ItemsMasterPage = () => {
           pageSizeOptions={[10, 25, 50, 100]}
         />
       </div>
+
+      {/* ── Table Row Action Menu Portal ── */}
+      {menuAnchor && createPortal(
+        <div
+          className="item-row-action-menu fixed z-[9999] w-44 bg-white border border-slate-200 rounded-xl shadow-xl py-1 text-xs animate-in fade-in zoom-in-95 duration-100"
+          style={{
+            top: menuAnchor.top,
+            left: menuAnchor.left,
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <Link
+            to={`/inventory/items/edit/${menuAnchor.item.id}`}
+            onClick={closeRowMenu}
+            className="flex items-center gap-2 px-3 py-2 text-slate-700 hover:bg-slate-50 transition-colors"
+          >
+            Edit Item Master
+          </Link>
+          <button
+            type="button"
+            onClick={() => {
+              setSelectedBarcodeItem(menuAnchor.item);
+              closeRowMenu();
+            }}
+            className="w-full text-left flex items-center gap-2 px-3 py-2 text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer"
+          >
+            <Tag size={13} /> Barcode Label
+          </button>
+          <Link
+            to="/inventory/lot-register"
+            onClick={closeRowMenu}
+            className="flex items-center gap-2 px-3 py-2 text-slate-700 hover:bg-slate-50 transition-colors"
+          >
+            View Takas in Register
+          </Link>
+          <Link
+            to="/inventory/transfers"
+            onClick={closeRowMenu}
+            className="flex items-center gap-2 px-3 py-2 text-slate-700 hover:bg-slate-50 transition-colors"
+          >
+            Stock Transfer
+          </Link>
+          <div className="border-t border-slate-100 my-1" />
+          <button
+            type="button"
+            onClick={() => {
+              const itemToDelete = menuAnchor.item;
+              closeRowMenu();
+              handleDeleteItem(itemToDelete);
+            }}
+            className="w-full text-left flex items-center gap-2 px-3 py-2 text-rose-600 hover:bg-rose-50 cursor-pointer font-medium transition-colors"
+          >
+            <Trash2 size={13} /> Delete Item
+          </button>
+        </div>,
+        document.body
+      )}
 
       {/* ── Floating Bulk Action Bar when checkboxes are selected ── */}
       {selectedIds.size > 0 && (
@@ -1572,7 +1636,7 @@ export const ItemsMasterPage = () => {
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <h3 className="font-bold text-base text-slate-800 flex items-center gap-2">
                 <Info size={18} className="text-blue-600" />
-                Total Inventory – Grey Fabric Architecture
+                Inventory – Grey Fabric Architecture
               </h3>
               <button
                 type="button"

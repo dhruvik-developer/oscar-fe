@@ -172,37 +172,6 @@
   color: var(--ol-muted);
 }
 
-/* ── Role chips (visual only) ── */
-.oscar-login__chips {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 6px;
-  margin-bottom: 22px;
-}
-.oscar-login__chip {
-  font-family: 'Manrope', system-ui, sans-serif;
-  font-weight: 600;
-  font-size: 12.5px;
-  line-height: 1.2;
-  padding: 7px 12px;
-  border-radius: 99px;
-  background: #F1F4F9;
-  border: 1px solid #E3E8F0;
-  color: var(--ol-muted);
-  cursor: pointer;
-  transition: background .15s, color .15s;
-}
-.oscar-login__chip:hover {
-  color: var(--ol-text);
-  background: #E7ECF4;
-}
-.oscar-login__chip[aria-pressed='true'] {
-  background: var(--ol-gradient);
-  border-color: transparent;
-  color: #fff;
-}
-
 /* ── Form ── */
 .oscar-login__form {
   display: flex;
@@ -249,6 +218,20 @@
 }
 select.oscar-login__input {
   cursor: pointer;
+}
+select.oscar-login__input:disabled {
+  cursor: progress;
+  color: #8A97B0;
+}
+.oscar-login__hint {
+  display: block;
+  margin-top: 6px;
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--ol-muted);
+}
+.oscar-login__hint:empty {
+  display: none;
 }
 select.oscar-login__input option {
   background: #FFFFFF;
@@ -408,7 +391,6 @@ select.oscar-login__input option {
 }
 
 /* ── Keyboard focus ── */
-.oscar-login__chip:focus-visible,
 .oscar-login__toggle:focus-visible,
 .oscar-login__link:focus-visible,
 .oscar-login__submit:focus-visible,

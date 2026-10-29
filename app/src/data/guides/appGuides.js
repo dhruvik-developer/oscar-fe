@@ -600,16 +600,16 @@ export const appGuides = {
   },
 
   locationsPage: {
-    title: 'Godown & Rack Locations',
-    subtitle: 'Warehouse layout, bin coordinates, capacity limits, and storage zones.',
-    purpose: 'Defines the structural physical storage architecture of all company warehouses (Godowns, Zones, Aisles, Racks, Shelves, and Bins). Facilitates directed pick-and-pack operations and prevents warehouse congestion.',
-    workflow: ['Create Godown / Facility', 'Map Storage Aisles & Racks', 'Assign Specific Bin Coordinates', 'Set Capacity Constraints'],
+    title: 'Warehouse Management',
+    subtitle: 'Manage warehouses, facility locations, and stock inventory balances.',
+    purpose: 'Defines and manages physical warehouses and facilities for fabric and goods inventory, providing real-time stock balances, batch assignments, and warehouse transfers.',
+    workflow: ['Create Warehouse', 'Assign Manager & Contact Details', 'Track Batch / Fabric Inventory', 'Initiate Stock Transfers'],
     keyTerms: [
-      { term: 'Bin Coordinate (e.g., WH1-A-04-B)', definition: 'Precise physical address of a shelf compartment for rapid item retrieval.' },
-      { term: 'Storage Zone', definition: 'Designated area tailored for specific goods (e.g., Grey Godown, Chemical Store, Quarantine).' },
+      { term: 'Warehouse Code (e.g., WH-01)', definition: 'Unique identifier for the physical warehouse facility.' },
+      { term: 'Stock Transfer', definition: 'Movement of inventory batches between warehouses without changing total company stock.' },
     ],
     tips: [
-      'Print barcode labels for all bin locations to enable barcode-guided warehouse picking.',
+      'Ensure every warehouse has an assigned manager and valid contact number for logistics coordination.',
     ],
   },
 
@@ -1431,6 +1431,7 @@ export const TITLE_MAP = {
   'QC Results & Disposition': 'qcDisposition',
   'QC Disposition': 'qcDisposition',
   'QC Reports': 'qcReports',
+  'Quality Check Reports & Analytics': 'qcReports',
   'QC Analytics & Defect Reports': 'qcReports',
   'QC Dashboard': 'qcDashboard',
   'Quality Control Dashboard': 'qcDashboard',
@@ -1502,6 +1503,8 @@ export const TITLE_MAP = {
   'Stock Transfers': 'stockTransfers',
   'Inter-Warehouse Stock Transfers': 'stockTransfers',
   'Transfers': 'stockTransfers',
+  'Warehouse Management': 'locationsPage',
+  'Warehouse': 'locationsPage',
   'Godown / Rack - Locations Management': 'locationsPage',
   'Locations Management': 'locationsPage',
   'Warehouse Locations': 'locationsPage',

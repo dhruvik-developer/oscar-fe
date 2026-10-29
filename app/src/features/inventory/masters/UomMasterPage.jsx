@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useFabricMastersEmbed } from './fabricMastersEmbed';
 import {
   Search,
   Plus,
@@ -308,7 +309,7 @@ export default function UomMasterPage() {
 
   // Shared rules for the popup and the CSV import (local mode re-checks what the server would).
   const validate = (item, others) => {
-    if (!item.code) return 'UOM Code is required.';
+    if (!item.code && !backendOn) return 'UOM Code is required.';
     if (!item.label) return 'UOM Name is required.';
     if (!item.uomType) return 'UOM Type is required.';
     if (!Number.isInteger(item.decimalPlaces) || item.decimalPlaces < 0 || item.decimalPlaces > 6) return 'Decimal places must be between 0 and 6.';
@@ -492,24 +493,30 @@ export default function UomMasterPage() {
     ? `1 ${previewCode} = ${formatFactor(form.conversionFactor)} ${baseForType.code}`
     : '';
 
+  const embedded = useFabricMastersEmbed();
+
   return (
     <div className="w-full space-y-4">
       {/* ── Slide 9 header ── */}
-      <div className="flex items-center gap-3">
-        <div className="w-8 h-8 rounded-full bg-[#1e60f2] text-white flex items-center justify-center font-bold text-base shrink-0 shadow-xs">
-          9
+      {!embedded && (
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-full bg-[#1e60f2] text-white flex items-center justify-center font-bold text-base shrink-0 shadow-xs">
+            9
+          </div>
+          <h1 className="text-xl sm:text-2xl font-bold text-[#0f172a] tracking-tight">Units of Measurement (UOM) – List</h1>
+          <PageInfoButton title="Units of Measurement (UOM)" />
         </div>
-        <h1 className="text-xl sm:text-2xl font-bold text-[#0f172a] tracking-tight">Units of Measurement (UOM) – List</h1>
-        <PageInfoButton title="Units of Measurement (UOM)" />
-      </div>
+      )}
 
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pt-1">
-        <div className="flex items-center gap-2 text-xs text-slate-500 font-medium">
-          <Layers className="w-4 h-4 text-[#1e60f2]" />
-          <span>Categories</span>
-          <span className="text-slate-300 font-bold">&gt;</span>
-          <span className="text-slate-800 font-semibold">Units of Measurement (UOM)</span>
-        </div>
+        {!embedded && (
+          <div className="flex items-center gap-2 text-xs text-slate-500 font-medium">
+            <Layers className="w-4 h-4 text-[#1e60f2]" />
+            <span>Categories</span>
+            <span className="text-slate-300 font-bold">&gt;</span>
+            <span className="text-slate-800 font-semibold">Units of Measurement (UOM)</span>
+          </div>
+        )}
 
         <div className="flex items-center gap-2.5 flex-wrap sm:flex-nowrap">
           <div className="relative min-w-[240px] sm:w-72">
@@ -770,13 +777,13 @@ export default function UomMasterPage() {
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
                     <div>
                       <label className="block font-semibold text-slate-700 mb-1">
-                        UOM Code <span className="text-rose-500">*</span>
+                        UOM Code {backendOn ? <span className="font-normal text-slate-400">(auto if blank)</span> : <span className="text-rose-500">*</span>}
                       </label>
                       <input
                         value={form.code}
                         disabled={readOnly || Boolean(editingRow)}
                         onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })}
-                        placeholder="MTR"
+                        placeholder={backendOn ? 'Auto from name' : 'MTR'}
                         title={editingRow ? "The code can't be changed once created — items store it by code." : ''}
                         className={`${inputClass} uppercase shadow-2xs`}
                       />

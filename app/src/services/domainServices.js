@@ -188,6 +188,29 @@ export const salesService = {
   generateChallanEwayBill: (id, data) => api.post(`/sales/delivery-challans/${id}/generate-eway-bill/`, data),
 };
 
+// ── Customer payments, terms and early-payment discounts ─────────────────
+export const receivablesService = {
+  // Dashboard KPIs (aggregates) + one row per finalized invoice.
+  getReceivables: (query) => api.get('/sales/receivables/', { query }),
+  getPaymentTermOptions: () => api.get('/sales/invoices/payment-term-options/'),
+  changePaymentTerms: (invoiceId, data) => api.post(`/sales/invoices/${invoiceId}/payment-terms/`, data),
+  getTermsHistory: (invoiceId) => api.get(`/sales/invoices/${invoiceId}/terms-history/`),
+  getPayments: (query) => api.get('/sales/payments/', { query }),
+  recordPayment: (data, idempotencyKey) => api.post('/sales/payments/', data, idempotencyKey ? { idempotencyKey } : undefined),
+  getBankAccounts: () => api.get('/accounts/bank-accounts/', { query: { page_size: 200 } }),
+  getDiscountRequests: (query) => api.get('/sales/discount-requests/', { query }),
+  getDiscountRequest: (id) => api.get(`/sales/discount-requests/${id}/`),
+  createDiscountRequest: (data) => api.post('/sales/discount-requests/', data),
+  updateDiscountRequest: (id, data) => api.patch(`/sales/discount-requests/${id}/`, data),
+  submitDiscountRequest: (id) => api.post(`/sales/discount-requests/${id}/submit/`, {}),
+  reviewDiscountRequest: (id, data) => api.post(`/sales/discount-requests/${id}/review/`, data || {}),
+  proposeDiscount: (id, data) => api.post(`/sales/discount-requests/${id}/propose/`, data),
+  approveDiscountRequest: (id, data) => api.post(`/sales/discount-requests/${id}/approve/`, data),
+  rejectDiscountRequest: (id, data) => api.post(`/sales/discount-requests/${id}/reject/`, data),
+  cancelDiscountRequest: (id, data) => api.post(`/sales/discount-requests/${id}/cancel/`, data),
+  getDiscountRequestHistory: (id) => api.get(`/sales/discount-requests/${id}/history/`),
+};
+
 // ── Purchase pipeline ────────────────────────────────────────────────────
 
 export const purchaseService = {
@@ -271,21 +294,29 @@ export const hrmsService = {
 
 // ── Inventory ────────────────────────────────────────────────────────────
 
+// QC type filter (All / Grey Fabric / Dyeing) on the QC screens lives in the URL.
+const qcStage = (query = {}) => {
+  if (query.stage) return query;
+  if (typeof window === 'undefined' || !window.location.pathname.startsWith('/inventory/qc')) return query;
+  const stage = new URLSearchParams(window.location.search).get('stage');
+  return stage === 'grey' || stage === 'dyeing' ? { ...query, stage } : query;
+};
+
 export const inventoryService = {
   getDashboard: (query) => api.get('/inventory/dashboard/', { query }),
-  getQCDashboard: (query) => api.get('/inventory/qc/dashboard/', { query }),
-  getQCPending: (query) => api.get('/inventory/qc/pending/', { query }),
+  getQCDashboard: (query) => api.get('/inventory/qc/dashboard/', { query: qcStage(query) }),
+  getQCPending: (query) => api.get('/inventory/qc/pending/', { query: qcStage(query) }),
   bulkAssignQC: (data) => api.post('/inventory/qc/pending/bulk-assign/', data),
   completeQCInspection: (data) => api.post('/inventory/qc/complete/', data),
   updateQCDisposition: (receiptId, data) => api.post(`/purchase/receipts/${receiptId}/qc/`, data),
-  getQCRegister: (query) => api.get('/inventory/qc/register/', { query }),
+  getQCRegister: (query) => api.get('/inventory/qc/register/', { query: qcStage(query) }),
   createManualQC: (data) => api.post('/inventory/qc/register/manual/', data),
-  getQCDispositionList: (query) => api.get('/inventory/qc/disposition/', { query }),
+  getQCDispositionList: (query) => api.get('/inventory/qc/disposition/', { query: qcStage(query) }),
   saveQCDisposition: (data) => api.post('/inventory/qc/disposition/', data),
-  getQCReinspection: (query) => api.get('/inventory/qc/reinspection/', { query }),
+  getQCReinspection: (query) => api.get('/inventory/qc/reinspection/', { query: qcStage(query) }),
   createQCReinspection: (data) => api.post('/inventory/qc/reinspection/', data),
   saveQCReinspectionDisposition: (data) => api.post('/inventory/qc/reinspection/', { ...data, actionType: 'disposition' }),
-  getQCReports: (query) => api.get('/inventory/qc/reports/', { query }),
+  getQCReports: (query) => api.get('/inventory/qc/reports/', { query: qcStage(query) }),
   // Lot / Taka Register
   getLotRegister: (query) => api.get('/inventory/lot-register/', { query }),
   createLotTaka: (data) => api.post('/inventory/lot-register/', data),
@@ -325,6 +356,9 @@ export const inventoryService = {
   setBatchOwnership: (code, data) => api.patch(`/inventory/batches/${encodeURIComponent(code)}/`, data),
   // Rejections: classify by cause (normal loss vs supplier / job worker / process fault) and track claims.
   recordBatchLoss: (code, data) => api.post(`/inventory/batches/${encodeURIComponent(code)}/losses/`, data),
+  // Batch 360 operations -> the refreshed batch.
+  // action: send-to-qc | qc | rework-done | yarn | yarn-delete | fabric-type
+  batchAction: (code, action, data) => api.post(`/inventory/batches/${encodeURIComponent(code)}/actions/${action}/`, data),
   updateBatchLoss: (id, data) => api.patch(`/inventory/batch-losses/${id}/`, data),
   // { rolls: [{lotTakaId, qty}], reason, lossId? } -> debit note(s) for QC-rejected purchased rolls
   returnRejectedToSupplier: (data) => api.post('/inventory/qc/purchase-return/', data),
@@ -366,7 +400,7 @@ export const inventoryService = {
   getStockAgeing: (query) => api.get('/inventory/stock/ageing/', { query }),
   getSlowMovingStock: (query) => api.get('/inventory/stock/slow-moving/', { query }),
   // Phase 2.6 QC Inspections (4-Point ASTM Piece Inspection)
-  getQCInspections: (query) => api.get('/inventory/qc-inspections/', { query }),
+  getQCInspections: (query) => api.get('/inventory/qc-inspections/', { query: qcStage(query) }),
   getQCInspection: (id) => api.get(`/inventory/qc-inspections/${id}/`),
   createQCInspection: (data) => api.post('/inventory/qc-inspections/', data),
   updateQCInspection: (id, data) => api.patch(`/inventory/qc-inspections/${id}/`, data),
@@ -544,6 +578,12 @@ export const misService = {
 // ── Job Work & ITC-04 Statutory Reporting (Phase 4.5) ─────────────────────
 export const jobworkService = {
   getProcessPlans: (query) => api.get('/jobwork/process-plans/', { query }),
+  // Dyeing service orders: customer-fabric dyeing, or OSCAR grey + dyeing.
+  getServiceOrders: (query) => api.get('/jobwork/service-orders/', { query }),
+  getServiceOrder: (id) => api.get('/jobwork/service-orders/' + id + '/'),
+  createServiceOrder: (data) => api.post('/jobwork/service-orders/', data),
+  updateServiceOrder: (id, data) => api.patch('/jobwork/service-orders/' + id + '/', data),
+  serviceOrderAction: (id, action, data = {}) => api.post('/jobwork/service-orders/' + id + '/' + action + '/', data),
   getOrders: (query) => api.get('/jobwork/orders/', { query }),
   getITC04Report: (query) => api.get('/jobwork/itc-04/', { query }),
   getITC04ExportUrl: (financialYear, quarter, table = 'both') =>

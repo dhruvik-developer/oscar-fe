@@ -1,5 +1,5 @@
 import React, { lazy, Suspense } from 'react';
-import { createBrowserRouter, RouterProvider, Navigate, useRouteError } from 'react-router-dom';
+import { createBrowserRouter, RouterProvider, Navigate, useLocation, useRouteError } from 'react-router-dom';
 import MainLayout from '../components/layout/MainLayout';
 import RequireAuth from './RequireAuth';
 import RequirePermission from './RequirePermission';
@@ -131,6 +131,7 @@ const SalesOrdersPage = lazy(() => import('../features/sales/SalesOrdersPage').t
 const SalesInvoicesPage = lazy(() => import('../features/sales/SalesInvoicesPage').then(m => ({ default: m.SalesInvoicesPage })));
 const SalesReturnsPage = lazy(() => import('../features/sales/SalesReturnsPage').then(m => ({ default: m.SalesReturnsPage })));
 const PaymentInPage = lazy(() => import('../features/sales/PaymentInPage').then(m => ({ default: m.PaymentInPage })));
+const CustomerPaymentsPage = lazy(() => import('../features/sales/receivables/CustomerPaymentsPage'));
 const DeliveryChallansPage = lazy(() => import('../features/sales/DeliveryChallansPage').then(m => ({ default: m.DeliveryChallansPage })));
 const BrokerCommissionPage = lazy(() => import('../features/sales/commercial/BrokerCommissionPage'));
 // [DISABLED] Warranty Cards concept commented out
@@ -152,6 +153,7 @@ const SupplierLedgerPage = lazy(() => import('../features/purchase/SupplierLedge
 const TextileMastersPage = lazy(() => import('../features/masters/TextileMastersPage'));
 
 // ── ERP — Inventory (Lazy Loaded) ─────────────────────────────
+const SubInventoryPage = lazy(() => import('../features/inventory/SubInventoryPage'));
 const ItemsMasterPage = lazy(() => import('../features/inventory/ItemsMasterPage').then(m => ({ default: m.ItemsMasterPage })));
 const AddEditItemPage = lazy(() => import('../features/inventory/AddEditItemPage').then(m => ({ default: m.AddEditItemPage })));
 const CategoriesPage = lazy(() => import('../features/inventory/CategoriesPage').then(m => ({ default: m.CategoriesPage })));
@@ -165,21 +167,22 @@ const ZoneRequestsPage = lazy(() => import('../features/inventory/ZoneRequestsPa
 const ValuationAgeingPage = lazy(() => import('../features/inventory/ValuationAgeingPage').then(m => ({ default: m.ValuationAgeingPage })));
 const MonthEndAuditPage = lazy(() => import('../features/inventory/MonthEndAuditPage').then(m => ({ default: m.MonthEndAuditPage })));
 const InventoryDashboardPage = lazy(() => import('../features/inventory/InventoryDashboardPage').then(m => ({ default: m.InventoryDashboardPage })));
-const FabricQualityPage = lazy(() => import('../features/inventory/masters/FabricQualityMasterPage'));
-const DesignMasterPage = lazy(() => import('../features/inventory/masters/textileMasterPages').then(m => ({ default: m.DesignMasterPage })));
-const ShadeMasterPage = lazy(() => import('../features/inventory/masters/ColourShadeMasterPage'));
-const FabricVariantMasterPage = lazy(() => import('../features/inventory/masters/FabricVariantMasterPage'));
-const FabricTypePage = lazy(() => import('../features/inventory/masters/textileMasterPages').then(m => ({ default: m.FabricTypePage })));
-const UomPage = lazy(() => import('../features/inventory/masters/textileMasterPages').then(m => ({ default: m.UomPage })));
-const QCDashboardPage = lazy(() => import('../features/inventory/qc/QCDashboardPage'));
-const QCPendingInspectionsPage = lazy(() => import('../features/inventory/qc/QCPendingInspectionsPage'));
-const QCInspectionRegisterPage = lazy(() => import('../features/inventory/qc/QCInspectionRegisterPage'));
-const QCResultsDispositionPage = lazy(() => import('../features/inventory/qc/QCResultsDispositionPage'));
-const QCReinspectionPage = lazy(() => import('../features/inventory/qc/QCReinspectionPage'));
-const QCReportsPage = lazy(() => import('../features/inventory/qc/QCReportsPage'));
+// Fabric quality, design, shade, variant, fabric type, categories and UOM: one page, one tab each.
+const FabricMastersPage = lazy(() => import('../features/inventory/masters/FabricMastersPage'));
+// QC: two hubs -- QC Work (inspect -> decide -> re-check) and QC Reports (overview, analytics).
+const QCWorkPage = lazy(() => import('../features/inventory/qc/QCWorkPage'));
+// QC per the requirement (PDF §08 / §18): QC Entry (roll by roll), Reprocess, QC History, QC Reports.
+const QCEntryPage = lazy(() => import('../features/inventory/qc/QCEntryPage'));
+const QCReprocessPage = lazy(() => import('../features/inventory/qc/QCReprocessHistoryPages').then(m => ({ default: m.QCReprocessPage })));
+const QCHistoryPage = lazy(() => import('../features/inventory/qc/QCReprocessHistoryPages').then(m => ({ default: m.QCHistoryPage })));
+const QCAdvancedPage = lazy(() => import('../features/inventory/qc/QcHubPages').then(m => ({ default: m.QCAdvancedPage })));
+const QCReportsHubPage = lazy(() => import('../features/inventory/qc/QcHubPages').then(m => ({ default: m.QCReportsHubPage })));
+const NotificationsPage = lazy(() => import('../features/notifications/NotificationsPage'));
+const ServiceOrdersPage = lazy(() => import('../features/jobwork/service-orders/ServiceOrdersPage'));
 const LotTakaRegisterPage = lazy(() => import('../features/inventory/LotTakaRegisterPage'));
 const TakaTagPrintPage = lazy(() => import('../features/inventory/TakaTagPrintPage'));
 const BatchRegistryPage = lazy(() => import('../features/inventory/batches/BatchRegistryPage'));
+const PublicBatchPassportPage = lazy(() => import('../features/inventory/batches/PublicBatchPassportPage'));
 const BatchTraceabilityPage = lazy(() => import('../features/inventory/batches/BatchTraceabilityPage'));
 const ProductionRunsPage = lazy(() => import('../features/inventory/batches/ProductionRunsPage'));
 const SampleListPage = lazy(() => import('../features/inventory/samples/SampleListPage'));
@@ -216,6 +219,14 @@ const ITC04ReportPage = lazy(() => import('../features/jobwork/ITC04ReportPage')
 
 // ── Main Dashboard (Lazy Loaded) ──────────────────────────────
 const DashboardPage = lazy(() => import('../features/sales/DashboardPage').then(m => ({ default: m.DashboardPage })));
+
+/** Redirect an old URL to its hub tab, keeping its query (?stage=, ?receiptId=...). */
+function RedirectWith({ to, set }) {
+  const location = useLocation();
+  const params = new URLSearchParams(location.search);
+  Object.entries(set).forEach(([key, value]) => params.set(key, value));
+  return <Navigate to={`${to}?${params}`} replace />;
+}
 
 function Page({ component: Component, ...rest }) {
   return (
@@ -328,6 +339,17 @@ const router = createBrowserRouter([
     // element: <Page component={PublicQuotationPage} />,
     // errorElement: <RootErrorBoundary />,
   // },
+  // Public Batch Passport (no sign-in required, opens directly from phone QR scan)
+  {
+    path: '/batch/:code',
+    element: <Page component={PublicBatchPassportPage} title="Batch Passport" />,
+    errorElement: <RootErrorBoundary />,
+  },
+  {
+    path: '/public/batch/:code',
+    element: <Page component={PublicBatchPassportPage} title="Batch Passport" />,
+    errorElement: <RootErrorBoundary />,
+  },
   // ── Protected Application Shell (Guarded by RequireAuth) ─
   {
     element: <RequireAuth />,
@@ -376,6 +398,7 @@ const router = createBrowserRouter([
       { path: 'crm/leads/create-form', element: <Page component={DynamicLeadFormPage} /> },
       { path: 'crm/customers', element: <Page component={CustomersPage} /> },
       { path: 'crm/tasks', element: <Page component={TasksPage} /> },
+      { path: 'notifications', element: <Page component={NotificationsPage} title="All notifications" /> },
       { path: 'crm/tasks/allocation', element: <Page component={TaskAllocationPage} /> },
       { path: 'crm/tasks/allocation/:id', element: <Page component={TaskAllocationDetailPage} /> },
       { path: 'crm/stage-tasks', element: <Page component={StageTasksPage} /> },
@@ -433,6 +456,7 @@ const router = createBrowserRouter([
       { path: 'sales/invoices', element: <Page component={SalesInvoicesPage} /> },
       { path: 'sales/returns', element: <Page component={SalesReturnsPage} /> },
       { path: 'sales/payments', element: <Page component={PaymentInPage} /> },
+      { path: 'sales/receivables', element: <Page component={CustomerPaymentsPage} /> },
       { path: 'sales/delivery', element: <Page component={DeliveryChallansPage} /> },
       { path: 'sales/broker-commissions', element: <Page component={BrokerCommissionPage} title="Broker Commissions" /> },
       // [REMOVED] Customer Warranty concept removed product-wide
@@ -464,20 +488,31 @@ const router = createBrowserRouter([
       // ── Inventory ─────────────────────────────────────────
       { path: 'inventory', element: <Navigate to="/inventory/dashboard" replace /> },
       { path: 'inventory/dashboard', element: <Page component={InventoryDashboardPage} title="Inventory Dashboard" /> },
-      { path: 'inventory/fabric/quality', element: <Page component={FabricQualityPage} /> },
-      { path: 'inventory/fabric/design', element: <Page component={DesignMasterPage} /> },
-      { path: 'inventory/fabric/colour', element: <Page component={ShadeMasterPage} /> },
-      { path: 'inventory/fabric/variants', element: <Page component={FabricVariantMasterPage} /> },
+      { path: 'inventory/fabric-masters', element: <Page component={FabricMastersPage} title="Fabric Masters" /> },
+      // The old one-page-per-master URLs open the matching tab.
+      { path: 'inventory/fabric/quality', element: <Navigate to="/inventory/fabric-masters?tab=quality" replace /> },
+      { path: 'inventory/fabric/design', element: <Navigate to="/inventory/fabric-masters?tab=design" replace /> },
+      { path: 'inventory/fabric/colour', element: <Navigate to="/inventory/fabric-masters?tab=colour" replace /> },
+      { path: 'inventory/fabric/variants', element: <Navigate to="/inventory/fabric-masters?tab=variants" replace /> },
       { path: 'inventory/masters/textile', element: <Page component={TextileMastersPage} /> },
       { path: 'masters/textile', element: <Navigate to="/inventory/masters/textile" replace /> },
-      { path: 'inventory/categories/fabric-type', element: <Page component={FabricTypePage} /> },
-      { path: 'inventory/categories/uom', element: <Page component={UomPage} /> },
-      { path: 'inventory/qc', element: <Page component={QCDashboardPage} title="QC Dashboard" /> },
-      { path: 'inventory/qc/pending', element: <Page component={QCPendingInspectionsPage} title="Pending Inspections" /> },
-      { path: 'inventory/qc/register', element: <Page component={QCInspectionRegisterPage} title="QC Inspection Register" /> },
-      { path: 'inventory/qc/results', element: <Page component={QCResultsDispositionPage} title="QC Results & Disposition" /> },
-      { path: 'inventory/qc/reinspection', element: <Page component={QCReinspectionPage} title="QC Reinspection / Reprocess" /> },
-      { path: 'inventory/qc/reports', element: <Page component={QCReportsPage} title="QC Reports" /> },
+      { path: 'inventory/categories/fabric-type', element: <Navigate to="/inventory/fabric-masters?tab=fabric-type" replace /> },
+      { path: 'inventory/categories/uom', element: <Navigate to="/inventory/fabric-masters?tab=uom" replace /> },
+      // Grey Fabric QC and Dyeing QC are the same screens filtered by ?stage=grey|dyeing.
+      { path: 'inventory/qc/entry', element: <Page component={QCEntryPage} title="QC Entry" /> },
+      { path: 'inventory/qc/reprocess', element: <Page component={QCReprocessPage} title="Reprocess" /> },
+      { path: 'inventory/qc/history', element: <Page component={QCHistoryPage} title="QC History" /> },
+      { path: 'inventory/qc/work', element: <Page component={QCWorkPage} title="QC Work" /> },
+      { path: 'inventory/qc/advanced', element: <Page component={QCAdvancedPage} title="Detailed QC Screens" /> },
+      { path: 'inventory/qc/reports', element: <Page component={QCReportsHubPage} title="QC Reports" /> },
+      // The old one-page-per-step URLs open the matching step / tab.
+      { path: 'inventory/qc', element: <RedirectWith to="/inventory/qc/entry" set={{}} /> },
+      { path: 'inventory/qc/pending', element: <RedirectWith to="/inventory/qc/advanced" set={{ step: 'pending' }} /> },
+      { path: 'inventory/qc/register', element: <RedirectWith to="/inventory/qc/advanced" set={{ step: 'inspect' }} /> },
+      { path: 'inventory/qc/results', element: <RedirectWith to="/inventory/qc/advanced" set={{ step: 'decide' }} /> },
+      { path: 'inventory/qc/reinspection', element: <RedirectWith to="/inventory/qc/advanced" set={{ step: 'recheck' }} /> },
+      { path: 'inventory/qc/dashboard', element: <RedirectWith to="/inventory/qc/reports" set={{ tab: 'overview' }} /> },
+      { path: 'job-work/service-orders', element: <Page component={ServiceOrdersPage} title="Dyeing Service Orders" /> },
       { path: 'inventory/lot-register', element: <Page component={LotTakaRegisterPage} title="Lot / Taka Register" /> },
       { path: 'inventory/lots-takas', element: <Navigate to="/inventory/lot-register" replace /> },
       { path: 'inventory/taka-tags', element: <Page component={TakaTagPrintPage} title="Taka Tag Print" /> },
@@ -487,17 +522,19 @@ const router = createBrowserRouter([
       { path: 'inventory/batches/:code', element: <Page component={BatchTraceabilityPage} title="Batch Traceability" /> },
       { path: 'inventory/samples', element: <Page component={SampleListPage} title="Sample Management" /> },
       { path: 'inventory/trips', element: <Page component={TripListPage} title="Logistics & Tempo Trips" /> },
-      { path: 'inventory/items', element: <Page component={ItemsMasterPage} /> },
+      { path: 'inventory/grey', element: <Page component={SubInventoryPage} title="Grey Inventory" /> },
+      { path: 'inventory/dyeing', element: <Page component={SubInventoryPage} title="Dyeing Inventory" /> },
+      { path: 'inventory/items', element: <Page component={SubInventoryPage} title="Inventory" /> },
       { path: 'inventory/items/fabric', element: <Page component={ItemsMasterPage} /> },
       { path: 'inventory/items/machines', element: <Page component={ItemsMasterPage} /> },
       { path: 'inventory/items/stock', element: <Navigate to="/inventory/items" replace /> },
       { path: 'inventory/machines', element: <Navigate to="/inventory/items/machines" replace /> },
       { path: 'inventory/items/new', element: <Page component={AddEditItemPage} /> },
       { path: 'inventory/items/edit/:id', element: <Page component={AddEditItemPage} /> },
-      { path: 'inventory/categories', element: <Page component={CategoriesPage} /> },
+      { path: 'inventory/categories', element: <Navigate to="/inventory/fabric-masters?tab=categories" replace /> },
       { path: 'inventory/categories/machines', element: <Page component={CategoriesPage} /> },
       { path: 'inventory/categories/machine', element: <Navigate to="/inventory/categories/machines" replace /> },
-      { path: 'inventory/categories/stock', element: <Navigate to="/inventory/categories" replace /> },
+      { path: 'inventory/categories/stock', element: <Navigate to="/inventory/fabric-masters?tab=categories" replace /> },
       { path: 'inventory/stock-position', element: <Page component={StockPositionPage} /> },
       { path: 'inventory/stock', element: <Navigate to="/inventory/stock-position" replace /> },
       { path: 'inventory/transfers', element: <Page component={TransfersPage} /> },

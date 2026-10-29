@@ -228,7 +228,7 @@ function WarehouseTab({ warehouses, onChanged }) {
       <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
         <table className="w-full min-w-[820px]">
           <thead className="bg-slate-50 text-[10px] uppercase text-slate-500">
-            <tr><th className="text-left p-2">Code</th><th className="text-left p-2">Name</th><th className="text-left p-2">Address</th><th className="text-left p-2">Manager</th><th className="text-left p-2">Contact</th><th className="text-left p-2">Status</th><th className="p-2" /></tr>
+            <tr><th className="text-left p-2">Code</th><th className="text-left p-2">Name</th><th className="text-left p-2">Address</th><th className="text-left p-2">Manager</th><th className="text-left p-2">Contact Number</th><th className="text-left p-2">Status</th><th className="p-2" /></tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {warehouses.length === 0 && <tr><td colSpan={7} className="p-6 text-center text-slate-400">No warehouses yet. Add the first one.</td></tr>}
@@ -259,39 +259,121 @@ function WarehouseForm({ initial, onClose, onDone }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const isNew = !initial.id;
+
   const field = (key, label, props = {}) => (
     <label className="block"><span className="block font-semibold mb-1">{label}</span>
       <input value={form[key] ?? ''} onChange={(e) => setForm({ ...form, [key]: e.target.value })} className={`${input} w-full`} {...props} /></label>
   );
+
+  const handleOnlyDigitsKeyDown = (e) => {
+    if (e.key === 'Backspace' || e.key === 'Delete' || e.key === 'Tab' || e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.ctrlKey || e.metaKey) return;
+    if (!/^[0-9]$/.test(e.key)) e.preventDefault();
+  };
+
   const submit = async (e) => {
     e.preventDefault();
-    setSaving(true);
     setError('');
+
+    // 10-digit number validation for Contact Number
+    if (form.contact && form.contact.trim()) {
+      const cleanContact = form.contact.replace(/\D/g, '');
+      if (cleanContact.length !== 10) {
+        setError('Contact Number must be exactly 10 digits.');
+        return;
+      }
+    }
+
+    // 6-digit number validation for PIN code
+    if (form.pincode && form.pincode.trim()) {
+      const cleanPin = form.pincode.replace(/\D/g, '');
+      if (cleanPin.length !== 6) {
+        setError('PIN code must be exactly 6 digits.');
+        return;
+      }
+    }
+
+    setSaving(true);
     try {
       const { id, type, ...data } = form;
-      if (isNew) await inventoryService.createWarehouse(data);
-      else await inventoryService.updateWarehouse(id, { ...data, code: undefined });
+      const cleanData = {
+        ...data,
+        contact: (form.contact || '').replace(/\D/g, '').slice(0, 10),
+        pincode: (form.pincode || '').replace(/\D/g, '').slice(0, 6)
+      };
+      if (isNew) await inventoryService.createWarehouse(cleanData);
+      else await inventoryService.updateWarehouse(id, { ...cleanData, code: undefined });
       onDone();
     } catch (err) {
       setError(describeApiError(err) || 'The warehouse could not be saved.');
       setSaving(false);
     }
   };
+
   return (
     <Modal title={isNew ? 'Add warehouse' : `Edit ${initial.name}`} onClose={onClose}>
       <form onSubmit={submit} className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        {field('code', 'Warehouse code *', { required: true, disabled: !isNew, placeholder: 'e.g. WH-SURAT' })}
+        {field('code', isNew ? 'Warehouse code (auto if blank)' : 'Warehouse code', { disabled: !isNew, placeholder: isNew ? 'Auto from name, e.g. WH-SURAT' : '' })}
         {field('name', 'Warehouse name *', { required: true })}
         <div className="sm:col-span-2">{field('address', 'Address')}</div>
         {field('city', 'City')}
         {field('state', 'State')}
-        {field('pincode', 'PIN code', { inputMode: 'numeric', pattern: '[0-9]{6}', title: '6 digits' })}
+
+        {/* PIN Code: exactly 6 numbers */}
+        <label className="block">
+          <div className="flex items-center justify-between mb-1">
+            <span className="font-semibold">PIN code</span>
+            <span className="text-[10px] text-slate-400 font-mono">
+              {form.pincode ? `${form.pincode.length}/6` : '6 digits'}
+            </span>
+          </div>
+          <input
+            type="tel"
+            inputMode="numeric"
+            maxLength={6}
+            pattern="[0-9]{6}"
+            title="Must be exactly 6 numbers"
+            value={form.pincode ?? ''}
+            onChange={(e) => {
+              const val = e.target.value.replace(/\D/g, '').slice(0, 6);
+              setForm((prev) => ({ ...prev, pincode: val }));
+            }}
+            onKeyDown={handleOnlyDigitsKeyDown}
+            placeholder="e.g. 394230"
+            className={`${input} w-full font-mono`}
+          />
+        </label>
+
         {field('manager', 'Manager')}
-        {field('contact', 'Contact (phone / email)')}
+
+        {/* Contact Number: strictly digits only, max 10 digits */}
+        <label className="block">
+          <div className="flex items-center justify-between mb-1">
+            <span className="font-semibold">Contact Number</span>
+            <span className="text-[10px] text-slate-400 font-mono">
+              {form.contact ? `${form.contact.length}/10` : '10 digits'}
+            </span>
+          </div>
+          <input
+            type="tel"
+            inputMode="numeric"
+            maxLength={10}
+            pattern="[0-9]{10}"
+            title="Must be exactly 10 numbers"
+            value={form.contact ?? ''}
+            onChange={(e) => {
+              const val = e.target.value.replace(/\D/g, '').slice(0, 10);
+              setForm((prev) => ({ ...prev, contact: val }));
+            }}
+            onKeyDown={handleOnlyDigitsKeyDown}
+            placeholder="e.g. 9825012345"
+            className={`${input} w-full font-mono`}
+          />
+        </label>
+
         {isNew ? null : (
           <label className="inline-flex items-center gap-2 font-semibold self-end h-9"><input type="checkbox" checked={!!form.isActive} onChange={(e) => setForm({ ...form, isActive: e.target.checked })} /> Active</label>
         )}
-        {error && <div role="alert" className="sm:col-span-2 p-2 rounded-lg bg-rose-50 border border-rose-200 text-rose-700">{error}</div>}
+        {error && <div role="alert" className="sm:col-span-2 p-2 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-xs font-medium">{error}</div>}
         <div className="sm:col-span-2"><ModalButtons saving={saving} onClose={onClose} label={isNew ? 'Create warehouse' : 'Save changes'} /></div>
       </form>
     </Modal>

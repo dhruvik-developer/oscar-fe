@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useFabricMastersEmbed } from './fabricMastersEmbed';
 import {
   Search,
   Plus,
@@ -251,7 +252,7 @@ export default function FabricTypeMasterPage() {
   const handleSave = async (e) => {
     e?.preventDefault();
     if (saving) return;
-    if (!form.code.trim()) return setFormError('Type Code is required.');
+    if (!backendOn && !form.code.trim()) return setFormError('Type Code is required.');
     if (!form.name.trim()) return setFormError('Type Name is required.');
     if (!form.processStage) return setFormError('Process Stage is required.');
 
@@ -410,24 +411,30 @@ export default function FabricTypeMasterPage() {
   const readOnly = panelMode === 'view';
   const crumbTail = panelMode === 'create' ? 'Add New' : panelMode === 'edit' ? 'Edit' : 'View';
 
+  const embedded = useFabricMastersEmbed();
+
   return (
     <div className="w-full space-y-4">
       {/* ── Slide 7 header ── */}
-      <div className="flex items-center gap-3">
-        <div className="w-8 h-8 rounded-full bg-[#1e60f2] text-white flex items-center justify-center font-bold text-base shrink-0 shadow-xs">
-          7
+      {!embedded && (
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-full bg-[#1e60f2] text-white flex items-center justify-center font-bold text-base shrink-0 shadow-xs">
+            7
+          </div>
+          <h1 className="text-xl sm:text-2xl font-bold text-[#0f172a] tracking-tight">Fabric Type / Classification – List</h1>
+          <PageInfoButton title="Fabric Type Master" />
         </div>
-        <h1 className="text-xl sm:text-2xl font-bold text-[#0f172a] tracking-tight">Fabric Type / Classification – List</h1>
-        <PageInfoButton title="Fabric Type Master" />
-      </div>
+      )}
 
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pt-1">
-        <div className="flex items-center gap-2 text-xs text-slate-500 font-medium">
-          <Layers className="w-4 h-4 text-[#1e60f2]" />
-          <span>Categories</span>
-          <span className="text-slate-300 font-bold">&gt;</span>
-          <span className="text-slate-800 font-semibold">Fabric Type / Classification</span>
-        </div>
+        {!embedded && (
+          <div className="flex items-center gap-2 text-xs text-slate-500 font-medium">
+            <Layers className="w-4 h-4 text-[#1e60f2]" />
+            <span>Categories</span>
+            <span className="text-slate-300 font-bold">&gt;</span>
+            <span className="text-slate-800 font-semibold">Fabric Type / Classification</span>
+          </div>
+        )}
 
         <div className="flex items-center gap-2.5 flex-wrap sm:flex-nowrap">
           <div className="relative min-w-[240px] sm:w-72">
@@ -676,13 +683,13 @@ export default function FabricTypeMasterPage() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                     <div>
                       <label className="block font-semibold text-slate-700 mb-1">
-                        Type Code <span className="text-rose-500">*</span>
+                        Type Code {backendOn ? <span className="font-normal text-slate-400">(auto if blank)</span> : <span className="text-rose-500">*</span>}
                       </label>
                       <input
                         value={form.code}
                         disabled={readOnly}
                         onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })}
-                        placeholder="T-001"
+                        placeholder={backendOn ? 'Auto from name' : 'T-001'}
                         className={`${inputClass} uppercase shadow-2xs`}
                       />
                     </div>

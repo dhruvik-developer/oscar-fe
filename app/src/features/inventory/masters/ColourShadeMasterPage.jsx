@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useFabricMastersEmbed } from './fabricMastersEmbed';
 import {
   Search,
   Filter,
@@ -676,7 +677,7 @@ export default function ColourShadeMasterPage() {
       return;
     }
 
-    if (!form.code.trim()) {
+    if (!backendOn && !form.code.trim()) {
       setFormError('Shade Code is required.');
       return;
     }
@@ -758,28 +759,34 @@ export default function ColourShadeMasterPage() {
     }
   };
 
+  const embedded = useFabricMastersEmbed();
+
   return (
     <div className="w-full space-y-4">
       {/* ── Slide 5 Header: 5 Colour / Shade Master – List ── */}
-      <div className="flex items-center gap-3">
-        <div className="w-8 h-8 rounded-full bg-[#1e60f2] text-white flex items-center justify-center font-bold text-base shrink-0 shadow-xs">
-          5
+      {!embedded && (
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-full bg-[#1e60f2] text-white flex items-center justify-center font-bold text-base shrink-0 shadow-xs">
+            5
+          </div>
+          <h1 className="text-xl sm:text-2xl font-bold text-[#0f172a] tracking-tight">
+            Colour / Shade Master – List
+          </h1>
+          <PageInfoButton title="Colour / Shade Master" />
         </div>
-        <h1 className="text-xl sm:text-2xl font-bold text-[#0f172a] tracking-tight">
-          Colour / Shade Master – List
-        </h1>
-        <PageInfoButton title="Colour / Shade Master" />
-      </div>
+      )}
 
       {/* ── Sub-header: Breadcrumb & Toolbar ── */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
         {/* Breadcrumb: Inventory > Colour / Shade Master */}
-        <div className="flex items-center gap-2 text-xs text-slate-600 font-medium">
-          <Layers className="w-4 h-4 text-[#1e60f2]" />
-          <span>Inventory</span>
-          <span className="text-slate-300 font-bold">&gt;</span>
-          <span className="text-slate-800 font-semibold">Colour / Shade Master</span>
-        </div>
+        {!embedded && (
+          <div className="flex items-center gap-2 text-xs text-slate-600 font-medium">
+            <Layers className="w-4 h-4 text-[#1e60f2]" />
+            <span>Inventory</span>
+            <span className="text-slate-300 font-bold">&gt;</span>
+            <span className="text-slate-800 font-semibold">Colour / Shade Master</span>
+          </div>
+        )}
 
         {/* Toolbar: Search + Filter + Add New */}
         <div className="flex items-center gap-2.5 flex-wrap sm:flex-nowrap">
@@ -1160,14 +1167,14 @@ export default function ColourShadeMasterPage() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                     <div>
                       <label className="block font-semibold text-slate-700 mb-1">
-                        Shade Code <span className="text-rose-500">*</span>
+                        Shade Code {backendOn ? <span className="font-normal text-slate-400">(auto if blank)</span> : <span className="text-rose-500">*</span>}
                       </label>
                       <input
                         type="text"
-                        required
+                        required={!backendOn}
                         value={form.code}
                         onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })}
-                        placeholder="SH-001"
+                        placeholder={backendOn ? 'Auto from name' : 'SH-001'}
                         className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-blue-500 text-slate-800 font-mono uppercase shadow-2xs"
                       />
                     </div>

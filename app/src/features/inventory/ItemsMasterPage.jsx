@@ -608,12 +608,12 @@ export const ItemsMasterPage = () => {
             <ChevronRight size={12} className="text-slate-300" />
             <span>Inventory</span>
             <ChevronRight size={12} className="text-slate-300" />
-            <span className="text-slate-700 font-semibold">Total Inventory</span>
+            <span className="text-slate-700 font-semibold">Inventory</span>
           </div>
 
           <div className="flex items-center gap-2">
             <h1 className="text-xl sm:text-2xl font-black text-slate-800 tracking-tight">
-              Total Inventory – Grey Fabric
+              Inventory – Grey Fabric
             </h1>
             <button
               type="button"
@@ -642,7 +642,7 @@ export const ItemsMasterPage = () => {
           <button
             type="button"
             className="btn-outline flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 shadow-2xs cursor-pointer transition-colors"
-            onClick={() => navigate('/inventory/categories')}
+            onClick={() => navigate('/inventory/fabric-masters?tab=categories')}
           >
             <Layers size={14} />
             Categories
@@ -1636,7 +1636,7 @@ export const ItemsMasterPage = () => {
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <h3 className="font-bold text-base text-slate-800 flex items-center gap-2">
                 <Info size={18} className="text-blue-600" />
-                Total Inventory – Grey Fabric Architecture
+                Inventory – Grey Fabric Architecture
               </h3>
               <button
                 type="button"

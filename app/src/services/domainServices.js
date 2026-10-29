@@ -356,6 +356,9 @@ export const inventoryService = {
   setBatchOwnership: (code, data) => api.patch(`/inventory/batches/${encodeURIComponent(code)}/`, data),
   // Rejections: classify by cause (normal loss vs supplier / job worker / process fault) and track claims.
   recordBatchLoss: (code, data) => api.post(`/inventory/batches/${encodeURIComponent(code)}/losses/`, data),
+  // Batch 360 operations -> the refreshed batch.
+  // action: send-to-qc | qc | rework-done | yarn | yarn-delete | fabric-type
+  batchAction: (code, action, data) => api.post(`/inventory/batches/${encodeURIComponent(code)}/actions/${action}/`, data),
   updateBatchLoss: (id, data) => api.patch(`/inventory/batch-losses/${id}/`, data),
   // { rolls: [{lotTakaId, qty}], reason, lossId? } -> debit note(s) for QC-rejected purchased rolls
   returnRejectedToSupplier: (data) => api.post('/inventory/qc/purchase-return/', data),

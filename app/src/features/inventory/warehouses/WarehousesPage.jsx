@@ -312,7 +312,7 @@ function WarehouseForm({ initial, onClose, onDone }) {
   return (
     <Modal title={isNew ? 'Add warehouse' : `Edit ${initial.name}`} onClose={onClose}>
       <form onSubmit={submit} className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        {field('code', 'Warehouse code *', { required: true, disabled: !isNew, placeholder: 'e.g. WH-SURAT' })}
+        {field('code', isNew ? 'Warehouse code (auto if blank)' : 'Warehouse code', { disabled: !isNew, placeholder: isNew ? 'Auto from name, e.g. WH-SURAT' : '' })}
         {field('name', 'Warehouse name *', { required: true })}
         <div className="sm:col-span-2">{field('address', 'Address')}</div>
         {field('city', 'City')}

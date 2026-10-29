@@ -887,13 +887,12 @@ export default function QCInspectionRegisterPage() {
                     </div>
 
                     <div>
-                      <label className="block text-slate-700 font-medium mb-1">Lot Number *</label>
+                      <label className="block text-slate-700 font-medium mb-1">Lot Number <span className="font-normal text-slate-400">(auto if blank)</span></label>
                       <input
                         type="text"
-                        placeholder="e.g. LOT-FAB-200"
+                        placeholder="Auto-generated"
                         value={newLotNo}
                         onChange={(e) => setNewLotNo(e.target.value)}
-                        required
                         className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white text-slate-800 font-mono font-bold"
                       />
                     </div>

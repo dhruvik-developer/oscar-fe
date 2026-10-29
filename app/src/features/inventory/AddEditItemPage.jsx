@@ -534,9 +534,11 @@ export const AddEditItemPage = () => {
 
   const handleCreateUnit = (e) => {
     e.preventDefault();
-    if (!newUnitCode.trim() || !newUnitLabel.trim()) return;
+    if (!newUnitLabel.trim()) return;
+    // No code typed: made from the label (Bundle -> BUNDLE), as the server would.
+    const autoCode = newUnitLabel.trim().toUpperCase().replace(/[^A-Z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 24);
     const created = addUnit({
-      code: newUnitCode.trim(),
+      code: newUnitCode.trim() || autoCode,
       label: newUnitLabel.trim(),
     });
     setSalesUnit(created.code);
@@ -2921,12 +2923,11 @@ export const AddEditItemPage = () => {
 
             <form onSubmit={handleCreateUnit} className="space-y-3 text-xs">
               <div>
-                <label className="block font-medium text-slate-700 mb-1">Unit Code / Symbol</label>
+                <label className="block font-medium text-slate-700 mb-1">Unit Code / Symbol <span className="font-normal text-slate-400">(auto if blank)</span></label>
                 <input
-                  required
                   value={newUnitCode}
                   onChange={(e) => setNewUnitCode(e.target.value)}
-                  placeholder="e.g. BDL, REEL, CTN"
+                  placeholder="Auto from label, e.g. BDL, REEL, CTN"
                   className="w-full border border-slate-200 rounded-xl p-2.5 bg-slate-50 font-mono uppercase text-xs"
                 />
               </div>

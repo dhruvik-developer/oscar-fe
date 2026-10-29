@@ -2012,7 +2012,8 @@ export const ERPProvider = ({ children, }) => {
         showToast(`Customer ${newCust.name} created and synced to Parties.`);
         // `persist: false` when called from addParty, which posts the party itself.
         if (persist) {
-            persistCreate('parties', { ...newCust, type: 'Customer' }, setParties, {
+            // No typed code: the server allocates CUST-… (the local one is a placeholder).
+            persistCreate('parties', { ...newCust, code: cust.code || undefined, type: 'Customer' }, setParties, {
                 also: [{ setter: setCustomers, map: partyAsCustomer }],
             });
         }
@@ -2076,7 +2077,8 @@ export const ERPProvider = ({ children, }) => {
 
         showToast(`Vendor ${newVendor.name} added and synced to Parties.`);
         if (persist) {
-            persistCreate('parties', { ...newVendor, type: 'Vendor' }, setParties, {
+            // No typed code: the server allocates VEND-… (the local one is a placeholder).
+            persistCreate('parties', { ...newVendor, code: ven.code || undefined, type: 'Vendor' }, setParties, {
                 also: [{ setter: setVendors, map: partyAsVendor }],
             });
         }

@@ -12,8 +12,8 @@ import { RowActionModal } from './RowActions';
 
 /** `?type=` values the sidebar already links to -> screen keys. */
 const TYPE_TO_SCREEN = {
-  '': 'overview', sample: 'samples', wastage: 'scrap', good: 'usable', reprocess: 'reprocessing',
-  'customer-return': 'customer-returns',
+  good: 'usable', sample: 'samples', shortage: 'scrap', reprocess: 'reprocessing', 'customer-return': 'customer-returns', '': 'usable', wastage: 'scrap',
+
 };
 const SCREEN_TO_TYPE = Object.fromEntries(Object.entries(TYPE_TO_SCREEN).map(([k, v]) => [v, k]));
 
@@ -44,13 +44,6 @@ const rollColumns = (withCost) => [
 
 /** One config per screen: KPIs, columns, filters and row actions. */
 const SCREENS = {
-  overview: {
-    title: 'Fabric Stock Overview',
-    subtitle: 'All fabric physically held, by batch and taka — split into available, reserved, QC-hold / rejected and in-process.',
-    kpis: [['physical', 'Total physical'], ['available', 'Available (OSCAR)'], ['reserved', 'Reserved'], ['qcHoldRejected', 'QC hold / rejected'], ['inProcess', 'At vendor / reprocessing'], ['customerHeld', 'Customer material held']],
-    filters: ['q', 'date', 'item', 'design', 'shade', 'location', 'ownership', 'stockStatus'],
-    columns: rollColumns,
-  },
   usable: {
     title: 'Usable Fabric Stock',
     subtitle: "OSCAR's own QC-passed fabric in godowns. QC hold, rejected, at vendor and customer material are excluded; reserved is shown apart.",
@@ -59,7 +52,7 @@ const SCREENS = {
     columns: rollColumns,
   },
   scrap: {
-    title: 'Scrap & Waste Inventory',
+    title: 'Short Stock Fabric',
     subtitle: 'QC-rejected stock awaiting a decision, second quality, production wastage and approved process loss. Material routed to rework leaves this list.',
     kpis: [['qcRejected', 'QC rejected (in stock)'], ['scrap', 'Classified as scrap'], ['reusable', 'Reusable / downgrade'], ['productionWaste', 'Production wastage'], ['processLoss', 'Approved process loss'], ['value', 'Rejected stock value', 'money']],
     filters: ['q', 'date', 'item', 'location', 'scrapKind'],
@@ -77,7 +70,7 @@ const SCREENS = {
     actions: (r) => (r.kind === 'QC rejected' && r.lotTakaId ? ['rework', 'dispose', 'vendorReturn'] : []),
   },
   reprocessing: {
-    title: 'Reprocessing Stock',
+    title: 'Reprocess Stock',
     subtitle: 'Fabric with dyeing / processing vendors and in the in-house reprocess store. Pending material is pending — never assumed lost.',
     kpis: [['lotsUnderProcessing', 'Orders with material out', 'count'], ['vendorHeld', 'Held by vendors'], ['pendingReturn', 'Pending return'], ['returnedAwaitingQc', 'Returned, awaiting QC'], ['overdueLots', 'Overdue orders', 'count'], ['awaitingReprocessInStore', 'In reprocess store']],
     filters: ['q', 'reprocessStatus'],
@@ -116,7 +109,7 @@ const SCREENS = {
     ],
   },
   samples: {
-    title: 'Sample Inventory',
+    title: 'Sample Fabric Stock',
     subtitle: 'Samples cut from batches: issued, returned, consumed and outstanding. Returns are routed by condition; damaged samples go to Reject.',
     kpis: [['total', 'Samples', 'count'], ['outstanding', 'Outstanding', 'count'], ['issuedQty', 'Issued qty'], ['returnedQty', 'Returned qty'], ['consumedQty', 'Consumed qty'], ['returnedUnderQcQty', 'Returned, under QC']],
     filters: ['q', 'date', 'sampleStatus'],

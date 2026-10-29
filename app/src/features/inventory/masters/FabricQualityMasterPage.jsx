@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useFabricMastersEmbed } from './fabricMastersEmbed';
 import {
   Search,
   Filter,
@@ -232,7 +233,7 @@ export default function FabricQualityMasterPage() {
       return;
     }
 
-    if (!form.code.trim()) {
+    if (!backendOn && !form.code.trim()) {
       setFormError('Quality Code is required.');
       return;
     }
@@ -318,18 +319,22 @@ export default function FabricQualityMasterPage() {
     }
   };
 
+  const embedded = useFabricMastersEmbed();
+
   return (
     <div className="w-full space-y-4">
       {/* ── Slide 1: Header Bar & Actions ── */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         {/* Breadcrumb: Inventory > Fabric Quality Master */}
-        <div className="flex items-center gap-2 text-xs text-slate-600 font-medium">
-          <Layers className="w-4 h-4 text-[#1e60f2]" />
-          <span>Inventory</span>
-          <span className="text-slate-300 font-bold">&gt;</span>
-          <span className="text-slate-800 font-semibold">Fabric Quality Master</span>
-          <PageInfoButton title="Fabric Quality Master" />
-        </div>
+        {!embedded && (
+          <div className="flex items-center gap-2 text-xs text-slate-600 font-medium">
+            <Layers className="w-4 h-4 text-[#1e60f2]" />
+            <span>Inventory</span>
+            <span className="text-slate-300 font-bold">&gt;</span>
+            <span className="text-slate-800 font-semibold">Fabric Quality Master</span>
+            <PageInfoButton title="Fabric Quality Master" />
+          </div>
+        )}
 
         {/* Toolbar: Search + Filter + Add New */}
         <div className="flex items-center gap-2.5 flex-wrap sm:flex-nowrap">
@@ -684,14 +689,14 @@ export default function FabricQualityMasterPage() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                     <div>
                       <label className="block font-semibold text-slate-700 mb-1">
-                        Quality Code <span className="text-rose-500">*</span>
+                        Quality Code {backendOn ? <span className="font-normal text-slate-400">(auto if blank)</span> : <span className="text-rose-500">*</span>}
                       </label>
                       <input
                         type="text"
-                        required
+                        required={!backendOn}
                         value={form.code}
                         onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })}
-                        placeholder="COT-60S"
+                        placeholder={backendOn ? 'Auto from name' : 'COT-60S'}
                         className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-blue-500 text-slate-800 font-mono uppercase shadow-2xs"
                       />
                     </div>

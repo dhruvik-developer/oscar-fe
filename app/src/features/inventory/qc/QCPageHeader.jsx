@@ -1,5 +1,12 @@
-import React from 'react';
+import React, { createContext, useContext } from 'react';
 import { PageHeader } from '../../../components/ui/PageHeader';
+
+/**
+ * True while a QC page is shown as a step / tab of QC Work or QC Reports:
+ * the hub owns the title, breadcrumb and QC-type filter, so the page keeps
+ * only its own action buttons.
+ */
+export const QcHubEmbed = createContext(false);
 
 /**
  * Standardized Quality Control (QC) Page Header.
@@ -29,6 +36,10 @@ export function QCPageHeader({
   actions,
   titleExtra,
 }) {
+  const embedded = useContext(QcHubEmbed);
+  if (embedded) {
+    return actions ? <div className="flex flex-wrap justify-end gap-2">{actions}</div> : null;
+  }
   const defaultBreadcrumbs = (isDashboard || subpage === null)
     ? [
         { label: 'Dashboard', path: '/dashboard' },

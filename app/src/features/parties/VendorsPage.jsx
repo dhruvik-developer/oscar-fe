@@ -138,7 +138,7 @@ export const VendorsPage = () => {
         if (!newVend.name)
             return;
         addVendor({
-            code: newVend.code || `VEND-${String(vendors.length + 1).padStart(3, '0')}`,
+            code: newVend.code,
             name: newVend.name,
             category: newVend.category || 'Hardware',
             contactPerson: newVend.contactPerson || 'Vendor Account Rep',
@@ -189,7 +189,7 @@ export const VendorsPage = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="font-semibold text-slate-700 block mb-1">Vendor Code</label>
-                  <input type="text" placeholder="e.g. VEND-005" value={newVend.code} onChange={(e) => setNewVend({ ...newVend, code: e.target.value })} className="w-full p-2 border border-slate-300 rounded bg-white text-slate-800 font-mono"/>
+                  <input type="text" placeholder="Auto-generated (VEND-…)" value={newVend.code} onChange={(e) => setNewVend({ ...newVend, code: e.target.value })} className="w-full p-2 border border-slate-300 rounded bg-white text-slate-800 font-mono"/>
                 </div>
                 <div>
                   <label className="font-semibold text-slate-700 block mb-1">Company / Supplier Name *</label>

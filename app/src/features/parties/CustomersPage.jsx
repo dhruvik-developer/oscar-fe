@@ -131,7 +131,7 @@ export const CustomersPage = () => {
         if (!newCust.name)
             return;
         addCustomer({
-            code: newCust.code || `CUST-${String(customers.length + 1).padStart(3, '0')}`,
+            code: newCust.code,
             name: newCust.name,
             contactPerson: newCust.contactPerson || 'General Contact',
             email: newCust.email || 'billing@client.com',
@@ -186,7 +186,7 @@ export const CustomersPage = () => {
                 </div>
                 <div>
                   <label className="font-semibold text-slate-700 block mb-1">Customer Code</label>
-                  <input type="text" placeholder="e.g. CUST-010" value={newCust.code} onChange={(e) => setNewCust({ ...newCust, code: e.target.value })} className="w-full p-2 border border-slate-300 rounded bg-white text-slate-800 font-mono"/>
+                  <input type="text" placeholder="Auto-generated (CUST-…)" value={newCust.code} onChange={(e) => setNewCust({ ...newCust, code: e.target.value })} className="w-full p-2 border border-slate-300 rounded bg-white text-slate-800 font-mono"/>
                 </div>
               </div>
 

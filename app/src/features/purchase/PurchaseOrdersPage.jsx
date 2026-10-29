@@ -38,6 +38,11 @@ import UomSelect from '../../components/common/UomSelect';
 import MasterSourceLink from '../../components/common/MasterSourceLink';
 import useUnits from '../../hooks/useUnits';
 import { formatQty, formatUnitTotals, sumByUnit, unitKey, resolveUnit } from '../../utils/uom';
+import {
+  FabricFlowCards, FabricFlowSteps, YarnLinesEditor, OpeningCostsEditor, fabricFlowPayload, flowLabel,
+  FABRIC_FLOW_B,
+} from './FabricFlowForm';
+import { PoFabricFlowPanel } from './PoFabricFlowPanel';
 
 const purchaseOrderGuide = {
     title: 'Purchase Orders',
@@ -129,7 +134,7 @@ const STATUS_PILL = {
 
 export const PurchaseOrdersPage = () => {
     const navigate = useNavigate();
-    const { purchaseOrders, vendors, items: inventoryItems, fabrics: fabricMasters, addPurchaseOrder, updatePurchaseOrderStatus, cancelPurchaseOrder, deletePurchaseOrder, getPoBilledStatus, convertPurchaseOrderToBill, purchaseBills, paymentOuts, formatCurrency, formatDateDDMMYYYY, getCurrentDateFormatted, getCurrentISODate, addDaysISO, showToast, refreshCollections } = useERP();
+    const { purchaseOrders, vendors, items: inventoryItems, locations: erpLocations = [], fabrics: fabricMasters, addPurchaseOrder, updatePurchaseOrderStatus, cancelPurchaseOrder, deletePurchaseOrder, getPoBilledStatus, convertPurchaseOrderToBill, purchaseBills, paymentOuts, formatCurrency, formatDateDDMMYYYY, getCurrentDateFormatted, getCurrentISODate, addDaysISO, showToast, refreshCollections } = useERP();
     const { units } = useUnits();
     const [showAddModal, setShowAddModal] = useState(false);
     const [isFullscreen, setIsFullscreen] = useState(false);
@@ -262,6 +267,16 @@ export const PurchaseOrdersPage = () => {
     const [lineItems, setLineItems] = useState([]);
     const [remarks, setRemarks] = useState('');
     const [purchaseType, setPurchaseType] = useState('');
+    // Factory fabric flow (Factory -> OSCAR / Factory -> Dyeing Mill -> OSCAR);
+    // empty for the older purchase types.
+    const [fabricFlow, setFabricFlow] = useState('');
+    const [dyeingMillId, setDyeingMillId] = useState('');
+    const [yarnRows, setYarnRows] = useState([]);
+    const [costRows, setCostRows] = useState([]);
+    const resetFabricFlow = () => { setFabricFlow(''); setDyeingMillId(''); setYarnRows([]); setCostRows([]); };
+    const chooseFabricFlow = (flow) => { setFabricFlow(flow); setPurchaseType(PURCHASE_TYPE_GREY); if (flow !== FABRIC_FLOW_B) setDyeingMillId(''); };
+    // Used by the "Other purchase types" cards, hidden for now in the Create PO form.
+    // const choosePurchaseType = (type) => { setPurchaseType(type); setFabricFlow(''); setDyeingMillId(''); };
     // Project association is separate from purchase type: a ready grey stock
     // purchase may be for a project or for general warehouse stock.
     const [projectMode, setProjectMode] = useState('general');
@@ -351,6 +366,7 @@ export const PurchaseOrdersPage = () => {
         setLineItems([{ id: `li-${Date.now()}`, itemId: '', sku: '', itemSku: '', name: '', qty: '', rate: '', amount: 0 }]);
         setRemarks('');
         setPurchaseType('');
+        resetFabricFlow();
         setProjectMode('general');
         setProjectId('');
         setIsFullscreen(false);
@@ -380,6 +396,7 @@ export const PurchaseOrdersPage = () => {
         setLineItems([]);
         setRemarks('');
         setPurchaseType('');
+        resetFabricFlow();
         setProjectMode('general');
         setProjectId('');
         setIsFullscreen(false);
@@ -423,6 +440,8 @@ export const PurchaseOrdersPage = () => {
         setRemarks(po.notes || '');
         const clonedType = purchaseTypeOf(po);
         setPurchaseType(clonedType === PURCHASE_TYPE_FINAL_JW ? '' : clonedType);
+        resetFabricFlow();
+        if (po.fabricFlow) { setFabricFlow(po.fabricFlow); setDyeingMillId(po.dyeingMillId || ''); }
         setProjectMode(po.projectId ? 'project' : 'general');
         setProjectId(po.projectId || '');
         setIsFullscreen(false);
@@ -432,7 +451,13 @@ export const PurchaseOrdersPage = () => {
     const handleCreate = async (e) => {
         e.preventDefault();
         const validLines = lineItems.filter((it) => it.itemId && Number(it.qty) > 0 && Number(it.rate) > 0);
-        if (!purchaseType) { alert('Select the purchase type.'); return; }
+        if (!purchaseType && !fabricFlow) { alert('Select how the fabric reaches OSCAR.'); return; }
+        let flowExtras = {};
+        if (fabricFlow) {
+            const built = fabricFlowPayload({ flow: fabricFlow, dyeingMillId, yarnRows, costRows });
+            if (built.error) { alert(built.error); return; }
+            flowExtras = built.payload;
+        }
         if (projectMode === 'project' && !projectId) { alert('Select the project, or choose General Stock.'); return; }
         if (!selectedVendorId) { alert('Vendor is required.'); return; }
         if (!poDate) { alert('PO Date is required.'); return; }
@@ -460,10 +485,11 @@ export const PurchaseOrdersPage = () => {
                 date: poDate,
                 expectedDate,
                 status: 'Draft',
-                purchaseType,
+                purchaseType: fabricFlow ? PURCHASE_TYPE_GREY : purchaseType,
                 projectId: projectMode === 'project' ? projectId : undefined,
                 items: normalizedLines,
                 notes: remarks || '',
+                ...flowExtras,
             });
             handleCloseCreateModal();
         } catch {
@@ -1136,7 +1162,9 @@ export const PurchaseOrdersPage = () => {
                     <td className="px-4 py-2.5">
                       <button onClick={() => setSelectedPo(p)} className="flex items-center gap-1.5 font-mono font-bold text-blue-600 hover:underline whitespace-nowrap"><ClipboardList size={13} className="text-slate-400" /> {p.poNumber}</button>
                       <div className="mt-1 flex flex-wrap items-center gap-1">
-                        <span className={`inline-block rounded border px-1.5 py-px text-[9.5px] font-bold ${TYPE_BADGE[purchaseTypeOf(p)]?.cls || TYPE_BADGE[PURCHASE_TYPE_GREY].cls}`}>{TYPE_BADGE[purchaseTypeOf(p)]?.label || purchaseTypeOf(p)}</span>
+                        {p.fabricFlow
+                          ? <span className="inline-block rounded border px-1.5 py-px text-[9.5px] font-bold bg-teal-50 text-teal-700 border-teal-200">{p.fabricFlow === FABRIC_FLOW_B ? 'Factory → Mill → OSCAR' : 'Factory → OSCAR'}</span>
+                          : <span className={`inline-block rounded border px-1.5 py-px text-[9.5px] font-bold ${TYPE_BADGE[purchaseTypeOf(p)]?.cls || TYPE_BADGE[PURCHASE_TYPE_GREY].cls}`}>{TYPE_BADGE[purchaseTypeOf(p)]?.label || purchaseTypeOf(p)}</span>}
                         <span className="text-[9.5px] font-semibold text-slate-400">{p.projectCode || 'General Stock'}</span>
                       </div>
                     </td>
@@ -1302,14 +1330,27 @@ export const PurchaseOrdersPage = () => {
 
             <form onSubmit={handleCreate} className="space-y-4 mt-4 overflow-y-auto pr-1 flex-1">
               <div>
-                <label className="block font-semibold text-slate-700 mb-1.5">Purchase Type <span className="text-rose-500">*</span></label>
+                <label className="block font-semibold text-slate-700 mb-1.5">How does the fabric reach OSCAR? <span className="text-rose-500">*</span></label>
+                <FabricFlowCards value={fabricFlow} onChange={chooseFabricFlow} />
+                {fabricFlow && (
+                  <div className="mt-2 rounded-lg bg-slate-50 px-2.5 py-2 space-y-1">
+                    <p className="text-[11px] text-slate-600"><strong>After approval:</strong> one batch is created for every actual receipt — never for the ordered quantity.</p>
+                    <FabricFlowSteps flow={fabricFlow} />
+                  </div>
+                )}
+              </div>
+              {/* "Other purchase types" (Ready Grey Fabric Purchase / Vendor A Production) is hidden
+                  for now: new POs use the two factory fabric flows above. Restore by uncommenting
+                  this block and `choosePurchaseType`.
+              <div>
+                <label className="block font-semibold text-slate-600 mb-1.5 text-[11px] uppercase tracking-wide">Other purchase types</label>
                 <div role="radiogroup" aria-label="Purchase Type" className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {PURCHASE_TYPE_OPTIONS.map((opt) => {
                     const Icon = opt.icon;
-                    const active = purchaseType === opt.value;
+                    const active = !fabricFlow && purchaseType === opt.value;
                     return (
                       <label key={opt.value} className={`flex cursor-pointer items-center gap-3 rounded-xl border p-3 transition-colors ${active ? 'border-blue-500 bg-blue-50/70 ring-1 ring-blue-200' : 'border-slate-200 bg-white hover:border-slate-300'}`}>
-                        <input type="radio" name="purchaseType" value={opt.value} checked={active} onChange={() => setPurchaseType(opt.value)} className="h-4 w-4 accent-blue-600" />
+                        <input type="radio" name="purchaseType" value={opt.value} checked={active} onChange={() => choosePurchaseType(opt.value)} className="h-4 w-4 accent-blue-600" />
                         <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-lg ${active ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-500'}`}><Icon size={18} /></span>
                         <span className="min-w-0">
                           <span className="block text-[12.5px] font-bold text-slate-800">{opt.label}</span>
@@ -1321,11 +1362,14 @@ export const PurchaseOrdersPage = () => {
                 </div>
                 <p className="mt-2 flex items-start gap-1.5 rounded-lg bg-slate-50 px-2.5 py-1.5 text-[11px] text-slate-600">
                   <Info size={13} className="mt-px shrink-0 text-blue-500" />
-                  {purchaseType
-                    ? <span><strong>Next steps after approval:</strong> {PURCHASE_TYPE_OPTIONS.find((o) => o.value === purchaseType)?.flow}</span>
-                    : <span>Selected cycle determines the next workflow after PO.</span>}
+                  {fabricFlow
+                    ? <span>Selected: <strong>{flowLabel(fabricFlow)}</strong>. Choose one of these instead for a ready-fabric purchase or Vendor A production.</span>
+                    : purchaseType
+                      ? <span><strong>Next steps after approval:</strong> {PURCHASE_TYPE_OPTIONS.find((o) => o.value === purchaseType)?.flow}</span>
+                      : <span>Selected cycle determines the next workflow after PO.</span>}
                 </p>
               </div>
+              */}
               <div>
                 <label className="block font-semibold text-slate-700 mb-1.5">Project Association</label>
                 <div className="flex flex-wrap items-center gap-2">
@@ -1353,7 +1397,7 @@ export const PurchaseOrdersPage = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <div className="flex items-center justify-between mb-1">
-                    <label className="block font-semibold text-slate-700">Vendor / Supplier *</label>
+                    <label className="block font-semibold text-slate-700">{fabricFlow ? 'Factory / Vendor *' : 'Vendor / Supplier *'}</label>
                     <MasterSourceLink source="vendors" />
                   </div>
                   <select value={selectedVendorId} onChange={(e) => setSelectedVendorId(e.target.value)} className="w-full border border-slate-300 rounded-lg p-2 bg-white text-slate-800 font-medium">
@@ -1465,6 +1509,37 @@ export const PurchaseOrdersPage = () => {
                 </div>
                 <button type="button" onClick={addBlankLine} className="mt-2 inline-flex items-center gap-1 text-[12px] font-semibold text-blue-600 hover:underline"><Plus size={13}/> Add Fabric Line</button>
               </div>
+
+              {fabricFlow === FABRIC_FLOW_B && (
+                <div className="rounded-xl border border-violet-200 bg-violet-50/40 p-3.5">
+                  <label className="block font-semibold text-slate-700 mb-1" htmlFor="po-dyeing-mill">Dyeing Mill</label>
+                  <select id="po-dyeing-mill" value={dyeingMillId} onChange={(e) => setDyeingMillId(e.target.value)} className="w-full sm:w-96 border border-slate-300 rounded-lg p-2 bg-white text-slate-800 font-medium">
+                    <option value="">Not decided yet</option>
+                    {vendors.filter((v) => v.id !== selectedVendorId).map((v) => <option key={v.id} value={v.id}>{v.name}{v.code ? ` (${v.code})` : ''}</option>)}
+                  </select>
+                  <p className="mt-1 text-[10.5px] text-slate-500">The factory sends the grey fabric straight to this mill. It is tracked on the PO but never becomes OSCAR grey stock; OSCAR stock starts when the dyed fabric arrives.</p>
+                </div>
+              )}
+
+              {fabricFlow && (
+                <div>
+                  <label className="font-semibold text-slate-700 block mb-2">Yarn Details <span className="font-normal text-slate-400">(optional)</span></label>
+                  <YarnLinesEditor
+                    rows={yarnRows}
+                    onChange={setYarnRows}
+                    yarnItems={(inventoryItems || []).filter((i) => /yarn/i.test(`${i.itemKind || ''} ${i.category || ''} ${i.name || ''}`))}
+                    vendors={vendors}
+                    formatCurrency={formatCurrency}
+                  />
+                </div>
+              )}
+
+              {fabricFlow && (
+                <div>
+                  <label className="font-semibold text-slate-700 block mb-2">Costs &amp; Expenses <span className="font-normal text-slate-400">(optional now — add or update on the PO later)</span></label>
+                  <OpeningCostsEditor rows={costRows} onChange={setCostRows} flow={fabricFlow} formatCurrency={formatCurrency} />
+                </div>
+              )}
 
               {/* Remarks + Order Summary */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -1610,7 +1685,7 @@ export const PurchaseOrdersPage = () => {
                       <Receipt size={12} className="text-indigo-600" /> Commercial Snapshot
                     </span>
                     <span className="px-2 py-0.5 rounded-full text-[9.5px] font-bold bg-indigo-100 text-indigo-800 border border-indigo-200">
-                      {purchaseTypeOf(selectedPo)}
+                      {selectedPo.fabricFlow ? flowLabel(selectedPo.fabricFlow) : purchaseTypeOf(selectedPo)}
                     </span>
                   </div>
                   <div className="flex items-baseline justify-between pt-0.5">
@@ -1653,6 +1728,19 @@ export const PurchaseOrdersPage = () => {
                   else if (lbl.includes('payment') || lbl.includes('disbursement')) setActiveTimelineSlide('disbursement_payment');
                 }}
               />
+
+              {/* Factory fabric flow: PO, yarn, dispatch, mill, receipts & batches, costs, reconciliation. */}
+              {selectedPo.fabricFlow && (
+                <PoFabricFlowPanel
+                  key={selectedPo.id}
+                  po={selectedPo}
+                  vendors={vendors}
+                  items={inventoryItems || []}
+                  locations={erpLocations}
+                  formatCurrency={formatCurrency}
+                  onChanged={() => refreshCollections?.(['purchaseOrders'])}
+                />
+              )}
 
               {/* ── Stage Execution Workspace Container ── */}
               {(() => {

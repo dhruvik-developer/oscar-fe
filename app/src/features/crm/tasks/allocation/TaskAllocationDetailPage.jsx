@@ -1,6 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { Pencil } from 'lucide-react';
+import { CheckCircle2, Pencil } from 'lucide-react';
+import { api } from '../../../../services/api';
 import AssignTaskModal from './AssignTaskModal';
 import PageHeader from '../../../../components/ui/PageHeader';
 import { formatDeadline, formatAuditDate, STATUSES } from './taskAllocationStore';
@@ -29,6 +31,9 @@ export default function TaskAllocationDetailPage() {
   const [reassignTo, setReassignTo] = useState('');
   const [reassignReason, setReassignReason] = useState('');
   const [isEditOpen, setIsEditOpen] = useState(false);
+  // Lead tasks: their activity comes from the server's audit log.
+  const [activity, setActivity] = useState(null);
+  const [reassigned, setReassigned] = useState(null); // name shown in the "Reassign complete" popup
 
   const requestedKind = searchParams.get('kind');
   const allocationMatch = allocations.find((t) => String(t.id) === String(id));
@@ -42,6 +47,17 @@ export default function TaskAllocationDetailPage() {
   const departmentName = task ? (task.department || '') : '';
   const deadlineValue = task ? (task.deadline || task.dueDate || task.due || '') : '';
   const leadName = task ? (task.leadName || task.lead || '') : '';
+
+  const loadActivity = useCallback(async () => {
+    if (!task?.id || !isLeadTask || task._pending) return;
+    try {
+      const res = await api.get(`/crm/tasks/${task.id}/activity/`);
+      setActivity(res?.results || []);
+    } catch {
+      setActivity(null);
+    }
+  }, [task?.id, isLeadTask, task?._pending]);
+  useEffect(() => { loadActivity(); }, [loadActivity]);
 
   useEffect(() => {
     if (task) {
@@ -81,6 +97,7 @@ export default function TaskAllocationDetailPage() {
     try {
       if (isLeadTask) {
         await saveChanges({ status: statusDraft });
+        loadActivity();
       } else {
         await saveChanges(
           { status: statusDraft },
@@ -96,15 +113,20 @@ export default function TaskAllocationDetailPage() {
   }
 
   async function handleReassign() {
-    if (!reassignTo || String(reassignTo) === String(task.assigneeId || '') || saving || task._pending) return;
+    if (!reassignTo || saving || task._pending) return;
     const assignee = employees.find((e) => String(e.id) === String(reassignTo));
     if (!assignee) return;
+    if (String(reassignTo) === String(task.assigneeId || '')) {
+      setError(`This task is already assigned to ${assignee.name}. Choose someone else to reassign it.`);
+      return;
+    }
     setError('');
     setSaving(true);
     try {
       if (isLeadTask) {
         await updateRecord('tasks', task.id, { assigneeId: assignee.id });
         refresh('tasks');
+        loadActivity();
       } else {
         await saveChanges(
           { assigneeId: assignee.id, assignee: assignee.name, department: assignee.department || task.department || '' },
@@ -112,12 +134,15 @@ export default function TaskAllocationDetailPage() {
         );
       }
       setReassignReason('');
+      setReassigned(assignee.name);
     } catch (err) {
       setError(describeError(err));
     } finally {
       setSaving(false);
     }
   }
+
+  const auditRows = isLeadTask ? (activity || []) : (task.audit || []);
 
   async function handleEditSubmit(data) {
     await saveChanges(data);
@@ -233,18 +258,32 @@ export default function TaskAllocationDetailPage() {
           <div className="bg-white rounded-xl border border-slate-200/70 shadow-sm p-6">
             <h3 className="text-[13px] font-bold text-slate-900 mb-4">Audit Log</h3>
             <div className="relative pl-4 border-l border-slate-200 space-y-5">
-              {(task.audit || []).map((a, i) => (
+              {auditRows.map((a, i) => (
                 <div key={i} className="relative">
-                  <span className="absolute -left-[21px] top-1 w-2.5 h-2.5 rounded-full bg-slate-500 border-2 border-white shadow" />
+                  <span className={`absolute -left-[21px] top-1 w-2.5 h-2.5 rounded-full border-2 border-white shadow ${i === 0 ? 'bg-blue-600' : 'bg-slate-400'}`} />
                   <p className="text-[13px] text-slate-700">{a.text}</p>
                   <p className="text-xs text-slate-400 mt-0.5">{formatAuditDate(a.at)}</p>
                 </div>
               ))}
-              {(!task.audit || task.audit.length === 0) && <p className="text-xs text-slate-400">No activity yet.</p>}
+              {auditRows.length === 0 && <p className="text-xs text-slate-400">{isLeadTask && activity === null ? 'Loading activity…' : 'No activity yet.'}</p>}
             </div>
           </div>
         </div>
       </div>
+
+      {reassigned && createPortal(
+        <div className="fixed inset-0 z-[1000] bg-slate-900/40 flex items-center justify-center p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) setReassigned(null); }}>
+          <div role="alertdialog" aria-modal="true" aria-labelledby="reassign-done-title" className="w-full max-w-sm bg-white rounded-2xl shadow-2xl p-6 text-center">
+            <div className="mx-auto w-12 h-12 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center">
+              <CheckCircle2 size={28} />
+            </div>
+            <h3 id="reassign-done-title" className="mt-3 text-base font-bold text-slate-900">Reassign complete</h3>
+            <p className="mt-1 text-[13px] text-slate-600"><span className="font-semibold">{task.title}</span> is now assigned to <span className="font-semibold">{reassigned}</span>.</p>
+            <button type="button" autoFocus onClick={() => setReassigned(null)} className="mt-5 w-full py-2.5 rounded-lg bg-[#1d4a79] hover:bg-[#163a61] text-white text-[13px] font-semibold cursor-pointer">OK</button>
+          </div>
+        </div>,
+        document.body,
+      )}
 
       {isEditOpen && !isLeadTask && <AssignTaskModal isOpen initial={task} onClose={() => setIsEditOpen(false)} onSubmit={handleEditSubmit} />}
     </section>

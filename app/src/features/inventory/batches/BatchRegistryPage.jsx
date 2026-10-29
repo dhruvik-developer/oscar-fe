@@ -1,6 +1,8 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Printer, RotateCcw, ScanLine, IndianRupee, Eye } from 'lucide-react';
+import {
+  Search, Printer, ScanLine, IndianRupee, Eye, SlidersHorizontal, X, Plus, Users, Layers, PackageOpen,
+} from 'lucide-react';
 import PageHeader from '../../../components/ui/PageHeader';
 import AppPagination from '../../../components/ui/AppPagination';
 import { inventoryService } from '../../../services/domainServices';
@@ -19,32 +21,34 @@ const ORIGINS = [
   ['MERGE', 'Merge'],
   ['MANUAL', 'Manual'],
 ];
+const ORIGIN_LABEL = Object.fromEntries(ORIGINS.filter(([v]) => v));
 const FABRIC_TYPES = [
-  ['', 'Grey & dyed'],
-  ['GREY', 'Grey fabric'],
-  ['DYED', 'Dyed fabric'],
+  ['', 'All'],
+  ['GREY', 'Grey'],
+  ['DYED', 'Dyed'],
 ];
-/** Where the rolls are now -- answers "how much is in QC / at the dyer / free to sell". */
-const HOLDINGS = [
-  ['', 'Any stock state'],
-  ['available', 'Available to sell / use'],
-  ['reserved', 'Reserved'],
-  ['qcHold', 'In QC hold'],
-  ['rework', 'In rework / reprocess'],
-  ['secondQuality', 'Second quality'],
-  ['rejected', 'Rejected'],
-  ['withJobWorker', 'At job worker / dyer'],
-];
-/** Stock tiles: [summary key, label, holding filter it opens]. */
+/** Stock tiles: [summary key, label, holding filter it opens, colour of the figure]. */
 const STOCK_TILES = [
-  ['totalPhysical', 'Total physical', ''],
-  ['available', 'Available (OSCAR)', 'available'],
-  ['reserved', 'Reserved', 'reserved'],
-  ['qcHold', 'QC hold', 'qcHold'],
-  ['rework', 'Rework', 'rework'],
-  ['rejected', 'Rejected', 'rejected'],
-  ['withJobWorker', 'At job worker', 'withJobWorker'],
-  ['customerMaterial', 'Customer material', ''],
+  ['totalPhysical', 'Total physical', '', 'text-slate-900'],
+  ['available', 'Available', 'available', 'text-emerald-700'],
+  ['reserved', 'Reserved', 'reserved', 'text-blue-700'],
+  ['qcHold', 'QC hold', 'qcHold', 'text-amber-700'],
+  ['rework', 'Rework', 'rework', 'text-violet-700'],
+  ['rejected', 'Rejected', 'rejected', 'text-rose-700'],
+  ['withJobWorker', 'At job worker', 'withJobWorker', 'text-indigo-700'],
+  ['customerMaterial', 'Customer material', '', 'text-slate-700'],
+];
+const HOLDING_LABEL = Object.fromEntries(STOCK_TILES.filter(([, , h]) => h).map(([, label, h]) => [h, label]));
+/** The stock bar of a row: [quantity key, label, bar colour]. */
+const STOCK_PARTS = [
+  ['available', 'Available', 'bg-emerald-500'],
+  ['reserved', 'Reserved', 'bg-blue-500'],
+  ['qcHold', 'QC hold', 'bg-amber-400'],
+  ['rework', 'Rework', 'bg-violet-500'],
+  ['secondQuality', '2nd quality', 'bg-sky-400'],
+  ['rejected', 'Rejected', 'bg-rose-500'],
+  ['withJobWorker', 'At job worker', 'bg-indigo-500'],
+  ['sold', 'Sold', 'bg-slate-300'],
 ];
 const STATUSES = ['', 'In Stock', 'QC Hold', 'At Job Worker', 'Blocked', 'Sold Out', 'Closed'];
 const STATUS_STYLE = {
@@ -55,7 +59,33 @@ const STATUS_STYLE = {
   'Sold Out': 'bg-slate-100 text-slate-600 border-slate-200',
   Closed: 'bg-slate-100 text-slate-500 border-slate-200',
 };
+const BLANK = { q: '', origin: '', fabricType: '', status: '', from: '', to: '', itemId: '', designId: '', shadeId: '', locationId: '', holding: '' };
 const inputCls = 'h-9 px-3 bg-white border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:border-blue-500';
+const ghostBtn = 'h-9 px-3 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50 inline-flex items-center gap-1.5 cursor-pointer';
+
+/** One bar per row: where the batch's metres are now, plus what was sold. */
+function StockBar({ q }) {
+  const parts = STOCK_PARTS.map(([key, label, colour]) => [key, label, colour, Number(q[key] || 0)]).filter(([, , , v]) => v > 0);
+  const total = parts.reduce((s, [, , , v]) => s + v, 0);
+  const uom = q.uom || 'm';
+  if (!total) return <span className="text-slate-400">No stock</span>;
+  return (
+    <div className="min-w-44">
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="font-bold text-emerald-700 tabular-nums">{formatNumberIN(q.available)}</span>
+        <span className="text-[10px] text-slate-400 tabular-nums">of {formatNumberIN(q.received)} {uom}</span>
+      </div>
+      <div className="mt-1 h-1.5 rounded-full bg-slate-100 overflow-hidden flex" aria-hidden="true">
+        {parts.map(([key, , colour, v]) => <span key={key} className={colour} style={{ width: `${(v / total) * 100}%` }} />)}
+      </div>
+      <div className="mt-1 flex flex-wrap gap-x-2 text-[10px] text-slate-500">
+        {parts.filter(([key]) => key !== 'available').map(([key, label, colour, v]) => (
+          <span key={key} className="inline-flex items-center gap-1"><span className={`w-1.5 h-1.5 rounded-full ${colour}`} />{label} {formatNumberIN(v)}</span>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 /** Batch Registry: every permanent batch ID with its live quantities. */
 export default function BatchRegistryPage() {
@@ -64,8 +94,9 @@ export default function BatchRegistryPage() {
   const { designs, shades } = useTextileMasters();
   const fabrics = items.filter((i) => ['LOT', 'TAKA'].includes(String(i.trackingType || '').toUpperCase()) || /fabric/i.test(i.itemKind || ''));
   const godowns = locations.filter((l) => !String(l.code || '').startsWith('SYS-'));
-  const [filters, setFilters] = useState({ q: '', origin: '', fabricType: '', status: '', from: '', to: '', itemId: '', designId: '', shadeId: '', locationId: '', holding: '' });
-  const [query, setQuery] = useState(filters);
+  const [filters, setFilters] = useState(BLANK);
+  const [query, setQuery] = useState(BLANK);
+  const [showFilters, setShowFilters] = useState(false);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
   const [data, setData] = useState({ results: [], count: 0, canSeeCost: false });
@@ -102,20 +133,16 @@ export default function BatchRegistryPage() {
       setLoading(false);
     }
   }, [query, page, pageSize, withCost]);
-
   useEffect(() => { load(); }, [load]);
 
-  const apply = (e) => {
-    e?.preventDefault();
-    setPage(1);
-    setQuery(filters);
-  };
-  const reset = () => {
-    const blank = { q: '', origin: '', fabricType: '', status: '', from: '', to: '', itemId: '', designId: '', shadeId: '', locationId: '', holding: '' };
-    setFilters(blank);
-    setQuery(blank);
-    setPage(1);
-  };
+  // Filters apply as they change; typing in search waits a moment.
+  useEffect(() => {
+    const t = setTimeout(() => { setQuery(filters); setPage(1); }, filters.q !== query.q ? 350 : 0);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters]);
+  const setF = (key, value) => setFilters((prev) => ({ ...prev, [key]: value }));
+
   // A barcode/QR scanner types the code and presses Enter; a scanned URL
   // carries the code as its last path segment.
   const openScanned = (e) => {
@@ -126,6 +153,7 @@ export default function BatchRegistryPage() {
     setScan('');
     navigate(`/inventory/batches/${encodeURIComponent(code)}`);
   };
+  const open = (code) => navigate(`/inventory/batches/${encodeURIComponent(code)}`);
   const printTag = async (row) => {
     try {
       await printBatchTags([row]);
@@ -134,21 +162,38 @@ export default function BatchRegistryPage() {
     }
   };
 
+  /** The filters in use, as removable chips. */
+  const nameOf = (list, id) => list.find((x) => String(x.id) === String(id))?.name || '…';
+  const chips = [
+    filters.holding && ['holding', `Stock: ${HOLDING_LABEL[filters.holding]}`],
+    filters.origin && ['origin', `Origin: ${ORIGIN_LABEL[filters.origin]}`],
+    filters.itemId && ['itemId', `Fabric: ${nameOf(fabrics, filters.itemId)}`],
+    filters.designId && ['designId', `Design: ${nameOf(designs, filters.designId)}`],
+    filters.shadeId && ['shadeId', `Colour: ${nameOf(shades, filters.shadeId)}`],
+    filters.locationId && ['locationId', `Godown: ${nameOf(godowns, filters.locationId)}`],
+    filters.status && ['status', `Status: ${filters.status}`],
+    filters.from && ['from', `From ${filters.from}`],
+    filters.to && ['to', `To ${filters.to}`],
+  ].filter(Boolean);
+  const advancedCount = chips.filter(([k]) => k !== 'holding').length;
+  const s = data.summary;
+  const cols = withCost ? 13 : 8;
+
   return (
     <div className="space-y-4">
       <PageHeader
         title="Batch Registry"
-        subtitle="Every grey and dyed fabric batch with its permanent ID, QR, live quantities and status. Scan a tag or open a batch for its Batch 360° view."
+        subtitle="Every grey and dyed fabric batch — its ID, QR tag, where its metres are now and its status. Click a batch for its Batch 360° view."
         actions={(
-          <div className="flex gap-2">
-            <button type="button" onClick={() => setShowPhysical((v) => !v)} className="h-9 px-3 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer">
-              {showPhysical ? 'Hide' : 'Physical stock'} (own vs customer)
+          <div className="flex flex-wrap gap-2">
+            <button type="button" onClick={() => setShowPhysical((v) => !v)} className={ghostBtn} aria-pressed={showPhysical}>
+              <Layers size={14} /> {showPhysical ? 'Hide own vs customer' : 'Own vs customer'}
             </button>
-            <button type="button" onClick={() => setReceiving(true)} className="h-9 px-3 rounded-lg border border-blue-200 bg-white text-blue-700 text-xs font-semibold hover:bg-blue-50 cursor-pointer">
-              Receive customer material
+            <button type="button" onClick={() => setReceiving(true)} className={ghostBtn}>
+              <Users size={14} /> Customer material
             </button>
-            <button type="button" onClick={() => setAdding(true)} className="h-9 px-3 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold cursor-pointer">
-              + Create Batch
+            <button type="button" onClick={() => setAdding(true)} className="h-9 px-4 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold inline-flex items-center gap-1.5 cursor-pointer">
+              <Plus size={14} /> Create Batch
             </button>
           </div>
         )}
@@ -169,112 +214,132 @@ export default function BatchRegistryPage() {
           onClose={() => setReceiving(false)}
           onDone={(batch) => {
             setReceiving(false);
-            navigate(`/inventory/batches/${encodeURIComponent(batch.batchCode)}`);
+            open(batch.batchCode);
           }}
         />
       )}
 
-      <form onSubmit={openScanned} className="bg-white border border-slate-200 rounded-xl p-3 flex flex-col sm:flex-row gap-2 sm:items-center">
-        <label htmlFor="batch-scan" className="text-xs font-semibold text-slate-700 flex items-center gap-1.5 shrink-0">
-          <ScanLine size={15} className="text-blue-600" /> Scan or enter batch / taka ID
-        </label>
-        <input
-          id="batch-scan"
-          value={scan}
-          onChange={(e) => setScan(e.target.value)}
-          placeholder="OSCAR-GRY-2026-0001"
-          className={`${inputCls} flex-1 font-mono`}
-          autoComplete="off"
-        />
-        <button type="submit" className="h-9 px-4 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold cursor-pointer">Open</button>
-      </form>
-
-      {data.summary && (
-        <section className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2" aria-label="Stock of the batches shown">
-          {STOCK_TILES.map(([key, label, holding]) => {
-            const active = holding && query.holding === holding;
+      {/* Stock of all the batches shown: one strip, each figure filters the list. */}
+      {s && (
+        <section className="bg-white border border-slate-200 rounded-xl grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 divide-x divide-y lg:divide-y-0 divide-slate-100 overflow-hidden" aria-label="Stock of the batches shown">
+          {STOCK_TILES.map(([key, label, holding, tone]) => {
+            const value = Number(s[key] || 0);
+            const active = holding && filters.holding === holding;
             return (
               <button
                 key={key}
                 type="button"
                 disabled={!holding}
-                onClick={() => { const next = { ...filters, holding: active ? '' : holding }; setFilters(next); setQuery(next); setPage(1); }}
-                title={holding ? (active ? 'Show all batches' : `Show batches with ${label.toLowerCase()} stock`) : undefined}
-                className={`text-left bg-white border rounded-xl p-3 ${active ? 'border-blue-500 ring-1 ring-blue-500' : 'border-slate-200'} ${holding ? 'hover:border-blue-300 cursor-pointer' : 'cursor-default'}`}
+                onClick={() => setF('holding', active ? '' : holding)}
+                title={holding ? (active ? 'Show all batches' : `Only batches with ${label.toLowerCase()} stock`) : undefined}
+                className={`text-left px-4 py-3 transition-colors ${active ? 'bg-blue-50 shadow-[inset_0_-2px_0_0_#2563eb]' : ''} ${holding ? 'hover:bg-slate-50 cursor-pointer' : 'cursor-default'}`}
               >
-                <div className="text-[10px] uppercase tracking-wide text-slate-400">{label}</div>
-                <div className={`text-base font-bold tabular-nums ${key === 'available' ? 'text-emerald-700' : 'text-slate-900'}`}>{formatNumberIN(data.summary[key])}</div>
+                <div className="text-[10px] uppercase tracking-wide text-slate-400 font-semibold">{label}</div>
+                <div className={`text-lg font-bold tabular-nums ${value ? tone : 'text-slate-300'}`}>{formatNumberIN(value)}</div>
               </button>
             );
           })}
         </section>
       )}
 
-      <form onSubmit={apply} className="bg-white border border-slate-200 rounded-xl p-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-2">
-        <div className="relative lg:col-span-2">
-          <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input
-            value={filters.q}
-            onChange={(e) => setFilters({ ...filters, q: e.target.value })}
-            placeholder="Batch, lot, taka, fabric, supplier, GRN…"
-            className={`${inputCls} w-full pl-8`}
-          />
-        </div>
-        <select value={filters.origin} onChange={(e) => setFilters({ ...filters, origin: e.target.value })} className={inputCls} aria-label="Origin">
-          {ORIGINS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-        </select>
-        <select value={filters.fabricType} onChange={(e) => setFilters({ ...filters, fabricType: e.target.value })} className={inputCls} aria-label="Fabric type">
-          {FABRIC_TYPES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-        </select>
-        <select value={filters.itemId} onChange={(e) => setFilters({ ...filters, itemId: e.target.value })} className={inputCls} aria-label="Fabric">
-          <option value="">All fabrics</option>
-          {fabrics.map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}
-        </select>
-        <select value={filters.designId} onChange={(e) => setFilters({ ...filters, designId: e.target.value })} className={inputCls} aria-label="Design">
-          <option value="">All designs</option>
-          {designs.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
-        </select>
-        <select value={filters.shadeId} onChange={(e) => setFilters({ ...filters, shadeId: e.target.value })} className={inputCls} aria-label="Colour / shade">
-          <option value="">All colours</option>
-          {shades.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-        </select>
-        <select value={filters.locationId} onChange={(e) => setFilters({ ...filters, locationId: e.target.value })} className={inputCls} aria-label="Godown">
-          <option value="">All godowns</option>
-          {godowns.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
-        </select>
-        <select value={filters.holding} onChange={(e) => setFilters({ ...filters, holding: e.target.value })} className={inputCls} aria-label="Stock state">
-          {HOLDINGS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-        </select>
-        <select value={filters.status} onChange={(e) => setFilters({ ...filters, status: e.target.value })} className={inputCls} aria-label="Status">
-          {STATUSES.map((s) => <option key={s} value={s}>{s || 'All statuses'}</option>)}
-        </select>
-        <div className="flex gap-2 lg:col-span-2">
-          <input type="date" value={filters.from} onChange={(e) => setFilters({ ...filters, from: e.target.value })} className={`${inputCls} flex-1 min-w-0`} aria-label="From date" />
-          <input type="date" value={filters.to} onChange={(e) => setFilters({ ...filters, to: e.target.value })} className={`${inputCls} flex-1 min-w-0`} aria-label="To date" />
-        </div>
-        <div className="flex gap-2 sm:col-span-2 lg:col-span-6 justify-end items-center">
-          {data.canSeeCost && (
-            <label className="mr-auto inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600 cursor-pointer">
-              <input type="checkbox" checked={withCost} onChange={(e) => { setWithCost(e.target.checked); setPage(1); }} />
-              Show cost &amp; profit (profitability report)
-            </label>
-          )}
-          <button type="button" onClick={reset} className="h-9 px-3 rounded-lg border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 inline-flex items-center gap-1 cursor-pointer">
-            <RotateCcw size={13} /> Reset
+      {/* Toolbar: scan, search, grey / dyed, more filters. */}
+      <div className="bg-white border border-slate-200 rounded-xl p-3 space-y-3">
+        <div className="flex flex-col lg:flex-row gap-2">
+          <form onSubmit={openScanned} className="relative lg:w-80">
+            <ScanLine size={15} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-blue-600" />
+            <input
+              value={scan}
+              onChange={(e) => setScan(e.target.value)}
+              placeholder="Scan tag or type batch / taka ID, Enter"
+              aria-label="Scan or enter batch or taka ID"
+              className={`${inputCls} w-full pl-8 font-mono`}
+              autoComplete="off"
+            />
+          </form>
+          <div className="relative flex-1">
+            <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              value={filters.q}
+              onChange={(e) => setF('q', e.target.value)}
+              placeholder="Search batch, lot, taka, fabric, supplier, GRN…"
+              aria-label="Search batches"
+              className={`${inputCls} w-full pl-8`}
+            />
+          </div>
+          <div className="inline-flex p-0.5 rounded-lg bg-slate-100 border border-slate-200 self-start" role="radiogroup" aria-label="Fabric type">
+            {FABRIC_TYPES.map(([v, l]) => (
+              <button key={v || 'all'} type="button" role="radio" aria-checked={filters.fabricType === v} onClick={() => setF('fabricType', v)}
+                className={`h-8 px-4 rounded-md text-xs font-semibold cursor-pointer ${filters.fabricType === v ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}>
+                {l}
+              </button>
+            ))}
+          </div>
+          <button type="button" onClick={() => setShowFilters((v) => !v)} aria-expanded={showFilters} className={`${ghostBtn} self-start ${showFilters || advancedCount ? 'border-blue-300 text-blue-700' : ''}`}>
+            <SlidersHorizontal size={14} /> Filters{advancedCount ? ` (${advancedCount})` : ''}
           </button>
-          <button type="submit" className="h-9 px-4 rounded-lg bg-slate-900 text-white text-xs font-semibold cursor-pointer">Apply</button>
         </div>
-      </form>
+
+        {showFilters && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 pt-3 border-t border-slate-100">
+            <select value={filters.itemId} onChange={(e) => setF('itemId', e.target.value)} className={inputCls} aria-label="Fabric">
+              <option value="">All fabrics</option>
+              {fabrics.map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}
+            </select>
+            <select value={filters.designId} onChange={(e) => setF('designId', e.target.value)} className={inputCls} aria-label="Design">
+              <option value="">All designs</option>
+              {designs.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+            </select>
+            <select value={filters.shadeId} onChange={(e) => setF('shadeId', e.target.value)} className={inputCls} aria-label="Colour / shade">
+              <option value="">All colours</option>
+              {shades.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+            <select value={filters.locationId} onChange={(e) => setF('locationId', e.target.value)} className={inputCls} aria-label="Godown">
+              <option value="">All godowns</option>
+              {godowns.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
+            </select>
+            <select value={filters.origin} onChange={(e) => setF('origin', e.target.value)} className={inputCls} aria-label="Origin">
+              {ORIGINS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+            </select>
+            <select value={filters.status} onChange={(e) => setF('status', e.target.value)} className={inputCls} aria-label="Status">
+              {STATUSES.map((st) => <option key={st} value={st}>{st || 'All statuses'}</option>)}
+            </select>
+            <label className="flex items-center gap-2 text-xs text-slate-500">From
+              <input type="date" value={filters.from} onChange={(e) => setF('from', e.target.value)} className={`${inputCls} flex-1 min-w-0`} aria-label="Created from" /></label>
+            <label className="flex items-center gap-2 text-xs text-slate-500">To
+              <input type="date" value={filters.to} onChange={(e) => setF('to', e.target.value)} className={`${inputCls} flex-1 min-w-0`} aria-label="Created to" /></label>
+          </div>
+        )}
+
+        {(chips.length > 0 || data.canSeeCost) && (
+          <div className="flex flex-wrap items-center gap-2">
+            {chips.map(([key, label]) => (
+              <span key={key} className="inline-flex items-center gap-1 h-7 pl-2.5 pr-1 rounded-full bg-blue-50 border border-blue-200 text-[11px] font-semibold text-blue-800">
+                {label}
+                <button type="button" onClick={() => setF(key, '')} aria-label={`Remove ${label}`} className="p-0.5 rounded-full hover:bg-blue-100 cursor-pointer"><X size={11} /></button>
+              </span>
+            ))}
+            {chips.length > 0 && (
+              <button type="button" onClick={() => setFilters({ ...BLANK, q: filters.q, fabricType: filters.fabricType })} className="text-[11px] font-semibold text-slate-500 hover:text-slate-800 cursor-pointer">Clear all</button>
+            )}
+            {data.canSeeCost && (
+              <label className="ml-auto inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600 cursor-pointer">
+                <input type="checkbox" checked={withCost} onChange={(e) => { setWithCost(e.target.checked); setPage(1); }} />
+                <IndianRupee size={13} /> Show cost &amp; profit
+              </label>
+            )}
+          </div>
+        )}
+      </div>
 
       {error && <div role="alert" className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-xs text-rose-700">{error}</div>}
       {notice && <div role="status" className="p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-xs text-emerald-700">{notice}</div>}
 
       {selectedRows.length > 0 && (
-        <div className="flex flex-wrap items-center gap-2 p-2.5 rounded-xl bg-blue-50 border border-blue-200 text-xs">
-          <span className="font-semibold text-blue-900">{selectedRows.length} selected</span>
-          <button type="button" onClick={() => setChargeOpen(true)} className="h-8 px-3 rounded-lg bg-blue-600 text-white font-semibold inline-flex items-center gap-1 cursor-pointer"><IndianRupee size={13} /> Add charge (freight etc.)</button>
-          <button type="button" onClick={() => printBatchTags(selectedRows).catch((err) => setError(err.message))} className="h-8 px-3 rounded-lg border border-blue-300 bg-white font-semibold text-blue-700 inline-flex items-center gap-1 cursor-pointer"><Printer size={13} /> Print tags</button>
-          <button type="button" onClick={() => setSelected({})} className="h-8 px-3 rounded-lg text-blue-700 font-semibold cursor-pointer">Clear</button>
+        <div className="sticky top-2 z-10 flex flex-wrap items-center gap-2 p-2.5 rounded-xl bg-slate-900 text-white text-xs shadow-lg">
+          <span className="font-semibold px-1">{selectedRows.length} selected</span>
+          <button type="button" onClick={() => setChargeOpen(true)} className="h-8 px-3 rounded-lg bg-white/10 hover:bg-white/20 font-semibold inline-flex items-center gap-1 cursor-pointer"><IndianRupee size={13} /> Add charge (freight etc.)</button>
+          <button type="button" onClick={() => printBatchTags(selectedRows).catch((err) => setError(err.message))} className="h-8 px-3 rounded-lg bg-white/10 hover:bg-white/20 font-semibold inline-flex items-center gap-1 cursor-pointer"><Printer size={13} /> Print tags</button>
+          <button type="button" onClick={() => setSelected({})} className="ml-auto h-8 px-3 rounded-lg font-semibold text-white/80 hover:text-white cursor-pointer">Clear</button>
         </div>
       )}
       {chargeOpen && (
@@ -292,85 +357,100 @@ export default function BatchRegistryPage() {
 
       <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[900px] text-xs">
-            <thead className="bg-slate-50 text-[11px] uppercase text-slate-500">
+          <table className="w-full min-w-[960px] text-xs">
+            <thead className="bg-slate-50 text-[11px] uppercase tracking-wide text-slate-500">
               <tr>
-                <th className="px-3 py-2.5 w-8"><span className="sr-only">Select</span></th>
-                <th className="px-3 py-2.5 text-left">Batch ID</th>
-                <th className="px-3 py-2.5 text-left">Fabric</th>
-                <th className="px-3 py-2.5 text-left">Type</th>
-                <th className="px-3 py-2.5 text-left">Origin / Source</th>
-                <th className="px-3 py-2.5 text-left">Supplier / Owner</th>
-                <th className="px-3 py-2.5 text-right">Received</th>
-                <th className="px-3 py-2.5 text-right">Available</th>
-                <th className="px-3 py-2.5 text-right">QC Hold</th>
-                <th className="px-3 py-2.5 text-right">At Job Worker</th>
-                <th className="px-3 py-2.5 text-right">Sold</th>
+                <th className="px-3 py-3 w-8">
+                  <input
+                    type="checkbox"
+                    aria-label="Select all batches on this page"
+                    checked={data.results.length > 0 && data.results.every((b) => selected[b.batchCode])}
+                    onChange={(e) => setSelected((prev) => {
+                      const next = { ...prev };
+                      data.results.forEach((b) => { if (e.target.checked) next[b.batchCode] = b; else delete next[b.batchCode]; });
+                      return next;
+                    })}
+                    className="cursor-pointer"
+                  />
+                </th>
+                <th className="px-3 py-3 text-left">Batch</th>
+                <th className="px-3 py-3 text-left">Fabric</th>
+                <th className="px-3 py-3 text-left">Source</th>
+                <th className="px-3 py-3 text-left">Stock now</th>
                 {withCost && (
                   <>
-                    <th className="px-3 py-2.5 text-right">Total cost</th>
-                    <th className="px-3 py-2.5 text-right">Cost / m</th>
-                    <th className="px-3 py-2.5 text-right">Revenue</th>
-                    <th className="px-3 py-2.5 text-right">Profit</th>
-                    <th className="px-3 py-2.5 text-right">Stock value</th>
+                    <th className="px-3 py-3 text-right">Total cost</th>
+                    <th className="px-3 py-3 text-right">Cost / m</th>
+                    <th className="px-3 py-3 text-right">Revenue</th>
+                    <th className="px-3 py-3 text-right">Profit</th>
+                    <th className="px-3 py-3 text-right">Stock value</th>
                   </>
                 )}
-                <th className="px-3 py-2.5 text-left">Status</th>
-                <th className="px-3 py-2.5 text-right">Actions</th>
+                <th className="px-3 py-3 text-left">Status</th>
+                <th className="px-3 py-3 text-right"><span className="sr-only">Actions</span></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {loading && (
-                <tr><td colSpan={withCost ? 18 : 13} className="px-3 py-10 text-center text-slate-400">Loading batches…</td></tr>
-              )}
+              {loading && Array.from({ length: 4 }).map((_, i) => (
+                <tr key={`sk-${i}`}><td colSpan={cols} className="px-3 py-4"><div className="h-8 rounded-lg bg-slate-100 animate-pulse" /></td></tr>
+              ))}
               {!loading && data.results.length === 0 && (
-                <tr><td colSpan={withCost ? 18 : 13} className="px-3 py-10 text-center text-slate-400">No batches match these filters.</td></tr>
+                <tr>
+                  <td colSpan={cols} className="px-3 py-14 text-center">
+                    <PackageOpen size={30} className="mx-auto text-slate-300" />
+                    <p className="mt-2 text-sm font-semibold text-slate-700">{chips.length || filters.q || filters.fabricType ? 'No batches match these filters' : 'No batches yet'}</p>
+                    <p className="text-xs text-slate-500">{chips.length || filters.q || filters.fabricType ? 'Clear a filter to see more.' : 'Batches are created from goods receipts, production and job work — or by hand.'}</p>
+                    {!(chips.length || filters.q || filters.fabricType) && (
+                      <button type="button" onClick={() => setAdding(true)} className="mt-3 h-9 px-4 rounded-lg bg-blue-600 text-white text-xs font-semibold inline-flex items-center gap-1.5 cursor-pointer"><Plus size={14} /> Create Batch</button>
+                    )}
+                  </td>
+                </tr>
               )}
               {!loading && data.results.map((b) => {
                 const q = b.quantities || {};
+                const isSelected = Boolean(selected[b.batchCode]);
                 return (
-                  <tr key={b.id} className="hover:bg-slate-50">
-                    <td className="px-3 py-2.5">
-                      <input type="checkbox" checked={Boolean(selected[b.batchCode])} onChange={() => toggle(b)} aria-label={`Select ${b.batchCode}`} className="cursor-pointer" />
+                  <tr
+                    key={b.id}
+                    onClick={() => open(b.batchCode)}
+                    className={`cursor-pointer align-top ${isSelected ? 'bg-blue-50/60' : 'hover:bg-slate-50'}`}
+                  >
+                    <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
+                      <input type="checkbox" checked={isSelected} onChange={() => toggle(b)} aria-label={`Select ${b.batchCode}`} className="cursor-pointer" />
                     </td>
-                    <td className="px-3 py-2.5">
-                      <button type="button" onClick={() => navigate(`/inventory/batches/${encodeURIComponent(b.batchCode)}`)} className="font-mono font-bold text-blue-700 hover:underline cursor-pointer">
-                        {b.batchCode}
-                      </button>
-                      <div className="text-[10px] text-slate-400">{b.createdOn} · {b.takaCount} taka</div>
+                    <td className="px-3 py-3">
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-mono font-bold text-blue-700">{b.batchCode}</span>
+                        <span className={`px-1.5 py-px rounded border text-[10px] font-semibold ${b.fabricType === 'DYED' ? 'bg-sky-50 text-sky-700 border-sky-200' : 'bg-stone-50 text-stone-600 border-stone-200'}`}>{b.fabricType === 'DYED' ? 'Dyed' : 'Grey'}</span>
+                      </div>
+                      <div className="text-[10px] text-slate-400 mt-0.5">{b.createdOn} · {b.takaCount} taka{b.processed && b.fabricType !== 'DYED' ? ' · has dyed rolls' : ''}</div>
                     </td>
-                    <td className="px-3 py-2.5">
-                      <div className="font-semibold text-slate-800">{b.item || '—'}</div>
-                      <div className="text-[10px] text-slate-500">{[b.fabricQuality, b.shade].filter(Boolean).join(' · ')}</div>
-                      <div className={`text-[10px] font-mono ${b.hsnCode ? 'text-slate-500' : 'text-amber-700 font-semibold'}`}>
-                        {b.hsnCode ? `HSN ${b.hsnCode}` : 'HSN missing in item master'}
+                    <td className="px-3 py-3 max-w-60">
+                      <div className="font-semibold text-slate-800 truncate">{b.item || '—'}</div>
+                      <div className="text-[10px] text-slate-500 truncate">{[b.fabricQuality, b.design, b.shade].filter(Boolean).join(' · ') || ' '}</div>
+                      {!b.hsnCode && <div className="text-[10px] font-semibold text-amber-700">HSN missing in item master</div>}
+                    </td>
+                    <td className="px-3 py-3">
+                      <div className="text-slate-700">{ORIGIN_LABEL[b.origin] || b.origin}{b.sourceDocumentNumber && b.sourceDocumentNumber !== b.batchCode ? <span className="text-slate-400"> · {b.sourceDocumentNumber}</span> : ''}</div>
+                      <div className="text-[10px] text-slate-500 truncate max-w-48">
+                        {b.ownership === 'OSCAR' ? (b.supplierName || '') : <span className="font-semibold text-amber-700">{b.ownerPartyName || b.ownership}'s material</span>}
                       </div>
                     </td>
-                    <td className="px-3 py-2.5">
-                      <span className={`px-2 py-0.5 rounded-full border text-[10px] font-semibold ${b.fabricType === 'DYED' ? 'bg-sky-50 text-sky-700 border-sky-200' : 'bg-stone-50 text-stone-700 border-stone-200'}`}>{b.fabricType === 'DYED' ? 'Dyed' : 'Grey'}</span>
-                      {b.processed && b.fabricType !== 'DYED' && <div className="text-[10px] text-sky-700 mt-0.5">+ dyed rolls</div>}
-                    </td>
-                    <td className="px-3 py-2.5 text-slate-600">{b.origin}<div className="text-[10px] text-slate-400">{b.sourceDocumentNumber}</div></td>
-                    <td className="px-3 py-2.5 text-slate-600">{b.ownership === 'OSCAR' ? (b.supplierName || '—') : `${b.ownerPartyName || b.ownership} (owned)`}</td>
-                    <td className="px-3 py-2.5 text-right tabular-nums">{formatNumberIN(q.received)}</td>
-                    <td className="px-3 py-2.5 text-right tabular-nums font-semibold text-emerald-700">{formatNumberIN(q.available)}</td>
-                    <td className="px-3 py-2.5 text-right tabular-nums">{formatNumberIN(q.qcHold)}</td>
-                    <td className="px-3 py-2.5 text-right tabular-nums">{formatNumberIN(q.withJobWorker)}</td>
-                    <td className="px-3 py-2.5 text-right tabular-nums">{formatNumberIN(q.sold)}</td>
+                    <td className="px-3 py-3"><StockBar q={q} /></td>
                     {withCost && (
                       <>
-                        <td className="px-3 py-2.5 text-right tabular-nums">{formatINR(b.costing?.totalCost)}</td>
-                        <td className="px-3 py-2.5 text-right tabular-nums">{formatINR(b.costing?.costPerUnit)}</td>
-                        <td className="px-3 py-2.5 text-right tabular-nums">{formatINR(b.costing?.revenue)}</td>
-                        <td className={`px-3 py-2.5 text-right tabular-nums font-semibold ${Number(b.costing?.realizedProfit) < 0 ? 'text-rose-700' : 'text-emerald-700'}`}>{formatINR(b.costing?.realizedProfit)}</td>
-                        <td className="px-3 py-2.5 text-right tabular-nums">{formatINR(b.costing?.unsoldInventoryValue)}</td>
+                        <td className="px-3 py-3 text-right tabular-nums">{formatINR(b.costing?.totalCost)}</td>
+                        <td className="px-3 py-3 text-right tabular-nums">{formatINR(b.costing?.costPerUnit)}</td>
+                        <td className="px-3 py-3 text-right tabular-nums">{formatINR(b.costing?.revenue)}</td>
+                        <td className={`px-3 py-3 text-right tabular-nums font-semibold ${Number(b.costing?.realizedProfit) < 0 ? 'text-rose-700' : 'text-emerald-700'}`}>{formatINR(b.costing?.realizedProfit)}</td>
+                        <td className="px-3 py-3 text-right tabular-nums">{formatINR(b.costing?.unsoldInventoryValue)}</td>
                       </>
                     )}
-                    <td className="px-3 py-2.5">
-                      <span className={`px-2 py-0.5 rounded-full border text-[10px] font-semibold ${STATUS_STYLE[b.status] || STATUS_STYLE.Closed}`}>{b.status}</span>
+                    <td className="px-3 py-3">
+                      <span className={`px-2 py-0.5 rounded-full border text-[10px] font-semibold whitespace-nowrap ${STATUS_STYLE[b.status] || STATUS_STYLE.Closed}`}>{b.status}</span>
                     </td>
-                    <td className="px-3 py-2.5 text-right whitespace-nowrap space-x-1">
-                      <button type="button" onClick={() => navigate(`/inventory/batches/${encodeURIComponent(b.batchCode)}`)} title="View details (Batch 360°)" aria-label={`View details of ${b.batchCode}`} className="p-1.5 rounded-md border border-slate-200 text-blue-700 hover:bg-blue-50 cursor-pointer">
+                    <td className="px-3 py-3 text-right whitespace-nowrap space-x-1" onClick={(e) => e.stopPropagation()}>
+                      <button type="button" onClick={() => open(b.batchCode)} title="Open Batch 360°" aria-label={`Open ${b.batchCode}`} className="p-1.5 rounded-md border border-slate-200 text-blue-700 hover:bg-blue-50 cursor-pointer">
                         <Eye size={13} />
                       </button>
                       <button type="button" onClick={() => printTag(b)} title="Print batch QR tag" aria-label={`Print tag for ${b.batchCode}`} className="p-1.5 rounded-md border border-slate-200 text-slate-600 hover:bg-slate-50 cursor-pointer">

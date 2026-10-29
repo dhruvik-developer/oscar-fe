@@ -200,7 +200,8 @@ export const NAV = [
         ],
       },
       { label: 'Deals', icon: TrendingUp, to: '/crm/deals' },
-      { label: 'Contracts', icon: FileText, to: '/crm/contracts' },
+      // Hidden for now; the /crm/contracts route still works.
+      // { label: 'Contracts', icon: FileText, to: '/crm/contracts' },
       {
         label: 'CRM Setup',
         icon: Sliders,

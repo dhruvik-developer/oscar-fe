@@ -518,9 +518,24 @@ export const RESOURCES = {
   salesReturns: documentResource('/sales/returns/', { numberField: 'returnNumber' }),
 
   // Purchase pipeline (api.md §6) — same documents, `vendorId` on the wire.
-  purchaseOrders: documentResource('/purchase/orders/', {
-    partyField: 'vendorId', partyLabel: 'vendor', numberField: 'poNumber',
-  }),
+  purchaseOrders: (() => {
+    const base = documentResource('/purchase/orders/', {
+      partyField: 'vendorId', partyLabel: 'vendor', numberField: 'poNumber',
+    });
+    return {
+      ...base,
+      // Factory fabric flow: the route, the dyeing mill, and the yarn plan /
+      // opening costs saved with the order (only sent when the form set them).
+      toApi: (doc, opts) => {
+        const payload = base.toApi(doc, opts);
+        if (doc.fabricFlow !== undefined) payload.fabricFlow = doc.fabricFlow || null;
+        if (doc.dyeingMillId !== undefined) payload.dyeingMillId = doc.dyeingMillId || null;
+        if (Array.isArray(doc.yarnLines)) payload.yarnLines = doc.yarnLines;
+        if (Array.isArray(doc.expenses)) payload.expenses = doc.expenses;
+        return payload;
+      },
+    };
+  })(),
   purchaseBills: (() => {
     const base = documentResource('/purchase/bills/', {
       partyField: 'vendorId', partyLabel: 'vendor', numberField: 'billNumber',

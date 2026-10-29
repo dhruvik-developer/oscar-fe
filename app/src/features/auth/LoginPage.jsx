@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Headphones, X, Clock } from 'lucide-react';
+import { Headphones, X, Clock, Settings, BarChart3, Layers, Truck, Mail, Lock, Eye, EyeOff, ArrowRight, Sun, Moon } from 'lucide-react';
 import './LoginPage.css';
 
+/** localStorage key of the sign-in screen look: 'light' | 'dark'. */
+const LOOK_KEY = 'oscar.login.look';
 const INFINITY_PATH = 'M32 18c-5-8-10-12-16-12C9 6 4 11 4 18s5 12 12 12c6 0 11-4 16-12zm0 0c5 8 10 12 16 12 7 0 12-5 12-12S55 6 48 6c-6 0-11 4-16 12z';
 
 const SESSION_END_NOTICES = {
@@ -50,6 +52,15 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  // Light (white card) or dark (glass card) sign-in; remembered in this browser.
+  const [look, setLook] = useState(() => {
+    try { return window.localStorage.getItem(LOOK_KEY) === 'dark' ? 'dark' : 'light'; } catch { return 'light'; }
+  });
+  const dark = look === 'dark';
+  const chooseLook = (value) => {
+    setLook(value);
+    try { window.localStorage.setItem(LOOK_KEY, value); } catch { /* per-browser convenience only */ }
+  };
   const [rememberMe, setRememberMe] = useState(true);
   const [capsOn, setCapsOn] = useState(false);
   const [notice, setNotice] = useState('');
@@ -198,10 +209,10 @@ export default function LoginPage() {
 
 
   return (
-    <div className="oscar-login">
+    <div className={`oscar-login${dark ? ' oscar-login--dark' : ''}`}>
       {/* ── Background: base gradient, photo, side overlay, vignette ── */}
       <div className="oscar-login__bg" aria-hidden="true">
-        <img src="/images/login-bg.jpg" alt="" className="oscar-login__photo" draggable={false} />
+        <img src="/images/login-bg.png" alt="" className="oscar-login__photo" draggable={false} />
         <div className="oscar-login__side" />
         <div className="oscar-login__vignette" />
       </div>
@@ -211,20 +222,45 @@ export default function LoginPage() {
         <div className="oscar-login__hero">
           <div className="oscar-login__brandrow">
             <BrandLogo
-              size={20}
+              size={34}
               fallback={
-                <svg width="34" height="20" viewBox="0 0 64 36" fill="none" aria-hidden="true">
-                  <path d={INFINITY_PATH} stroke="#5FA8F2" strokeWidth="5" strokeLinejoin="round" />
+                <svg width="58" height="34" viewBox="0 0 64 36" fill="none" aria-hidden="true">
+                  <defs>
+                    <linearGradient id="oscarHeroMark" x1="0" y1="0" x2="64" y2="0" gradientUnits="userSpaceOnUse">
+                      <stop offset="0" stopColor="#1B4FD0" />
+                      <stop offset="1" stopColor="#3B9BF0" />
+                    </linearGradient>
+                  </defs>
+                  <path d={INFINITY_PATH} stroke="url(#oscarHeroMark)" strokeWidth="5" strokeLinejoin="round" />
                 </svg>
               }
             />
-            <span className="oscar-login__brandname">{heroBrandName}</span>
+            <span className="oscar-login__brandtext">
+              <span className="oscar-login__brandname">{heroBrandName}</span>
+              <span className="oscar-login__brandsub">ERP System</span>
+            </span>
           </div>
+          <span className="oscar-login__rule" aria-hidden="true" />
+          <p className="oscar-login__eyebrow">Textile operations<br />simplified</p>
           <h1 className="oscar-login__headline">
-            Every thread.<br />
-            <span>One vision.</span>
+            Efficiency<br />in Every<br />
+            <span>Process.</span>
           </h1>
-          <p className="oscar-login__tagline">Your workspace for smarter operations.</p>
+          <p className="oscar-login__tagline">Textile ERP for<br />a Smarter Tomorrow.</p>
+          <ul className="oscar-login__pillars" aria-label="What Oscar ERP covers">
+            {[
+              [Settings, 'Plan', 'Orders & purchase'],
+              [BarChart3, 'Produce', 'Production & job work'],
+              [Layers, 'Track', 'Batches, QC & stock'],
+              [Truck, 'Deliver', 'Dispatch & billing'],
+            ].map(([Icon, label, detail]) => (
+              <li key={label}>
+                <span className="oscar-login__pillar-icon"><Icon size={22} strokeWidth={1.5} aria-hidden="true" /></span>
+                <span className="oscar-login__pillar-label">{label}</span>
+                <span className="oscar-login__pillar-detail">{detail}</span>
+              </li>
+            ))}
+          </ul>
         </div>
 
         {/* ── Right: login card ── */}
@@ -247,7 +283,7 @@ export default function LoginPage() {
               </div>
             </div>
 
-            <h2 className="oscar-login__title">Welcome to {brandName} ERP</h2>
+            <h2 className="oscar-login__title">{`Welcome to ${brandName} ERP`}</h2>
             <p className="oscar-login__subtitle">Sign in to continue to your workspace.</p>
 
             {twoFactor ? (
@@ -301,6 +337,8 @@ export default function LoginPage() {
 
                   <div>
                     <label htmlFor="login-username" className="oscar-login__label">Email</label>
+                    <div className="oscar-login__field">
+                    {dark && <Mail size={18} className="oscar-login__icon" aria-hidden="true" />}
                     <input
                       id="login-username"
                       type="email"
@@ -309,13 +347,15 @@ export default function LoginPage() {
                       onChange={(e) => handleEmailChange(e.target.value)}
                       placeholder="you@company.com"
                       autoComplete="username"
-                      className="oscar-login__input"
+                      className={`oscar-login__input${dark ? ' oscar-login__input--icon' : ''}`}
                     />
+                    </div>
                   </div>
 
                   <div>
                     <label htmlFor="login-password" className="oscar-login__label">Password</label>
                     <div className="oscar-login__field">
+                      {dark && <Lock size={18} className="oscar-login__icon" aria-hidden="true" />}
                       <input
                         id="login-password"
                         type={showPassword ? 'text' : 'password'}
@@ -327,7 +367,7 @@ export default function LoginPage() {
                         onBlur={() => setCapsOn(false)}
                         placeholder="Your password"
                         autoComplete="current-password"
-                        className="oscar-login__input oscar-login__input--pw"
+                        className={`oscar-login__input oscar-login__input--pw${dark ? ' oscar-login__input--icon' : ''}`}
                       />
                       <button
                         type="button"
@@ -335,7 +375,9 @@ export default function LoginPage() {
                         className="oscar-login__toggle"
                         aria-label={showPassword ? 'Hide password' : 'Show password'}
                       >
-                        {showPassword ? 'Hide' : 'Show'}
+                        {dark
+                          ? (showPassword ? <EyeOff size={18} aria-hidden="true" /> : <Eye size={18} aria-hidden="true" />)
+                          : (showPassword ? 'Hide' : 'Show')}
                       </button>
                     </div>
                     <span className="oscar-login__caps" aria-live="polite">
@@ -383,7 +425,10 @@ export default function LoginPage() {
                         <span>Signing in...</span>
                       </>
                     ) : (
-                      <span>Sign in</span>
+                      <>
+                        <span>Sign in</span>
+                        {dark && <ArrowRight size={18} aria-hidden="true" />}
+                      </>
                     )}
                   </button>
                 </form>
@@ -405,6 +450,14 @@ export default function LoginPage() {
                 Ask your administrator.
               </button>
             </div>
+          </div>
+          <div className="oscar-login__look" role="radiogroup" aria-label="Sign-in screen theme">
+            <button type="button" role="radio" aria-checked={!dark} onClick={() => chooseLook('light')} className={!dark ? 'is-active' : ''}>
+              <Sun size={14} aria-hidden="true" /> Light
+            </button>
+            <button type="button" role="radio" aria-checked={dark} onClick={() => chooseLook('dark')} className={dark ? 'is-active' : ''}>
+              <Moon size={14} aria-hidden="true" /> Dark
+            </button>
           </div>
           <div className="oscar-login__footer">Oscar Creation · Surat</div>
         </div>

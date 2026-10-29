@@ -8,6 +8,7 @@ import { batchUrl } from '../printBatchTag';
 import { DeliverToOwnerForm } from '../CustomerMaterialPanels';
 import RegisterTakasForm from '../RegisterTakasForm';
 import { Card, Stat, btnGhost, btnPrimary, useBatchAction } from './shared';
+import PurchaseTraceCard from './PurchaseTraceCard';
 
 const QTY_TILES = [
   ['received', 'Received / produced'],
@@ -118,6 +119,8 @@ export default function OverviewTab({ batch, onBatch, goTo }) {
           <p className="text-[10px] text-slate-400 text-center max-w-40">Scanning shows the batch; cost and customer details need a login with access.</p>
         </Card>
       </div>
+
+      <PurchaseTraceCard trace={batch.purchaseTrace} />
 
       <Card title="What do you want to do?" subtitle="Every step is optional — pick the one this batch needs. QC is not compulsory.">
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">

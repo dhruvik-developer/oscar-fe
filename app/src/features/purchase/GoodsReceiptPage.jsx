@@ -28,7 +28,7 @@ import {
   Search,
 } from 'lucide-react';
 import api from '../../services/api';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate, Link } from 'react-router-dom';
 import { numIN } from '../../utils/formatters';
 import MasterSourceLink from '../../components/common/MasterSourceLink';
 import GrnDetailDrawer from './GrnDetailDrawer';
@@ -612,6 +612,7 @@ export const GoodsReceiptPage = () => {
                       <SortableTh sort={grnSort} sortKey="poNumber" className="px-4 py-3">PO Number</SortableTh>
                       <SortableTh sort={grnSort} sortKey="lines" className="px-4 py-3 text-right" align="right">Lines</SortableTh>
                       <SortableTh sort={grnSort} sortKey="qc_status" className="px-4 py-3 text-center" align="center">QC Status</SortableTh>
+                      <th className="px-4 py-3 text-right">QC Action</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -634,12 +635,26 @@ export const GoodsReceiptPage = () => {
                         <td className="px-4 py-3 text-right font-semibold text-slate-800">{g.lines?.length || 0}</td>
                         <td className="px-4 py-3 text-center">
                           <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold border ${
-                            g.qc_status === 'Approved' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                            g.qc_status === 'Approved' || g.qc_status === 'Partially Approved' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
                             g.qc_status === 'Rejected' ? 'bg-rose-50 text-rose-700 border-rose-200' :
                             'bg-amber-50 text-amber-700 border-amber-200'
                           }`}>
                             {g.qc_status || 'Pending'}
                           </span>
+                        </td>
+                        <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
+                          <Link
+                            to={`/inventory/qc/results?receiptId=${g.id}`}
+                            className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-semibold border transition ${
+                              g.qc_status === 'Approved' || g.qc_status === 'Partially Approved'
+                                ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-200'
+                                : 'bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-200'
+                            }`}
+                            title="Open in QC Results & Disposition"
+                          >
+                            <ShieldCheck className="w-3.5 h-3.5" />
+                            <span>{g.qc_status === 'Approved' || g.qc_status === 'Partially Approved' ? 'View QC' : 'QC Disposition'}</span>
+                          </Link>
                         </td>
                       </tr>
                     ))}

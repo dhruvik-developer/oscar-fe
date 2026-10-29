@@ -120,6 +120,16 @@ export default function GrnDetailDrawer({ grn, onClose }) {
           )}
           <button
             type="button"
+            onClick={() => {
+              onClose();
+              navigate(`/inventory/qc/results?receiptId=${g.id}`);
+            }}
+            className="px-3.5 py-1.5 rounded-lg border border-blue-200 bg-blue-50 text-xs font-semibold text-blue-700 hover:bg-blue-100 inline-flex items-center gap-1.5 cursor-pointer"
+          >
+            <ShieldCheck size={13} /> {qcStatus === 'Approved' || qcStatus === 'Partially Approved' ? 'View QC Results' : 'Open QC Disposition'}
+          </button>
+          <button
+            type="button"
             onClick={onClose}
             className="px-4 py-1.5 rounded-lg bg-slate-900 text-xs font-semibold text-white hover:bg-slate-800"
           >

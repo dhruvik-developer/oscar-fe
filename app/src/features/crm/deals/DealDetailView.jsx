@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
+import SearchableCombobox from '../../../components/common/SearchableCombobox';
 import { Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Copy, FileText, Menu, MoreHorizontal, Pencil, Plus, Trophy, Upload, X } from 'lucide-react';
 import Modal from '../../../components/ui/Modal';
@@ -84,7 +85,31 @@ const serverDealTaskToRow = (t, dealId) => ({
 
 export default function DealDetailView({ deal, onEdit, onNotify, onUpdate, onDuplicate, onDelete }) {
   const navigate = useNavigate();
-  const { quotations, customers } = useERP();
+  const { quotations, customers, items = [] } = useERP();
+  // Products offered on a deal: the fabrics in the item master (any other
+  // stock item when there are no fabrics yet). A typed name still works.
+  const productItems = (() => {
+    const live = items.filter((i) => i && i.name && i.isActive !== false && i.itemKind !== 'Service');
+    const fabrics = live.filter((i) => /fabric/i.test(i.itemKind || '') || ['LOT', 'TAKA'].includes(String(i.trackingType || '').toUpperCase()));
+    return (fabrics.length ? fabrics : live).slice().sort((a, b) => a.name.localeCompare(b.name));
+  })();
+  const productOptions = productItems.map((i) => ({ id: i.id, label: i.name, meta: [i.sku, i.fabricQuality, i.uom].filter(Boolean).join(' · ') }));
+  const pickProductName = (title) => {
+    const match = productItems.find((i) => i.name.toLowerCase() === title.trim().toLowerCase());
+    if (!match) {
+      setEditor((current) => ({ ...current, title, itemId: undefined }));
+      return;
+    }
+    const details = [match.fabricQuality, match.fabricGsm ? `${match.fabricGsm} GSM` : '', match.hsnCode ? `HSN ${match.hsnCode}` : ''].filter(Boolean).join(' · ');
+    setEditor((current) => ({
+      ...current,
+      title: match.name,
+      itemId: match.id,
+      unit: match.uom || current.unit,
+      rate: Number(match.sellingPrice) > 0 ? match.sellingPrice : current.rate,
+      description: current.description || details,
+    }));
+  };
   const currentUser = useAppStore((state) => state.currentUser);
   const [tab, setTab] = useState('Overview');
   const [tasks, setTasks] = useState(loadCrmTasks);
@@ -223,13 +248,13 @@ export default function DealDetailView({ deal, onEdit, onNotify, onUpdate, onDup
         setTab('Tasks');
         onNotify(editor.id ? 'Task updated.' : 'Task created and linked to this deal.');
       } else if (editor.type === 'Product') {
-        const item = { ...(products.find((product) => product.id === editor.id) || {}), id: editor.id || crypto.randomUUID(), name: title, description: editor.description || '', details: editor.description || '', qty: Number(editor.qty), rate: Number(editor.rate), unit: editor.unit || 'Qty' };
+        const item = { ...(products.find((product) => product.id === editor.id) || {}), id: editor.id || crypto.randomUUID(), name: title, itemId: editor.itemId || undefined, description: editor.description || '', details: editor.description || '', qty: Number(editor.qty), rate: Number(editor.rate), unit: editor.unit || 'Qty' };
         if (!Number.isFinite(item.qty) || item.qty <= 0 || !Number.isFinite(item.rate) || item.rate < 0) throw new Error('Enter a positive quantity and a valid rate.');
         const updated = editor.id ? products.map((product) => product.id === editor.id ? item : product) : [...products, item];
         const totals = dealTotals(updated, deal.discount, deal.taxRate);
         save({ products: updated, discount: totals.discount, price: totals.total }, 'Products and deal value updated');
         if (backendDealOn(deal)) {
-          const payload = { name: item.name, description: item.description || '', qty: item.qty, rate: item.rate, unit: item.unit || 'Qty' };
+          const payload = { name: item.name, itemId: item.itemId || null, description: item.description || '', qty: item.qty, rate: item.rate, unit: item.unit || 'Qty' };
           const req = item.serverLineId
             ? crmService.updateDealLine(deal.id, item.serverLineId, payload)
             : crmService.addDealLine(deal.id, payload);
@@ -348,7 +373,7 @@ export default function DealDetailView({ deal, onEdit, onNotify, onUpdate, onDup
       </>
     <Modal isOpen={Boolean(removal)} onClose={() => setRemoval(null)} title={`Remove ${removal?.type || 'record'}`} footer={<><button className="btn-outline btn-sm" onClick={() => setRemoval(null)}>Cancel</button><button className="btn-primary btn-sm" onClick={removeRecord}>Remove</button></>}><p className="text-sm">Remove {removal?.item.name || removal?.item.title} from this deal?</p></Modal>
     <Modal isOpen={Boolean(editor)} onClose={() => setEditor(null)} title={editor ? `${editor.type === 'Summary' || editor.id ? 'Edit' : 'Add'} ${editor.type}` : ''}>
-      {editor && <form onSubmit={submit} className="deal-detail-form">{editor.type !== 'Pricing' && <label>{editor.type === 'Product' ? 'Product name' : editor.type === 'Summary' ? 'Summary' : 'Title'} *{['Activity', 'Summary'].includes(editor.type) ? <textarea autoFocus required rows={4} value={editor.title || ''} onChange={(event) => setEditor({ ...editor, title: event.target.value })} /> : <input autoFocus required value={editor.title || ''} onChange={(event) => setEditor({ ...editor, title: event.target.value })} />}</label>}
+      {editor && <form onSubmit={submit} className="deal-detail-form">{editor.type !== 'Pricing' && <label>{editor.type === 'Product' ? 'Product name' : editor.type === 'Summary' ? 'Summary' : 'Title'} *{['Activity', 'Summary'].includes(editor.type) ? <textarea autoFocus required rows={4} value={editor.title || ''} onChange={(event) => setEditor({ ...editor, title: event.target.value })} /> : editor.type === 'Product' ? <><SearchableCombobox autoFocus required ariaLabel="Product name" placeholder="Search a fabric or type a product name" value={editor.title || ''} selectedId={editor.itemId} onChange={pickProductName} onSelect={(o) => pickProductName(o.label)} options={productOptions} emptyText="No fabric matches — the name you typed will be used." />{editor.itemId ? <small className="deal-form-hint">From the item master — unit and rate filled in; you can change them.</small> : productItems.length > 0 && <small className="deal-form-hint">{productItems.length} fabrics available — start typing to pick one.</small>}</> : <input autoFocus required value={editor.title || ''} onChange={(event) => setEditor({ ...editor, title: event.target.value })} />}</label>}
         {editor.type === 'Product' && <><label>Description<textarea rows={2} value={editor.description || ''} onChange={(event) => setEditor({ ...editor, description: event.target.value })} /></label><div className="deal-form-grid">{[['qty', 'Quantity', 'number'], ['rate', 'Rate (₹)', 'number'], ['unit', 'Unit', 'text']].map(([key, label, type]) => <label key={key}>{label}<input required={key !== 'unit'} type={type} min={key === 'qty' ? '0.001' : '0'} step="any" value={editor[key] ?? ''} onChange={(event) => setEditor({ ...editor, [key]: event.target.value })} /></label>)}</div></>}
         {editor.type === 'Task' && <><label>Assigned to<input value={editor.owner || ''} onChange={(event) => setEditor({ ...editor, owner: event.target.value })} /></label><div className="deal-form-grid"><label>Due date *<input required type="date" value={editor.dueDate || ''} onChange={(event) => setEditor({ ...editor, dueDate: event.target.value })} /></label><label>Priority<select value={editor.priority || 'Medium'} onChange={(event) => setEditor({ ...editor, priority: event.target.value })}>{['Low', 'Medium', 'High', 'Urgent'].map((priority) => <option key={priority}>{priority}</option>)}</select></label></div><label>Status<select value={editor.status || 'Open'} onChange={(event) => setEditor({ ...editor, status: event.target.value })}>{['Open', 'In Progress', 'Waiting', 'Completed'].map((status) => <option key={status}>{status}</option>)}</select></label></>}
         {editor.type === 'Pricing' && <div className="deal-form-grid"><label>Discount (₹)<input aria-label="Discount" type="number" min="0" step="0.01" value={editor.discount} onChange={(event) => setEditor({ ...editor, discount: event.target.value })} /></label><label>Tax (%)<input aria-label="Tax rate" type="number" min="0" max="100" step="0.01" value={editor.taxRate} onChange={(event) => setEditor({ ...editor, taxRate: event.target.value })} /></label></div>}

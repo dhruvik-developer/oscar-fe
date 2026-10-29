@@ -211,7 +211,7 @@ function YarnSection({ data, run, busy, vendors, items, formatCurrency }) {
   const yarnItems = items.filter((i) => /yarn/i.test(`${i.itemKind || ''} ${i.category || ''} ${i.name || ''}`));
   if (editing) {
     return (
-      <form onSubmit={(e) => { e.preventDefault(); run('yarn', 'put', 'yarn-lines/', { yarnLines: editing.map(({ key, id, item, supplierName, amount, ...r }) => ({ ...r, itemId: r.itemId || undefined, supplierId: r.supplierId || undefined })) }, () => setEditing(null)); }} className="space-y-2">
+      <form onSubmit={(e) => { e.preventDefault(); run('yarn', 'put', 'yarn-lines/', { yarnLines: editing.map(({ key, id, item, amount, ...r }) => ({ ...r, itemId: r.itemId || undefined, supplierId: r.supplierId || undefined, supplierName: String(r.supplierName || '').trim() || undefined, supplierPhone: String(r.supplierPhone || '').trim() || undefined })) }, () => setEditing(null)); }} className="space-y-2">
         <YarnLinesEditor rows={editing} onChange={setEditing} yarnItems={yarnItems} vendors={vendors} formatCurrency={formatCurrency} />
         <div className="flex justify-end gap-2">
           <button type="button" onClick={() => setEditing(null)} className={btnGhost}>Cancel</button>
@@ -225,14 +225,14 @@ function YarnSection({ data, run, busy, vendors, items, formatCurrency }) {
     <div className="space-y-2">
       {data.yarnLines.length === 0 ? <Empty>No yarn planned for this order.</Empty> : (
         <Table
-          head={[['Yarn'], ['Supplier'], ['Lot / ref'], ['Required', 1], ['Actual used', 1], ['Rate', 1], ['Planned amount', 1]]}
-          rows={data.yarnLines.map((y) => [y.item || y.yarnQuality, y.supplierName || '—', y.yarnLot || '—', `${qty(y.requiredQty)} ${y.uom}`, y.actualQtyUsed != null ? `${qty(y.actualQtyUsed)} ${y.uom}` : '—', formatCurrency(num(y.rate)), formatCurrency(num(y.amount))])}
-          foot={data.yarnLines.length > 1 ? ['Total', '', '', '', '', '', formatCurrency(total)] : null}
+          head={[['Yarn'], ['Supplier'], ['Contact'], ['Lot / ref'], ['Required', 1], ['Actual used', 1], ['Rate', 1], ['Planned amount', 1]]}
+          rows={data.yarnLines.map((y) => [y.item || y.yarnQuality, y.supplierName || '—', y.supplierPhone ? <a href={`tel:${y.supplierPhone.replace(/[^\d+]/g, '')}`} className="text-blue-700 hover:underline">{y.supplierPhone}</a> : '—', y.yarnLot || '—', `${qty(y.requiredQty)} ${y.uom}`, y.actualQtyUsed != null ? `${qty(y.actualQtyUsed)} ${y.uom}` : '—', formatCurrency(num(y.rate)), formatCurrency(num(y.amount))])}
+          foot={data.yarnLines.length > 1 ? ['Total', '', '', '', '', '', '', formatCurrency(total)] : null}
         />
       )}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-[10.5px] text-slate-400">Planned yarn is not consumed stock. Yarn bills go under Costs &amp; Expenses.</p>
-        <button type="button" className={btnGhost} onClick={() => setEditing(data.yarnLines.length ? data.yarnLines.map((y) => ({ ...y, key: y.id, itemId: y.itemId || '', supplierId: y.supplierId || '', yarnQuality: y.itemId ? '' : y.yarnQuality, actualQtyUsed: y.actualQtyUsed ?? '' })) : [blankYarnLine()])}>
+        <button type="button" className={btnGhost} onClick={() => setEditing(data.yarnLines.length ? data.yarnLines.map((y) => ({ ...y, key: y.id, itemId: y.itemId || '', supplierId: y.supplierId || '', yarnQuality: y.item || y.yarnQuality || '', supplierName: y.supplierName || '', supplierPhone: y.supplierPhone || '', actualQtyUsed: y.actualQtyUsed ?? '' })) : [blankYarnLine()])}>
           <Pencil size={13} /> Edit yarn plan
         </button>
       </div>
@@ -391,7 +391,7 @@ function ReceiptsSection({ data, run, busy, flowB, active, money, items, locatio
         />
       )}
       {data.receipts.length > 0 && (
-        <p className="text-[11px] text-slate-500">QC each receipt in <Link to="/inventory/qc" className="font-semibold text-blue-700 hover:underline">QC Work</Link> or from the batch&apos;s QC tab.</p>
+        <p className="text-[11px] text-slate-500">QC each receipt in <Link to="/inventory/qc/work" className="font-semibold text-blue-700 hover:underline">QC Work</Link> or from the batch&apos;s QC tab.</p>
       )}
       {active && !form && <button type="button" className={btnGhost} onClick={() => setForm(blank)}><Plus size={13} /> Record receipt at OSCAR</button>}
       {form && (

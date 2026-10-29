@@ -107,6 +107,7 @@
 .deal-related-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; align-items: start; }
 .deal-detail-form { display: grid; gap: 18px; font-size: 12px; }
 .deal-detail-form label { display: grid; gap: 7px; color: var(--text); }
+.deal-detail-form .deal-form-hint { font-size: 11px; font-weight: 400; color: var(--muted, #64748b); }
 .deal-detail-form input, .deal-detail-form textarea, .deal-detail-form select { width: 100%; border: 1px solid var(--border); background: var(--card); color: var(--text); border-radius: 8px; padding: 10px 12px; }
 .deal-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .deal-form-footer { display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid var(--border); padding-top: 16px; }

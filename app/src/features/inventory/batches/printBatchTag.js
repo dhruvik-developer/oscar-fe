@@ -61,6 +61,11 @@ const escapeHtml = (value) =>
 
 /** Open a print window with one 100 x 60 mm tag per batch. */
 export async function printBatchTags(batches) {
+  // A PO receipt gets its tag once QC has passed it, never while at QC Hold.
+  const waiting = batches.filter((b) => b && b.awaitingQc);
+  if (waiting.length) {
+    throw new Error(`${waiting.map((b) => b.batchCode).join(', ')} ${waiting.length === 1 ? 'is' : 'are'} waiting for QC; print the tag after QC passes.`);
+  }
   const win = window.open('', '_blank', 'width=760,height=600');
   if (!win) throw new Error('The browser blocked the print window. Allow pop-ups for this site and try again.');
 

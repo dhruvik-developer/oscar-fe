@@ -1,7 +1,9 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   Search, Printer, ScanLine, IndianRupee, Eye, SlidersHorizontal, X, Plus, Users, Layers, PackageOpen,
+  Boxes, CheckCircle2, Bookmark, ClipboardCheck, RefreshCcw, XCircle, Truck, UserRound, ShoppingCart,
+  Factory, GitMerge, PenLine,
 } from 'lucide-react';
 import PageHeader from '../../../components/ui/PageHeader';
 import AppPagination from '../../../components/ui/AppPagination';
@@ -27,17 +29,25 @@ const FABRIC_TYPES = [
   ['GREY', 'Grey'],
   ['DYED', 'Dyed'],
 ];
-/** Stock tiles: [summary key, label, holding filter it opens, colour of the figure]. */
+/** Stock tiles: [summary key, label, holding filter it opens, figure colour, icon, icon tint]. */
 const STOCK_TILES = [
-  ['totalPhysical', 'Total physical', '', 'text-slate-900'],
-  ['available', 'Available', 'available', 'text-emerald-700'],
-  ['reserved', 'Reserved', 'reserved', 'text-blue-700'],
-  ['qcHold', 'QC hold', 'qcHold', 'text-amber-700'],
-  ['rework', 'Rework', 'rework', 'text-violet-700'],
-  ['rejected', 'Rejected', 'rejected', 'text-rose-700'],
-  ['withJobWorker', 'At job worker', 'withJobWorker', 'text-indigo-700'],
-  ['customerMaterial', 'Customer material', '', 'text-slate-700'],
+  ['totalPhysical', 'Total physical', '', 'text-slate-900', Boxes, 'bg-slate-100 text-slate-600'],
+  ['available', 'Available', 'available', 'text-emerald-700', CheckCircle2, 'bg-emerald-50 text-emerald-600'],
+  ['reserved', 'Reserved', 'reserved', 'text-blue-700', Bookmark, 'bg-blue-50 text-blue-600'],
+  ['qcHold', 'QC hold', 'qcHold', 'text-amber-700', ClipboardCheck, 'bg-amber-50 text-amber-600'],
+  ['rework', 'Rework', 'rework', 'text-violet-700', RefreshCcw, 'bg-violet-50 text-violet-600'],
+  ['rejected', 'Rejected', 'rejected', 'text-rose-700', XCircle, 'bg-rose-50 text-rose-600'],
+  ['withJobWorker', 'At job worker', 'withJobWorker', 'text-indigo-700', Truck, 'bg-indigo-50 text-indigo-600'],
+  ['customerMaterial', 'Customer material', '', 'text-slate-700', UserRound, 'bg-slate-100 text-slate-600'],
 ];
+/** Where a batch came from, with its icon. */
+const ORIGIN_ICON = { PURCHASE: ShoppingCart, PRODUCTION: Factory, JOB_WORK: Truck, MERGE: GitMerge, MANUAL: PenLine };
+/** Status tabs above the table ('' = all). */
+const STATUS_TABS = ['', 'In Stock', 'QC Hold', 'At Job Worker', 'Blocked', 'Sold Out'];
+const STATUS_DOT = {
+  'In Stock': 'bg-emerald-500', 'QC Hold': 'bg-amber-500', 'At Job Worker': 'bg-violet-500',
+  Blocked: 'bg-rose-500', 'Sold Out': 'bg-slate-400', Closed: 'bg-slate-300',
+};
 const HOLDING_LABEL = Object.fromEntries(STOCK_TILES.filter(([, , h]) => h).map(([, label, h]) => [h, label]));
 /** The stock bar of a row: [quantity key, label, bar colour]. */
 const STOCK_PARTS = [
@@ -50,7 +60,6 @@ const STOCK_PARTS = [
   ['withJobWorker', 'At job worker', 'bg-indigo-500'],
   ['sold', 'Sold', 'bg-slate-300'],
 ];
-const STATUSES = ['', 'In Stock', 'QC Hold', 'At Job Worker', 'Blocked', 'Sold Out', 'Closed'];
 const STATUS_STYLE = {
   'In Stock': 'bg-emerald-50 text-emerald-700 border-emerald-200',
   'QC Hold': 'bg-amber-50 text-amber-700 border-amber-200',
@@ -72,10 +81,10 @@ function StockBar({ q }) {
   return (
     <div className="min-w-44">
       <div className="flex items-baseline justify-between gap-2">
-        <span className="font-bold text-emerald-700 tabular-nums">{formatNumberIN(q.available)}</span>
-        <span className="text-[10px] text-slate-400 tabular-nums">of {formatNumberIN(q.received)} {uom}</span>
+        <span className="tabular-nums"><span className="text-sm font-bold text-emerald-700">{formatNumberIN(q.available)}</span> <span className="text-[10px] text-slate-400">{uom} available</span></span>
+        <span className="text-[10px] text-slate-400 tabular-nums">{Number(q.received) > 0 ? `${Math.round((Number(q.available || 0) / Number(q.received)) * 100)}% of ${formatNumberIN(q.received)}` : ''}</span>
       </div>
-      <div className="mt-1 h-1.5 rounded-full bg-slate-100 overflow-hidden flex" aria-hidden="true">
+      <div className="mt-1.5 h-2 rounded-full bg-slate-100 overflow-hidden flex" aria-hidden="true">
         {parts.map(([key, , colour, v]) => <span key={key} className={colour} style={{ width: `${(v / total) * 100}%` }} />)}
       </div>
       <div className="mt-1 flex flex-wrap gap-x-2 text-[10px] text-slate-500">
@@ -102,6 +111,8 @@ export default function BatchRegistryPage() {
   const [data, setData] = useState({ results: [], count: 0, canSeeCost: false });
   // Batch profitability report: cost / revenue / profit columns (ledger access only).
   const [withCost, setWithCost] = useState(false);
+  // PO receipts still at QC Hold are kept out of the registry unless asked for.
+  const [showAwaitingQc, setShowAwaitingQc] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [scan, setScan] = useState('');
@@ -122,17 +133,17 @@ export default function BatchRegistryPage() {
     setLoading(true);
     setError('');
     try {
-      const params = { page, page_size: pageSize, ...(withCost ? { withCost: 1 } : {}) };
+      const params = { page, page_size: pageSize, ...(withCost ? { withCost: 1 } : {}), ...(showAwaitingQc ? { awaitingQc: 'include' } : {}) };
       Object.entries(query).forEach(([k, v]) => { if (v) params[k] = v; });
       const res = await inventoryService.getBatches(params);
-      setData({ results: res?.results || [], count: res?.count || 0, canSeeCost: Boolean(res?.canSeeCost), summary: res?.summary || null });
+      setData({ results: res?.results || [], count: res?.count || 0, canSeeCost: Boolean(res?.canSeeCost), summary: res?.summary || null, awaitingQcCount: res?.awaitingQcCount || 0 });
     } catch (err) {
       setError(describeApiError(err) || 'Batches could not be loaded.');
       setData({ results: [], count: 0 });
     } finally {
       setLoading(false);
     }
-  }, [query, page, pageSize, withCost]);
+  }, [query, page, pageSize, withCost, showAwaitingQc]);
   useEffect(() => { load(); }, [load]);
 
   // Filters apply as they change; typing in search waits a moment.
@@ -171,7 +182,6 @@ export default function BatchRegistryPage() {
     filters.designId && ['designId', `Design: ${nameOf(designs, filters.designId)}`],
     filters.shadeId && ['shadeId', `Colour: ${nameOf(shades, filters.shadeId)}`],
     filters.locationId && ['locationId', `Godown: ${nameOf(godowns, filters.locationId)}`],
-    filters.status && ['status', `Status: ${filters.status}`],
     filters.from && ['from', `From ${filters.from}`],
     filters.to && ['to', `To ${filters.to}`],
   ].filter(Boolean);
@@ -221,8 +231,8 @@ export default function BatchRegistryPage() {
 
       {/* Stock of all the batches shown: one strip, each figure filters the list. */}
       {s && (
-        <section className="bg-white border border-slate-200 rounded-xl grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 divide-x divide-y lg:divide-y-0 divide-slate-100 overflow-hidden" aria-label="Stock of the batches shown">
-          {STOCK_TILES.map(([key, label, holding, tone]) => {
+        <section className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-8 gap-3" aria-label="Stock of the batches shown">
+          {STOCK_TILES.map(([key, label, holding, tone, Icon, tint]) => {
             const value = Number(s[key] || 0);
             const active = holding && filters.holding === holding;
             return (
@@ -232,10 +242,14 @@ export default function BatchRegistryPage() {
                 disabled={!holding}
                 onClick={() => setF('holding', active ? '' : holding)}
                 title={holding ? (active ? 'Show all batches' : `Only batches with ${label.toLowerCase()} stock`) : undefined}
-                className={`text-left px-4 py-3 transition-colors ${active ? 'bg-blue-50 shadow-[inset_0_-2px_0_0_#2563eb]' : ''} ${holding ? 'hover:bg-slate-50 cursor-pointer' : 'cursor-default'}`}
+                className={`group text-left rounded-xl border bg-white px-3.5 py-3 transition-all ${active ? 'border-blue-500 ring-2 ring-blue-500/20' : 'border-slate-200'} ${holding ? 'hover:border-blue-300 hover:shadow-sm cursor-pointer' : 'cursor-default'}`}
               >
-                <div className="text-[10px] uppercase tracking-wide text-slate-400 font-semibold">{label}</div>
-                <div className={`text-lg font-bold tabular-nums ${value ? tone : 'text-slate-300'}`}>{formatNumberIN(value)}</div>
+                <div className="flex items-center gap-2">
+                  <span className={`grid place-items-center w-7 h-7 rounded-lg ${value || !holding ? tint : 'bg-slate-50 text-slate-300'}`}><Icon size={15} /></span>
+                  <span className="text-[10.5px] font-semibold uppercase tracking-wide text-slate-500 leading-tight">{label}</span>
+                </div>
+                <div className={`mt-2 text-xl font-bold tabular-nums ${value ? tone : 'text-slate-300'}`}>{formatNumberIN(value)}</div>
+                {key === 'totalPhysical' && <div className="text-[10px] text-slate-400">{data.count} batch{data.count === 1 ? '' : 'es'} · metres</div>}
               </button>
             );
           })}
@@ -277,6 +291,12 @@ export default function BatchRegistryPage() {
           <button type="button" onClick={() => setShowFilters((v) => !v)} aria-expanded={showFilters} className={`${ghostBtn} self-start ${showFilters || advancedCount ? 'border-blue-300 text-blue-700' : ''}`}>
             <SlidersHorizontal size={14} /> Filters{advancedCount ? ` (${advancedCount})` : ''}
           </button>
+          {data.canSeeCost && (
+            <label className={`${ghostBtn} self-start ${withCost ? 'border-emerald-300 text-emerald-700 bg-emerald-50' : ''}`}>
+              <input type="checkbox" className="sr-only" checked={withCost} onChange={(e) => { setWithCost(e.target.checked); setPage(1); }} />
+              <IndianRupee size={14} /> {withCost ? 'Hide' : 'Show'} cost &amp; profit
+            </label>
+          )}
         </div>
 
         {showFilters && (
@@ -300,9 +320,6 @@ export default function BatchRegistryPage() {
             <select value={filters.origin} onChange={(e) => setF('origin', e.target.value)} className={inputCls} aria-label="Origin">
               {ORIGINS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
             </select>
-            <select value={filters.status} onChange={(e) => setF('status', e.target.value)} className={inputCls} aria-label="Status">
-              {STATUSES.map((st) => <option key={st} value={st}>{st || 'All statuses'}</option>)}
-            </select>
             <label className="flex items-center gap-2 text-xs text-slate-500">From
               <input type="date" value={filters.from} onChange={(e) => setF('from', e.target.value)} className={`${inputCls} flex-1 min-w-0`} aria-label="Created from" /></label>
             <label className="flex items-center gap-2 text-xs text-slate-500">To
@@ -310,7 +327,7 @@ export default function BatchRegistryPage() {
           </div>
         )}
 
-        {(chips.length > 0 || data.canSeeCost) && (
+        {chips.length > 0 && (
           <div className="flex flex-wrap items-center gap-2">
             {chips.map(([key, label]) => (
               <span key={key} className="inline-flex items-center gap-1 h-7 pl-2.5 pr-1 rounded-full bg-blue-50 border border-blue-200 text-[11px] font-semibold text-blue-800">
@@ -321,15 +338,22 @@ export default function BatchRegistryPage() {
             {chips.length > 0 && (
               <button type="button" onClick={() => setFilters({ ...BLANK, q: filters.q, fabricType: filters.fabricType })} className="text-[11px] font-semibold text-slate-500 hover:text-slate-800 cursor-pointer">Clear all</button>
             )}
-            {data.canSeeCost && (
-              <label className="ml-auto inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600 cursor-pointer">
-                <input type="checkbox" checked={withCost} onChange={(e) => { setWithCost(e.target.checked); setPage(1); }} />
-                <IndianRupee size={13} /> Show cost &amp; profit
-              </label>
-            )}
           </div>
         )}
       </div>
+
+      {(data.awaitingQcCount > 0 || showAwaitingQc) && (
+        <div className="flex flex-wrap items-center justify-between gap-2 p-3 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-900">
+          <span>
+            <strong>{data.awaitingQcCount}</strong> PO receipt batch{data.awaitingQcCount === 1 ? '' : 'es'} waiting for QC.
+            {' '}They join the registry, stock and godown only after QC — <Link to="/inventory/qc/entry" className="font-semibold underline">open QC Entry</Link>.
+          </span>
+          <label className="inline-flex items-center gap-1.5 font-semibold cursor-pointer">
+            <input type="checkbox" checked={showAwaitingQc} onChange={(e) => { setShowAwaitingQc(e.target.checked); setPage(1); }} />
+            Show batches waiting for QC
+          </label>
+        </div>
+      )}
 
       {error && <div role="alert" className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-xs text-rose-700">{error}</div>}
       {notice && <div role="status" className="p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-xs text-emerald-700">{notice}</div>}
@@ -356,6 +380,19 @@ export default function BatchRegistryPage() {
       )}
 
       <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+        <div className="flex items-center gap-1 px-3 border-b border-slate-200 overflow-x-auto" role="tablist" aria-label="Batch status">
+          {STATUS_TABS.map((st) => {
+            const isActive = filters.status === st;
+            return (
+              <button key={st || 'all'} type="button" role="tab" aria-selected={isActive} onClick={() => setF('status', st)}
+                className={`inline-flex items-center gap-1.5 px-3 py-3 text-xs font-semibold border-b-2 whitespace-nowrap cursor-pointer transition-colors ${isActive ? 'border-blue-600 text-blue-700' : 'border-transparent text-slate-500 hover:text-slate-800'}`}>
+                {st && <span className={`w-1.5 h-1.5 rounded-full ${STATUS_DOT[st]}`} />}
+                {st || 'All batches'}
+                {isActive && !loading && <span className="px-1.5 rounded-full bg-blue-100 text-blue-700 text-[10px]">{data.count}</span>}
+              </button>
+            );
+          })}
+        </div>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[960px] text-xs">
             <thead className="bg-slate-50 text-[11px] uppercase tracking-wide text-slate-500">
@@ -376,7 +413,7 @@ export default function BatchRegistryPage() {
                 <th className="px-3 py-3 text-left">Batch</th>
                 <th className="px-3 py-3 text-left">Fabric</th>
                 <th className="px-3 py-3 text-left">Source</th>
-                <th className="px-3 py-3 text-left">Stock now</th>
+                <th className="px-3 py-3 text-left w-[300px]">Stock now</th>
                 {withCost && (
                   <>
                     <th className="px-3 py-3 text-right">Total cost</th>
@@ -413,7 +450,7 @@ export default function BatchRegistryPage() {
                   <tr
                     key={b.id}
                     onClick={() => open(b.batchCode)}
-                    className={`cursor-pointer align-top ${isSelected ? 'bg-blue-50/60' : 'hover:bg-slate-50'}`}
+                    className={`group cursor-pointer align-top transition-colors ${isSelected ? 'bg-blue-50/60' : 'hover:bg-slate-50/80'}`}
                   >
                     <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
                       <input type="checkbox" checked={isSelected} onChange={() => toggle(b)} aria-label={`Select ${b.batchCode}`} className="cursor-pointer" />
@@ -431,8 +468,11 @@ export default function BatchRegistryPage() {
                       {!b.hsnCode && <div className="text-[10px] font-semibold text-amber-700">HSN missing in item master</div>}
                     </td>
                     <td className="px-3 py-3">
-                      <div className="text-slate-700">{ORIGIN_LABEL[b.origin] || b.origin}{b.sourceDocumentNumber && b.sourceDocumentNumber !== b.batchCode ? <span className="text-slate-400"> · {b.sourceDocumentNumber}</span> : ''}</div>
-                      <div className="text-[10px] text-slate-500 truncate max-w-48">
+                      <div className="flex items-center gap-1.5 text-slate-700">
+                        {(() => { const OriginIcon = ORIGIN_ICON[b.origin] || PenLine; return <span className="grid place-items-center w-6 h-6 rounded-md bg-slate-100 text-slate-500"><OriginIcon size={13} /></span>; })()}
+                        <span>{ORIGIN_LABEL[b.origin] || b.origin}{b.sourceDocumentNumber && b.sourceDocumentNumber !== b.batchCode ? <span className="text-slate-400 font-mono text-[10.5px]"> · {b.sourceDocumentNumber}</span> : ''}</span>
+                      </div>
+                      <div className="pl-7 text-[10px] text-slate-500 truncate max-w-56">
                         {b.ownership === 'OSCAR' ? (b.supplierName || '') : <span className="font-semibold text-amber-700">{b.ownerPartyName || b.ownership}'s material</span>}
                       </div>
                     </td>
@@ -447,9 +487,11 @@ export default function BatchRegistryPage() {
                       </>
                     )}
                     <td className="px-3 py-3">
-                      <span className={`px-2 py-0.5 rounded-full border text-[10px] font-semibold whitespace-nowrap ${STATUS_STYLE[b.status] || STATUS_STYLE.Closed}`}>{b.status}</span>
+                      {b.awaitingQc
+                        ? <span className="px-2 py-0.5 rounded-full border text-[10px] font-semibold whitespace-nowrap bg-amber-50 text-amber-800 border-amber-200">Waiting for QC</span>
+                        : <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-[10px] font-semibold whitespace-nowrap ${STATUS_STYLE[b.status] || STATUS_STYLE.Closed}`}><span className={`w-1.5 h-1.5 rounded-full ${STATUS_DOT[b.status] || STATUS_DOT.Closed}`} />{b.status}</span>}
                     </td>
-                    <td className="px-3 py-3 text-right whitespace-nowrap space-x-1" onClick={(e) => e.stopPropagation()}>
+                    <td className="px-3 py-3 text-right whitespace-nowrap space-x-1 opacity-60 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
                       <button type="button" onClick={() => open(b.batchCode)} title="Open Batch 360°" aria-label={`Open ${b.batchCode}`} className="p-1.5 rounded-md border border-slate-200 text-blue-700 hover:bg-blue-50 cursor-pointer">
                         <Eye size={13} />
                       </button>

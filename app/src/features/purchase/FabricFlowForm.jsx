@@ -87,28 +87,40 @@ export function FabricFlowSteps({ flow }) {
   );
 }
 
-export const blankYarnLine = () => ({ key: `y-${Date.now()}-${Math.floor(Math.random() * 1000)}`, itemId: '', yarnQuality: '', supplierId: '', yarnLot: '', requiredQty: '', uom: 'Kg', rate: '', remarks: '' });
+export const blankYarnLine = () => ({ key: `y-${Date.now()}-${Math.floor(Math.random() * 1000)}`, itemId: '', yarnQuality: '', supplierId: '', supplierName: '', supplierPhone: '', yarnLot: '', requiredQty: '', uom: 'Kg', rate: '', remarks: '' });
 export const blankCostLine = (flow) => ({ key: `c-${Date.now()}-${Math.floor(Math.random() * 1000)}`, category: 'MANUFACTURING', expenseType: 'Manufacturing charges', amount: '', status: 'ESTIMATED', billReference: '', flow });
 
-/** Planned yarn for the order. Planning only: nothing is issued from stock. */
+/**
+ * Planned yarn for the order. Planning only: nothing is issued from stock.
+ * Every field is typed by hand; yarn items and vendors only suggest -- a
+ * typed name that matches one links it, anything else is kept as typed.
+ */
 export function YarnLinesEditor({ rows, onChange, yarnItems, vendors, formatCurrency }) {
+  const same = (a, b) => String(a || '').trim().toLowerCase() === String(b || '').trim().toLowerCase();
   const update = (i, key, value) => onChange(rows.map((r, j) => {
     if (j !== i) return r;
     const next = { ...r, [key]: value };
-    if (key === 'itemId') {
-      const it = yarnItems.find((y) => String(y.id) === String(value));
+    if (key === 'yarnQuality') {
+      const it = yarnItems.find((y) => same(y.name, value));
+      next.itemId = it ? it.id : '';
       if (it) { next.uom = it.uom || next.uom; next.rate = next.rate || it.costPrice || ''; }
+    }
+    if (key === 'supplierName') {
+      const v = vendors.find((p) => same(p.name, value));
+      next.supplierId = v ? v.id : '';
+      if (v && !next.supplierPhone) next.supplierPhone = v.phone || v.mobile || '';
     }
     return next;
   }));
   return (
     <div>
       <div className="border border-slate-200 rounded-xl overflow-x-auto">
-        <table className="w-full min-w-[860px] text-left text-[12px]">
+        <table className="w-full min-w-[1000px] text-left text-[12px]">
           <thead>
             <tr className="bg-slate-50 border-b border-slate-200 text-[10.5px] font-bold uppercase tracking-wide text-slate-400">
               <th className="px-2 py-2">Yarn / quality *</th>
-              <th className="px-2 py-2 w-40">Yarn supplier</th>
+              <th className="px-2 py-2 w-44">Yarn supplier</th>
+              <th className="px-2 py-2 w-36">Supplier contact</th>
               <th className="px-2 py-2 w-28">Lot / ref</th>
               <th className="px-2 py-2 w-24 text-right">Required qty</th>
               <th className="px-2 py-2 w-16">UOM</th>
@@ -119,24 +131,18 @@ export function YarnLinesEditor({ rows, onChange, yarnItems, vendors, formatCurr
           </thead>
           <tbody className="divide-y divide-slate-100">
             {rows.length === 0 && (
-              <tr><td colSpan={8} className="px-3 py-3 text-center text-slate-400">No yarn planned. Add a line if the factory uses yarn for this order.</td></tr>
+              <tr><td colSpan={9} className="px-3 py-3 text-center text-slate-400">No yarn planned. Add a line if the factory uses yarn for this order.</td></tr>
             )}
             {rows.map((r, i) => (
               <tr key={r.key || r.id || i}>
                 <td className="px-2 py-1.5">
-                  <div className="flex gap-1.5">
-                    <select aria-label="Yarn item" value={r.itemId || ''} onChange={(e) => update(i, 'itemId', e.target.value)} className={inputCls}>
-                      <option value="">Typed quality…</option>
-                      {yarnItems.map((y) => <option key={y.id} value={y.id}>{y.name}</option>)}
-                    </select>
-                    {!r.itemId && <input aria-label="Yarn quality" value={r.yarnQuality} onChange={(e) => update(i, 'yarnQuality', e.target.value)} placeholder="e.g. 60s combed cotton" className={inputCls} />}
-                  </div>
+                  <input aria-label="Yarn quality" list="yarn-item-options" value={r.yarnQuality} onChange={(e) => update(i, 'yarnQuality', e.target.value)} placeholder="e.g. 60s combed cotton" className={inputCls} />
                 </td>
                 <td className="px-2 py-1.5">
-                  <select aria-label="Yarn supplier" value={r.supplierId || ''} onChange={(e) => update(i, 'supplierId', e.target.value)} className={inputCls}>
-                    <option value="">—</option>
-                    {vendors.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
-                  </select>
+                  <input aria-label="Yarn supplier" list="yarn-supplier-options" value={r.supplierName || ''} onChange={(e) => update(i, 'supplierName', e.target.value)} placeholder="Supplier name" className={inputCls} />
+                </td>
+                <td className="px-2 py-1.5">
+                  <input aria-label="Supplier contact number" type="tel" inputMode="tel" value={r.supplierPhone || ''} onChange={(e) => update(i, 'supplierPhone', e.target.value.replace(/[^0-9+ -]/g, ''))} placeholder="e.g. 98250 12345" className={inputCls} />
                 </td>
                 <td className="px-2 py-1.5"><input aria-label="Yarn lot" value={r.yarnLot} onChange={(e) => update(i, 'yarnLot', e.target.value)} className={inputCls} /></td>
                 <td className="px-2 py-1.5"><input aria-label="Required quantity" type="number" min="0" step="any" value={r.requiredQty} onChange={(e) => update(i, 'requiredQty', e.target.value)} className={`${inputCls} text-right font-mono`} /></td>
@@ -150,6 +156,8 @@ export function YarnLinesEditor({ rows, onChange, yarnItems, vendors, formatCurr
             ))}
           </tbody>
         </table>
+        <datalist id="yarn-item-options">{yarnItems.map((y) => <option key={y.id} value={y.name} />)}</datalist>
+        <datalist id="yarn-supplier-options">{vendors.map((v) => <option key={v.id} value={v.name} />)}</datalist>
       </div>
       <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
         <button type="button" onClick={() => onChange([...rows, blankYarnLine()])} className="inline-flex items-center gap-1 text-[12px] font-semibold text-blue-600 hover:underline"><Plus size={13} /> Add yarn line</button>
@@ -237,6 +245,9 @@ export function fabricFlowPayload({ flow, dyeingMillId, yarnRows, costRows }) {
   if (yarnLines.some((r) => !r.itemId && !String(r.yarnQuality || '').trim())) {
     return { error: 'Every yarn line needs a yarn item or a typed yarn quality.' };
   }
+  if (yarnLines.some((r) => r.supplierPhone && !/^\+?[0-9][0-9 -]{5,18}[0-9]$/.test(String(r.supplierPhone).trim()))) {
+    return { error: 'Enter a valid yarn supplier contact number.' };
+  }
   const expenses = costRows.filter((r) => r.amount !== '' || r.billReference);
   if (expenses.some((r) => !(Number(r.amount) > 0))) return { error: 'Every cost needs an amount greater than zero.' };
   return {
@@ -247,6 +258,8 @@ export function fabricFlowPayload({ flow, dyeingMillId, yarnRows, costRows }) {
         ...r,
         itemId: r.itemId || undefined,
         supplierId: r.supplierId || undefined,
+        supplierName: String(r.supplierName || '').trim() || undefined,
+        supplierPhone: String(r.supplierPhone || '').trim() || undefined,
         requiredQty: Number(r.requiredQty) || 0,
         rate: Number(r.rate) || 0,
       })),

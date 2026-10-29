@@ -177,6 +177,7 @@ const QCReprocessPage = lazy(() => import('../features/inventory/qc/QCReprocessH
 const QCHistoryPage = lazy(() => import('../features/inventory/qc/QCReprocessHistoryPages').then(m => ({ default: m.QCHistoryPage })));
 const QCAdvancedPage = lazy(() => import('../features/inventory/qc/QcHubPages').then(m => ({ default: m.QCAdvancedPage })));
 const QCReportsHubPage = lazy(() => import('../features/inventory/qc/QcHubPages').then(m => ({ default: m.QCReportsHubPage })));
+const QCDashboardHubPage = lazy(() => import('../features/inventory/qc/QcHubPages').then(m => ({ default: m.QCDashboardHubPage })));
 const NotificationsPage = lazy(() => import('../features/notifications/NotificationsPage'));
 const ServiceOrdersPage = lazy(() => import('../features/jobwork/service-orders/ServiceOrdersPage'));
 const LotTakaRegisterPage = lazy(() => import('../features/inventory/LotTakaRegisterPage'));
@@ -506,12 +507,12 @@ const router = createBrowserRouter([
       { path: 'inventory/qc/advanced', element: <Page component={QCAdvancedPage} title="Detailed QC Screens" /> },
       { path: 'inventory/qc/reports', element: <Page component={QCReportsHubPage} title="QC Reports" /> },
       // The old one-page-per-step URLs open the matching step / tab.
-      { path: 'inventory/qc', element: <RedirectWith to="/inventory/qc/entry" set={{}} /> },
+      { path: 'inventory/qc', element: <RedirectWith to="/inventory/qc/dashboard" set={{}} /> },
       { path: 'inventory/qc/pending', element: <RedirectWith to="/inventory/qc/advanced" set={{ step: 'pending' }} /> },
       { path: 'inventory/qc/register', element: <RedirectWith to="/inventory/qc/advanced" set={{ step: 'inspect' }} /> },
       { path: 'inventory/qc/results', element: <RedirectWith to="/inventory/qc/advanced" set={{ step: 'decide' }} /> },
       { path: 'inventory/qc/reinspection', element: <RedirectWith to="/inventory/qc/advanced" set={{ step: 'recheck' }} /> },
-      { path: 'inventory/qc/dashboard', element: <RedirectWith to="/inventory/qc/reports" set={{ tab: 'overview' }} /> },
+      { path: 'inventory/qc/dashboard', element: <Page component={QCDashboardHubPage} title="QC Dashboard" /> },
       { path: 'job-work/service-orders', element: <Page component={ServiceOrdersPage} title="Dyeing Service Orders" /> },
       { path: 'inventory/lot-register', element: <Page component={LotTakaRegisterPage} title="Lot / Taka Register" /> },
       { path: 'inventory/lots-takas', element: <Navigate to="/inventory/lot-register" replace /> },

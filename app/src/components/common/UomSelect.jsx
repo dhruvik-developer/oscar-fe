@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { ChevronDown, Search } from 'lucide-react';
 
 import useUnits from '../../hooks/useUnits';
@@ -11,7 +12,12 @@ import { resolveUnit, sameUnitText, unitsCompatibleWith } from '../../utils/uom'
  *   unit (CM / Meter for a fabric in Mtr; never Kg).
  * - The current `value` is always shown, even if it is now inactive, so an
  *   old document still displays the unit it was saved with.
+ * - The menu opens in a portal at a fixed position, so a table or modal that
+ *   scrolls (`overflow-auto`) can never clip it; it opens upward when there is
+ *   no room below.
  */
+const MENU_WIDTH = 208;
+const MENU_MAX_HEIGHT = 300;
 export default function UomSelect({
   value,
   onChange,
@@ -25,6 +31,29 @@ export default function UomSelect({
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const rootRef = useRef(null);
+  const menuRef = useRef(null);
+  const [pos, setPos] = useState(null);
+
+  const place = useCallback(() => {
+    const rect = rootRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const below = window.innerHeight - rect.bottom;
+    const up = below < MENU_MAX_HEIGHT && rect.top > below;
+    const left = Math.min(Math.max(8, rect.right - MENU_WIDTH), window.innerWidth - MENU_WIDTH - 8);
+    setPos(up ? { left, bottom: window.innerHeight - rect.top + 4 } : { left, top: rect.bottom + 4 });
+  }, []);
+
+  useLayoutEffect(() => {
+    if (!open) return undefined;
+    place();
+    // Follow the button when anything (page, modal, table) scrolls.
+    window.addEventListener('scroll', place, true);
+    window.addEventListener('resize', place);
+    return () => {
+      window.removeEventListener('scroll', place, true);
+      window.removeEventListener('resize', place);
+    };
+  }, [open, place]);
 
   const options = useMemo(() => {
     const list = stockUom ? unitsCompatibleWith(units, stockUom) : activeUnits;
@@ -48,7 +77,9 @@ export default function UomSelect({
 
   useEffect(() => {
     if (!open) return undefined;
-    const onDoc = (e) => { if (!rootRef.current?.contains(e.target)) setOpen(false); };
+    const onDoc = (e) => {
+      if (!rootRef.current?.contains(e.target) && !menuRef.current?.contains(e.target)) setOpen(false);
+    };
     document.addEventListener('mousedown', onDoc);
     return () => document.removeEventListener('mousedown', onDoc);
   }, [open]);
@@ -76,8 +107,12 @@ export default function UomSelect({
         <span className={value ? '' : 'text-slate-400'}>{value || placeholder}</span>
         {!disabled && <ChevronDown className="w-3 h-3 text-slate-400 shrink-0" />}
       </button>
-      {open && (
-        <div className="absolute z-40 mt-1 w-52 right-0 bg-white border border-slate-200 rounded-lg shadow-lg">
+      {open && pos && createPortal(
+        <div
+          ref={menuRef}
+          style={{ position: 'fixed', width: MENU_WIDTH, ...pos }}
+          className="z-[1100] bg-white border border-slate-200 rounded-lg shadow-lg"
+        >
           <div className="relative p-1.5 border-b border-slate-100">
             <Search className="w-3 h-3 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
@@ -110,7 +145,8 @@ export default function UomSelect({
           {stockUom && (
             <p className="px-3 py-1.5 border-t border-slate-100 text-[10px] text-slate-400">Units that convert to {stockUom}</p>
           )}
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );

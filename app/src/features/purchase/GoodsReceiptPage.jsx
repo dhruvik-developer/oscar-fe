@@ -89,6 +89,8 @@ export const GoodsReceiptPage = () => {
   const [grnIdempotencyKey, setGrnIdempotencyKey] = useState('');
   const [standaloneSubmitting, setStandaloneSubmitting] = useState(false);
   const [standaloneError, setStandaloneError] = useState('');
+  // Earlier GRNs against the PO picked in the intake form (date, qty, rate per delivery).
+  const [poHistory, setPoHistory] = useState([]);
   const [standaloneSuccess, setStandaloneSuccess] = useState('');
 
   const todayStr = new Date().toISOString().split('T')[0];
@@ -254,10 +256,14 @@ export const GoodsReceiptPage = () => {
   };
 
   const handlePoSelect = (poId) => {
+    setPoHistory([]);
     if (!poId) {
       setStandaloneForm((prev) => ({ ...prev, poId: '', lines: [] }));
       return;
     }
+    api.get('/purchase/receipts/', { query: { page_size: 200 } })
+      .then((res) => setPoHistory((res?.results || res || []).filter((r) => String(r.purchaseOrder ?? r.purchase_order) === String(poId))))
+      .catch(() => setPoHistory([]));
     const po = purchaseOrders.find((p) => p.id === poId);
     if (!po) return;
 
@@ -270,6 +276,8 @@ export const GoodsReceiptPage = () => {
         itemName: it.name || it.itemName || it.description || '',
         poLineId: it.id,
         orderedQty: Number(it.qty || 0),
+        earlierQty: Number(it.receivedQty || 0),
+        pendingQty: remaining,
         receivedQty: targetQty,
         unitCost: Number(it.rate || it.unitPrice || 0),
         uom: it.uom || '',
@@ -842,6 +850,52 @@ export const GoodsReceiptPage = () => {
                 </div>
               </div>
 
+              {standaloneForm.poId && (
+                <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-3 space-y-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <h4 className="font-bold text-slate-800 text-xs uppercase tracking-wider">Deliveries on this PO ({poHistory.length + 1})</h4>
+                    <span className="text-[11px] text-slate-500">Each delivery is its own GRN with its date, quantity and rate. The highlighted row is the one you are entering now.</span>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full min-w-[560px] text-[11px]">
+                      <thead className="text-[10px] uppercase text-slate-400">
+                        <tr><th className="text-left py-1">Date</th><th className="text-left py-1">GRN</th><th className="text-left py-1">Fabric</th><th className="text-right py-1">Qty</th><th className="text-right py-1">Rate</th><th className="text-right py-1">Amount</th></tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-200/70">
+                        {poHistory.flatMap((g) => (g.lines || []).map((ln) => {
+                          const q = Number(ln.receivedQty ?? ln.received_qty ?? 0);
+                          const r = Number(ln.unitCost ?? ln.unit_cost ?? 0);
+                          return (
+                            <tr key={`${g.id}-${ln.id}`}>
+                              <td className="py-1.5 pl-1">{String(g.receiptDate ?? g.receipt_date ?? '').split('-').reverse().join('-')}</td>
+                              <td className="py-1.5 font-mono">{g.grnNumber ?? g.grn_number}</td>
+                              <td className="py-1.5">{ln.itemName}</td>
+                              <td className="py-1.5 text-right font-mono">{numIN(q)} {ln.uom || 'm'}</td>
+                              <td className="py-1.5 text-right font-mono">₹{numIN(r)}</td>
+                              <td className="py-1.5 text-right font-mono font-semibold">₹{numIN(q * r)}</td>
+                            </tr>
+                          );
+                        }))}
+                        {standaloneForm.lines.map((ln) => {
+                          const q = Number(ln.receivedQty) || 0;
+                          const r = Number(ln.unitCost) || 0;
+                          return (
+                            <tr key={`now-${ln.id}`} className="bg-blue-50/70 font-semibold text-blue-900">
+                              <td className="py-1.5 pl-1">{standaloneForm.receiptDate ? standaloneForm.receiptDate.split('-').reverse().join('-') : '—'}</td>
+                              <td className="py-1.5"><span className="px-1.5 py-0.5 rounded bg-blue-600 text-white text-[10px]">This delivery</span></td>
+                              <td className="py-1.5">{ln.itemName || '—'}</td>
+                              <td className="py-1.5 text-right font-mono">{numIN(q)} {ln.uom || 'm'}</td>
+                              <td className="py-1.5 text-right font-mono">₹{numIN(r)}</td>
+                              <td className="py-1.5 text-right font-mono">₹{numIN(q * r)}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
               {/* Lines and Takas Section */}
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
@@ -861,8 +915,9 @@ export const GoodsReceiptPage = () => {
                 </div>
 
                 {standaloneForm.lines.map((line, lIdx) => {
-                  const shortage = Math.max(0, Number(line.orderedQty || 0) - Number(line.receivedQty || 0));
-                  const excess = Math.max(0, Number(line.receivedQty || 0) - Number(line.orderedQty || 0));
+                  const baseQty = line.pendingQty != null ? Number(line.pendingQty) : Number(line.orderedQty || 0);
+                  const shortage = Math.max(0, baseQty - Number(line.receivedQty || 0));
+                  const excess = Math.max(0, Number(line.receivedQty || 0) - baseQty);
                   const takaSum = (line.takas || []).reduce((s, t) => s + (Number(t.qty) || 0), 0);
                   const takaDiff = Math.round((Number(line.receivedQty || 0) - takaSum) * 100) / 100;
                   const takaMatch = Math.abs(takaDiff) < 0.001;
@@ -871,7 +926,7 @@ export const GoodsReceiptPage = () => {
                     <div key={line.id} className="border border-slate-200 rounded-xl p-4 bg-white shadow-xs space-y-3">
                       {/* Line Overview Row */}
                       <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
-                        <div className="sm:col-span-4">
+                        <div className="sm:col-span-3">
                           <label className="block text-[11px] font-semibold text-slate-500 mb-1">Fabric Item *</label>
                           {standaloneForm.poId && line.itemName ? (
                             <div className="px-3 py-1.5 bg-slate-100 rounded-lg font-medium text-slate-800 border border-slate-200 truncate">
@@ -892,14 +947,22 @@ export const GoodsReceiptPage = () => {
                         </div>
 
                         <div className="sm:col-span-2">
-                          <label className="block text-[11px] font-semibold text-slate-500 mb-1">PO Ordered</label>
-                          <input
-                            type="number"
-                            readOnly={Boolean(standaloneForm.poId)}
-                            value={line.orderedQty}
-                            onChange={(e) => handleUpdateLine(line.id, 'orderedQty', e.target.value)}
-                            className="w-full px-3 py-1.5 border border-slate-200 rounded-lg bg-slate-50 font-mono text-slate-700"
-                          />
+                          {standaloneForm.poId && line.pendingQty != null ? (
+                            <>
+                              <label className="block text-[11px] font-semibold text-slate-500 mb-1">Pending on PO</label>
+                              <div className="px-3 py-1.5 border border-slate-200 rounded-lg bg-slate-50 font-mono font-semibold text-slate-800">{numIN(line.pendingQty)}</div>
+                            </>
+                          ) : (
+                            <>
+                              <label className="block text-[11px] font-semibold text-slate-500 mb-1">PO Ordered</label>
+                              <input
+                                type="number"
+                                value={line.orderedQty}
+                                onChange={(e) => handleUpdateLine(line.id, 'orderedQty', e.target.value)}
+                                className="w-full px-3 py-1.5 border border-slate-200 rounded-lg bg-slate-50 font-mono text-slate-700"
+                              />
+                            </>
+                          )}
                         </div>
 
                         <div className="sm:col-span-2">
@@ -915,6 +978,19 @@ export const GoodsReceiptPage = () => {
                         </div>
 
                         <div className="sm:col-span-2">
+                          <label className="block text-[11px] font-semibold text-slate-700 mb-1">Rate (₹/m)</label>
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={line.unitCost}
+                            onChange={(e) => handleUpdateLine(line.id, 'unitCost', e.target.value)}
+                            aria-label="Rate per metre"
+                            className="w-full px-3 py-1.5 border border-slate-300 rounded-lg bg-white font-mono text-slate-900 focus:border-blue-500 focus:outline-none"
+                          />
+                        </div>
+
+                        <div className="sm:col-span-1">
                           <label className="block text-[11px] font-semibold text-slate-500 mb-1">Batch / Lot #</label>
                           <input
                             type="text"
@@ -950,7 +1026,11 @@ export const GoodsReceiptPage = () => {
                       {/* Variance Indicator */}
                       {Number(line.orderedQty) > 0 && (
                         <div className="flex items-center gap-3 text-[11px] pt-1">
-                          <span className="text-slate-500 font-medium">Variance vs PO:</span>
+                          {standaloneForm.poId && line.pendingQty != null && (
+                            <span className="text-slate-500">PO {numIN(line.orderedQty)} m · {numIN(line.earlierQty)} m received earlier ·</span>
+                          )}
+                          <span className="font-semibold text-slate-700">This delivery{standaloneForm.receiptDate ? ` on ${standaloneForm.receiptDate.split('-').reverse().join('-')}` : ''}: {numIN(line.receivedQty)} m × ₹{numIN(line.unitCost)} = ₹{numIN((Number(line.receivedQty) || 0) * (Number(line.unitCost) || 0))}</span>
+                          <span className="text-slate-500 font-medium">Variance vs pending:</span>
                           {shortage > 0 ? (
                             <span className="text-amber-600 font-semibold flex items-center gap-1">
                               ⚠️ Shortage: {numIN(shortage)} m ({Math.round((shortage / line.orderedQty) * 100)}%)
@@ -960,7 +1040,7 @@ export const GoodsReceiptPage = () => {
                               ℹ️ Excess: +{numIN(excess)} m ({Math.round((excess / line.orderedQty) * 100)}%)
                             </span>
                           ) : (
-                            <span className="text-emerald-600 font-semibold">✓ Exact match with PO</span>
+                            <span className="text-emerald-600 font-semibold">{standaloneForm.poId && line.pendingQty != null ? '✓ Completes the pending quantity' : '✓ Exact match with PO'}</span>
                           )}
                         </div>
                       )}

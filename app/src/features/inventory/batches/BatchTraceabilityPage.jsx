@@ -120,7 +120,7 @@ export default function BatchTraceabilityPage() {
             <button type="button" onClick={refresh} disabled={refreshing} aria-label="Reload batch" className="h-9 px-3 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-600 hover:bg-slate-50 inline-flex items-center gap-1.5 cursor-pointer">
               <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} /> Refresh
             </button>
-            <button type="button" onClick={() => printBatchTags([batch]).catch((err) => setError(err.message))} className="h-9 px-3 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold inline-flex items-center gap-1.5 cursor-pointer">
+            <button type="button" disabled={batch.awaitingQc} title={batch.awaitingQc ? 'Waiting for QC — print the tag after QC passes.' : undefined} onClick={() => printBatchTags([batch]).catch((err) => setError(err.message))} className="h-9 px-3 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
               <Printer size={14} /> Print Tag
             </button>
           </div>

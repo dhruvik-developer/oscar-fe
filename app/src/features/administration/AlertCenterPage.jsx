@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   AlertTriangle,
   Bell,
@@ -22,6 +23,33 @@ const SEVERITY_PILL = {
   Warning: 'bg-amber-100 text-amber-800 border-amber-300 font-semibold',
   Info: 'bg-blue-100 text-blue-800 border-blue-300 font-medium',
 };
+
+/** Server row → the names this page edits (the API speaks threshold_pct,
+ * is_enabled and a channels list; the page used other names and so showed
+ * every rule as Disabled and never saved % thresholds or on/off). */
+const settingFromApi = (row) => {
+  const channels = Array.isArray(row.channels) ? row.channels : [];
+  return {
+    ...row,
+    tolerance_percent: row.threshold_pct,
+    is_active: row.is_enabled,
+    notify_in_app: channels.includes('in_app'),
+    notify_email: channels.includes('email'),
+  };
+};
+
+const settingToApi = (setting) => {
+  // Keep channels this screen does not show (sms, whatsapp).
+  const others = (setting.channels || []).filter((c) => c !== 'in_app' && c !== 'email');
+  return {
+    threshold_days: setting.threshold_days === '' || setting.threshold_days == null ? 0 : parseInt(setting.threshold_days, 10),
+    threshold_pct: setting.tolerance_percent === '' || setting.tolerance_percent == null ? 0 : parseFloat(setting.tolerance_percent),
+    is_enabled: Boolean(setting.is_active),
+    channels: [...(setting.notify_in_app ? ['in_app'] : []), ...(setting.notify_email ? ['email'] : []), ...others],
+  };
+};
+
+const errorText = (err, fallback) => err?.message || fallback;
 
 const STATUS_PILL = {
   Active: 'bg-rose-50 text-rose-700 border-rose-200 font-semibold',
@@ -57,7 +85,9 @@ const formatAlertText = (text) => {
 };
 
 export default function AlertCenterPage() {
-  const [activeTab, setActiveTab] = useState('incidents'); // 'incidents' | 'settings'
+  const [searchParams] = useSearchParams();
+  // The notification bell's settings button opens straight onto the settings tab.
+  const [activeTab, setActiveTab] = useState(() => (searchParams.get('tab') === 'settings' ? 'settings' : 'incidents')); // 'incidents' | 'settings'
   const [incidents, setIncidents] = useState([]);
   const [settings, setSettings] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -73,6 +103,28 @@ export default function AlertCenterPage() {
   const [editingSetting, setEditingSetting] = useState(null);
   const [savingSetting, setSavingSetting] = useState(false);
 
+  // "Run checks now"
+  const [running, setRunning] = useState(false);
+  const [runResult, setRunResult] = useState(null);
+
+  const handleRunChecks = async () => {
+    setRunning(true);
+    setRunResult(null);
+    try {
+      const res = await alertService.runChecks();
+      setRunResult({
+        ok: true,
+        text: `Checks finished: ${res.incidentCount || 0} incident(s) raised or updated`
+          + (res.errors?.length ? `, ${res.errors.length} check(s) failed` : '') + '.',
+      });
+      await loadData();
+    } catch (err) {
+      setRunResult({ ok: false, text: errorText(err, 'Could not run the alert checks.') });
+    } finally {
+      setRunning(false);
+    }
+  };
+
   const loadData = async () => {
     setLoading(true);
     setError('');
@@ -83,10 +135,10 @@ export default function AlertCenterPage() {
         alertService.getIncidentBadge(),
       ]);
       setIncidents(incRes.results || incRes || []);
-      setSettings(setRes.results || setRes || []);
+      setSettings((setRes.results || setRes || []).map(settingFromApi));
       setBadgeCount(badgeRes.activeCount || 0);
     } catch (err) {
-      setError(err?.response?.data?.message || err.message || 'Failed to load alert center data');
+      setError(errorText(err, 'Failed to load alert center data'));
     } finally {
       setLoading(false);
     }
@@ -101,7 +153,7 @@ export default function AlertCenterPage() {
       await alertService.acknowledgeIncident(id);
       await loadData();
     } catch (err) {
-      alert(err?.response?.data?.message || 'Failed to acknowledge incident');
+      alert(errorText(err, 'Failed to acknowledge incident'));
     }
   };
 
@@ -110,7 +162,7 @@ export default function AlertCenterPage() {
       await alertService.resolveIncident(id);
       await loadData();
     } catch (err) {
-      alert(err?.response?.data?.message || 'Failed to resolve incident');
+      alert(errorText(err, 'Failed to resolve incident'));
     }
   };
 
@@ -119,17 +171,11 @@ export default function AlertCenterPage() {
     if (!editingSetting) return;
     setSavingSetting(true);
     try {
-      await alertService.updateSetting(editingSetting.id, {
-        threshold_days: editingSetting.threshold_days ? parseInt(editingSetting.threshold_days) : null,
-        tolerance_percent: editingSetting.tolerance_percent ? parseFloat(editingSetting.tolerance_percent) : null,
-        is_active: editingSetting.is_active,
-        notify_in_app: editingSetting.notify_in_app,
-        notify_email: editingSetting.notify_email,
-      });
+      await alertService.updateSetting(editingSetting.id, settingToApi(editingSetting));
       setEditingSetting(null);
       await loadData();
     } catch (err) {
-      alert(err?.response?.data?.message || 'Failed to update alert setting');
+      alert(errorText(err, 'Failed to update alert setting'));
     } finally {
       setSavingSetting(false);
     }
@@ -171,7 +217,26 @@ export default function AlertCenterPage() {
           <RefreshCw className="w-3.5 h-3.5" />
           Refresh
         </button>
+        <button
+          onClick={handleRunChecks}
+          disabled={running}
+          title="Evaluate all 13 alert rules against current data now"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-blue-600 border border-blue-600 rounded-lg hover:bg-blue-700 shadow-sm transition disabled:opacity-60"
+        >
+          <ShieldAlert className="w-3.5 h-3.5" />
+          {running ? 'Running checks…' : 'Run checks now'}
+        </button>
       </PageHeader>
+
+      {runResult && (
+        <div className={`p-3 rounded-xl border text-xs font-semibold flex items-start gap-2 ${runResult.ok ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-rose-50 border-rose-200 text-rose-700'}`}>
+          {runResult.ok ? <CheckCircle2 className="w-4 h-4 shrink-0" /> : <XCircle className="w-4 h-4 shrink-0" />}
+          <span>
+            {runResult.text}
+            {runResult.ok && ' Checks also run automatically when the run_alerts job is scheduled on the server.'}
+          </span>
+        </div>
+      )}
 
       {/* KPI Cards (Standardized CRM KpiCard) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">

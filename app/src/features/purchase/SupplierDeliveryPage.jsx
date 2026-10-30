@@ -22,6 +22,7 @@ import { useERP } from '../../context/ERPContext';
 import PageHeader from '../../components/ui/PageHeader';
 import TablePagination from '../../components/ui/TablePagination';
 import KpiCard from '../../components/ui/KpiCard';
+import MasterSourceLink from '../../components/common/MasterSourceLink';
 
 const STATUS_PILLS = {
   'Pending Dispatch': 'bg-amber-50 text-amber-700 border-amber-200',
@@ -711,7 +712,10 @@ export default function SupplierDeliveryPage() {
                 </div>
 
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">Transporter Name</label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block font-bold text-slate-700">Transporter Name</label>
+                    <MasterSourceLink source="transporters" />
+                  </div>
                   <input
                     type="text"
                     value={dispatchForm.transporterName}
@@ -722,7 +726,10 @@ export default function SupplierDeliveryPage() {
                 </div>
 
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">Vehicle & LR / Bilty Number</label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block font-bold text-slate-700">Vehicle & LR / Bilty Number</label>
+                    <MasterSourceLink source="vehicles" />
+                  </div>
                   <div className="grid grid-cols-2 gap-2">
                     <input
                       type="text"
@@ -1003,7 +1010,7 @@ export default function SupplierDeliveryPage() {
         <div className="space-y-4">
           <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-2xs flex items-center justify-between gap-3">
             <div className="relative w-full max-w-sm">
-              <Search className="absolute left-3 top-2.5 text-slate-400" size={15} />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
               <input
                 type="text"
                 value={search}

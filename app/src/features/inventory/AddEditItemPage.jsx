@@ -534,9 +534,11 @@ export const AddEditItemPage = () => {
 
   const handleCreateUnit = (e) => {
     e.preventDefault();
-    if (!newUnitCode.trim() || !newUnitLabel.trim()) return;
+    if (!newUnitLabel.trim()) return;
+    // No code typed: made from the label (Bundle -> BUNDLE), as the server would.
+    const autoCode = newUnitLabel.trim().toUpperCase().replace(/[^A-Z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 24);
     const created = addUnit({
-      code: newUnitCode.trim(),
+      code: newUnitCode.trim() || autoCode,
       label: newUnitLabel.trim(),
     });
     setSalesUnit(created.code);
@@ -1720,10 +1722,10 @@ export const AddEditItemPage = () => {
                     Default Warehouse & Storage Location
                   </label>
                   <Link
-                    to="/inventory/locations"
+                    to="/inventory/warehouses?tab=warehouses"
                     className="text-[11px] text-blue-600 hover:text-blue-800 font-semibold hover:underline"
                   >
-                    Manage Locations
+                    Manage Warehouses
                   </Link>
                 </div>
                 <div className="relative">
@@ -1734,11 +1736,14 @@ export const AddEditItemPage = () => {
                     className="w-full h-10 pl-9 pr-8 border border-slate-200 rounded-xl bg-slate-50 text-slate-800 text-xs focus:bg-white focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-500/20 appearance-none cursor-pointer"
                   >
                     <option value="">-- Select Warehouse Location --</option>
-                    {locations.map((loc) => (
-                      <option key={loc.id || loc.code} value={loc.name}>
-                        {loc.name} ({loc.code}) {loc.type ? `— ${loc.type}` : ''}
-                      </option>
-                    ))}
+                    {/* Warehouses only: no zones / racks / bins, no system stores. */}
+                    {locations
+                      .filter((loc) => !loc.parent && !String(loc.code || '').startsWith('SYS-') && !['Transit', 'Scrap', 'Zone', 'Rack', 'Bin'].includes(loc.type) && loc.isActive !== false && loc.is_active !== false)
+                      .map((loc) => (
+                        <option key={loc.id || loc.code} value={loc.name}>
+                          {loc.name} ({loc.code})
+                        </option>
+                      ))}
                     {/* Preserve custom legacy location if not matched */}
                     {location && !locations.some((l) => l.name === location) && (
                       <option value={location}>{location} (Custom Location)</option>
@@ -2918,12 +2923,11 @@ export const AddEditItemPage = () => {
 
             <form onSubmit={handleCreateUnit} className="space-y-3 text-xs">
               <div>
-                <label className="block font-medium text-slate-700 mb-1">Unit Code / Symbol</label>
+                <label className="block font-medium text-slate-700 mb-1">Unit Code / Symbol <span className="font-normal text-slate-400">(auto if blank)</span></label>
                 <input
-                  required
                   value={newUnitCode}
                   onChange={(e) => setNewUnitCode(e.target.value)}
-                  placeholder="e.g. BDL, REEL, CTN"
+                  placeholder="Auto from label, e.g. BDL, REEL, CTN"
                   className="w-full border border-slate-200 rounded-xl p-2.5 bg-slate-50 font-mono uppercase text-xs"
                 />
               </div>

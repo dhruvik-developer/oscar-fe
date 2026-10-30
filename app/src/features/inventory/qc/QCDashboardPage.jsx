@@ -29,7 +29,7 @@ import {
 } from 'lucide-react';
 import { inventoryService } from '../../../services/domainServices';
 import { useERP } from '../../../context/ERPContext';
-import PageInfoButton from '../../../components/ui/PageInfoButton';
+import QCPageHeader from './QCPageHeader';
 
 export default function QCDashboardPage({ defaultTab = 'All' }) {
   const { purchaseBills = [], vendors = [], items = [], formatCurrency } = useERP();
@@ -297,90 +297,82 @@ export default function QCDashboardPage({ defaultTab = 'All' }) {
 
   return (
     <div className="w-full space-y-4 pb-12 font-sans text-slate-800">
-      {/* ── Top Header & Filter Controls ─────────────────────────── */}
-      <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3 pt-1">
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-xl sm:text-2xl font-bold text-[#0f172a] tracking-tight">
-              QC Dashboard
-            </h1>
-            <PageInfoButton title="QC Dashboard" />
-            {loading && (
-              <RefreshCw className="w-4 h-4 text-blue-600 animate-spin" />
-            )}
+      {/* ── Standard QC Page Header & Filter Controls ────────────── */}
+      <QCPageHeader
+        title="QC Dashboard"
+        subtitle="Real-time overview of fabric inspection, quality status, and stock impact."
+        isDashboard={true}
+        titleExtra={
+          loading && <RefreshCw className="w-4 h-4 text-blue-600 animate-spin" />
+        }
+        actions={
+          <div className="flex items-center gap-2 flex-wrap text-xs">
+            {/* Supplier Dropdown */}
+            <select
+              value={supplierFilter}
+              onChange={(e) => setSupplierFilter(e.target.value)}
+              className="px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-700 font-medium shadow-2xs focus:outline-none focus:border-blue-500 cursor-pointer"
+            >
+              <option value="All">All Suppliers</option>
+              {suppliersList.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
+
+            {/* Date Range From */}
+            <div className="relative flex items-center">
+              <input
+                type="date"
+                value={dateFrom}
+                onChange={(e) => setDateFrom(e.target.value)}
+                className="pl-3 pr-2 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-700 font-medium shadow-2xs focus:outline-none focus:border-blue-500"
+              />
+            </div>
+
+            {/* Date Range To */}
+            <div className="relative flex items-center">
+              <input
+                type="date"
+                value={dateTo}
+                onChange={(e) => setDateTo(e.target.value)}
+                className="pl-3 pr-2 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-700 font-medium shadow-2xs focus:outline-none focus:border-blue-500"
+              />
+            </div>
+
+            {/* Source Type / Status Filter */}
+            <select
+              value={sourceTypeFilter}
+              onChange={(e) => setSourceTypeFilter(e.target.value)}
+              className="px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-700 font-medium shadow-2xs focus:outline-none focus:border-blue-500 cursor-pointer"
+            >
+              <option value="All">All Sources</option>
+              <option value="Purchase">Purchase (GRN)</option>
+              <option value="Job Work">Job Work Inward</option>
+              <option value="Internal">Internal Production</option>
+            </select>
+
+            {/* Apply Button */}
+            <button
+              type="button"
+              onClick={handleApplyFilters}
+              className="px-4 py-1.5 bg-[#2563eb] hover:bg-[#1d4ed8] text-white font-semibold rounded-lg shadow-xs transition cursor-pointer"
+            >
+              Apply
+            </button>
+
+            {/* Quick Intake Button */}
+            <Link
+              to="/purchase/receipts"
+              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-lg shadow-xs transition flex items-center gap-1"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Intake GRN</span>
+            </Link>
           </div>
-          <p className="text-xs text-slate-500 font-medium mt-0.5">
-            Real-time overview of fabric inspection, quality status and stock impact
-          </p>
-        </div>
-
-        {/* Global Filter Bar */}
-        <div className="flex items-center gap-2 flex-wrap text-xs">
-          {/* Supplier Dropdown */}
-          <select
-            value={supplierFilter}
-            onChange={(e) => setSupplierFilter(e.target.value)}
-            className="px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-700 font-medium shadow-2xs focus:outline-none focus:border-blue-500 cursor-pointer"
-          >
-            <option value="All">All Suppliers</option>
-            {suppliersList.map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </select>
-
-          {/* Date Range From */}
-          <div className="relative flex items-center">
-            <input
-              type="date"
-              value={dateFrom}
-              onChange={(e) => setDateFrom(e.target.value)}
-              className="pl-3 pr-2 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-700 font-medium shadow-2xs focus:outline-none focus:border-blue-500"
-            />
-          </div>
-
-          {/* Date Range To */}
-          <div className="relative flex items-center">
-            <input
-              type="date"
-              value={dateTo}
-              onChange={(e) => setDateTo(e.target.value)}
-              className="pl-3 pr-2 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-700 font-medium shadow-2xs focus:outline-none focus:border-blue-500"
-            />
-          </div>
-
-          {/* Source Type / Status Filter */}
-          <select
-            value={sourceTypeFilter}
-            onChange={(e) => setSourceTypeFilter(e.target.value)}
-            className="px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-700 font-medium shadow-2xs focus:outline-none focus:border-blue-500 cursor-pointer"
-          >
-            <option value="All">All Sources</option>
-            <option value="Purchase">Purchase (GRN)</option>
-            <option value="Job Work">Job Work Inward</option>
-            <option value="Internal">Internal Production</option>
-          </select>
-
-          {/* Apply Button */}
-          <button
-            type="button"
-            onClick={handleApplyFilters}
-            className="px-4 py-1.5 bg-[#2563eb] hover:bg-[#1d4ed8] text-white font-semibold rounded-lg shadow-xs transition cursor-pointer"
-          >
-            Apply
-          </button>
-
-          {/* Quick Intake Button */}
-          <Link
-            to="/purchase/receipts"
-            className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-lg shadow-xs transition flex items-center gap-1"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>Intake GRN</span>
-          </Link>
-        </div>
-      </div>
+        }
+      />
 
       {/* ── 6 Top Metric Cards ───────────────────────────────────── */}
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">

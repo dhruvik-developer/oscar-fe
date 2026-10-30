@@ -1024,9 +1024,10 @@ export const ERPProvider = ({ children, }) => {
             sgst = Math.round((totalTax - cgst) * 100) / 100;
         }
 
+        const freightCharges = Number(newInvoice.freightCharges || 0);
         const otherCharges = Number(newInvoice.otherCharges || 0);
         const roundOff = Number(newInvoice.roundOff || 0);
-        const calculatedGrandTotal = Math.round((taxableAmount + totalTax + otherCharges + roundOff) * 100) / 100;
+        const calculatedGrandTotal = Math.round((taxableAmount + totalTax + freightCharges + otherCharges + roundOff) * 100) / 100;
         const total = Number(newInvoice.grandTotal || newInvoice.total) || calculatedGrandTotal;
 
         const defaultAddresses = resolvePartyAddresses(newInvoice.customerId, newInvoice.customer);
@@ -1066,6 +1067,7 @@ export const ERPProvider = ({ children, }) => {
             customerGstin: newInvoice.customerGstin || cust?.gstin || party?.gstin || 'URP / Unregistered',
             placeOfSupply: newInvoice.placeOfSupply || pos,
             placeOfSupplyState: newInvoice.placeOfSupplyState || String(pos).match(/(\d{2})/)?.[1] || '',
+            freightCharges,
             otherCharges,
             roundOff,
             total,
@@ -1175,9 +1177,10 @@ export const ERPProvider = ({ children, }) => {
                 sgst = Math.round((totalTax - cgst) * 100) / 100;
             }
 
+            const freightCharges = Number(updates.freightCharges !== undefined ? updates.freightCharges : (inv.freightCharges || 0));
             const otherCharges = Number(updates.otherCharges !== undefined ? updates.otherCharges : (inv.otherCharges || 0));
             const roundOff = Number(updates.roundOff !== undefined ? updates.roundOff : (inv.roundOff || 0));
-            const calculatedGrandTotal = Math.round((taxableAmount + totalTax + otherCharges + roundOff) * 100) / 100;
+            const calculatedGrandTotal = Math.round((taxableAmount + totalTax + freightCharges + otherCharges + roundOff) * 100) / 100;
             const total = Number(updates.grandTotal || updates.total) || calculatedGrandTotal;
 
             updatedInv = {
@@ -1192,6 +1195,7 @@ export const ERPProvider = ({ children, }) => {
                 sgst,
                 igst,
                 tax: totalTax,
+                freightCharges,
                 otherCharges,
                 roundOff,
                 total,
@@ -2008,7 +2012,8 @@ export const ERPProvider = ({ children, }) => {
         showToast(`Customer ${newCust.name} created and synced to Parties.`);
         // `persist: false` when called from addParty, which posts the party itself.
         if (persist) {
-            persistCreate('parties', { ...newCust, type: 'Customer' }, setParties, {
+            // No typed code: the server allocates CUST-… (the local one is a placeholder).
+            persistCreate('parties', { ...newCust, code: cust.code || undefined, type: 'Customer' }, setParties, {
                 also: [{ setter: setCustomers, map: partyAsCustomer }],
             });
         }
@@ -2072,7 +2077,8 @@ export const ERPProvider = ({ children, }) => {
 
         showToast(`Vendor ${newVendor.name} added and synced to Parties.`);
         if (persist) {
-            persistCreate('parties', { ...newVendor, type: 'Vendor' }, setParties, {
+            // No typed code: the server allocates VEND-… (the local one is a placeholder).
+            persistCreate('parties', { ...newVendor, code: ven.code || undefined, type: 'Vendor' }, setParties, {
                 also: [{ setter: setVendors, map: partyAsVendor }],
             });
         }
@@ -2135,6 +2141,8 @@ export const ERPProvider = ({ children, }) => {
             date: formatDateDDMMYYYY(quote.date || 'Today'),
             leadId: quote.leadId || '',
             leadName: quote.leadName || '',
+            // Quotation typed by hand (no customer / lead): sent as partyName etc.
+            manualParty: quote.manualParty || undefined,
             validUntil: quote.validUntil || 'In 30 days',
             amount: totalAmount,
             status: quote.status || 'Draft',
@@ -3175,6 +3183,12 @@ export const ERPProvider = ({ children, }) => {
             projectId: po.projectId || undefined,
             items: poLines,
             notes: po.notes || '',
+            ...(po.fabricFlow ? {
+                fabricFlow: po.fabricFlow,
+                dyeingMillId: po.dyeingMillId || undefined,
+                yarnLines: po.yarnLines || [],
+                expenses: po.expenses || [],
+            } : {}),
         }, setPurchaseOrders, { label: 'Purchase Order' });
         showToast(`Purchase Order ${saved.poNumber} saved.`);
         return saved;
@@ -4110,13 +4124,14 @@ export const ERPProvider = ({ children, }) => {
         try {
             const created = await api.post(resource.path, resource.toApi(tr));
             let saved = created;
-            if (tr.dispatchNow !== false && created?.id) {
+            // Transfers now need approval before dispatch; dispatch only on request.
+            if (tr.dispatchNow === true && created?.id) {
                 saved = await api.post(`/inventory/transfers/${created.id}/dispatch/`, {});
             }
             const row = resource.fromApi ? resource.fromApi(saved) : saved;
             setTransfers((prev) => [row, ...prev.filter((t) => t.id !== row.id)]);
             refreshCollections(['transfers', 'inventoryMovements', 'items']);
-            showToast(`Transfer ${row.transferNumber || row.transfer_number || ''} ${tr.dispatchNow !== false ? 'dispatched' : 'created'}.`);
+            showToast(`Transfer ${row.transferNumber || row.transfer_number || ''} ${tr.dispatchNow === true ? 'dispatched' : 'requested'}.`);
             return row;
         } catch (err) {
             showToast(`Transfer not saved — ${describeError(err)}`);

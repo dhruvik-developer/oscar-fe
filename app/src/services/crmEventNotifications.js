@@ -32,23 +32,39 @@ const SYNC_EVENT = 'crm:data-updated';
  * synchronously, and refreshes it whenever something changes.
  */
 let feed = [];
+// 'idle' until the first read, then 'loading' | 'ready' | 'error'.
+let feedState = { status: 'idle', error: '' };
 
 function readStore() {
   return feed;
+}
+
+/** Where the last `GET /notifications/` got to, for the bell's loading / error states. */
+export function getNotificationFeedState() {
+  return feedState;
+}
+
+/** The server sends `read`; rows raised locally before a refresh carry `status`. */
+export function isNotificationRead(entry) {
+  return entry?.read === true || entry?.status === 'read';
 }
 
 /** `GET /notifications/` — the current feed for the signed-in user. */
 export async function refreshNotifications() {
   if (!isBackendEnabled()) {
     feed = [];
+    feedState = { status: 'ready', error: '' };
     signalUpdate();
     return feed;
   }
+  feedState = { ...feedState, status: feed.length || feedState.status === 'ready' ? feedState.status : 'loading' };
   try {
     const body = await api.get('/notifications/', { query: { limit: 100 } });
     feed = rowsOf(body);
+    feedState = { status: 'ready', error: '' };
   } catch (err) {
     console.warn('[CRM] notifications unavailable:', err?.message || err);
+    feedState = { status: 'error', error: err?.message || 'Notifications could not be loaded.' };
   }
   signalUpdate();
   return feed;
@@ -232,22 +248,76 @@ export function loadEventNotifications() {
 }
 
 export function markEventNotificationRead(id) {
-  feed = feed.map((entry) => (entry.id === id && entry.status !== 'read'
-    ? { ...entry, status: 'read', readAt: new Date().toISOString() }
+  feed = feed.map((entry) => (entry.id === id && !isNotificationRead(entry)
+    ? { ...entry, read: true, status: 'read', readAt: new Date().toISOString() }
     : entry));
   signalUpdate();
   // Read state belongs to the user, not the tab.
   if (isBackendEnabled()) {
     api.post(`/notifications/${id}/read/`, {}).catch((err) => {
       console.warn('[CRM] notification not marked read:', err?.message || err);
+      refreshNotifications();
     });
   }
   return true;
 }
 
+/** `POST /notifications/{id}/unread/` — puts one back in the unread list. */
+export function markEventNotificationUnread(id) {
+  feed = feed.map((entry) => (entry.id === id && isNotificationRead(entry)
+    ? { ...entry, read: false, status: 'unread', readAt: null }
+    : entry));
+  signalUpdate();
+  if (isBackendEnabled()) {
+    api.post(`/notifications/${id}/unread/`, {}).catch((err) => {
+      console.warn('[CRM] notification not marked unread:', err?.message || err);
+      refreshNotifications();
+    });
+  }
+  return true;
+}
+
+/** Drop one row from the bell now; the server call follows and a failure reloads the feed. */
+function removeFromFeed(id, request, label) {
+  feed = feed.filter((entry) => entry.id !== id);
+  signalUpdate();
+  if (!isBackendEnabled()) return Promise.resolve(true);
+  return request()
+    .then(() => true)
+    .catch((err) => {
+      console.warn(`[CRM] notification not ${label}:`, err?.message || err);
+      refreshNotifications();
+      return false;
+    });
+}
+
+/** `POST /notifications/{id}/dismiss/` — clears it from the bell (kept under Archived). */
+export function dismissNotification(id) {
+  return removeFromFeed(id, () => api.post(`/notifications/${id}/dismiss/`, {}), 'dismissed');
+}
+
+/** `POST /notifications/{id}/snooze/` — hidden until then, back as unread. `when`: {minutes} or {until}. */
+export function snoozeNotification(id, when) {
+  return removeFromFeed(id, () => api.post(`/notifications/${id}/snooze/`, when), 'snoozed');
+}
+
+/** `POST /notifications/clear-read/` — dismisses every read notification. */
+export function clearReadNotifications() {
+  feed = feed.filter((entry) => !isNotificationRead(entry));
+  signalUpdate();
+  if (!isBackendEnabled()) return Promise.resolve(true);
+  return api.post('/notifications/clear-read/', {})
+    .then(() => true)
+    .catch((err) => {
+      console.warn('[CRM] read notifications not cleared:', err?.message || err);
+      refreshNotifications();
+      return false;
+    });
+}
+
 /** `POST /notifications/read-all/` — clears the bell in one go. */
 export function markAllNotificationsRead() {
-  feed = feed.map((entry) => ({ ...entry, status: 'read', readAt: entry.readAt || new Date().toISOString() }));
+  feed = feed.map((entry) => ({ ...entry, read: true, status: 'read', readAt: entry.readAt || new Date().toISOString() }));
   signalUpdate();
   if (isBackendEnabled()) {
     api.post('/notifications/read-all/', {})

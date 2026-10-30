@@ -5,6 +5,8 @@ import { StatCard } from '../../components/ui/StatCard';
 import { DollarSign, Clock, AlertTriangle, Layers, Calendar, Package, ArrowRight } from 'lucide-react';
 import PageHeader from '../../components/ui/PageHeader';
 import { api } from '../../services/api';
+import { useTableSort } from '../../hooks/useTableSort';
+import SortableTh from '../../components/ui/SortableTh';
 import { inventoryService } from '../../services/domainServices';
 
 // Must match the backend's STOCK_AGE_BUCKETS (apps/inventory/views.py).
@@ -102,6 +104,9 @@ export const ValuationAgeingPage = () => {
 
   const bucketValue = (label) => Number(aggs?.buckets?.find((b) => b.bucket === label)?.value || 0);
   const filteredData = selectedBucket === 'All' ? rows : rows.filter((r) => r.agingBucket === selectedBucket);
+  const qualitySort = useTableSort(ageingData?.byQuality || [], {
+    accessors: { qty: (q) => Number(q.qty), value: (q) => Number(q.value) },
+  });
 
   const columnsValuation = [
     {
@@ -220,7 +225,7 @@ export const ValuationAgeingPage = () => {
     },
     {
       key: 'location',
-      header: 'Godown / Rack',
+      header: 'Warehouse',
       width: '14%',
       render: (r) => <span className="text-xs text-slate-600">{r.location_name || r.location?.name || '—'}</span>,
     },
@@ -404,14 +409,14 @@ export const ValuationAgeingPage = () => {
                 <table className="w-full text-left text-xs border-collapse">
                   <thead>
                     <tr className="bg-slate-50 text-slate-600 font-semibold uppercase text-[10.5px] border-b border-[#dce5f4]">
-                      <th className="py-2.5 px-4">Fabric Quality</th>
-                      <th className="py-2.5 px-4 text-center">Takas / Rolls</th>
-                      <th className="py-2.5 px-4 text-right">Available Meters</th>
-                      <th className="py-2.5 px-4 text-right">Holding Value</th>
+                      <SortableTh sort={qualitySort} sortKey="quality" className="py-2.5 px-4">Fabric Quality</SortableTh>
+                      <SortableTh sort={qualitySort} sortKey="takas" className="py-2.5 px-4 text-center" align="center">Takas / Rolls</SortableTh>
+                      <SortableTh sort={qualitySort} sortKey="qty" className="py-2.5 px-4 text-right" align="right">Available Meters</SortableTh>
+                      <SortableTh sort={qualitySort} sortKey="value" className="py-2.5 px-4 text-right" align="right">Holding Value</SortableTh>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#dce5f4]">
-                    {ageingData.byQuality.map((q) => (
+                    {qualitySort.rows.map((q) => (
                       <tr key={q.quality} className="hover:bg-slate-50">
                         <td className="py-2.5 px-4 font-semibold text-slate-800">{q.quality}</td>
                         <td className="py-2.5 px-4 text-center font-mono text-slate-600">{q.takas}</td>

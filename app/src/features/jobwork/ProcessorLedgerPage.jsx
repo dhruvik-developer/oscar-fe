@@ -21,6 +21,8 @@ import { fetchProcessorLedger } from '../../services/jobWorkSync';
 import { numIN } from './jobWorkOrdersStore';
 import PageHeader from '../../components/ui/PageHeader';
 import TablePagination from '../../components/ui/TablePagination';
+import SortableTh from '../../components/ui/SortableTh';
+import { useTableSort } from '../../hooks/useTableSort';
 import KpiCard from '../../components/ui/KpiCard';
 
 export default function ProcessorLedgerPage() {
@@ -113,10 +115,11 @@ export default function ProcessorLedgerPage() {
     setPage(1);
   }, [selectedProcessorId, dateFrom, dateTo]);
 
+  const sort = useTableSort(sortedEntries);
   const paginatedEntries = useMemo(() => {
     const start = (page - 1) * pageSize;
-    return sortedEntries.slice(start, start + pageSize);
-  }, [sortedEntries, page, pageSize]);
+    return sort.rows.slice(start, start + pageSize);
+  }, [sort.rows, page, pageSize]);
 
   return (
     <div className="min-h-[calc(100vh-62px)] bg-[#eef3fb] p-3 md:p-4 space-y-3">
@@ -217,15 +220,15 @@ export default function ProcessorLedgerPage() {
             <thead>
               <tr className="border-b border-slate-200/80 bg-[#f8fafc] text-[11px] font-bold text-slate-700">
                 <th className="px-3.5 py-2.5 w-10 text-center">#</th>
-                <th className="px-3.5 py-2.5">Date</th>
-                <th className="px-3.5 py-2.5">JWO No.</th>
-                <th className="px-3.5 py-2.5">Type</th>
-                <th className="px-3.5 py-2.5">Challan / Ref No.</th>
-                <th className="px-3.5 py-2.5">Process</th>
-                <th className="px-3.5 py-2.5 text-right font-mono">Debit / Sent (M)</th>
-                <th className="px-3.5 py-2.5 text-right font-mono">Credit / Recv (M)</th>
-                <th className="px-3.5 py-2.5 text-right font-mono">Loss (M)</th>
-                <th className="px-3.5 py-2.5 text-right font-mono font-extrabold">Balance (M)</th>
+                <SortableTh sort={sort} sortKey="date" className="px-3.5 py-2.5">Date</SortableTh>
+                <SortableTh sort={sort} sortKey="jwoNo" className="px-3.5 py-2.5">JWO No.</SortableTh>
+                <SortableTh sort={sort} sortKey="type" className="px-3.5 py-2.5">Type</SortableTh>
+                <SortableTh sort={sort} sortKey="refNo" className="px-3.5 py-2.5">Challan / Ref No.</SortableTh>
+                <SortableTh sort={sort} sortKey="process" className="px-3.5 py-2.5">Process</SortableTh>
+                <SortableTh sort={sort} sortKey="debitQty" className="px-3.5 py-2.5 text-right font-mono" align="right">Debit / Sent (M)</SortableTh>
+                <SortableTh sort={sort} sortKey="creditQty" className="px-3.5 py-2.5 text-right font-mono" align="right">Credit / Recv (M)</SortableTh>
+                <SortableTh sort={sort} sortKey="lossQty" className="px-3.5 py-2.5 text-right font-mono" align="right">Loss (M)</SortableTh>
+                <SortableTh sort={sort} sortKey="runningBalance" className="px-3.5 py-2.5 text-right font-mono font-extrabold" align="right">Balance (M)</SortableTh>
               </tr>
             </thead>
             <tbody>

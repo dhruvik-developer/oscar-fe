@@ -37,6 +37,7 @@ import {
 } from 'lucide-react';
 import { inventoryService } from '../../services/domainServices';
 import PageInfoButton from '../../components/ui/PageInfoButton';
+import AppPagination from '../../components/ui/AppPagination';
 import { ConfirmModal } from '../../components/ui/ConfirmModal';
 
 export const LocationsPage = () => {
@@ -368,7 +369,6 @@ export const LocationsPage = () => {
   }, [locations, typeFilter, statusFilter, warehouseFilter, zoneFilter, searchTerm]);
 
   // Pagination
-  const totalPages = Math.ceil(filteredLocations.length / pageSize) || 1;
   const paginatedLocations = useMemo(() => {
     const start = (currentPage - 1) * pageSize;
     return filteredLocations.slice(start, start + pageSize);
@@ -422,6 +422,19 @@ export const LocationsPage = () => {
     if (!formData.type) errors.type = 'Location Type is required';
     if (formData.type !== 'Warehouse' && !formData.parent) {
       errors.parent = 'Parent location is required for sub-locations';
+    }
+
+    if (formData.contact_number && formData.contact_number.trim()) {
+      const cleanContact = formData.contact_number.replace(/\D/g, '');
+      if (cleanContact.length !== 10) {
+        errors.contact_number = 'Contact number must be exactly 10 digits';
+      }
+    }
+    if (formData.pin_code && formData.pin_code.trim()) {
+      const cleanPin = formData.pin_code.replace(/\D/g, '');
+      if (cleanPin.length !== 6) {
+        errors.pin_code = 'PIN code must be exactly 6 digits';
+      }
     }
 
     if (Object.keys(errors).length > 0) {
@@ -1086,74 +1099,14 @@ export const LocationsPage = () => {
         </div>
 
         {/* Pagination Footer */}
-        <div className="p-3.5 border-t border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-600 dark:text-slate-400">
-          <div>
-            Showing{' '}
-            <span className="font-semibold text-slate-900 dark:text-slate-200">
-              {filteredLocations.length > 0 ? (currentPage - 1) * pageSize + 1 : 0}
-            </span>{' '}
-            to{' '}
-            <span className="font-semibold text-slate-900 dark:text-slate-200">
-              {Math.min(currentPage * pageSize, filteredLocations.length)}
-            </span>{' '}
-            of{' '}
-            <span className="font-semibold text-slate-900 dark:text-slate-200">
-              {filteredLocations.length}
-            </span>{' '}
-            entries
-          </div>
-
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-1.5">
-              <span>Show</span>
-              <select
-                value={pageSize}
-                onChange={(e) => {
-                  setPageSize(Number(e.target.value));
-                  setCurrentPage(1);
-                }}
-                className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded px-2 py-1 text-xs"
-              >
-                <option value={10}>10</option>
-                <option value={25}>25</option>
-                <option value={50}>50</option>
-              </select>
-            </div>
-
-            <div className="flex items-center gap-1">
-              <button
-                type="button"
-                disabled={currentPage <= 1}
-                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                className="px-2.5 py-1 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 rounded disabled:opacity-40 hover:bg-slate-50 text-xs"
-              >
-                &lt;
-              </button>
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map((pg) => (
-                <button
-                  key={pg}
-                  type="button"
-                  onClick={() => setCurrentPage(pg)}
-                  className={`w-7 h-7 rounded text-xs font-semibold ${
-                    currentPage === pg
-                      ? 'bg-blue-600 text-white'
-                      : 'border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:bg-slate-50'
-                  }`}
-                >
-                  {pg}
-                </button>
-              ))}
-              <button
-                type="button"
-                disabled={currentPage >= totalPages}
-                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                className="px-2.5 py-1 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 rounded disabled:opacity-40 hover:bg-slate-50 text-xs"
-              >
-                &gt;
-              </button>
-            </div>
-          </div>
-        </div>
+        <AppPagination
+          total={filteredLocations.length}
+          page={currentPage}
+          pageSize={pageSize}
+          onPageChange={setCurrentPage}
+          onPageSizeChange={setPageSize}
+          pageSizeOptions={[10, 25, 50]}
+        />
       </div>
 
       {/* ========================================================================= */}

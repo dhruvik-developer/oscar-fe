@@ -14,7 +14,7 @@
  * With no auth token the module is inert: every push resolves to `null` and the
  * app keeps behaving exactly as it did before it had a backend.
  */
-import { api, ApiError } from './api';
+import { api, ApiError, getAllPages } from './api';
 import { mapWithLimit } from './resourceSync';
 import { getStoredToken } from '../utils/authUtils';
 import { formatDateDDMMYYYY, toISODate } from '../utils/dateUtils';
@@ -85,6 +85,9 @@ function lineToApi(line, index) {
     // Lot/taka items: [{ lotTakaId, qty }] -- empty means FIFO on dispatch.
     takaAllocations: Array.isArray(line.takaAllocations) && line.takaAllocations.length
       ? line.takaAllocations : undefined,
+    // On a sales order the picked takas are the reservation (Available -> Reserved).
+    reservedTakas: Array.isArray(line.takaAllocations) && line.takaAllocations.length
+      ? line.takaAllocations : undefined,
   });
 }
 
@@ -152,7 +155,18 @@ function documentToApi(doc, { partyField = 'partyId', partyKeys = [] } = {}, { p
     freightCharges: !partial || doc.freightCharges !== undefined ? (doc.freightCharges !== undefined ? num(doc.freightCharges) : undefined) : undefined,
     otherCharges: !partial || doc.otherCharges !== undefined ? (doc.otherCharges !== undefined ? num(doc.otherCharges) : undefined) : undefined,
     roundOff: !partial || doc.roundOff !== undefined ? (doc.roundOff !== undefined ? num(doc.roundOff) : undefined) : undefined,
-    discountOverride: !partial || doc.discountTotal !== undefined ? (doc.discountTotal !== undefined ? num(doc.discountTotal) : undefined) : undefined,
+    // A quotation addressed by hand (no customer or lead row): the name and
+    // details typed on the form. Only quotations accept a typed name.
+    ...(doc.manualParty ? {
+      partyName: doc.manualParty.name,
+      partyGstin: doc.manualParty.gstin || null,
+      placeOfSupply: doc.manualParty.state || null,
+      billingAddress: doc.manualParty.billingAddress || {},
+    } : {}),
+    // null clears an earlier override (the server then sums the line discounts).
+    discountOverride: doc.discountTotal === null
+      ? null
+      : (!partial || doc.discountTotal !== undefined ? (doc.discountTotal !== undefined ? num(doc.discountTotal) : undefined) : undefined),
     lineItems: !partial || doc.lineItems !== undefined || doc.items !== undefined ? lines.map(lineToApi) : undefined,
   });
 }
@@ -504,9 +518,24 @@ export const RESOURCES = {
   salesReturns: documentResource('/sales/returns/', { numberField: 'returnNumber' }),
 
   // Purchase pipeline (api.md §6) — same documents, `vendorId` on the wire.
-  purchaseOrders: documentResource('/purchase/orders/', {
-    partyField: 'vendorId', partyLabel: 'vendor', numberField: 'poNumber',
-  }),
+  purchaseOrders: (() => {
+    const base = documentResource('/purchase/orders/', {
+      partyField: 'vendorId', partyLabel: 'vendor', numberField: 'poNumber',
+    });
+    return {
+      ...base,
+      // Factory fabric flow: the route, the dyeing mill, and the yarn plan /
+      // opening costs saved with the order (only sent when the form set them).
+      toApi: (doc, opts) => {
+        const payload = base.toApi(doc, opts);
+        if (doc.fabricFlow !== undefined) payload.fabricFlow = doc.fabricFlow || null;
+        if (doc.dyeingMillId !== undefined) payload.dyeingMillId = doc.dyeingMillId || null;
+        if (Array.isArray(doc.yarnLines)) payload.yarnLines = doc.yarnLines;
+        if (Array.isArray(doc.expenses)) payload.expenses = doc.expenses;
+        return payload;
+      },
+    };
+  })(),
   purchaseBills: (() => {
     const base = documentResource('/purchase/bills/', {
       partyField: 'vendorId', partyLabel: 'vendor', numberField: 'billNumber',
@@ -600,6 +629,7 @@ export const RESOURCES = {
       mode: p.mode || 'Bank Transfer',
       bankAccountId: p.bankAccountId || undefined,
       referenceNumber: p.reference || p.referenceNumber || undefined,
+      transactionReference: p.transactionReference || undefined,
       notes: p.notes || undefined,
       invoiceId: p.invoiceId || p.linkedInvoiceId || undefined,
     }),
@@ -898,7 +928,8 @@ export const RESOURCES = {
 export const PULL_ORDER = [
   'categories', 'units', 'locations', 'fabrics', 'items',
   'parties', 'customers', 'vendors',
-  'quotations', 'salesOrders', 'proformaInvoices',
+  // [Quotation & Proforma Invoice modules are commented out] — 'quotations' and 'proformaInvoices' are not pulled.
+  /* 'quotations', */ 'salesOrders', /* 'proformaInvoices', */
   'deliveryChallans', 'invoices', 'paymentIns', 'salesReturns',
   'purchaseOrders', 'purchaseBills', 'vendorBills', 'paymentOuts', 'purchaseReturns', 'expenses',
   'transfers', 'serviceUsages', 'valuationItems', 'monthEndAudits',
@@ -907,8 +938,6 @@ export const PULL_ORDER = [
 ];
 
 // ── transport ───────────────────────────────────────────────────────────────
-
-const PAGE_SIZE = 200;
 
 /** One key per create attempt; `randomUUID` needs a secure context. */
 function newIdempotencyKey() {
@@ -925,10 +954,8 @@ export async function pullResource(key) {
   const resource = RESOURCES[key];
   if (!resource) return null;
   try {
-    const body = await api.get(resource.pullPath || resource.path, {
-      query: { limit: PAGE_SIZE },
-    });
-    const rows = Array.isArray(body) ? body : (body?.results || []);
+    // Every page: one 200-row read used to leave the rest of the collection behind.
+    const rows = await getAllPages(resource.pullPath || resource.path);
     return rows.map(resource.fromApi || ((r) => r));
   } catch (err) {
     console.warn(`[backendSync] pull ${key} failed:`, err?.message || err);

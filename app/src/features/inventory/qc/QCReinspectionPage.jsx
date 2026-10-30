@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import { api } from '../../../services/api';
 import { inventoryService } from '../../../services/domainServices';
-import PageInfoButton from '../../../components/ui/PageInfoButton';
+import QCPageHeader from './QCPageHeader';
 
 /*
  * Reprocess cycle, as the requirement lays it out:
@@ -168,24 +168,19 @@ export default function QCReinspectionPage() {
         </div>
       )}
 
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-xl font-bold text-slate-900">Reinspection / Reprocess</h1>
-            <PageInfoButton title="Reinspection / Reprocess" />
-          </div>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Fabric that failed QC goes to the processor, comes back, and is inspected again: Pass, Repeat or Reject.
-          </p>
-        </div>
-        <Link
-          to="/job-work/reprocess"
-          className="inline-flex items-center gap-1.5 self-start md:self-auto rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-100"
-        >
-          <Plus className="w-4 h-4" /> New Reprocess Order
-        </Link>
-      </div>
+      {/* ── Standard QC Page Header ─────────────────────────────── */}
+      <QCPageHeader
+        title="Reinspection / Reprocess"
+        subtitle="Secondary quality audit of disputed lots, re-rolled fabric, or reprocessed batches: Pass, Repeat or Reject."
+        actions={
+          <Link
+            to="/job-work/reprocess"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-100 transition shadow-2xs"
+          >
+            <Plus className="w-4 h-4" /> New Reprocess Order
+          </Link>
+        }
+      />
 
       {/* Step tabs: the reprocess cycle, left to right */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">

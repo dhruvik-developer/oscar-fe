@@ -28,6 +28,8 @@ import {
   inputClass,
   labelClass,
 } from './accountingShared';
+import { useTableSort } from '../../hooks/useTableSort';
+import SortableTh from '../../components/ui/SortableTh';
 
 const STATUS_PILLS = {
   Draft: 'bg-slate-100 text-slate-700 border-slate-300',
@@ -244,6 +246,18 @@ export default function StandaloneNotesPage() {
     });
   }, [notes, selectedType, selectedStatus, search]);
 
+  const noteSort = useTableSort(filteredNotes, {
+    accessors: {
+      noteNumber: (n) => n.note_number || n.noteNumber,
+      type: (n) => (n.note_type === 'CREDIT_NOTE' ? 'Credit Note' : 'Debit Note'),
+      date: (n) => n.note_date || n.noteDate,
+      party: (n) => n.party_name || n.party?.name || n.partyName,
+      against: (n) => `${DOC_TYPE_LABELS[n.against_document_type] || n.against_document_type || ''} ${n.against_document_number || n.againstDocumentNumber || ''}`.trim(),
+      taxable: (n) => parseFloat(n.taxable_amount || n.taxableAmount || 0),
+      total: (n) => parseFloat(n.total_amount || n.totalAmount || 0),
+    },
+  });
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -341,14 +355,14 @@ export default function StandaloneNotesPage() {
           <table className="w-full text-left text-xs border-collapse">
             <thead>
               <tr className="bg-slate-50 border-b border-[#dce5f4] text-slate-600 font-semibold uppercase tracking-wider text-[11px]">
-                <th className="py-3 px-4">Note #</th>
-                <th className="py-3 px-4">Type</th>
-                <th className="py-3 px-4">Date</th>
-                <th className="py-3 px-4">Party</th>
-                <th className="py-3 px-4">Against Document</th>
-                <th className="py-3 px-4 text-right">Taxable</th>
-                <th className="py-3 px-4 text-right">Total Amount</th>
-                <th className="py-3 px-4 text-center">Status</th>
+                <SortableTh sort={noteSort} sortKey="noteNumber" className="py-3 px-4">Note #</SortableTh>
+                <SortableTh sort={noteSort} sortKey="type" className="py-3 px-4">Type</SortableTh>
+                <SortableTh sort={noteSort} sortKey="date" className="py-3 px-4">Date</SortableTh>
+                <SortableTh sort={noteSort} sortKey="party" className="py-3 px-4">Party</SortableTh>
+                <SortableTh sort={noteSort} sortKey="against" className="py-3 px-4">Against Document</SortableTh>
+                <SortableTh sort={noteSort} sortKey="taxable" className="py-3 px-4 text-right" align="right">Taxable</SortableTh>
+                <SortableTh sort={noteSort} sortKey="total" className="py-3 px-4 text-right" align="right">Total Amount</SortableTh>
+                <SortableTh sort={noteSort} sortKey="status" className="py-3 px-4 text-center" align="center">Status</SortableTh>
                 <th className="py-3 px-4 text-right">Actions</th>
               </tr>
             </thead>
@@ -366,7 +380,7 @@ export default function StandaloneNotesPage() {
                   </td>
                 </tr>
               ) : (
-                filteredNotes.map((note) => {
+                noteSort.rows.map((note) => {
                   const isCredit = note.note_type === 'CREDIT_NOTE';
                   const noteNumber = note.note_number || note.noteNumber || '—';
                   const partyName = note.party_name || note.party?.name || note.partyName || '—';

@@ -1,12 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useFabricMastersEmbed } from './fabricMastersEmbed';
 import {
   Search,
   Plus,
   Eye,
   SquarePen,
   MoreHorizontal,
-  ChevronLeft,
-  ChevronRight,
   X,
   Trash2,
   Check,
@@ -21,6 +20,9 @@ import {
 import { fabricMasterSync, isBackendEnabled, describeError } from '../../../services/fabricMasterSync';
 import { uploadFileToBackend } from '../../../services/fileUploadService';
 import PageInfoButton from '../../../components/ui/PageInfoButton';
+import AppPagination from '../../../components/ui/AppPagination';
+import { useTableSort } from '../../../hooks/useTableSort';
+import SortableTh from '../../../components/ui/SortableTh';
 
 // Fabric Type / Classification — list (slide 7) plus an Add / Edit / View
 // popup (slide 8). Logged in → rows live in Postgres (/inventory/fabric-types/)
@@ -183,9 +185,12 @@ export default function FabricTypeMasterPage() {
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PER_PAGE));
   const safePage = Math.min(page, totalPages);
-  const pageItems = filtered.slice((safePage - 1) * PER_PAGE, safePage * PER_PAGE);
-  const from = filtered.length === 0 ? 0 : (safePage - 1) * PER_PAGE + 1;
-  const to = Math.min(safePage * PER_PAGE, filtered.length);
+  const tableSort = useTableSort(filtered, {
+    accessors: {
+      status: (r) => (r.isActive !== false ? 'Active' : 'Inactive'),
+    },
+  });
+  const pageItems = tableSort.rows.slice((safePage - 1) * PER_PAGE, safePage * PER_PAGE);
 
   // ── Popup ─────────────────────────────────────────────────────────
   const openPanel = (mode, row = null) => {
@@ -247,7 +252,7 @@ export default function FabricTypeMasterPage() {
   const handleSave = async (e) => {
     e?.preventDefault();
     if (saving) return;
-    if (!form.code.trim()) return setFormError('Type Code is required.');
+    if (!backendOn && !form.code.trim()) return setFormError('Type Code is required.');
     if (!form.name.trim()) return setFormError('Type Name is required.');
     if (!form.processStage) return setFormError('Process Stage is required.');
 
@@ -406,24 +411,30 @@ export default function FabricTypeMasterPage() {
   const readOnly = panelMode === 'view';
   const crumbTail = panelMode === 'create' ? 'Add New' : panelMode === 'edit' ? 'Edit' : 'View';
 
+  const embedded = useFabricMastersEmbed();
+
   return (
     <div className="w-full space-y-4">
       {/* ── Slide 7 header ── */}
-      <div className="flex items-center gap-3">
-        <div className="w-8 h-8 rounded-full bg-[#1e60f2] text-white flex items-center justify-center font-bold text-base shrink-0 shadow-xs">
-          7
+      {!embedded && (
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-full bg-[#1e60f2] text-white flex items-center justify-center font-bold text-base shrink-0 shadow-xs">
+            7
+          </div>
+          <h1 className="text-xl sm:text-2xl font-bold text-[#0f172a] tracking-tight">Fabric Type / Classification – List</h1>
+          <PageInfoButton title="Fabric Type Master" />
         </div>
-        <h1 className="text-xl sm:text-2xl font-bold text-[#0f172a] tracking-tight">Fabric Type / Classification – List</h1>
-        <PageInfoButton title="Fabric Type Master" />
-      </div>
+      )}
 
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pt-1">
-        <div className="flex items-center gap-2 text-xs text-slate-500 font-medium">
-          <Layers className="w-4 h-4 text-[#1e60f2]" />
-          <span>Categories</span>
-          <span className="text-slate-300 font-bold">&gt;</span>
-          <span className="text-slate-800 font-semibold">Fabric Type / Classification</span>
-        </div>
+        {!embedded && (
+          <div className="flex items-center gap-2 text-xs text-slate-500 font-medium">
+            <Layers className="w-4 h-4 text-[#1e60f2]" />
+            <span>Categories</span>
+            <span className="text-slate-300 font-bold">&gt;</span>
+            <span className="text-slate-800 font-semibold">Fabric Type / Classification</span>
+          </div>
+        )}
 
         <div className="flex items-center gap-2.5 flex-wrap sm:flex-nowrap">
           <div className="relative min-w-[240px] sm:w-72">
@@ -496,11 +507,11 @@ export default function FabricTypeMasterPage() {
             <thead>
               <tr className="border-b border-slate-200 bg-[#f8fafc] text-slate-700 font-semibold text-xs">
                 <th className="px-3.5 py-3.5 w-12 text-center text-slate-500 font-medium">#</th>
-                <th className="px-3.5 py-3.5 font-semibold text-slate-800">Type Code</th>
-                <th className="px-3.5 py-3.5 font-semibold text-slate-800">Type Name</th>
-                <th className="px-3.5 py-3.5 font-semibold text-slate-800 text-center">Process Stage</th>
-                <th className="px-3.5 py-3.5 font-semibold text-slate-800">Description</th>
-                <th className="px-3.5 py-3.5 font-semibold text-slate-800 text-center">Status</th>
+                <SortableTh sort={tableSort} sortKey="code" className="px-3.5 py-3.5 font-semibold text-slate-800">Type Code</SortableTh>
+                <SortableTh sort={tableSort} sortKey="name" className="px-3.5 py-3.5 font-semibold text-slate-800">Type Name</SortableTh>
+                <SortableTh sort={tableSort} sortKey="processStage" className="px-3.5 py-3.5 font-semibold text-slate-800 text-center" align="center">Process Stage</SortableTh>
+                <SortableTh sort={tableSort} sortKey="description" className="px-3.5 py-3.5 font-semibold text-slate-800">Description</SortableTh>
+                <SortableTh sort={tableSort} sortKey="status" className="px-3.5 py-3.5 font-semibold text-slate-800 text-center" align="center">Status</SortableTh>
                 <th className="px-4 py-3.5 font-semibold text-slate-800 text-center">Action</th>
               </tr>
             </thead>
@@ -579,29 +590,12 @@ export default function FabricTypeMasterPage() {
           </table>
         </div>
 
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 py-3 border-t border-slate-100 text-xs text-slate-600 bg-white pr-20 sm:pr-24">
-          <div>Showing {from} to {to} of {filtered.length} entries</div>
-          <div className="flex items-center gap-1">
-            <button type="button" disabled={safePage <= 1} onClick={() => setPage(safePage - 1)} className="p-1.5 rounded-lg border border-slate-200 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-slate-50 transition cursor-pointer" aria-label="Previous page">
-              <ChevronLeft className="w-3.5 h-3.5 text-slate-600" />
-            </button>
-            {Array.from({ length: totalPages }, (_, i) => i + 1).map((n) => (
-              <button
-                key={n}
-                type="button"
-                onClick={() => setPage(n)}
-                className={`w-7 h-7 rounded-md text-xs font-semibold transition cursor-pointer flex items-center justify-center ${
-                  n === safePage ? 'bg-[#1e60f2] text-white shadow-2xs' : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50'
-                }`}
-              >
-                {n}
-              </button>
-            ))}
-            <button type="button" disabled={safePage >= totalPages} onClick={() => setPage(safePage + 1)} className="p-1.5 rounded-lg border border-slate-200 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-slate-50 transition cursor-pointer" aria-label="Next page">
-              <ChevronRight className="w-3.5 h-3.5 text-slate-600" />
-            </button>
-          </div>
-        </div>
+        <AppPagination
+          total={filtered.length}
+          page={safePage}
+          pageSize={PER_PAGE}
+          onPageChange={setPage}
+        />
       </div>
 
       {/* ── Slide 8: Add / Edit / View popup ── */}
@@ -689,13 +683,13 @@ export default function FabricTypeMasterPage() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                     <div>
                       <label className="block font-semibold text-slate-700 mb-1">
-                        Type Code <span className="text-rose-500">*</span>
+                        Type Code {backendOn ? <span className="font-normal text-slate-400">(auto if blank)</span> : <span className="text-rose-500">*</span>}
                       </label>
                       <input
                         value={form.code}
                         disabled={readOnly}
                         onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })}
-                        placeholder="T-001"
+                        placeholder={backendOn ? 'Auto from name' : 'T-001'}
                         className={`${inputClass} uppercase shadow-2xs`}
                       />
                     </div>

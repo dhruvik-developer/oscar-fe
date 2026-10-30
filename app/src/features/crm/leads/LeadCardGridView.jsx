@@ -20,7 +20,7 @@ export default function LeadCardGridView({ rows = [], selected = [], pinnedLeadI
           />
           <div className="lead-grid-top">
             <div className="lead-grid-person">
-              <LeadAvatar lead={row} />
+              <LeadAvatar lead={row} previewable />
               <div>
                 <button type="button" className="lead-name-button" onClick={() => onOpenLead(row)}>
                   <strong>{row.name}</strong>

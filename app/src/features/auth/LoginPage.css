@@ -1,0 +1,697 @@
+/* Oscar ERP sign-in page. Light theme; scoped under .oscar-login. */
+.oscar-login {
+  --ol-text: #0F1B33;
+  --ol-muted: #5B6B8C;
+  --ol-divider: rgba(15, 27, 51, .14);
+  --ol-accent: #1B5FD6;
+  --ol-error: #D6334A;
+  --ol-success: #12936E;
+  --ol-gradient: linear-gradient(110deg, #1747C4, #2B9BE8 60%, #27C7EA);
+  --ol-focus: 0 0 0 4px rgba(125, 180, 246, .35);
+
+  position: relative;
+  min-height: 100vh;
+  width: 100%;
+  overflow-x: hidden;
+  color: var(--ol-text);
+  background: #05080F;
+  font-family: 'Manrope', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Background layers (fixed, bottom to top) ── */
+.oscar-login__bg {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  background: linear-gradient(180deg, #05080F 0%, #09101C 55%, #0E1627 100%);
+}
+.oscar-login__photo {
+  opacity: .95;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center bottom;
+  display: block;
+}
+.oscar-login__side,
+.oscar-login__vignette {
+  position: absolute;
+  inset: 0;
+}
+/* Soft dark shade on the left so the white headline reads over the photo. */
+.oscar-login__side {
+  background: linear-gradient(90deg, rgba(4, 7, 14, .6) 0%, rgba(4, 7, 14, .25) 50%, rgba(4, 7, 14, .1) 100%);
+}
+.oscar-login__vignette {
+  background: none;
+}
+
+/* ── Layout ── */
+.oscar-login__wrap {
+  position: relative;
+  z-index: 1;
+  min-height: 100vh;
+  max-width: 1260px;
+  margin: 0 auto;
+  padding: 36px 40px;
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 440px);
+  gap: 64px;
+  align-items: center;
+  box-sizing: border-box;
+}
+
+/* ── Left hero text ── */
+.oscar-login__hero {
+  position: relative;
+  align-self: start;
+  padding-top: clamp(28px, 12vh, 120px);
+}
+.oscar-login__brandrow {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 40px;
+}
+.oscar-login__brandtext {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.oscar-login__brandname {
+  font-family: 'Manrope', system-ui, sans-serif;
+  font-weight: 700;
+  font-size: 18px;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: #FFFFFF;
+}
+.oscar-login__brandsub {
+  font-size: 12px;
+  letter-spacing: .32em;
+  text-transform: uppercase;
+  color: #B8C6DD;
+}
+.oscar-login__rule {
+  display: block;
+  width: 56px;
+  height: 2px;
+  margin-bottom: 22px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, #2F8BF0, #7FD3FF);
+}
+.oscar-login__eyebrow {
+  margin: 0 0 22px;
+  font-size: 12px;
+  line-height: 1.9;
+  letter-spacing: .32em;
+  text-transform: uppercase;
+  color: #C9D4E6;
+}
+.oscar-login__pillars {
+  list-style: none;
+  margin: 44px 0 0;
+  padding: 0;
+  display: flex;
+  max-width: 480px;
+}
+.oscar-login__pillars li {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 8px;
+  padding: 4px 10px;
+  color: #FFFFFF;
+}
+.oscar-login__pillars li + li {
+  border-left: 1px solid rgba(255, 255, 255, .18);
+}
+.oscar-login__pillar-icon {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  margin-bottom: 4px;
+  border-radius: 999px;
+  border: 1px solid rgba(110, 170, 245, .45);
+  background: rgba(59, 142, 234, .12);
+  box-shadow: inset 0 0 0 4px rgba(10, 20, 40, .25);
+  transition: background .2s ease, border-color .2s ease, transform .2s ease;
+}
+.oscar-login__pillars li:hover .oscar-login__pillar-icon {
+  background: rgba(59, 142, 234, .28);
+  border-color: rgba(140, 190, 250, .8);
+  transform: translateY(-2px);
+}
+.oscar-login__pillar-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .22em;
+  text-transform: uppercase;
+  color: #FFFFFF;
+}
+.oscar-login__pillar-detail {
+  font-size: 11px;
+  line-height: 1.35;
+  color: #9FB0CC;
+}
+
+/* Hero content rises in, one line after another. */
+@keyframes oscar-login-rise {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: none; }
+}
+.oscar-login__hero > * {
+  animation: oscar-login-rise .7s cubic-bezier(.2, .7, .2, 1) both;
+}
+.oscar-login__hero > :nth-child(2) { animation-delay: .08s; }
+.oscar-login__hero > :nth-child(3) { animation-delay: .16s; }
+.oscar-login__hero > :nth-child(4) { animation-delay: .24s; }
+.oscar-login__hero > :nth-child(5) { animation-delay: .34s; }
+.oscar-login__hero > :nth-child(6) { animation-delay: .46s; }
+.oscar-login__headline {
+  margin: 0 0 20px;
+  font-family: 'Source Serif 4', Georgia, 'Times New Roman', serif;
+  font-weight: 500;
+  font-size: clamp(42px, 5.2vw, 76px);
+  line-height: 1.02;
+  letter-spacing: -.015em;
+  color: #FFFFFF;
+  text-shadow: 0 2px 22px rgba(2, 8, 28, .75);
+}
+.oscar-login__headline span {
+  color: #3B9BF0;
+  background: linear-gradient(90deg, #2F8BF0 0%, #5CB4FF 60%, #7FD3FF 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-shadow: none;
+}
+.oscar-login__tagline {
+  margin: 0;
+  font-weight: 400;
+  font-size: 18px;
+  line-height: 1.5;
+  color: #DCE5F5;
+  text-shadow: 0 1px 12px rgba(2, 8, 28, .8);
+}
+
+/* ── Right column ── */
+.oscar-login__side-col {
+  width: 100%;
+  max-width: 440px;
+  justify-self: end;
+}
+.oscar-login__card {
+  width: 100%;
+  max-width: 440px;
+  box-sizing: border-box;
+  border-radius: 18px;
+  padding: 34px 34px 28px;
+  background: #FFFFFF;
+  border: 1px solid rgba(15, 27, 51, .08);
+  box-shadow: 0 30px 70px -30px rgba(15, 35, 70, .35);
+}
+
+.oscar-login__logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 22px;
+}
+.oscar-login__wordmark {
+  display: flex;
+  flex-direction: column;
+  line-height: 1;
+}
+.oscar-login__wordmark-main {
+  font-family: 'Sora', system-ui, sans-serif;
+  font-weight: 700;
+  font-size: 17px;
+  letter-spacing: .16em;
+  color: var(--ol-text);
+}
+.oscar-login__wordmark-main b {
+  font-weight: 700;
+  color: #2B9BE8;
+}
+.oscar-login__wordmark-sub {
+  margin-top: 5px;
+  font-weight: 600;
+  font-size: 9px;
+  letter-spacing: .24em;
+  color: var(--ol-muted);
+}
+
+.oscar-login__title {
+  margin: 0;
+  text-align: center;
+  font-family: 'Sora', system-ui, sans-serif;
+  font-weight: 700;
+  font-size: 24px;
+  letter-spacing: -.01em;
+  color: var(--ol-text);
+}
+.oscar-login__subtitle {
+  margin: 6px 0 22px;
+  text-align: center;
+  font-size: 14px;
+  color: var(--ol-muted);
+}
+
+/* ── Form ── */
+.oscar-login__form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.oscar-login__label {
+  display: block;
+  margin-bottom: 6px;
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--ol-text);
+}
+.oscar-login__field {
+  position: relative;
+}
+.oscar-login__input {
+  width: 100%;
+  height: 48px;
+  box-sizing: border-box;
+  padding: 0 14px;
+  border-radius: 12px;
+  border: 1.5px solid var(--ol-divider);
+  background: #F6F8FC;
+  color: var(--ol-text);
+  font-family: 'Manrope', system-ui, sans-serif;
+  font-weight: 500;
+  font-size: 15px;
+  outline: none;
+  transition: border-color .15s, box-shadow .15s;
+}
+.oscar-login__input::placeholder {
+  color: #8A97B0;
+  font-weight: 400;
+}
+.oscar-login__input:focus {
+  border-color: #2B9BE8;
+  background: #FFFFFF;
+  box-shadow: var(--ol-focus);
+  outline: none;
+}
+.oscar-login__input--pw {
+  padding-right: 72px;
+}
+select.oscar-login__input {
+  cursor: pointer;
+}
+select.oscar-login__input:disabled {
+  cursor: progress;
+  color: #8A97B0;
+}
+.oscar-login__hint {
+  display: block;
+  margin-top: 6px;
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--ol-muted);
+}
+.oscar-login__hint:empty {
+  display: none;
+}
+select.oscar-login__input option {
+  background: #FFFFFF;
+  color: var(--ol-text);
+}
+.oscar-login__toggle {
+  position: absolute;
+  right: 6px;
+  top: 7px;
+  height: 34px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  font-family: 'Manrope', system-ui, sans-serif;
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--ol-accent);
+  cursor: pointer;
+}
+.oscar-login__caps {
+  display: block;
+  min-height: 0;
+  margin-top: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #B26B00;
+}
+.oscar-login__caps:empty {
+  display: none;
+}
+
+.oscar-login__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 0 0 20px;
+  font-size: 13.5px;
+}
+.oscar-login__remember {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 500;
+  color: var(--ol-muted);
+  cursor: pointer;
+}
+.oscar-login__remember input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: #1B5FD6;
+  cursor: pointer;
+}
+.oscar-login__link {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-weight: 700;
+  color: var(--ol-accent);
+  text-decoration: none;
+  cursor: pointer;
+  border-radius: 4px;
+}
+.oscar-login__link:hover {
+  text-decoration: underline;
+}
+
+.oscar-login__submit {
+  width: 100%;
+  height: 50px;
+  border: 0;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: #fff;
+  font-family: 'Sora', system-ui, sans-serif;
+  font-weight: 600;
+  font-size: 15.5px;
+  background: var(--ol-gradient);
+  box-shadow: 0 12px 24px -12px rgba(27, 95, 214, .9);
+  cursor: pointer;
+  transition: filter .15s, transform .05s;
+}
+.oscar-login__submit:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+.oscar-login__submit:active:not(:disabled) {
+  transform: translateY(1px);
+}
+.oscar-login__submit:disabled {
+  opacity: .65;
+  cursor: not-allowed;
+}
+.oscar-login__spinner {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, .3);
+  border-top-color: #fff;
+  animation: oscar-login-spin .8s linear infinite;
+}
+@keyframes oscar-login-spin {
+  to { transform: rotate(360deg); }
+}
+
+.oscar-login__status {
+  min-height: 20px;
+  margin-top: 12px;
+  text-align: center;
+  font-size: 13.5px;
+  line-height: 1.45;
+  color: var(--ol-muted);
+}
+.oscar-login__status--error {
+  color: var(--ol-error);
+}
+
+.oscar-login__card-footer {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--ol-divider);
+  text-align: center;
+  font-size: 12.5px;
+  color: var(--ol-muted);
+}
+.oscar-login__card-footer .oscar-login__link {
+  font-weight: 600;
+  color: var(--ol-muted);
+  text-decoration: underline;
+  text-decoration-color: rgba(91, 107, 140, .4);
+  text-underline-offset: 2px;
+}
+.oscar-login__card-footer .oscar-login__link:hover {
+  color: var(--ol-accent);
+}
+.oscar-login__footer {
+  margin-top: 18px;
+  text-align: center;
+  font-size: 12.5px;
+  color: #DCE5F5;
+  text-shadow: 0 1px 8px rgba(2, 8, 28, .8);
+}
+
+/* Two-factor step keeps its own markup; match its text to the card colours. */
+.oscar-login__twofactor label {
+  color: var(--ol-text) !important;
+}
+.oscar-login__twofactor form > div > div > span,
+.oscar-login__twofactor form > button[type='button'] {
+  color: var(--ol-muted) !important;
+}
+
+/* ── Keyboard focus ── */
+.oscar-login__toggle:focus-visible,
+.oscar-login__link:focus-visible,
+.oscar-login__submit:focus-visible,
+.oscar-login__remember input:focus-visible {
+  outline: none;
+  box-shadow: var(--ol-focus);
+}
+
+/* ── Responsive ── */
+@media (max-width: 980px) {
+  .oscar-login__wrap {
+    grid-template-columns: minmax(0, 1fr);
+    justify-items: center;
+    gap: 36px;
+    padding: 32px 24px;
+  }
+  .oscar-login__hero {
+    align-self: auto;
+    padding-top: 8px;
+    text-align: center;
+  }
+  .oscar-login__brandrow {
+    justify-content: center;
+    margin-bottom: 22px;
+  }
+  .oscar-login__brandtext {
+    align-items: flex-start;
+  }
+  .oscar-login__rule {
+    margin-left: auto;
+    margin-right: auto;
+  }
+  .oscar-login__pillars {
+    margin: 28px auto 0;
+  }
+  .oscar-login__side-col {
+    justify-self: center;
+  }
+}
+@media (max-width: 480px) {
+  .oscar-login__wrap {
+    padding: 24px 16px;
+  }
+  .oscar-login__card {
+    padding: 26px 20px 22px;
+  }
+  .oscar-login__tagline {
+    font-size: 16px;
+  }
+  .oscar-login__pillars li {
+    padding: 4px 2px;
+  }
+  .oscar-login__pillar-label {
+    font-size: 9px;
+    letter-spacing: .14em;
+  }
+  .oscar-login__pillar-detail {
+    display: none;
+  }
+  .oscar-login__pillar-icon {
+    width: 40px;
+    height: 40px;
+  }
+}
+
+/* ── Input icons (dark look) ── */
+.oscar-login__icon {
+  position: absolute;
+  left: 14px;
+  top: 15px;
+  color: var(--ol-muted);
+  pointer-events: none;
+}
+.oscar-login__input--icon {
+  padding-left: 44px;
+}
+
+/* ── Light / Dark switch under the card ── */
+.oscar-login__look {
+  display: flex;
+  width: max-content;
+  margin: 16px auto 0;
+  padding: 3px;
+  gap: 2px;
+  border-radius: 999px;
+  background: rgba(10, 18, 34, .55);
+  border: 1px solid rgba(255, 255, 255, .16);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+.oscar-login__look button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  font-family: 'Manrope', system-ui, sans-serif;
+  font-weight: 600;
+  font-size: 12.5px;
+  color: #C9D4E6;
+  cursor: pointer;
+  transition: background .15s, color .15s;
+}
+.oscar-login__look button:hover {
+  color: #FFFFFF;
+}
+.oscar-login__look button.is-active {
+  background: #FFFFFF;
+  color: #0F1B33;
+}
+.oscar-login--dark .oscar-login__look button.is-active {
+  background: linear-gradient(90deg, #1E6BF0, #4FA8FF);
+  color: #FFFFFF;
+}
+.oscar-login__look button:focus-visible {
+  outline: 2px solid #7FD3FF;
+  outline-offset: 2px;
+}
+
+/* ── Dark look: a glass card over the photo ── */
+.oscar-login--dark {
+  --ol-text: #EEF3FF;
+  --ol-muted: #B3C2DC;
+  --ol-divider: rgba(255, 255, 255, .16);
+  --ol-accent: #5AB0FF;
+  --ol-gradient: linear-gradient(90deg, #1E6BF0 0%, #4FA8FF 60%, #86DBFF 100%);
+  --ol-focus: 0 0 0 4px rgba(90, 176, 255, .25);
+}
+.oscar-login--dark .oscar-login__card {
+  background: linear-gradient(160deg, rgba(36, 58, 96, .58) 0%, rgba(16, 28, 52, .62) 100%);
+  border: 1px solid rgba(150, 190, 245, .32);
+  box-shadow:
+    0 0 0 1px rgba(80, 150, 255, .08),
+    0 0 46px -12px rgba(59, 142, 234, .55),
+    0 34px 80px -24px rgba(0, 0, 0, .65);
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+}
+/* Same heading as the light card; only the colours change. */
+.oscar-login--dark .oscar-login__subtitle {
+  color: #D5DEEE;
+}
+.oscar-login--dark .oscar-login__input {
+  background: rgba(8, 16, 32, .42);
+  border-color: rgba(255, 255, 255, .2);
+  color: #FFFFFF;
+}
+.oscar-login--dark .oscar-login__input::placeholder {
+  color: #8FA2C2;
+}
+.oscar-login--dark .oscar-login__input:focus {
+  background: rgba(8, 16, 32, .6);
+  border-color: #5AB0FF;
+}
+.oscar-login--dark select.oscar-login__input option {
+  background: #13213C;
+  color: #FFFFFF;
+}
+.oscar-login--dark select.oscar-login__input:disabled {
+  color: #8FA2C2;
+}
+.oscar-login--dark .oscar-login__input:-webkit-autofill {
+  -webkit-text-fill-color: #FFFFFF;
+  -webkit-box-shadow: 0 0 0 40px #14223D inset;
+  caret-color: #FFFFFF;
+}
+.oscar-login--dark .oscar-login__toggle {
+  top: 7px;
+  display: inline-flex;
+  align-items: center;
+  color: #C9D4E6;
+}
+.oscar-login--dark .oscar-login__remember {
+  color: #E3EAF6;
+}
+.oscar-login--dark .oscar-login__remember input {
+  accent-color: #2F86F6;
+}
+.oscar-login--dark .oscar-login__submit {
+  box-shadow: 0 14px 30px -14px rgba(59, 142, 234, .95);
+}
+.oscar-login--dark .oscar-login__card-footer {
+  color: #D5DEEE;
+}
+.oscar-login--dark .oscar-login__card-footer .oscar-login__link {
+  color: #5AB0FF;
+  text-decoration-color: rgba(90, 176, 255, .5);
+}
+.oscar-login--dark .oscar-login__caps {
+  color: #FFC266;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .oscar-login__hero > * {
+    animation: none !important;
+  }
+  .oscar-login *,
+  .oscar-login *::before,
+  .oscar-login *::after {
+    transition: none !important;
+    animation-duration: 1.5s !important;
+  }
+  .oscar-login__submit:active:not(:disabled) {
+    transform: none;
+  }
+}

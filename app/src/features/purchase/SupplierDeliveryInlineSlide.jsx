@@ -19,6 +19,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { api } from '../../services/api';
 import { useERP } from '../../context/ERPContext';
+import MasterSourceLink from '../../components/common/MasterSourceLink';
 
 const STATUS_PILLS = {
   'Pending Dispatch': 'bg-amber-50 text-amber-700 border-amber-200',
@@ -545,7 +546,10 @@ export function SupplierDeliveryInlineSlide({ po, onClose, onDeliverySaved, onNe
             </div>
 
             <div>
-              <label className="block font-bold text-slate-700 mb-1">Transporter</label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block font-bold text-slate-700">Transporter</label>
+                <MasterSourceLink source="transporters" />
+              </div>
               <input
                 type="text"
                 value={dispatchForm.transporterName}
@@ -556,7 +560,10 @@ export function SupplierDeliveryInlineSlide({ po, onClose, onDeliverySaved, onNe
             </div>
 
             <div>
-              <label className="block font-bold text-slate-700 mb-1">Vehicle & LR No.</label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block font-bold text-slate-700">Vehicle & LR No.</label>
+                <MasterSourceLink source="vehicles" />
+              </div>
               <div className="grid grid-cols-2 gap-1.5">
                 <input
                   type="text"

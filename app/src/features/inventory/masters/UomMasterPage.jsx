@@ -1,12 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useFabricMastersEmbed } from './fabricMastersEmbed';
 import {
   Search,
   Plus,
   Eye,
   SquarePen,
   MoreHorizontal,
-  ChevronLeft,
-  ChevronRight,
   X,
   Trash2,
   Check,
@@ -22,6 +21,9 @@ import { fabricMasterSync, isBackendEnabled, describeError } from '../../../serv
 import { uploadFileToBackend } from '../../../services/fileUploadService';
 import { refreshUnits } from '../../../hooks/useUnits';
 import PageInfoButton from '../../../components/ui/PageInfoButton';
+import AppPagination from '../../../components/ui/AppPagination';
+import { useTableSort } from '../../../hooks/useTableSort';
+import SortableTh from '../../../components/ui/SortableTh';
 
 // Units of Measurement — list (slide 9) plus an Add / Edit / View popup
 // (slide 10). Logged in → rows live in Postgres (/inventory/units/) and the
@@ -224,9 +226,16 @@ export default function UomMasterPage() {
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PER_PAGE));
   const safePage = Math.min(page, totalPages);
-  const pageItems = filtered.slice((safePage - 1) * PER_PAGE, safePage * PER_PAGE);
-  const from = filtered.length === 0 ? 0 : (safePage - 1) * PER_PAGE + 1;
-  const to = Math.min(safePage * PER_PAGE, filtered.length);
+  const tableSort = useTableSort(filtered, {
+    accessors: {
+      name: (r) => unitName(r),
+      uomType: (r) => r.uomType || 'Other',
+      decimalPlaces: (r) => r.decimalPlaces ?? 2,
+      conversionFactor: (r) => Number(r.conversionFactor ?? 1),
+      status: (r) => (r.isActive !== false ? 'Active' : 'Inactive'),
+    },
+  });
+  const pageItems = tableSort.rows.slice((safePage - 1) * PER_PAGE, safePage * PER_PAGE);
 
   // The base unit of the type picked in the popup (excluding the row being edited).
   const baseForType = useMemo(
@@ -300,7 +309,7 @@ export default function UomMasterPage() {
 
   // Shared rules for the popup and the CSV import (local mode re-checks what the server would).
   const validate = (item, others) => {
-    if (!item.code) return 'UOM Code is required.';
+    if (!item.code && !backendOn) return 'UOM Code is required.';
     if (!item.label) return 'UOM Name is required.';
     if (!item.uomType) return 'UOM Type is required.';
     if (!Number.isInteger(item.decimalPlaces) || item.decimalPlaces < 0 || item.decimalPlaces > 6) return 'Decimal places must be between 0 and 6.';
@@ -484,24 +493,30 @@ export default function UomMasterPage() {
     ? `1 ${previewCode} = ${formatFactor(form.conversionFactor)} ${baseForType.code}`
     : '';
 
+  const embedded = useFabricMastersEmbed();
+
   return (
     <div className="w-full space-y-4">
       {/* ── Slide 9 header ── */}
-      <div className="flex items-center gap-3">
-        <div className="w-8 h-8 rounded-full bg-[#1e60f2] text-white flex items-center justify-center font-bold text-base shrink-0 shadow-xs">
-          9
+      {!embedded && (
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-full bg-[#1e60f2] text-white flex items-center justify-center font-bold text-base shrink-0 shadow-xs">
+            9
+          </div>
+          <h1 className="text-xl sm:text-2xl font-bold text-[#0f172a] tracking-tight">Units of Measurement (UOM) – List</h1>
+          <PageInfoButton title="Units of Measurement (UOM)" />
         </div>
-        <h1 className="text-xl sm:text-2xl font-bold text-[#0f172a] tracking-tight">Units of Measurement (UOM) – List</h1>
-        <PageInfoButton title="Units of Measurement (UOM)" />
-      </div>
+      )}
 
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pt-1">
-        <div className="flex items-center gap-2 text-xs text-slate-500 font-medium">
-          <Layers className="w-4 h-4 text-[#1e60f2]" />
-          <span>Categories</span>
-          <span className="text-slate-300 font-bold">&gt;</span>
-          <span className="text-slate-800 font-semibold">Units of Measurement (UOM)</span>
-        </div>
+        {!embedded && (
+          <div className="flex items-center gap-2 text-xs text-slate-500 font-medium">
+            <Layers className="w-4 h-4 text-[#1e60f2]" />
+            <span>Categories</span>
+            <span className="text-slate-300 font-bold">&gt;</span>
+            <span className="text-slate-800 font-semibold">Units of Measurement (UOM)</span>
+          </div>
+        )}
 
         <div className="flex items-center gap-2.5 flex-wrap sm:flex-nowrap">
           <div className="relative min-w-[240px] sm:w-72">
@@ -574,13 +589,13 @@ export default function UomMasterPage() {
             <thead>
               <tr className="border-b border-slate-200 bg-[#f8fafc] text-slate-700 font-semibold text-xs">
                 <th className="px-3.5 py-3.5 w-12 text-center text-slate-500 font-medium">#</th>
-                <th className="px-3.5 py-3.5 font-semibold text-slate-800">UOM Code</th>
-                <th className="px-3.5 py-3.5 font-semibold text-slate-800">UOM Name</th>
-                <th className="px-3.5 py-3.5 font-semibold text-slate-800 text-center">UOM Type</th>
-                <th className="px-3.5 py-3.5 font-semibold text-slate-800 text-center">Base Unit</th>
-                <th className="px-3.5 py-3.5 font-semibold text-slate-800 text-center">Decimal Places</th>
-                <th className="px-3.5 py-3.5 font-semibold text-slate-800 text-center">Conversion Factor</th>
-                <th className="px-3.5 py-3.5 font-semibold text-slate-800 text-center">Status</th>
+                <SortableTh sort={tableSort} sortKey="code" className="px-3.5 py-3.5 font-semibold text-slate-800">UOM Code</SortableTh>
+                <SortableTh sort={tableSort} sortKey="name" className="px-3.5 py-3.5 font-semibold text-slate-800">UOM Name</SortableTh>
+                <SortableTh sort={tableSort} sortKey="uomType" className="px-3.5 py-3.5 font-semibold text-slate-800 text-center" align="center">UOM Type</SortableTh>
+                <SortableTh sort={tableSort} sortKey="isBaseUnit" className="px-3.5 py-3.5 font-semibold text-slate-800 text-center" align="center">Base Unit</SortableTh>
+                <SortableTh sort={tableSort} sortKey="decimalPlaces" className="px-3.5 py-3.5 font-semibold text-slate-800 text-center" align="center">Decimal Places</SortableTh>
+                <SortableTh sort={tableSort} sortKey="conversionFactor" className="px-3.5 py-3.5 font-semibold text-slate-800 text-center" align="center">Conversion Factor</SortableTh>
+                <SortableTh sort={tableSort} sortKey="status" className="px-3.5 py-3.5 font-semibold text-slate-800 text-center" align="center">Status</SortableTh>
                 <th className="px-4 py-3.5 font-semibold text-slate-800 text-center">Action</th>
               </tr>
             </thead>
@@ -669,29 +684,12 @@ export default function UomMasterPage() {
           </table>
         </div>
 
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 py-3 border-t border-slate-100 text-xs text-slate-600 bg-white pr-20 sm:pr-24">
-          <div>Showing {from} to {to} of {filtered.length} entries</div>
-          <div className="flex items-center gap-1">
-            <button type="button" disabled={safePage <= 1} onClick={() => setPage(safePage - 1)} className="p-1.5 rounded-lg border border-slate-200 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-slate-50 transition cursor-pointer" aria-label="Previous page">
-              <ChevronLeft className="w-3.5 h-3.5 text-slate-600" />
-            </button>
-            {Array.from({ length: totalPages }, (_, i) => i + 1).map((n) => (
-              <button
-                key={n}
-                type="button"
-                onClick={() => setPage(n)}
-                className={`w-7 h-7 rounded-md text-xs font-semibold transition cursor-pointer flex items-center justify-center ${
-                  n === safePage ? 'bg-[#1e60f2] text-white shadow-2xs' : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50'
-                }`}
-              >
-                {n}
-              </button>
-            ))}
-            <button type="button" disabled={safePage >= totalPages} onClick={() => setPage(safePage + 1)} className="p-1.5 rounded-lg border border-slate-200 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-slate-50 transition cursor-pointer" aria-label="Next page">
-              <ChevronRight className="w-3.5 h-3.5 text-slate-600" />
-            </button>
-          </div>
-        </div>
+        <AppPagination
+          total={filtered.length}
+          page={safePage}
+          pageSize={PER_PAGE}
+          onPageChange={setPage}
+        />
       </div>
 
       {/* ── Slide 10: Add / Edit / View popup ── */}
@@ -779,13 +777,13 @@ export default function UomMasterPage() {
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
                     <div>
                       <label className="block font-semibold text-slate-700 mb-1">
-                        UOM Code <span className="text-rose-500">*</span>
+                        UOM Code {backendOn ? <span className="font-normal text-slate-400">(auto if blank)</span> : <span className="text-rose-500">*</span>}
                       </label>
                       <input
                         value={form.code}
                         disabled={readOnly || Boolean(editingRow)}
                         onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })}
-                        placeholder="MTR"
+                        placeholder={backendOn ? 'Auto from name' : 'MTR'}
                         title={editingRow ? "The code can't be changed once created — items store it by code." : ''}
                         className={`${inputClass} uppercase shadow-2xs`}
                       />

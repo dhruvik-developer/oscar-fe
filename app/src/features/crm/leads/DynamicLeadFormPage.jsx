@@ -104,11 +104,21 @@ function renderInput(field) {
       ? "number"
       : "text";
 
+  const isPhone = field.type === "Phone" || /phone|mobile/i.test(field.label);
+  const [val, setVal] = useState(isPhone ? "+91 " : "");
+
   return (
     <div className="relative flex items-center">
       <input
         type={inputType}
-        placeholder={field.placeholder}
+        value={isPhone ? val : undefined}
+        onChange={isPhone ? (e) => {
+          let v = e.target.value;
+          if (!v || v === '+' || v.trim() === '') { setVal('+91 '); return; }
+          if (!v.startsWith('+91')) { const cl = v.replace(/^\+?91\s*/, ''); setVal(`+91 ${cl}`); return; }
+          setVal(v);
+        } : undefined}
+        placeholder={field.placeholder || (isPhone ? "+91 98765 43210" : undefined)}
         className="w-full bg-white border border-slate-200 rounded-lg pl-3 pr-8 py-2 text-xs text-slate-700 placeholder:text-slate-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
       />
       <Icon size={15} className="absolute right-3 text-slate-400 pointer-events-none" />

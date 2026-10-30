@@ -4,6 +4,7 @@ import { Plus, Search, RotateCcw, Eye, Trash2, ChevronUp, ChevronDown, ChevronsU
 import AssignTaskModal from './AssignTaskModal';
 import InfoBanner from '../../common/InfoBanner';
 import PageHeader from '../../../../components/ui/PageHeader';
+import AppPagination from '../../../../components/ui/AppPagination';
 import KpiCard from '../../../../components/ui/KpiCard';
 import { formatDeadline, STATUSES } from './taskAllocationStore';
 import { useCrmStore } from '../../../../stores/crmStore';
@@ -116,8 +117,6 @@ export default function TaskAllocationPage() {
   const totalPages = Math.max(1, Math.ceil(filtered.length / perPage));
   const safePage = Math.min(page, totalPages);
   const pageItems = filtered.slice((safePage - 1) * perPage, safePage * perPage);
-  const startRow = filtered.length === 0 ? 0 : (safePage - 1) * perPage + 1;
-  const endRow = (safePage - 1) * perPage + pageItems.length;
 
   function toggleSort(key) {
     if (sortKey !== key) {
@@ -286,15 +285,6 @@ export default function TaskAllocationPage() {
               )}
               <ChevronDown size={14} className={`transition-transform ${showFilters ? 'rotate-180' : ''}`} />
             </button>
-            <div className="flex items-center gap-2 text-[13px] text-slate-500 font-medium ml-1">
-            <span className="font-semibold text-slate-700">Show</span>
-            <select value={perPage} onChange={(e) => setPerPage(Number(e.target.value))} className="h-9 px-2.5 bg-white border border-slate-200 rounded-lg text-[13px] font-semibold text-slate-700 focus:outline-none focus:border-blue-500 cursor-pointer">
-              {[10, 25, 50].map((n) => (
-                <option key={n} value={n}>{n}</option>
-              ))}
-            </select>
-            <span>entries</span>
-            </div>
           </div>
           <div className="relative w-full sm:w-80">
             <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
@@ -412,14 +402,14 @@ export default function TaskAllocationPage() {
           </table>
         </div>
 
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-5 py-3.5 border-t border-slate-100 bg-slate-50/50 text-xs text-slate-500">
-          <span className="font-medium">Showing <b className="text-slate-700">{startRow}–{endRow}</b> of <b className="text-slate-700">{filtered.length}</b> tasks</span>
-          <div className="flex items-center gap-1.5">
-            <button type="button" disabled={safePage <= 1} onClick={() => setPage(safePage - 1)} className="h-8 px-3.5 rounded-lg border border-slate-200 bg-white font-semibold disabled:opacity-40 hover:border-slate-300 hover:bg-white transition">Prev</button>
-            <span className="h-8 min-w-14 px-2 grid place-items-center rounded-lg bg-blue-600 text-white font-bold text-[11px]">{safePage} / {totalPages}</span>
-            <button type="button" disabled={safePage >= totalPages} onClick={() => setPage(safePage + 1)} className="h-8 px-3.5 rounded-lg border border-slate-200 bg-white font-semibold disabled:opacity-40 hover:border-slate-300 hover:bg-white transition">Next</button>
-          </div>
-        </div>
+        <AppPagination
+          total={filtered.length}
+          page={safePage}
+          pageSize={perPage}
+          onPageChange={setPage}
+          onPageSizeChange={setPerPage}
+          pageSizeOptions={[10, 25, 50]}
+        />
       </div>
 
       {isModalOpen && <AssignTaskModal isOpen onClose={() => setIsModalOpen(false)} onSubmit={handleCreate} />}

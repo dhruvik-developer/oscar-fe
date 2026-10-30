@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Copy, Eye, Pencil, Plus, Printer, Trash2, X } from 'lucide-react';
 import {
@@ -27,6 +27,8 @@ import {
 } from '../../services/jobWorkSync';
 import PageHeader from '../../components/ui/PageHeader';
 import MasterSourceLink from '../../components/common/MasterSourceLink';
+import SortableTh from '../../components/ui/SortableTh';
+import { useTableSort } from '../../hooks/useTableSort';
 
 const TABS = ['Plan Details', 'Job Work Orders', 'Material Requirement', 'Timeline', 'Charges', 'Documents', 'Remarks'];
 
@@ -107,6 +109,28 @@ export default function ProcessPlanDetailPage() {
       setBusy(false);
     }
   };
+
+  // Linked JWOs + column sorting (hooks must run before the early return below).
+  const linkedJwos = useMemo(
+    () => (po ? (jwos || []).filter((o) => o.processPlanId && String(o.processPlanId) === String(po.id)) : []),
+    [jwos, po],
+  );
+  const jwoSort = useTableSort(linkedJwos, {
+    accessors: {
+      quantity: (o) => jwoKpis(o).totalOrdered,
+      received: (o) => jwoKpis(o).totalInward,
+      pending: (o) => jwoKpis(o).pending,
+      rate: (o) => Number(o.rate || 0),
+      amount: (o) => jwoKpis(o).totalAmount,
+      status: (o) => o.status || 'Pending',
+    },
+  });
+  const chargeSort = useTableSort(po?.charges, {
+    accessors: {
+      rate: (c) => Number(c.rate || 0),
+      status: (c) => c.status || 'Active',
+    },
+  });
 
   if (loading || !po) {
     return (
@@ -223,7 +247,7 @@ export default function ProcessPlanDetailPage() {
   const address = po.address || '—';
 
   // Only orders actually linked to this plan.
-  const relatedJwos = (jwos || []).filter((o) => o.processPlanId && String(o.processPlanId) === String(po.id));
+  const relatedJwos = linkedJwos;
   const linkedQty = relatedJwos.reduce((s, o) => s + (jwoKpis(o).totalOrdered || 0), 0);
   const linkedReceived = relatedJwos.reduce((s, o) => s + (jwoKpis(o).totalInward || 0), 0);
   const linkedPending = relatedJwos.reduce((s, o) => s + (jwoKpis(o).pending || 0), 0);
@@ -575,17 +599,17 @@ export default function ProcessPlanDetailPage() {
                   <thead>
                     <tr className="border-b border-slate-200/80 bg-[#f8fafc] text-[11px] font-bold text-slate-700">
                       <th className="px-3.5 py-2.5 w-10 text-center">#</th>
-                      <th className="px-3.5 py-2.5">JWO No.</th>
-                      <th className="px-3.5 py-2.5">Date</th>
-                      <th className="px-3.5 py-2.5">Vendor</th>
-                      <th className="px-3.5 py-2.5">Process</th>
-                      <th className="px-3.5 py-2.5 text-right">Quantity (M)</th>
-                      <th className="px-3.5 py-2.5 text-right">Received (M)</th>
-                      <th className="px-3.5 py-2.5 text-right">Pending (M)</th>
-                      <th className="px-3.5 py-2.5 text-right">Rate (₹/M)</th>
-                      <th className="px-3.5 py-2.5 text-right">Amount (₹)</th>
-                      <th className="px-3.5 py-2.5">Exp. Completion</th>
-                      <th className="px-3.5 py-2.5 text-center">Status</th>
+                      <SortableTh sort={jwoSort} sortKey="jwoNo" className="px-3.5 py-2.5">JWO No.</SortableTh>
+                      <SortableTh sort={jwoSort} sortKey="orderDate" className="px-3.5 py-2.5">Date</SortableTh>
+                      <SortableTh sort={jwoSort} sortKey="vendor" className="px-3.5 py-2.5">Vendor</SortableTh>
+                      <SortableTh sort={jwoSort} sortKey="process" className="px-3.5 py-2.5">Process</SortableTh>
+                      <SortableTh sort={jwoSort} sortKey="quantity" className="px-3.5 py-2.5 text-right" align="right">Quantity (M)</SortableTh>
+                      <SortableTh sort={jwoSort} sortKey="received" className="px-3.5 py-2.5 text-right" align="right">Received (M)</SortableTh>
+                      <SortableTh sort={jwoSort} sortKey="pending" className="px-3.5 py-2.5 text-right" align="right">Pending (M)</SortableTh>
+                      <SortableTh sort={jwoSort} sortKey="rate" className="px-3.5 py-2.5 text-right" align="right">Rate (₹/M)</SortableTh>
+                      <SortableTh sort={jwoSort} sortKey="amount" className="px-3.5 py-2.5 text-right" align="right">Amount (₹)</SortableTh>
+                      <SortableTh sort={jwoSort} sortKey="expectedCompletion" className="px-3.5 py-2.5">Exp. Completion</SortableTh>
+                      <SortableTh sort={jwoSort} sortKey="status" className="px-3.5 py-2.5 text-center" align="center">Status</SortableTh>
                       <th className="px-3.5 py-2.5 text-center">Actions</th>
                     </tr>
                   </thead>
@@ -597,7 +621,7 @@ export default function ProcessPlanDetailPage() {
                         </td>
                       </tr>
                     )}
-                    {relatedJwos.map((o, i) => {
+                    {jwoSort.rows.map((o, i) => {
                       const k = jwoKpis(o);
                       return (
                       <tr key={o.id} className="border-b border-slate-100 hover:bg-slate-50/50">
@@ -780,12 +804,12 @@ export default function ProcessPlanDetailPage() {
                   <thead>
                     <tr className="border-b border-slate-200/80 bg-[#f8fafc] text-[11px] font-bold text-slate-700">
                       <th className="px-3.5 py-2.5 w-10 text-center">#</th>
-                      <th className="px-3.5 py-2.5">Charge Type</th>
-                      <th className="px-3.5 py-2.5">Description</th>
-                      <th className="px-3.5 py-2.5 text-right">Rate (₹/M)</th>
-                      <th className="px-3.5 py-2.5 text-right">Quantity (M)</th>
-                      <th className="px-3.5 py-2.5 text-right">Amount (₹)</th>
-                      <th className="px-3.5 py-2.5 text-center">Status</th>
+                      <SortableTh sort={chargeSort} sortKey="type" className="px-3.5 py-2.5">Charge Type</SortableTh>
+                      <SortableTh sort={chargeSort} sortKey="description" className="px-3.5 py-2.5">Description</SortableTh>
+                      <SortableTh sort={chargeSort} sortKey="rate" className="px-3.5 py-2.5 text-right" align="right">Rate (₹/M)</SortableTh>
+                      <SortableTh sort={chargeSort} sortKey="qty" className="px-3.5 py-2.5 text-right" align="right">Quantity (M)</SortableTh>
+                      <SortableTh sort={chargeSort} sortKey="amount" className="px-3.5 py-2.5 text-right" align="right">Amount (₹)</SortableTh>
+                      <SortableTh sort={chargeSort} sortKey="status" className="px-3.5 py-2.5 text-center" align="center">Status</SortableTh>
                       <th className="px-3.5 py-2.5 text-center">Actions</th>
                     </tr>
                   </thead>
@@ -797,7 +821,7 @@ export default function ProcessPlanDetailPage() {
                         </td>
                       </tr>
                     )}
-                    {planCharges.map((c, i) => (
+                    {chargeSort.rows.map((c, i) => (
                       <tr key={c.id || i} className="border-b border-slate-100 hover:bg-slate-50/50">
                         <td className="px-3.5 py-3 text-center text-slate-500">{i + 1}</td>
                         <td className="px-3.5 py-3 font-semibold text-slate-800">{c.type}</td>

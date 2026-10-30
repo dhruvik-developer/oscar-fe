@@ -945,7 +945,7 @@ export function PoDailyProductionEntrySection({ po, onUpdated, navigate, onSwitc
             <div className="p-3 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2 bg-white">
               <div className="flex items-center gap-2">
                 <div className="relative">
-                  <Search size={13} className="absolute left-2.5 top-2 text-slate-400" />
+                  <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
                   <input
                     type="text"
                     value={registerSearch}

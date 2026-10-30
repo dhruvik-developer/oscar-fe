@@ -46,6 +46,8 @@ import {
 import { usePmsStore } from '../../../../stores/pmsStore';
 import { Modal } from '../../../../components/ui/Modal';
 import { Button } from '../../../../components/ui/Button';
+import { useTableSort } from '../../../../hooks/useTableSort';
+import { SortableTh } from '../../../../components/ui/SortableTh';
 
 const n = (v) => Number(v || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 });
 const todayISO = () => new Date().toISOString().slice(0, 10);
@@ -470,6 +472,32 @@ export function Stage15QualityStockWorkspace({
       ? 'In Progress'
       : 'Pending';
 
+  const qcPassedTakas = useMemo(
+    () => inwardTakas.filter((t) => t.qcStatus === 'Passed' || t.qcStatus === 'Pass'),
+    [inwardTakas]
+  );
+  const inwardTakaSort = useTableSort(filteredTakas, {
+    accessors: {
+      shade: (t) => t.shade || 'Natural',
+      locationCode: (t) => t.locationCode || 'SYS-QC-HOLD',
+      qcStatus: (t) => t.qcStatus || 'Pending',
+    },
+  });
+  const inspectionSort = useTableSort(inspections, {
+    accessors: { qualityGrade: (i) => i.qualityGrade || 'Grade A' },
+  });
+  const qcPassedSort = useTableSort(qcPassedTakas, {
+    accessors: { acceptedQty: (t) => Number(t.receivedMeters || t.availableQuantity || 0) },
+  });
+  const allocationSort = useTableSort(allocations);
+  const inspectionLineSort = useTableSort(selectedInspection?.lines || [], {
+    accessors: {
+      width: (l) => Number(l.width || 44),
+      penaltyPoints: (l) => Number(l.penaltyPoints || 0),
+      pointsPer100SqMeter: (l) => Number(l.pointsPer100SqMeter || 0),
+    },
+  });
+
   return (
     <div className="space-y-4">
       {/* 1. STAGE 15 LIFECYCLE HEADER (Matches Stage 11 & Stage 14 exactly) */}
@@ -792,15 +820,15 @@ export function Stage15QualityStockWorkspace({
               <table className="w-full text-xs text-left border-collapse min-w-[1000px]">
                 <thead className="bg-slate-50/80 text-slate-600 font-semibold border-b border-slate-200">
                   <tr>
-                    <th className="py-2.5 px-3">Inward Receipt</th>
-                    <th className="py-2.5 px-3">JWO & Vendor</th>
-                    <th className="py-2.5 px-3">Fabric & Quality</th>
-                    <th className="py-2.5 px-3">Design / Shade</th>
-                    <th className="py-2.5 px-3">Lot / Taka No</th>
-                    <th className="py-2.5 px-3 text-right">Received (M)</th>
-                    <th className="py-2.5 px-3">Location</th>
-                    <th className="py-2.5 px-3 text-center">QC Status</th>
-                    <th className="py-2.5 px-3 text-center">Allocation Status</th>
+                    <SortableTh sort={inwardTakaSort} sortKey="inwardNumber" className="py-2.5 px-3">Inward Receipt</SortableTh>
+                    <SortableTh sort={inwardTakaSort} sortKey="jwoNumber" className="py-2.5 px-3">JWO & Vendor</SortableTh>
+                    <SortableTh sort={inwardTakaSort} sortKey="fabricName" className="py-2.5 px-3">Fabric & Quality</SortableTh>
+                    <SortableTh sort={inwardTakaSort} sortKey="shade" className="py-2.5 px-3">Design / Shade</SortableTh>
+                    <SortableTh sort={inwardTakaSort} sortKey="lotNumber" className="py-2.5 px-3">Lot / Taka No</SortableTh>
+                    <SortableTh sort={inwardTakaSort} sortKey="receivedMeters" className="py-2.5 px-3 text-right" align="right">Received (M)</SortableTh>
+                    <SortableTh sort={inwardTakaSort} sortKey="locationCode" className="py-2.5 px-3">Location</SortableTh>
+                    <SortableTh sort={inwardTakaSort} sortKey="qcStatus" className="py-2.5 px-3 text-center" align="center">QC Status</SortableTh>
+                    <SortableTh sort={inwardTakaSort} sortKey="allocationStatus" className="py-2.5 px-3 text-center" align="center">Allocation Status</SortableTh>
                     <th className="py-2.5 px-3 text-right">Actions</th>
                   </tr>
                 </thead>
@@ -812,7 +840,7 @@ export function Stage15QualityStockWorkspace({
                       </td>
                     </tr>
                   ) : (
-                    filteredTakas.map((taka, idx) => {
+                    inwardTakaSort.rows.map((taka, idx) => {
                       const isQCApproved = taka.qcStatus === 'Passed' || taka.qcStatus === 'Pass';
                       const isQCPending = taka.qcStatus === 'Pending' || taka.qcStatus === 'QC Hold';
                       const hasUnallocated = taka.remainingEligibleQty > 0;
@@ -922,17 +950,17 @@ export function Stage15QualityStockWorkspace({
               <table className="w-full text-xs text-left border-collapse min-w-[950px]">
                 <thead className="bg-slate-50/80 text-slate-600 font-semibold border-b border-slate-200">
                   <tr>
-                    <th className="py-2.5 px-3">QC Inspection No</th>
-                    <th className="py-2.5 px-3">Inward Receipt</th>
-                    <th className="py-2.5 px-3">Inspection Date</th>
-                    <th className="py-2.5 px-3">Inspector</th>
-                    <th className="py-2.5 px-3">Method</th>
-                    <th className="py-2.5 px-3 text-right">Inspected (M)</th>
-                    <th className="py-2.5 px-3 text-right">Passed (M)</th>
-                    <th className="py-2.5 px-3 text-right">Hold (M)</th>
-                    <th className="py-2.5 px-3 text-right">Rejected (M)</th>
-                    <th className="py-2.5 px-3 text-center">Quality Grade</th>
-                    <th className="py-2.5 px-3 text-center">Status</th>
+                    <SortableTh sort={inspectionSort} sortKey="inspectionNumber" className="py-2.5 px-3">QC Inspection No</SortableTh>
+                    <SortableTh sort={inspectionSort} sortKey="sourceDocumentNumber" className="py-2.5 px-3">Inward Receipt</SortableTh>
+                    <SortableTh sort={inspectionSort} sortKey="inspectionDate" className="py-2.5 px-3">Inspection Date</SortableTh>
+                    <SortableTh sort={inspectionSort} sortKey="inspectorName" className="py-2.5 px-3">Inspector</SortableTh>
+                    <SortableTh sort={inspectionSort} sortKey="inspectionMethod" className="py-2.5 px-3">Method</SortableTh>
+                    <SortableTh sort={inspectionSort} sortKey="totalInspectedQty" className="py-2.5 px-3 text-right" align="right">Inspected (M)</SortableTh>
+                    <SortableTh sort={inspectionSort} sortKey="passedQty" className="py-2.5 px-3 text-right" align="right">Passed (M)</SortableTh>
+                    <SortableTh sort={inspectionSort} sortKey="holdQty" className="py-2.5 px-3 text-right" align="right">Hold (M)</SortableTh>
+                    <SortableTh sort={inspectionSort} sortKey="rejectedQty" className="py-2.5 px-3 text-right" align="right">Rejected (M)</SortableTh>
+                    <SortableTh sort={inspectionSort} sortKey="qualityGrade" className="py-2.5 px-3 text-center" align="center">Quality Grade</SortableTh>
+                    <SortableTh sort={inspectionSort} sortKey="status" className="py-2.5 px-3 text-center" align="center">Status</SortableTh>
                     <th className="py-2.5 px-3 text-right">Actions</th>
                   </tr>
                 </thead>
@@ -944,7 +972,7 @@ export function Stage15QualityStockWorkspace({
                       </td>
                     </tr>
                   ) : (
-                    inspections.map((insp) => (
+                    inspectionSort.rows.map((insp) => (
                       <tr key={insp.id} className="hover:bg-slate-50/80 transition-colors">
                         <td className="py-2.5 px-3 font-mono font-bold text-slate-900">
                           {insp.inspectionNumber}
@@ -1035,27 +1063,26 @@ export function Stage15QualityStockWorkspace({
               <table className="w-full text-xs text-left border-collapse min-w-[950px]">
                 <thead className="bg-slate-50/80 text-slate-600 font-semibold border-b border-slate-200">
                   <tr>
-                    <th className="py-2.5 px-3">Fabric & Quality</th>
-                    <th className="py-2.5 px-3">Source Lot / Taka</th>
-                    <th className="py-2.5 px-3">Source Inward</th>
-                    <th className="py-2.5 px-3 text-right">QC Accepted (M)</th>
-                    <th className="py-2.5 px-3 text-right">Customer Alloc (M)</th>
-                    <th className="py-2.5 px-3 text-right">Own Alloc (M)</th>
-                    <th className="py-2.5 px-3 text-right">Remaining Eligible (M)</th>
-                    <th className="py-2.5 px-3 text-center">Allocation Status</th>
+                    <SortableTh sort={qcPassedSort} sortKey="fabricName" className="py-2.5 px-3">Fabric & Quality</SortableTh>
+                    <SortableTh sort={qcPassedSort} sortKey="lotNumber" className="py-2.5 px-3">Source Lot / Taka</SortableTh>
+                    <SortableTh sort={qcPassedSort} sortKey="inwardNumber" className="py-2.5 px-3">Source Inward</SortableTh>
+                    <SortableTh sort={qcPassedSort} sortKey="acceptedQty" className="py-2.5 px-3 text-right" align="right">QC Accepted (M)</SortableTh>
+                    <SortableTh sort={qcPassedSort} sortKey="customerAllocatedQty" className="py-2.5 px-3 text-right" align="right">Customer Alloc (M)</SortableTh>
+                    <SortableTh sort={qcPassedSort} sortKey="ownAllocatedQty" className="py-2.5 px-3 text-right" align="right">Own Alloc (M)</SortableTh>
+                    <SortableTh sort={qcPassedSort} sortKey="remainingEligibleQty" className="py-2.5 px-3 text-right" align="right">Remaining Eligible (M)</SortableTh>
+                    <SortableTh sort={qcPassedSort} sortKey="allocationStatus" className="py-2.5 px-3 text-center" align="center">Allocation Status</SortableTh>
                     <th className="py-2.5 px-3 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-slate-700">
-                  {inwardTakas.filter((t) => t.qcStatus === 'Passed' || t.qcStatus === 'Pass').length === 0 ? (
+                  {qcPassedTakas.length === 0 ? (
                     <tr>
                       <td colSpan={9} className="text-center py-8 text-slate-400">
                         No QC-passed fabric rolls currently available. Complete QC inspection in Section A first.
                       </td>
                     </tr>
                   ) : (
-                    inwardTakas
-                      .filter((t) => t.qcStatus === 'Passed' || t.qcStatus === 'Pass')
+                    qcPassedSort.rows
                       .map((taka, idx) => (
                         <tr key={taka.id || idx} className="hover:bg-slate-50/80 transition-colors">
                           <td className="py-2.5 px-3">
@@ -1124,14 +1151,14 @@ export function Stage15QualityStockWorkspace({
               <table className="w-full text-xs text-left border-collapse min-w-[900px]">
                 <thead className="bg-slate-50/80 text-slate-600 font-semibold border-b border-slate-200">
                   <tr>
-                    <th className="py-2.5 px-3">Allocation Ref</th>
-                    <th className="py-2.5 px-3">Fabric & Quality</th>
-                    <th className="py-2.5 px-3">Lot / Taka No</th>
-                    <th className="py-2.5 px-3">Destination</th>
-                    <th className="py-2.5 px-3 text-right">Allocated Qty</th>
-                    <th className="py-2.5 px-3">Allocation Date</th>
-                    <th className="py-2.5 px-3">Created By</th>
-                    <th className="py-2.5 px-3 text-center">Status</th>
+                    <SortableTh sort={allocationSort} sortKey="id" className="py-2.5 px-3">Allocation Ref</SortableTh>
+                    <SortableTh sort={allocationSort} sortKey="fabricName" className="py-2.5 px-3">Fabric & Quality</SortableTh>
+                    <SortableTh sort={allocationSort} sortKey="lotNumber" className="py-2.5 px-3">Lot / Taka No</SortableTh>
+                    <SortableTh sort={allocationSort} sortKey="allocationType" className="py-2.5 px-3">Destination</SortableTh>
+                    <SortableTh sort={allocationSort} sortKey="quantity" className="py-2.5 px-3 text-right" align="right">Allocated Qty</SortableTh>
+                    <SortableTh sort={allocationSort} sortKey="createdAt" className="py-2.5 px-3">Allocation Date</SortableTh>
+                    <SortableTh sort={allocationSort} sortKey="createdBy" className="py-2.5 px-3">Created By</SortableTh>
+                    <SortableTh sort={allocationSort} sortKey="status" className="py-2.5 px-3 text-center" align="center">Status</SortableTh>
                     <th className="py-2.5 px-3 text-right">Actions</th>
                   </tr>
                 </thead>
@@ -1143,7 +1170,7 @@ export function Stage15QualityStockWorkspace({
                       </td>
                     </tr>
                   ) : (
-                    allocations.map((alloc) => (
+                    allocationSort.rows.map((alloc) => (
                       <tr key={alloc.id} className="hover:bg-slate-50/80 transition-colors">
                         <td className="py-2.5 px-3 font-mono font-bold text-slate-900">
                           {alloc.id.slice(0, 8).toUpperCase()}
@@ -1739,17 +1766,17 @@ export function Stage15QualityStockWorkspace({
                 <table className="w-full text-left border-collapse text-xs">
                   <thead className="bg-slate-100 text-slate-600 font-semibold border-b border-slate-200">
                     <tr>
-                      <th className="py-2 px-2.5">Lot / Taka</th>
-                      <th className="py-2 px-2.5 text-right">Length (M)</th>
-                      <th className="py-2 px-2.5 text-right">Width (In)</th>
-                      <th className="py-2 px-2.5 text-right">Penalty Pts</th>
-                      <th className="py-2 px-2.5 text-right">Pts/100m²</th>
-                      <th className="py-2 px-2.5 text-center">Grade</th>
-                      <th className="py-2 px-2.5 text-center">Disposition</th>
+                      <SortableTh sort={inspectionLineSort} sortKey="lotNumber" className="py-2 px-2.5">Lot / Taka</SortableTh>
+                      <SortableTh sort={inspectionLineSort} sortKey="actualMeter" className="py-2 px-2.5 text-right" align="right">Length (M)</SortableTh>
+                      <SortableTh sort={inspectionLineSort} sortKey="width" className="py-2 px-2.5 text-right" align="right">Width (In)</SortableTh>
+                      <SortableTh sort={inspectionLineSort} sortKey="penaltyPoints" className="py-2 px-2.5 text-right" align="right">Penalty Pts</SortableTh>
+                      <SortableTh sort={inspectionLineSort} sortKey="pointsPer100SqMeter" className="py-2 px-2.5 text-right" align="right">Pts/100m²</SortableTh>
+                      <SortableTh sort={inspectionLineSort} sortKey="grade" className="py-2 px-2.5 text-center" align="center">Grade</SortableTh>
+                      <SortableTh sort={inspectionLineSort} sortKey="disposition" className="py-2 px-2.5 text-center" align="center">Disposition</SortableTh>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {selectedInspection.lines?.map((line, lIdx) => (
+                    {inspectionLineSort.rows.map((line, lIdx) => (
                       <tr key={lIdx}>
                         <td className="py-2 px-2.5 font-mono">
                           {line.lotNumber} / Taka {line.takaNumber}

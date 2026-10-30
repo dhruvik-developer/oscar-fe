@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import InfoBanner from "../common/InfoBanner";
 import PageHeader from "../../../components/ui/PageHeader";
+import AppPagination from "../../../components/ui/AppPagination";
 
 function parseDateValue(dateString) {
   if (!dateString || typeof dateString !== "string") return 0;
@@ -325,36 +326,15 @@ function StatusToggle({ form, activeFormId, onToggleForm }) {
           </div>
         )}
 
-        <div className="mt-5 flex flex-col gap-4 border-t border-slate-100 pt-4 text-sm text-slate-500 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            Showing {filteredForms.length === 0 ? 0 : 1} to {filteredForms.length} of {filteredForms.length} forms
-          </div>
-
-          <div className="flex items-center gap-2 self-start sm:self-auto">
-            <button
-              type="button"
-              className="inline-flex h-10 w-10 items-center justify-center rounded-[12px] border border-slate-200 bg-white text-slate-400 transition hover:bg-slate-50 disabled:opacity-50"
-              disabled
-              aria-label="Previous page"
-            >
-              <ChevronDown size={16} className="rotate-90" />
-            </button>
-            <button
-              type="button"
-              className="inline-flex h-10 min-w-10 items-center justify-center rounded-[12px] bg-[#2f6fed] px-3 text-sm font-semibold text-white shadow-md shadow-blue-600/20 transition hover:bg-[#1d4ed8]"
-            >
-              1
-            </button>
-            <button
-              type="button"
-              className="inline-flex h-10 w-10 items-center justify-center rounded-[12px] border border-slate-200 bg-white text-slate-400 transition hover:bg-slate-50 disabled:opacity-50"
-              disabled
-              aria-label="Next page"
-            >
-              <ChevronDown size={16} className="-rotate-90" />
-            </button>
-          </div>
-        </div>
+        {/* Every form is listed on one page; the bar reports the count. */}
+        <AppPagination
+          total={filteredForms.length}
+          page={1}
+          pageSize={Math.max(1, filteredForms.length)}
+          onPageChange={() => {}}
+          bordered={false}
+          className="mt-5 border-t border-border pt-4"
+        />
       </div>
     </section>
   );

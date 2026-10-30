@@ -6,12 +6,13 @@ import {
   ExternalLink,
   AlertCircle,
   MoreVertical,
-  ChevronLeft,
-  ChevronRight,
   Eye,
   FileEdit,
 } from 'lucide-react';
 import { getProjectRowMeta } from '../../../../stores/pmsStore';
+import AppPagination from '../../../../components/ui/AppPagination';
+import { useTableSort } from '../../../../hooks/useTableSort';
+import { SortableTh } from '../../../../components/ui/SortableTh';
 
 function formatDate(val) {
   if (!val) return '—';
@@ -64,16 +65,27 @@ export function ProjectsTable({
   }, [projects]);
 
   const total = rows.length;
-  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+
+  const sort = useTableSort(rows, {
+    accessors: {
+      code: (r) => r.code || r.id,
+      crmOrderId: (r) => r.crmOrderId || 'SO-026-0001',
+      projectManager: (r) => r.projectManager?.name || 'Unassigned',
+      requirementMeters: (r) => Number(r.requirementMeters ?? r.productDetails?.quantity ?? 0),
+      dyeingSentMeters: (r) => Number(r.dyeingSentMeters ?? 0),
+      customerProject: (r) => Number(r.customerProjectReceivedMeters ?? 0),
+      ownProject: (r) => Number(r.ownProjectReceivedMeters ?? 0),
+      paymentStatus: (r) => r.paymentStatus || 'Pending',
+      status: (r) => r.status || 'In Progress',
+      completion: (r) => Math.min(100, Math.max(0, r.overallCompletionPct ?? 0)),
+    },
+  });
 
   // Current page records
   const paginatedRows = useMemo(() => {
     const start = (currentPage - 1) * pageSize;
-    return rows.slice(start, start + pageSize);
-  }, [rows, currentPage, pageSize]);
-
-  const startRecord = total > 0 ? (currentPage - 1) * pageSize + 1 : 0;
-  const endRecord = Math.min(currentPage * pageSize, total);
+    return sort.rows.slice(start, start + pageSize);
+  }, [sort.rows, currentPage, pageSize]);
 
   return (
     <div className="bg-white rounded-xl border border-slate-200 shadow-2xs overflow-hidden">
@@ -81,20 +93,20 @@ export function ProjectsTable({
         <table className="w-full text-left border-collapse min-w-[1250px]">
           <thead>
             <tr className="border-b border-slate-200 bg-slate-50/70 text-[10.5px] font-bold text-slate-500 uppercase tracking-wider">
-              <th className="py-3 px-3.5 whitespace-nowrap">PROJECT ID</th>
-              <th className="py-3 px-3.5 whitespace-nowrap">CUSTOMER</th>
-              <th className="py-3 px-3.5 whitespace-nowrap">ORDER / ITEM</th>
-              <th className="py-3 px-3.5 whitespace-nowrap">PROJECT MANAGER</th>
+              <SortableTh sort={sort} sortKey="code" className="py-3 px-3.5 whitespace-nowrap">PROJECT ID</SortableTh>
+              <SortableTh sort={sort} sortKey="customerName" className="py-3 px-3.5 whitespace-nowrap">CUSTOMER</SortableTh>
+              <SortableTh sort={sort} sortKey="crmOrderId" className="py-3 px-3.5 whitespace-nowrap">ORDER / ITEM</SortableTh>
+              <SortableTh sort={sort} sortKey="projectManager" className="py-3 px-3.5 whitespace-nowrap">PROJECT MANAGER</SortableTh>
               <th className="py-3 px-3.5 whitespace-nowrap">TYPE</th>
-              <th className="py-3 px-3.5 whitespace-nowrap text-right">REQUIREMENT (m)</th>
-              <th className="py-3 px-3.5 whitespace-nowrap text-right">DYEING SENT (m)</th>
-              <th className="py-3 px-3.5 whitespace-nowrap">CUSTOMER PROJECT</th>
-              <th className="py-3 px-3.5 whitespace-nowrap">OWN PROJECT</th>
-              <th className="py-3 px-3.5 whitespace-nowrap text-center">PAYMENT STATUS</th>
-              <th className="py-3 px-3.5 whitespace-nowrap text-center">OVERALL STATUS</th>
-              <th className="py-3 px-3.5 whitespace-nowrap min-w-[130px]">COMPLETION</th>
-              <th className="py-3 px-3.5 whitespace-nowrap">START DATE</th>
-              <th className="py-3 px-3.5 whitespace-nowrap">EXPECTED END</th>
+              <SortableTh sort={sort} sortKey="requirementMeters" className="py-3 px-3.5 whitespace-nowrap text-right" align="right">REQUIREMENT (m)</SortableTh>
+              <SortableTh sort={sort} sortKey="dyeingSentMeters" className="py-3 px-3.5 whitespace-nowrap text-right" align="right">DYEING SENT (m)</SortableTh>
+              <SortableTh sort={sort} sortKey="customerProject" className="py-3 px-3.5 whitespace-nowrap">CUSTOMER PROJECT</SortableTh>
+              <SortableTh sort={sort} sortKey="ownProject" className="py-3 px-3.5 whitespace-nowrap">OWN PROJECT</SortableTh>
+              <SortableTh sort={sort} sortKey="paymentStatus" className="py-3 px-3.5 whitespace-nowrap text-center" align="center">PAYMENT STATUS</SortableTh>
+              <SortableTh sort={sort} sortKey="status" className="py-3 px-3.5 whitespace-nowrap text-center" align="center">OVERALL STATUS</SortableTh>
+              <SortableTh sort={sort} sortKey="completion" className="py-3 px-3.5 whitespace-nowrap min-w-[130px]">COMPLETION</SortableTh>
+              <SortableTh sort={sort} sortKey="startDate" className="py-3 px-3.5 whitespace-nowrap">START DATE</SortableTh>
+              <SortableTh sort={sort} sortKey="expectedCompletionDate" className="py-3 px-3.5 whitespace-nowrap">EXPECTED END</SortableTh>
               <th className="py-3 px-3.5 whitespace-nowrap text-center">ACTIONS</th>
             </tr>
           </thead>
@@ -415,62 +427,14 @@ export function ProjectsTable({
         </table>
       </div>
 
-      {/* Pagination Footer matching the reference UI */}
-      <div className="flex flex-wrap items-center justify-between gap-4 p-3.5 border-t border-slate-200 bg-white text-xs text-slate-600">
-        <div>
-          Showing <span className="font-semibold text-slate-800">{startRecord}</span> to{' '}
-          <span className="font-semibold text-slate-800">{endRecord}</span> of{' '}
-          <span className="font-semibold text-slate-800">{total}</span> projects
-        </div>
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1.5">
-            <select
-              value={pageSize}
-              onChange={(e) => {
-                setPageSize(Number(e.target.value));
-                setCurrentPage(1);
-              }}
-              className="border border-slate-200 rounded-lg px-2 py-1 text-xs bg-white text-slate-700 outline-none focus:ring-1 focus:ring-blue-400 cursor-pointer"
-            >
-              <option value={6}>6</option>
-              <option value={10}>10</option>
-              <option value={20}>20</option>
-              <option value={50}>50</option>
-            </select>
-            <span>per page</span>
-          </div>
-
-          <div className="flex items-center gap-1">
-            <button
-              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-              disabled={currentPage === 1}
-              className="w-7 h-7 rounded border border-slate-200 flex items-center justify-center hover:bg-slate-50 disabled:opacity-30 disabled:hover:bg-transparent cursor-pointer"
-            >
-              <ChevronLeft size={14} />
-            </button>
-            {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
-              <button
-                key={p}
-                onClick={() => setCurrentPage(p)}
-                className={`w-7 h-7 rounded flex items-center justify-center font-semibold text-xs transition cursor-pointer ${
-                  p === currentPage
-                    ? 'bg-blue-600 text-white'
-                    : 'border border-slate-200 hover:bg-slate-50 text-slate-700'
-                }`}
-              >
-                {p}
-              </button>
-            ))}
-            <button
-              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-              disabled={currentPage === totalPages}
-              className="w-7 h-7 rounded border border-slate-200 flex items-center justify-center hover:bg-slate-50 disabled:opacity-30 disabled:hover:bg-transparent cursor-pointer"
-            >
-              <ChevronRight size={14} />
-            </button>
-          </div>
-        </div>
-      </div>
+      <AppPagination
+        total={total}
+        page={currentPage}
+        pageSize={pageSize}
+        onPageChange={setCurrentPage}
+        onPageSizeChange={setPageSize}
+        pageSizeOptions={[6, 10, 20, 50]}
+      />
     </div>
   );
 }

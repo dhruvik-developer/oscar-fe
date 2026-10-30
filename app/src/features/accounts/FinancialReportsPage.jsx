@@ -35,6 +35,8 @@ import {
   thClass,
   useApiGet,
 } from './accountingShared';
+import { useTableSort } from '../../hooks/useTableSort';
+import SortableTh from '../../components/ui/SortableTh';
 
 const TABS = [
   { id: 'pl', label: 'Profit & Loss' },
@@ -108,6 +110,17 @@ export function FinancialReportsPage() {
   const ag = ageing.data;
   const budgetRows = unwrapList(budgets.data);
   const accountsList = unwrapList(chartOfAccounts.data);
+
+  const cashFlowSort = useTableSort(c?.periods || []);
+  const hsnSort = useTableSort(g?.byHsn || []);
+  const ageingSort = useTableSort(ag?.rows || []);
+  const isOverBudget = (r) => r.variance !== null && r.variance !== undefined && Number(r.variance) < 0;
+  const budgetSort = useTableSort(budgetRows, {
+    accessors: {
+      period: (r) => r.period_start || r.periodStart,
+      status: (r) => (isOverBudget(r) ? 'Over budget' : 'Within budget'),
+    },
+  });
 
   const handleExport = () => {
     const stamp = todayISO();
@@ -339,15 +352,15 @@ export function FinancialReportsPage() {
                 <table className="w-full min-w-[540px] text-left text-xs text-slate-600">
                   <thead className="bg-slate-50 border-b border-[#dce5f4]">
                     <tr>
-                      <th className={thClass}>Month</th>
-                      <th className={`${thClass} text-right`}>Inflow</th>
-                      <th className={`${thClass} text-right`}>Outflow</th>
-                      <th className={`${thClass} text-right`}>Net</th>
+                      <SortableTh sort={cashFlowSort} sortKey="period" className={thClass}>Month</SortableTh>
+                      <SortableTh sort={cashFlowSort} sortKey="inflow" className={`${thClass} text-right`} align="right">Inflow</SortableTh>
+                      <SortableTh sort={cashFlowSort} sortKey="outflow" className={`${thClass} text-right`} align="right">Outflow</SortableTh>
+                      <SortableTh sort={cashFlowSort} sortKey="net" className={`${thClass} text-right`} align="right">Net</SortableTh>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {(c.periods || []).length === 0 && <EmptyRow colSpan={4} message="No bank or cash movement in this period." />}
-                    {(c.periods || []).map((r) => (
+                    {cashFlowSort.rows.map((r) => (
                       <tr key={r.period} className="hover:bg-slate-50">
                         <td className="py-2 px-3 font-semibold text-slate-800">{String(r.period).slice(0, 7)}</td>
                         <td className="py-2 px-3 text-right font-mono text-emerald-700">{formatINR(r.inflow)}</td>
@@ -479,14 +492,14 @@ export function FinancialReportsPage() {
                     <table className="w-full text-left text-xs">
                       <thead className="bg-slate-50 text-slate-600 uppercase text-[10px]">
                         <tr>
-                          <th className="py-2 px-3">HSN Code</th>
-                          <th className="py-2 px-3 text-right">Taxable Value</th>
-                          <th className="py-2 px-3 text-right">Tax Amount</th>
-                          <th className="py-2 px-3 text-center">Items Count</th>
+                          <SortableTh sort={hsnSort} sortKey="hsnCode" className="py-2 px-3">HSN Code</SortableTh>
+                          <SortableTh sort={hsnSort} sortKey="taxableValue" className="py-2 px-3 text-right" align="right">Taxable Value</SortableTh>
+                          <SortableTh sort={hsnSort} sortKey="tax" className="py-2 px-3 text-right" align="right">Tax Amount</SortableTh>
+                          <SortableTh sort={hsnSort} sortKey="lineCount" className="py-2 px-3 text-center" align="center">Items Count</SortableTh>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
-                        {g.byHsn.map((h) => (
+                        {hsnSort.rows.map((h) => (
                           <tr key={h.hsnCode} className="hover:bg-slate-50">
                             <td className="py-2 px-3 font-mono font-bold text-slate-800">{h.hsnCode}</td>
                             <td className="py-2 px-3 text-right font-mono text-slate-700">{formatINR(h.taxableValue)}</td>
@@ -564,21 +577,21 @@ export function FinancialReportsPage() {
                   <table className="w-full text-left text-xs border-collapse">
                     <thead className="bg-slate-50 text-slate-600 uppercase text-[10.5px] border-b border-slate-200">
                       <tr>
-                        <th className="py-2.5 px-3">Document #</th>
-                        <th className="py-2.5 px-3">Party Name</th>
-                        <th className="py-2.5 px-3">Doc Date</th>
-                        <th className="py-2.5 px-3">Due Date</th>
-                        <th className="py-2.5 px-3 text-right">Total</th>
-                        <th className="py-2.5 px-3 text-right">Outstanding</th>
-                        <th className="py-2.5 px-3 text-center">Overdue</th>
-                        <th className="py-2.5 px-3 text-center">Bucket</th>
+                        <SortableTh sort={ageingSort} sortKey="documentNumber" className="py-2.5 px-3">Document #</SortableTh>
+                        <SortableTh sort={ageingSort} sortKey="partyName" className="py-2.5 px-3">Party Name</SortableTh>
+                        <SortableTh sort={ageingSort} sortKey="date" className="py-2.5 px-3">Doc Date</SortableTh>
+                        <SortableTh sort={ageingSort} sortKey="dueDate" className="py-2.5 px-3">Due Date</SortableTh>
+                        <SortableTh sort={ageingSort} sortKey="total" className="py-2.5 px-3 text-right" align="right">Total</SortableTh>
+                        <SortableTh sort={ageingSort} sortKey="outstanding" className="py-2.5 px-3 text-right" align="right">Outstanding</SortableTh>
+                        <SortableTh sort={ageingSort} sortKey="daysOverdue" className="py-2.5 px-3 text-center" align="center">Overdue</SortableTh>
+                        <SortableTh sort={ageingSort} sortKey="bucket" className="py-2.5 px-3 text-center" align="center">Bucket</SortableTh>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                       {(ag.rows || []).length === 0 ? (
                         <EmptyRow colSpan={8} message={`No ${ageingType} documents outstanding.`} />
                       ) : (
-                        ag.rows.map((r) => (
+                        ageingSort.rows.map((r) => (
                           <tr key={r.documentId} className="hover:bg-slate-50">
                             <td className="py-2.5 px-3 font-mono font-bold text-blue-600">{r.documentNumber}</td>
                             <td className="py-2.5 px-3 font-semibold text-slate-800">{r.partyName}</td>
@@ -630,19 +643,19 @@ export function FinancialReportsPage() {
                 <table className="w-full min-w-[640px] text-left text-xs text-slate-600">
                   <thead className="bg-slate-50 border-b border-[#dce5f4]">
                     <tr>
-                      <th className={thClass}>Account</th>
-                      <th className={thClass}>Period</th>
-                      <th className={`${thClass} text-right`}>Budget</th>
-                      <th className={`${thClass} text-right`}>Actual</th>
-                      <th className={`${thClass} text-right`}>Variance</th>
-                      <th className={`${thClass} text-center`}>Status</th>
+                      <SortableTh sort={budgetSort} sortKey="accountName" className={thClass}>Account</SortableTh>
+                      <SortableTh sort={budgetSort} sortKey="period" className={thClass}>Period</SortableTh>
+                      <SortableTh sort={budgetSort} sortKey="amount" className={`${thClass} text-right`} align="right">Budget</SortableTh>
+                      <SortableTh sort={budgetSort} sortKey="actual" className={`${thClass} text-right`} align="right">Actual</SortableTh>
+                      <SortableTh sort={budgetSort} sortKey="variance" className={`${thClass} text-right`} align="right">Variance</SortableTh>
+                      <SortableTh sort={budgetSort} sortKey="status" className={`${thClass} text-center`} align="center">Status</SortableTh>
                       <th className={`${thClass} text-right`}>Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {budgetRows.length === 0 && <EmptyRow colSpan={7} message="No budgets defined in this period. Click 'Set Budget' to create one." />}
-                    {budgetRows.map((r) => {
-                      const over = r.variance !== null && r.variance !== undefined && Number(r.variance) < 0;
+                    {budgetSort.rows.map((r) => {
+                      const over = isOverBudget(r);
                       return (
                         <tr key={r.id} className={`hover:bg-slate-50 ${over ? 'bg-rose-50/50' : ''}`}>
                           <td className="py-2.5 px-3 font-semibold text-slate-800">{r.accountName}</td>

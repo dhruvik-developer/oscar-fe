@@ -1,6 +1,10 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { ArrowUpDown, MoreVertical, Search, Download } from 'lucide-react';
+import { MoreVertical, Search, Download } from 'lucide-react';
 import TablePagination from './TablePagination';
+import { SortIcon } from './SortableTh';
+import { sortRows } from '../../hooks/useTableSort';
+
+const NON_SORTABLE_KEYS = new Set(['actions', 'action', 'menu', 'select', 'more', '_actions']);
 
 /**
  * DataTable — Unified CRM/ERP/HRMS Data Table.
@@ -79,16 +83,25 @@ export function DataTable({
     });
   }, [safeData, search, isSearchEnabled, searchFilter, columns]);
 
+  // Every column with data behind it sorts, unless it opts out with
+  // `sortable: false`; `sortValue(row)` overrides what a column sorts by.
+  const sortableKeys = useMemo(() => {
+    const keys = new Set();
+    columns.forEach((col, idx) => {
+      const key = col.key || col.accessor || col.id || `col-${idx}`;
+      const title = col.header || col.label || col.title;
+      if (col.sortable === false || NON_SORTABLE_KEYS.has(key) || !title) return;
+      if (col.sortable || col.sortValue || safeData.some((row) => row?.[key] != null && row?.[key] !== '')) keys.add(key);
+    });
+    return keys;
+  }, [columns, safeData]);
+
   // Sort
   const sorted = useMemo(() => {
-    if (!sortKey) return filtered;
-    return [...filtered].sort((a, b) => {
-      const av = a?.[sortKey] ?? '';
-      const bv = b?.[sortKey] ?? '';
-      const cmp = String(av).toLowerCase().localeCompare(String(bv).toLowerCase(), undefined, { numeric: true });
-      return sortDir === 'asc' ? cmp : -cmp;
-    });
-  }, [filtered, sortKey, sortDir]);
+    if (!sortKey || !sortDir) return filtered;
+    const col = columns.find((c, idx) => (c.key || c.accessor || c.id || `col-${idx}`) === sortKey);
+    return sortRows(filtered, sortKey, sortDir, col?.sortValue);
+  }, [filtered, sortKey, sortDir, columns]);
 
   // Clamp current page if total pages shrinks
   const totalPages = Math.max(1, Math.ceil(sorted.length / pageSize));
@@ -119,11 +132,15 @@ export function DataTable({
     return `row-${index}`;
   }
 
+  // ascending → descending → original order
   function toggleSort(key) {
-    if (sortKey === key) {
-      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
-    } else {
+    if (sortKey !== key) {
       setSortKey(key);
+      setSortDir('asc');
+    } else if (sortDir === 'asc') {
+      setSortDir('desc');
+    } else {
+      setSortKey('');
       setSortDir('asc');
     }
   }
@@ -272,10 +289,11 @@ export function DataTable({
                 return (
                   <th
                     key={colKey}
+                    aria-sort={sortKey === colKey ? (sortDir === 'asc' ? 'ascending' : 'descending') : undefined}
                     style={col.width ? { width: col.width } : {}}
                     className={`py-2.5 px-3 ${alignCls}`}
                   >
-                    {col.sortable ? (
+                    {sortableKeys.has(colKey) ? (
                       <button
                         type="button"
                         className={`inline-flex items-center gap-1 font-bold text-text-secondary hover:text-primary transition cursor-pointer ${
@@ -284,10 +302,7 @@ export function DataTable({
                         onClick={() => toggleSort(colKey)}
                       >
                         <span>{colTitle}</span>
-                        <ArrowUpDown
-                          size={12}
-                          className={sortKey === colKey ? 'text-primary' : 'text-muted/60'}
-                        />
+                        <SortIcon active={sortKey === colKey} dir={sortDir} />
                       </button>
                     ) : (
                       <div className={`w-full ${col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : 'text-left'}`}>

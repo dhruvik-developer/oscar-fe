@@ -18,8 +18,6 @@ import {
   Calendar,
   X,
   Check,
-  ChevronLeft,
-  ChevronRight,
   QrCode,
   Scan,
   Sparkles,
@@ -31,6 +29,7 @@ import JsBarcode from 'jsbarcode';
 import QRCode from 'qrcode';
 import { inventoryService } from '../../services/domainServices';
 import KpiCard from '../../components/ui/KpiCard';
+import AppPagination from '../../components/ui/AppPagination';
 
 // Helper for Quantity formatting
 function formatQty(val, uom = 'm') {
@@ -305,7 +304,6 @@ export default function TakaTagPrintPage() {
     return all.slice(start, start + pageSize);
   }, [data, currentPage, pageSize]);
 
-  const totalPages = Math.ceil((data?.records?.length || 0) / pageSize) || 1;
 
   const isAllPageSelected =
     paginatedRecords.length > 0 && paginatedRecords.every((r) => selectedRowIds.has(r.id));
@@ -998,35 +996,12 @@ export default function TakaTagPrintPage() {
 
         {/* Table Pagination Footer */}
         {data?.records?.length > 0 && (
-          <div className="p-3 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-500">
-            <div>
-              Showing{' '}
-              <span className="font-bold text-slate-800">
-                {(currentPage - 1) * pageSize + 1} -{' '}
-                {Math.min(currentPage * pageSize, data.records.length)}
-              </span>{' '}
-              of <span className="font-bold text-slate-800">{data.records.length}</span> takas
-            </div>
-            <div className="flex items-center gap-1.5">
-              <button
-                disabled={currentPage <= 1}
-                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                className="px-2 py-1 rounded border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition"
-              >
-                <ChevronLeft size={14} />
-              </button>
-              <span className="px-2 font-semibold text-slate-700">
-                Page {currentPage} of {totalPages}
-              </span>
-              <button
-                disabled={currentPage >= totalPages}
-                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                className="px-2 py-1 rounded border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition"
-              >
-                <ChevronRight size={14} />
-              </button>
-            </div>
-          </div>
+          <AppPagination
+            total={data.records.length}
+            page={currentPage}
+            pageSize={pageSize}
+            onPageChange={setCurrentPage}
+          />
         )}
       </div>
 

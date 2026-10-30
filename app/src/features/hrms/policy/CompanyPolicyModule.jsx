@@ -48,6 +48,7 @@ import { usePolicyStore } from "../../../stores/policyStore";
 import { Badge } from "../../../components/hrms/Badge";
 import Modal from "../../../components/ui/Modal";
 import PageHeader from "../../../components/ui/PageHeader";
+import AppPagination from "../../../components/ui/AppPagination";
 import { hrmsGuides } from "../../../data/hrms/hrmsGuides";
 import MasterSourceLink from "../../../components/common/MasterSourceLink";
 
@@ -369,8 +370,6 @@ export function CompanyPolicyModule({ forcedSection }) {
     const start = (currentPage - 1) * pageSize;
     return filteredPolicies.slice(start, start + pageSize);
   }, [filteredPolicies, currentPage, pageSize]);
-
-  const totalPages = Math.ceil(filteredPolicies.length / pageSize) || 1;
 
   // Acknowledgement statistics per policy
   const getPolicyAckStats = (policyId) => {
@@ -1248,32 +1247,12 @@ export function CompanyPolicyModule({ forcedSection }) {
             </div>
 
             {/* Pagination & Count */}
-            <div className="p-4 border-t border-bdr flex flex-wrap items-center justify-between gap-3 text-[12.5px] text-muted">
-              <div>
-                Showing <b>{paginatedPolicies.length}</b> of <b>{filteredPolicies.length}</b> policies
-              </div>
-              <div className="flex items-center gap-1.5">
-                <button
-                  type="button"
-                  disabled={currentPage <= 1}
-                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                  className="px-3 py-1.5 border border-bdr rounded-lg hover:bg-off disabled:opacity-40 disabled:hover:bg-transparent font-medium cursor-pointer"
-                >
-                  Previous
-                </button>
-                <span className="px-2">
-                  Page <b>{currentPage}</b> of <b>{totalPages}</b>
-                </span>
-                <button
-                  type="button"
-                  disabled={currentPage >= totalPages}
-                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                  className="px-3 py-1.5 border border-bdr rounded-lg hover:bg-off disabled:opacity-40 disabled:hover:bg-transparent font-medium cursor-pointer"
-                >
-                  Next
-                </button>
-              </div>
-            </div>
+            <AppPagination
+              total={filteredPolicies.length}
+              page={currentPage}
+              pageSize={pageSize}
+              onPageChange={setCurrentPage}
+            />
           </div>
         </div>
       )}

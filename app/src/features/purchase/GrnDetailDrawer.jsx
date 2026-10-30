@@ -97,6 +97,7 @@ export default function GrnDetailDrawer({ grn, onClose }) {
       subtitle={[g.vendorName, formatDateDDMMYYYY(pick(g, 'receiptDate', 'receipt_date'))].filter(Boolean).join(' • ')}
       footer={
         <>
+          {/* [DISABLED] Open PO button commented out as requested
           {poId && (
             <button
               type="button"
@@ -106,6 +107,7 @@ export default function GrnDetailDrawer({ grn, onClose }) {
               <ExternalLink size={13} /> Open {g.poNumber || 'PO'}
             </button>
           )}
+          */}
           <button
             type="button"
             onClick={onClose}

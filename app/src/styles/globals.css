@@ -3,7 +3,7 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
-  --font-sans: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-sans: "Manrope", "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --color-primary: var(--primary);
   --color-primary-dark: var(--primary-dark);
   --color-primary-hover: var(--primary-hover);
@@ -87,7 +87,7 @@
 
 /* ── CSS Custom Properties (Multi-Theme System) ─────────── */
 :root, [data-theme="light"] {
-  font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: "Manrope", "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --primary: #1f6bff;
   --primary-dark: #1456d9;
   --primary-hover: #1456d9;
@@ -230,15 +230,15 @@
   --body-bg: radial-gradient(circle at top left, rgba(16, 185, 129, 0.12), transparent 35%), linear-gradient(180deg, #051611 0%, #030e0b 100%);
 }
 
-/* ── Oscar Textile theme: light pages + dark-teal sidebar ─── */
+/* ── Oscar theme: light pages + navy sidebar, matching the login page ─── */
 [data-theme="oscar"] {
-  --primary: #14b8a6;
-  --primary-dark: #0f766e;
-  --primary-hover: #0d9488;
-  --primary-subtle: rgba(20, 184, 166, 0.14);
+  --primary: #1B5FD6;
+  --primary-dark: #1747C4;
+  --primary-hover: #1450C8;
+  --primary-subtle: rgba(27, 95, 214, 0.12);
   --page: #f6f9ff;
-  --text: #183153;
-  --text-secondary: #58709a;
+  --text: #0F1B33;
+  --text-secondary: #5B6B8C;
   --muted: #60708d;
   --border: #dce5f4;
   --border-subtle: #eef3fc;
@@ -247,18 +247,18 @@
   --card-hover: #f8fbff;
   --card-alt: #f8fbff;
   --topbar-bg: rgba(255, 255, 255, 0.94);
-  --sidebar-bg-from: #0e3547;
-  --sidebar-bg-to: #071f2b;
-  --sidebar-text: #c3d4dc;
-  --sidebar-active-bg: linear-gradient(90deg, #1cb3b3 0%, #129191 100%);
+  --sidebar-bg-from: #1C2A44;
+  --sidebar-bg-to: #0E1627;
+  --sidebar-text: #C9D5EC;
+  --sidebar-active-bg: linear-gradient(110deg, #1747C4 0%, #2B9BE8 60%, #27C7EA 100%);
   --sidebar-active-text: #ffffff;
-  --sidebar-border: rgba(45, 212, 191, 0.14);
+  --sidebar-border: rgba(255, 255, 255, 0.08);
   --table-head-bg: #f8fafc;
   --table-row-hover: rgba(241, 245, 249, 0.7);
   --danger: #ef4444;
   --success: #10b981;
   --warning: #f59e0b;
-  --info: #0ea5e9;
+  --info: #2B9BE8;
   --radius: 8px;
   --radius-lg: 12px;
   --radius-xl: 16px;
@@ -269,44 +269,48 @@
   --body-bg: radial-gradient(circle at top left, rgba(202, 222, 255, 0.35), transparent 28%), linear-gradient(180deg, #fbfdff 0%, #f3f7ff 100%);
 }
 
-/* ── Oscar sidebar: teal active pill + teal accents ───────── */
+/* ── Oscar sidebar: login-page blue gradient pill + blue accents ───────── */
+/* The login page's fabric photo under a slate-navy veil, so the shell
+   carries the same texture and tone as the sign-in screen. */
 [data-theme="oscar"] .sidebar {
   background:
-    radial-gradient(circle at 85% -5%, var(--brand-tint, rgba(45, 212, 191, 0.16)), transparent 45%),
+    radial-gradient(circle at 85% -5%, var(--brand-tint, rgba(43, 155, 232, 0.16)), transparent 45%),
+    linear-gradient(180deg, rgba(28, 42, 68, 0.78) 0%, rgba(14, 22, 39, 0.9) 100%),
+    url("/images/login-bg.png") 30% center / cover no-repeat,
     linear-gradient(180deg, var(--sidebar-bg-from) 0%, var(--sidebar-bg-to) 100%);
 }
 /* --brand-* vars are only set when a custom brand colour is saved
-   (utils/branding.js); the fallbacks are the stock Oscar teal. */
+   (utils/branding.js); the fallbacks are the stock Oscar blue. */
 [data-theme="oscar"] .brand-logo {
-  color: var(--brand-accent, #2dd4bf);
+  color: var(--brand-accent, #7DB4F6);
 }
 [data-theme="oscar"] .brand-tag {
-  color: #7fa3b0;
+  color: #8493B2;
 }
 [data-theme="oscar"] .nav-row.section-active {
   background: var(--sidebar-active-bg);
   color: #ffffff;
   font-weight: 700;
-  box-shadow: 0 4px 14px var(--brand-glow, rgba(20, 184, 166, 0.35));
+  box-shadow: 0 8px 18px -8px var(--brand-glow, rgba(27, 95, 214, 0.9));
   border-left: 0;
   padding-left: 10px;
   border-radius: 10px;
 }
 [data-theme="oscar"] .sub-group-row.section-active,
 [data-theme="oscar"] .sub-group-row.active {
-  background: var(--brand-active-bg, linear-gradient(90deg, rgba(28, 179, 179, 0.9) 0%, rgba(18, 145, 145, 0.9) 100%));
+  background: var(--brand-active-bg, linear-gradient(110deg, rgba(23, 71, 196, 0.9) 0%, rgba(43, 155, 232, 0.9) 100%));
   color: #ffffff;
   border: 0;
-  box-shadow: 0 4px 14px var(--brand-glow, rgba(20, 184, 166, 0.3));
+  box-shadow: 0 6px 14px -6px var(--brand-glow, rgba(27, 95, 214, 0.8));
 }
 [data-theme="oscar"] .sub-item.section-active,
 [data-theme="oscar"] .sub-item.active {
-  background: var(--brand-tint, rgba(45, 212, 191, 0.14));
+  background: var(--brand-tint, rgba(125, 180, 246, 0.14));
   color: #ffffff;
-  border-left: 3px solid var(--brand-accent, #2dd4bf);
+  border-left: 3px solid var(--brand-accent, #7DB4F6);
 }
 [data-theme="oscar"] .side-top::-webkit-scrollbar-thumb {
-  background: var(--brand-tint, rgba(45, 212, 191, 0.25));
+  background: var(--brand-tint, rgba(125, 180, 246, 0.25));
 }
 }
 
@@ -719,6 +723,8 @@ body {
    this reset overrode every font size set on an input, select or button. */
 @layer base {
   button, input, select, textarea { font: inherit; }
+  /* Page and card titles use the login page's display face. */
+  h1, h2, h3 { font-family: "Sora", "Manrope", system-ui, sans-serif; letter-spacing: -0.01em; }
 }
 button { cursor: pointer; }
 a { text-decoration: none; color: inherit; }
@@ -1226,27 +1232,55 @@ img { display: block; max-width: 100%; }
   position: sticky;
   top: 0;
   z-index: 30;
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   transition: background 0.3s ease, border-color 0.3s ease;
 }
 
 .top-search {
-  width: min(680px, 48vw);
-  height: 40px;
+  width: min(640px, 46vw);
+  height: 38px;
   display: flex;
   align-items: center;
   gap: 10px;
-  background: var(--soft);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 0 12px;
-  transition: all 0.15s ease;
+  background: rgba(241, 245, 249, 0.72);
+  border: 1px solid rgba(210, 222, 240, 0.85);
+  border-radius: 9999px;
+  padding: 0 14px 0 12px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03), inset 0 1px 1px rgba(255, 255, 255, 0.75);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
 }
 
-.top-search:hover, .top-search:focus-within {
-  border-color: var(--primary);
-  box-shadow: 0 0 0 3px var(--primary-subtle);
+.dark .top-search {
+  background: rgba(30, 41, 59, 0.65);
+  border-color: rgba(51, 65, 85, 0.75);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.top-search:hover {
+  background: rgba(255, 255, 255, 0.95);
+  border-color: rgba(147, 197, 253, 0.9);
+  box-shadow: 0 2px 10px rgba(37, 99, 235, 0.08);
+}
+
+.dark .top-search:hover {
+  background: rgba(30, 41, 59, 0.9);
+  border-color: rgba(96, 165, 250, 0.6);
+  box-shadow: 0 2px 10px rgba(37, 99, 235, 0.15);
+}
+
+.top-search:focus-within {
+  background: #ffffff;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.16), 0 2px 12px rgba(37, 99, 235, 0.1);
+}
+
+.dark .top-search:focus-within {
+  background: #0f172a;
+  border-color: #60a5fa;
+  box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.2), 0 2px 12px rgba(37, 99, 235, 0.2);
 }
 
 .top-search input {
@@ -1255,10 +1289,19 @@ img { display: block; max-width: 100%; }
   outline: 0;
   background: transparent;
   color: var(--text);
-  font-size: 0.88rem;
+  font-size: 0.84rem;
+  letter-spacing: -0.01em;
 }
 
-.top-search-ico { color: var(--muted); }
+.top-search-ico {
+  color: var(--muted);
+  transition: color 0.15s ease;
+}
+
+.top-search:hover .top-search-ico,
+.top-search:focus-within .top-search-ico {
+  color: var(--primary);
+}
 
 /* Topbar mobile controls (hamburger + compact search) — hidden by default */
 .topbar-hamburger,
@@ -1269,16 +1312,26 @@ img { display: block; max-width: 100%; }
   flex-shrink: 0;
   align-items: center;
   justify-content: center;
-  border-radius: 10px;
-  border: 1px solid var(--border);
-  background: var(--card);
+  border-radius: 9999px;
+  border: 1px solid rgba(210, 222, 240, 0.85);
+  background: rgba(255, 255, 255, 0.9);
   color: var(--text);
-  transition: background 0.15s ease;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  transition: all 0.2s ease;
+}
+
+.dark .topbar-hamburger,
+.dark .top-search-compact {
+  border-color: rgba(51, 65, 85, 0.75);
+  background: rgba(30, 41, 59, 0.8);
 }
 
 .topbar-hamburger:hover,
 .top-search-compact:hover {
-  background: var(--soft);
+  background: #ffffff;
+  border-color: rgba(147, 197, 253, 0.9);
+  color: var(--primary);
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.1);
 }
 
 .top-actions {
@@ -1381,6 +1434,35 @@ img { display: block; max-width: 100%; }
     max-height: calc(100dvh - 72px);
     overflow-y: auto;
     margin-top: 4px;
+  }
+}
+
+/* ── Notification center rows: actions replace the time on hover / focus;
+   on touch screens (no hover) they stay visible and the time moves to the meta line. */
+.notif-panel {
+  max-height: min(640px, calc(100dvh - 88px));
+}
+.notif-row-actions { display: none; }
+.notif-row-meta-time { display: none; }
+.notif-row:hover .notif-row-actions,
+.notif-row:focus-within .notif-row-actions { display: flex; }
+.notif-row:hover .notif-row-time,
+.notif-row:focus-within .notif-row-time { visibility: hidden; }
+@media (hover: none) {
+  /* No hover on touch: read / dismiss stay visible top-right; the time moves to the chip line. */
+  .notif-row-actions {
+    display: flex;
+    border: 0;
+    box-shadow: none;
+    background: transparent;
+  }
+  .notif-row-time { display: none; }
+  .notif-row-meta-time { display: inline; }
+}
+@media (max-width: 640px) {
+  .notif-panel {
+    overflow: hidden;
+    max-height: calc(100dvh - 72px);
   }
 }
 
@@ -1833,7 +1915,11 @@ img { display: block; max-width: 100%; }
   display: inline-flex;
   align-items: center;
 }
-.th-sort-btn:hover .sort-ico { color: var(--text); opacity: 1; }
+.th-sort-btn:hover .sort-ico:not(.active) { color: var(--text); opacity: 0.8; }
+/* Up and down arrows stacked, both always visible (leads table). */
+.sort-arrows { display: inline-flex; flex-direction: column; line-height: 0; margin-left: 2px; }
+.sort-arrows .sort-ico + .sort-ico { margin-top: -5px; }
+.sort-arrows .sort-ico:not(.active) { opacity: 0.4; }
 .th-sort-btn:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: 4px; }
 
 .data-table tbody td, .leads-table tbody td {
@@ -2075,6 +2161,17 @@ img { display: block; max-width: 100%; }
 }
 
 .lead-create-field input::placeholder { color: var(--muted); }
+/* The search box inside the multi-select sits in its own bordered control,
+   so it must not get the field styling above as well. */
+.lead-create-field input.lead-multi-search,
+.lead-create-field input.lead-multi-search:focus {
+  height: auto;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  padding: 0;
+  box-shadow: none;
+}
 .lead-create-field input:focus,
 .lead-create-field select:focus { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-subtle); }
 
@@ -2495,81 +2592,6 @@ img { display: block; max-width: 100%; }
   font-weight: 700;
   color: var(--text);
   margin: 0 0 12px;
-}
-
-/* ── Pagination ──────────────────────────────────────────── */
-.pagination {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 10px 16px;
-  font-size: 0.8rem;
-  color: var(--muted);
-}
-
-.pagination-pages {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-@media (max-width: 639px) {
-  .pagination {
-    flex-direction: column;
-    align-items: center;
-    padding: 10px 12px;
-    text-align: center;
-  }
-
-  .pagination-pages {
-    flex-wrap: wrap;
-    justify-content: center;
-  }
-}
-
-.pager-btn {
-  min-width: 28px;
-  height: 28px;
-  padding: 0 6px;
-  border: 1px solid var(--border);
-  border-radius: 9999px;
-  background: var(--card);
-  color: var(--text-secondary);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.75rem;
-  font-weight: 700;
-  transition: all 0.15s ease;
-  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.03);
-}
-
-.pager-btn:hover:not(:disabled) {
-  background: var(--soft);
-  color: var(--text);
-  border-color: var(--border);
-}
-
-.pager-btn.active {
-  background: #1F2E4A;
-  color: #ffffff;
-  border-color: #1F2E4A;
-  box-shadow: 0 1px 3px 0 rgba(31, 46, 74, 0.3);
-}
-
-.pager-btn:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-  background: var(--card);
-  color: var(--muted);
-}
-
-.pager-btn-nav {
-  padding: 0 14px;
-  font-weight: 600;
-  font-size: 0.75rem;
-  border-color: var(--border);
 }
 
 /* ── Filter Panel ────────────────────────────────────────── */
@@ -3115,6 +3137,19 @@ img { display: block; max-width: 100%; }
 }
 
 .lead-avatar img { width: 100%; height: 100%; object-fit: cover; }
+/* A lead photo that opens full size (LeadAvatar previewable). */
+.lead-avatar-preview-btn {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  border-radius: 999px;
+  cursor: zoom-in;
+  display: inline-flex;
+  flex-shrink: 0;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.lead-avatar-preview-btn:hover { transform: scale(1.06); box-shadow: 0 0 0 3px var(--primary-subtle); }
+.lead-avatar-preview-btn:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
 
 .lead-link-btn {
   border: 0;
@@ -3350,13 +3385,79 @@ tr:hover .pinned-indicator,
   color: #2563eb;
   background: #eff6ff;
   border-color: #bfdbfe;
-  transform: rotate(45deg);
 }
 
 .pinned-indicator.active:hover {
   background: #dbeafe;
   color: #1d4ed8;
-  transform: rotate(45deg) scale(1.1);
+  transform: scale(1.1);
+}
+
+.col-pin {
+  width: 36px;
+  min-width: 36px;
+  max-width: 36px;
+  text-align: center;
+  padding: 0 4px !important;
+}
+
+.lead-pin-cell {
+  width: 36px;
+  min-width: 36px;
+  max-width: 36px;
+  padding: 0 4px !important;
+  text-align: center;
+}
+
+.lead-pin-btn {
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  background: transparent;
+  border: 1px solid transparent;
+  color: #94a3b8;
+  opacity: 0.35;
+  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+tr:hover .lead-pin-btn {
+  opacity: 0.85;
+  color: #64748b;
+}
+
+.lead-pin-btn:hover {
+  opacity: 1 !important;
+  background: #f1f5f9;
+  color: #2563eb;
+  border-color: #cbd5e1;
+  transform: scale(1.1);
+}
+
+.lead-pin-btn.is-pinned {
+  opacity: 1 !important;
+  background: #eff6ff;
+  border-color: #bfdbfe;
+  color: #2563eb;
+  box-shadow: 0 1px 2px rgba(37, 99, 235, 0.08);
+}
+
+.lead-pin-btn.is-pinned:hover {
+  background: #dbeafe;
+  color: #1d4ed8;
+  border-color: #93c5fd;
+  transform: scale(1.1);
+}
+
+.pinned-lead-row {
+  background-color: rgba(239, 246, 255, 0.35) !important;
+}
+
+.pinned-lead-row:hover {
+  background-color: rgba(239, 246, 255, 0.6) !important;
 }
 
 .table-inline-input {
@@ -3583,8 +3684,10 @@ tr:hover .pinned-indicator,
 .grid-table-card .leads-table tbody tr:last-child td { border-bottom: 0; }
 .grid-table-card { border-color: #142033; }
 .grid-table-card .leads-table {
-  min-width: 1520px;
-  table-layout: fixed;
+  /* Columns come from the lead form builder, so their number and order vary:
+     size them by content, never by position. */
+  min-width: 100%;
+  table-layout: auto;
   font-size: 0.84rem;
 }
 .grid-table-card .leads-table thead th {
@@ -3593,26 +3696,22 @@ tr:hover .pinned-indicator,
   border-color: #142033;
   padding: 13px 12px;
   font-weight: 600;
+  white-space: nowrap;
 }
 .grid-table-card .leads-table tbody td {
   color: #092957;
   border-color: #142033;
   padding: 11px 12px;
   line-height: 1.35;
+  white-space: nowrap;
 }
-.grid-table-card .leads-table th:nth-child(1), .grid-table-card .leads-table td:nth-child(1) { width: 115px; }
-.grid-table-card .leads-table th:nth-child(2), .grid-table-card .leads-table td:nth-child(2) { width: 210px; }
-.grid-table-card .leads-table th:nth-child(3), .grid-table-card .leads-table td:nth-child(3) { width: 150px; }
-.grid-table-card .leads-table th:nth-child(4), .grid-table-card .leads-table td:nth-child(4) { width: 185px; }
-.grid-table-card .leads-table th:nth-child(5), .grid-table-card .leads-table td:nth-child(5) { width: 140px; }
-.grid-table-card .leads-table th:nth-child(6), .grid-table-card .leads-table td:nth-child(6) { width: 125px; }
-.grid-table-card .leads-table th:nth-child(7), .grid-table-card .leads-table td:nth-child(7) { width: 165px; }
-.grid-table-card .leads-table th:nth-child(8), .grid-table-card .leads-table td:nth-child(8) { width: 210px; }
-.grid-table-card .leads-table th:nth-child(9), .grid-table-card .leads-table td:nth-child(9) { width: 120px; }
-.grid-table-card .leads-table th:nth-child(10), .grid-table-card .leads-table td:nth-child(10) { width: 110px; }
-.grid-table-card .leads-table th:nth-child(11), .grid-table-card .leads-table td:nth-child(11),
-.grid-table-card .leads-table th:nth-child(12), .grid-table-card .leads-table td:nth-child(12) { width: 45px; }
-.grid-table-card .leads-table tbody td:not(:first-child) { overflow: hidden; text-overflow: ellipsis; }
+.grid-table-card .leads-table th:first-child,
+.grid-table-card .leads-table td:first-child { width: 48px; min-width: 48px; }
+.grid-table-card .leads-table tbody td:not(:first-child):not(:last-child) {
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 
 /* ── Tile-view lead cards (screenshot format) ──────────────── */
 .lead-tile-grid {
@@ -4589,30 +4688,6 @@ tr:hover .pinned-indicator,
 .leads-map-list-amount.red, .lead-status-chip.red, .leads-map-marker-pro.red .leads-map-marker-pill { background: #fee2e2; color: #dc2626; }
 .leads-map-list-amount.pink, .lead-status-chip.pink, .leads-map-marker-pro.pink .leads-map-marker-pill { background: #fce7f3; color: #db2777; }
 
-.leads-map-pagination {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  padding: 10px 12px 12px;
-}
-.page-nav, .page-num {
-  min-width: 28px;
-  height: 28px;
-  border: 0;
-  background: transparent;
-  border-radius: 999px;
-  color: var(--text-secondary);
-  display: inline-grid;
-  place-items: center;
-  font-size: 0.8rem;
-  font-weight: 600;
-  cursor: pointer;
-  padding: 0 6px;
-}
-.page-nav:hover, .page-num:hover { background: var(--soft); color: var(--text); }
-.page-num.active { background: var(--primary); color: #fff; }
-.leads-map-pagination > span { color: var(--muted); font-size: 0.8rem; padding: 0 2px; }
 
 /* Center: map stage */
 .leads-map-stage {
@@ -4886,21 +4961,6 @@ tr:hover .pinned-indicator,
   .leads-map-list-pane { max-height: 320px; min-height: 0; }
 }
 
-/* Pagination extras: total-records label + page-size selector */
-.pagination-total strong { color: var(--text); font-weight: 700; }
-
-.page-size-select {
-  height: 32px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--card);
-  color: var(--text);
-  font-size: 0.84rem;
-  font-weight: 600;
-  padding: 0 8px;
-  cursor: pointer;
-}
-
 .sr-only {
   position: absolute;
   width: 1px; height: 1px;
@@ -4970,6 +5030,15 @@ tr:hover .pinned-indicator,
 
 .empty-state h3 { margin: 0; font-size: 1rem; color: var(--text); }
 .empty-state p { margin: 0; font-size: 0.86rem; }
+.empty-state a.btn-primary,
+.empty-state a[class*="bg-blue"],
+.empty-state a[class*="text-white"],
+.empty-state button.btn-primary {
+  color: #ffffff !important;
+}
+.empty-state a[class*="bg-blue"] * {
+  color: #ffffff !important;
+}
 
 /* ── Toast ───────────────────────────────────────────────── */
 .toast {
@@ -5294,4 +5363,14 @@ html, body {
     padding-left: clamp(24px, 2vw, 40px);
     padding-right: clamp(24px, 2vw, 40px);
   }
+}
+
+/* Placeholders hide while a field has focus, so the caret is not drawn in
+   front of hint text that reads like a value. They come back on blur when
+   the field is still empty. !important beats the per-form placeholder
+   colours above and Tailwind `placeholder:*` utilities. */
+input:focus::placeholder,
+textarea:focus::placeholder {
+  color: transparent !important;
+  opacity: 0 !important;
 }

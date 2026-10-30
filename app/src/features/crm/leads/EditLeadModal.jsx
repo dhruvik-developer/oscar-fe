@@ -24,7 +24,7 @@ function buildInitialValues(lead, sections, sources, team) {
   set('lead-name', /^\s*lead\s*name\s*$/i, lead.name ?? '');
   set('company', /comp/, lead.company ?? '');
   set('email', /^\s*e-?mail\s*$/i, lead.email ?? '');
-  set('phone', /^\s*phone\s*$/i, lead.phone ?? '');
+  set('phone', /^\s*phone\s*$/i, lead.phone ? (String(lead.phone).startsWith('+91') ? lead.phone : `+91 ${lead.phone}`) : '+91 ');
   set('title', /^\s*title\s*$/i, lead.jobTitle ?? lead.title ?? '');
   set('industry', /^\s*industry\s*$/i, lead.industry ?? '');
   set('created-on', /creat\w*\s*on/, lead.createdOn ?? '');
@@ -122,7 +122,9 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSave }) {
     const productsField = fieldBy('products', /products?/);
     const rawSource = sourceField ? String(get(sourceField.id) || '') : '';
     // Only a real store row may travel as sourceId (the API field is a PK).
-    const storeSource = (sources || []).find((s) => String(s.id) === rawSource) || null;
+    const storeSource = (sources || []).find(
+      (s) => String(s.id) === rawSource || String(s?.name || "").trim().toLowerCase() === rawSource.trim().toLowerCase()
+    ) || null;
     const ownerId = ownerField ? get(ownerField.id) : '';
     const fieldValues = { ...values };
     if (photoField?.id) delete fieldValues[photoField.id];
@@ -137,7 +139,10 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSave }) {
         name: trimmedName,
         company: String(getValue('company', /comp/)).trim(),
         email: String(getValue('email', /^\s*e-?mail\s*$/i)).trim(),
-        phone: String(getValue('phone', /^\s*phone\s*$/i)).trim(),
+        phone: (() => {
+        const p = String(getValue('phone', /^\s*phone\s*$/i) ?? '').trim();
+        return (p !== '+91' && p !== '+91 ') ? p : '';
+      })(),
         sourceId: storeSource ? storeSource.id : undefined,
         source: sourceField ? (storeSource ? storeSource.name : rawSource) : lead.source,
         ownerId: ownerId || undefined,

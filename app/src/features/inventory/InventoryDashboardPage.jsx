@@ -331,7 +331,7 @@ export function InventoryDashboardPage() {
                 </option>
               ))}
             </select>
-            <ChevronDown size={12} className="absolute right-2 text-slate-400 pointer-events-none" />
+            <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
           </div>
 
           {/* Fabric Category Selector */}
@@ -351,7 +351,7 @@ export function InventoryDashboardPage() {
                 </option>
               ))}
             </select>
-            <ChevronDown size={12} className="absolute right-2 text-slate-400 pointer-events-none" />
+            <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
           </div>
 
           {/* Fabric Selector */}
@@ -371,7 +371,7 @@ export function InventoryDashboardPage() {
                 </option>
               ))}
             </select>
-            <ChevronDown size={12} className="absolute right-2 text-slate-400 pointer-events-none" />
+            <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
           </div>
 
           {/* Colour Selector */}
@@ -391,7 +391,7 @@ export function InventoryDashboardPage() {
                 </option>
               ))}
             </select>
-            <ChevronDown size={12} className="absolute right-2 text-slate-400 pointer-events-none" />
+            <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
           </div>
 
           {/* Date Range Picker */}
@@ -543,7 +543,7 @@ export function InventoryDashboardPage() {
                 <option value="qty">Quantity (Mtr)</option>
                 <option value="val">Value (₹)</option>
               </select>
-              <ChevronDown size={10} className="absolute right-1.5 text-slate-400 pointer-events-none" />
+              <ChevronDown size={10} className="absolute right-1.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
             </div>
           </div>
 
@@ -635,7 +635,7 @@ export function InventoryDashboardPage() {
                   <option value="qty">Quantity (Mtr)</option>
                   <option value="val">Value (₹)</option>
                 </select>
-                <ChevronDown size={10} className="absolute right-1.5 text-slate-400 pointer-events-none" />
+                <ChevronDown size={10} className="absolute right-1.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
               </div>
 
               <div className="relative inline-flex items-center">
@@ -651,7 +651,7 @@ export function InventoryDashboardPage() {
                     </option>
                   ))}
                 </select>
-                <ChevronDown size={10} className="absolute right-1.5 text-slate-400 pointer-events-none" />
+                <ChevronDown size={10} className="absolute right-1.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
               </div>
             </div>
           </div>
@@ -798,7 +798,7 @@ export function InventoryDashboardPage() {
                 <option value="qty">Quantity (Mtr)</option>
                 <option value="val">Value (₹)</option>
               </select>
-              <ChevronDown size={10} className="absolute right-1.5 text-slate-400 pointer-events-none" />
+              <ChevronDown size={10} className="absolute right-1.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
             </div>
           </div>
 
@@ -865,7 +865,7 @@ export function InventoryDashboardPage() {
                 <option value="qty">Quantity (Mtr)</option>
                 <option value="val">Value (₹)</option>
               </select>
-              <ChevronDown size={10} className="absolute right-1.5 text-slate-400 pointer-events-none" />
+              <ChevronDown size={10} className="absolute right-1.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
             </div>
           </div>
 

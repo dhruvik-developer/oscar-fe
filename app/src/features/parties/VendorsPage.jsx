@@ -42,7 +42,7 @@ export const VendorsPage = () => {
         category: 'Hardware',
         contactPerson: '',
         email: '',
-        phone: '',
+        phone: '+91 ',
         paymentTerms: 'Net 30',
     });
     const totalPayable = vendors.reduce((sum, v) => sum + v.balance, 0);
@@ -138,18 +138,18 @@ export const VendorsPage = () => {
         if (!newVend.name)
             return;
         addVendor({
-            code: newVend.code || `VEND-${String(vendors.length + 1).padStart(3, '0')}`,
+            code: newVend.code,
             name: newVend.name,
             category: newVend.category || 'Hardware',
             contactPerson: newVend.contactPerson || 'Vendor Account Rep',
             email: newVend.email || 'orders@supplier.com',
-            phone: newVend.phone || '+1 (800) 000-0000',
+            phone: newVend.phone || '+91 ',
             balance: 0,
             paymentTerms: newVend.paymentTerms || 'Net 30',
             status: 'Active',
         });
         setIsModalOpen(false);
-        setNewVend({ name: '', code: '', category: 'Hardware', contactPerson: '', email: '', phone: '', paymentTerms: 'Net 30' });
+        setNewVend({ name: '', code: '', category: 'Hardware', contactPerson: '', email: '', phone: '+91 ', paymentTerms: 'Net 30' });
     };
     const vendorEntries = selectedVendor ? getVendorLedger(selectedVendor.id) : [];
     return (<div className="space-y-6">
@@ -189,7 +189,7 @@ export const VendorsPage = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="font-semibold text-slate-700 block mb-1">Vendor Code</label>
-                  <input type="text" placeholder="e.g. VEND-005" value={newVend.code} onChange={(e) => setNewVend({ ...newVend, code: e.target.value })} className="w-full p-2 border border-slate-300 rounded bg-white text-slate-800 font-mono"/>
+                  <input type="text" placeholder="Auto-generated (VEND-…)" value={newVend.code} onChange={(e) => setNewVend({ ...newVend, code: e.target.value })} className="w-full p-2 border border-slate-300 rounded bg-white text-slate-800 font-mono"/>
                 </div>
                 <div>
                   <label className="font-semibold text-slate-700 block mb-1">Company / Supplier Name *</label>

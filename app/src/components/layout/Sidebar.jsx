@@ -22,6 +22,7 @@ import {
   FilePlus2,
   Receipt,
   ArrowDownLeft,
+  BadgePercent,
   RotateCcw,
   Boxes,
   MapPin,
@@ -59,9 +60,9 @@ import {
   Check,
   CheckCircle2,
   LogOut,
-  Spool,
   CircleCheck,
   Tag,
+  QrCode,
   Warehouse,
   Lock,
   Truck,
@@ -74,10 +75,10 @@ import { usePmsStore, computeNavBadges } from '../../stores/pmsStore';
 import { useERP } from '../../context/ERPContext';
 import { useModuleWhenIdle } from '../../hooks/useIdleReady';
 import { UserGuideModal } from '../common/UserGuideModal';
-import { clearStoredAuth } from '../../utils/authUtils';
+import { logout } from '../../services/authService';
 
 const SIDEBAR_THEMES = [
-  { id: 'oscar', name: 'Oscar', icon: Waves, color: '#14b8a6' },
+  { id: 'oscar', name: 'Oscar', icon: Waves, color: '#2B9BE8' },
   { id: 'light', name: 'Light', icon: Sun, color: '#1f6bff' },
   { id: 'dark', name: 'Dark', icon: Moon, color: '#3b82f6' },
   { id: 'midnight', name: 'Midnight', icon: Sparkles, color: '#818cf8' },
@@ -199,14 +200,14 @@ export const NAV = [
         ],
       },
       { label: 'Deals', icon: TrendingUp, to: '/crm/deals' },
-      { label: 'Contracts', icon: FileText, to: '/crm/contracts' },
+      // Hidden for now; the /crm/contracts route still works.
+      // { label: 'Contracts', icon: FileText, to: '/crm/contracts' },
       {
         label: 'CRM Setup',
         icon: Sliders,
         defaultOpen: false,
         children: [
           { label: 'Lead Stages', to: '/crm/system-setup' },
-          { label: 'Deal Stages', to: '/crm/deal-stages' },
           { label: 'Lead Sources', to: '/crm/lead-sources' },
         ],
       },
@@ -237,6 +238,7 @@ export const NAV = [
         icon: Wrench,
         defaultOpen: false,
         children: [
+          { label: 'Dyeing Service Orders', icon: Palette, to: '/job-work/service-orders' },
           { label: 'Process Plan', icon: ClipboardList, to: '/job-work/process-plan' },
           { label: 'Job Work Orders (JWO)', icon: FileText, to: '/job-work/orders' },
           { label: 'Job Work Outward', icon: Send, to: '/job-work/outward' },
@@ -259,9 +261,9 @@ export const NAV = [
     icon: BarChart3,
     permission: 'menu_sales',
     children: [
-      { label: 'Quotations', icon: FileText, to: '/sales/quotations' },
+      // { label: 'Quotations', icon: FileText, to: '/sales/quotations' },
       { label: 'Sales Orders', icon: ShoppingCart, to: '/sales/orders' },
-      { label: 'Proforma Invoices', icon: FileSpreadsheet, to: '/sales/proforma' },
+      // { label: 'Proforma Invoices', icon: FileSpreadsheet, to: '/sales/proforma' },
       { label: 'Sales Invoices', icon: Receipt, to: '/sales/invoices' },
       { label: 'Delivery Challans', icon: Send, to: '/sales/delivery' },
       // [DISABLED] Warranty Cards concept commented out
@@ -269,6 +271,7 @@ export const NAV = [
       { label: 'Broker Commissions', icon: DollarSign, to: '/sales/broker-commissions' },
       { label: 'Sales Returns', icon: RotateCcw, to: '/sales/returns' },
       { label: 'Payment In', icon: ArrowDownLeft, to: '/sales/payments' },
+      { label: 'Payments & Discounts', icon: BadgePercent, to: '/sales/receivables', permission: 'view_sales' },
     ],
   },
 
@@ -279,7 +282,8 @@ export const NAV = [
     children: [
       { label: 'Purchase Orders', icon: ClipboardList, to: '/purchase/orders' },
       { label: 'Supplier Delivery', icon: Truck, to: '/purchase/deliveries' },
-      { label: 'Final Job Work POs', icon: FileSpreadsheet, to: '/purchase/final-job-work-pos' },
+      // [DISABLED] Final Job Work POs concept commented out
+      // { label: 'Final Job Work POs', icon: FileSpreadsheet, to: '/purchase/final-job-work-pos' },
       { label: 'Goods Receipt', icon: PackageCheck, to: '/purchase/receipts' },
       { label: 'Supplier Reconciliation', icon: GitCompare, to: '/purchase/reconciliation' },
       { label: 'Supplier Ledger', icon: BookOpen, to: '/purchase/supplier-ledger' },
@@ -304,58 +308,88 @@ export const NAV = [
     permission: 'menu_inventory',
     children: [
       { label: 'Dashboard', icon: Home, to: '/inventory/dashboard' },
-      { label: 'Total Inventory', icon: Package, to: '/inventory/items' },
-      { label: 'Fabric Quality Master', icon: Spool, to: '/inventory/fabric/quality' },
-      { label: 'Design Master', icon: Layers, to: '/inventory/fabric/design' },
-      { label: 'Colour / Shade Master', icon: Palette, to: '/inventory/fabric/colour' },
-      { label: 'Textile Operations Masters', icon: Wrench, to: '/inventory/masters/textile' },
-      { label: 'Fabric Item / Variant Master', icon: Boxes, to: '/inventory/fabric/variants' },
       {
-        label: 'Categories',
-        icon: Layers,
-        defaultOpen: false,
+        label: 'Inventory',
+        icon: Package,
+        defaultOpen: true,
         navigateOnOpen: true,
         children: [
-          { label: 'Fabric Categories', to: '/inventory/categories', dot: true },
-          { label: 'Fabric Type / Classification', to: '/inventory/categories/fabric-type' },
-          { label: 'Units of Measurement (UOM)', to: '/inventory/categories/uom' },
+          { label: 'Grey Inventory', to: '/inventory/grey', dot: true },
+          { label: 'Dyeing Inventory', to: '/inventory/dyeing' },
         ],
       },
+      { label: 'Batch Registry', icon: QrCode, to: '/inventory/batches' },
       {
         label: 'Stock Position',
         icon: BarChart3,
         defaultOpen: false,
         navigateOnOpen: true,
         children: [
-          { label: 'Fabric Stock Overview', to: '/inventory/stock-position', dot: true },
-          { label: 'Sample Inventory', to: '/inventory/stock-position?type=sample' },
-          { label: 'Scrap & Waste Inventory', to: '/inventory/stock-position?type=wastage' },
-          { label: 'Usable Fabric Stock', to: '/inventory/stock-position?type=good' },
-          { label: 'Reprocessing Stock', to: '/inventory/stock-position?type=reprocess' },
+          { label: 'Usable Fabric Stock', to: '/inventory/stock-position?type=good', dot: true },
+          { label: 'Sample Fabric Stock', to: '/inventory/stock-position?type=sample' },
+          { label: 'Short Stock Fabric', to: '/inventory/stock-position?type=shortage' },
+          { label: 'Reprocess Stock', to: '/inventory/stock-position?type=reprocess' },
           { label: 'Customer Return Stock', to: '/inventory/stock-position?type=customer-return' },
         ],
       },
       {
-        label: 'QC (Quality Check)', icon: CircleCheck, to: '/inventory/qc',
+        label: 'QC (Quality Control)', icon: CircleCheck, to: '/inventory/qc/dashboard',
         navigateOnOpen: true,
+        // As the requirement (PDF §18): QC Entry, Reprocess, QC History, QC Reports.
+        // The Defect Master is in Textile Operations Masters.
         children: [
-          { label: 'QC Dashboard', to: '/inventory/qc', dot: true },
-          { label: 'Pending Inspections', to: '/inventory/qc/pending' },
-          { label: 'QC Inspection Register', to: '/inventory/qc/register' },
-          { label: 'QC Results & Disposition', to: '/inventory/qc/results' },
-          { label: 'Reinspection / Reprocess', to: '/inventory/qc/reinspection' },
+          { label: 'QC Dashboard', to: '/inventory/qc/dashboard', dot: true },
+          { label: 'QC Entry', to: '/inventory/qc/entry' },
+          { label: 'Reprocess', to: '/inventory/qc/reprocess' },
+          { label: 'QC History', to: '/inventory/qc/history' },
           { label: 'QC Reports', to: '/inventory/qc/reports' },
         ],
       },
-      { label: 'Lot / Taka Register', icon: FileText, to: '/inventory/lot-register' },
-      { label: 'Taka Tag Print', icon: Tag, to: '/inventory/taka-tags' },
-      { label: 'Sample Management', icon: FlaskConical, to: '/inventory/samples' },
-      { label: 'Logistics / Trips', icon: Truck, to: '/inventory/trips' },
-      { label: 'Transfers', icon: ArrowLeftRight, to: '/inventory/transfers' },
-      { label: 'Godown / Rack', icon: Warehouse, to: '/inventory/locations' },
-      { label: 'Valuation & Ageing', icon: TrendingUp, to: '/inventory/valuation' },
-      { label: 'Lot Costing & Profitability', icon: DollarSign, to: '/inventory/lot-costing' },
-      { label: 'Month-End Audit', icon: CalendarCheck, to: '/inventory/audit' },
+      {
+        label: 'Lot & Taka',
+        icon: Tag,
+        defaultOpen: false,
+        navigateOnOpen: true,
+        children: [
+          { label: 'Lot / Taka Register', to: '/inventory/lot-register', dot: true },
+          { label: 'Taka Tag Print', to: '/inventory/taka-tags' },
+          { label: 'Production Runs (In-house)', to: '/inventory/production-runs' },
+        ],
+      },
+      {
+        label: 'Warehouse & Movement',
+        icon: Warehouse,
+        defaultOpen: false,
+        navigateOnOpen: true,
+        children: [
+          { label: 'Warehouses', to: '/inventory/warehouses', dot: true },
+          { label: 'Transfers', to: '/inventory/transfers' },
+          { label: 'Logistics / Trips', to: '/inventory/trips' },
+          { label: 'Sample Management', to: '/inventory/samples' },
+        ],
+      },
+      {
+        label: 'Reports',
+        icon: TrendingUp,
+        defaultOpen: false,
+        navigateOnOpen: true,
+        children: [
+          { label: 'Valuation & Ageing', to: '/inventory/valuation', dot: true },
+          { label: 'Lot Costing & Profitability', to: '/inventory/lot-costing' },
+          { label: 'Month-End Audit', to: '/inventory/audit' },
+        ],
+      },
+      {
+        label: 'Masters',
+        icon: Boxes,
+        defaultOpen: false,
+        navigateOnOpen: true,
+        children: [
+          // Quality, design, shade, item / variant, fabric type, categories and UOM -- one page, one tab each.
+          { label: 'Fabric Masters', to: '/inventory/fabric-masters', dot: true },
+          { label: 'Textile Operations Masters', to: '/inventory/masters/textile' },
+        ],
+      },
     ],
   },
 
@@ -732,7 +766,7 @@ function SubList({ items, depth = 1, badges }) {
 // ── Oscar Vector Textile Brand Card & Footer (Pure SVG/CSS — No Raster Images) ──
 function FabricFooter() {
   return (
-    <div className="relative mx-0.5 mb-2 p-2.5 rounded-xl border border-teal-500/25 bg-gradient-to-r from-teal-950/60 via-[#071f2b]/90 to-teal-950/40 overflow-hidden select-none shadow-xs group">
+    <div className="relative mx-0.5 mb-2 p-2.5 rounded-xl border border-sky-400/20 bg-gradient-to-r from-blue-950/60 via-[#0E1627]/80 to-blue-950/40 overflow-hidden select-none shadow-xs group">
       {/* Dynamic Vector Textile Weave Waves */}
       <svg
         viewBox="0 0 260 65"
@@ -742,14 +776,14 @@ function FabricFooter() {
       >
         <defs>
           <linearGradient id="weaveGrad1" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor="#2dd4bf" stopOpacity="0.8" />
-            <stop offset="50%" stopColor="#0d9488" stopOpacity="0.4" />
-            <stop offset="100%" stopColor="#14b8a6" stopOpacity="0.9" />
+            <stop offset="0%" stopColor="#7DB4F6" stopOpacity="0.8" />
+            <stop offset="50%" stopColor="#1747C4" stopOpacity="0.4" />
+            <stop offset="100%" stopColor="#2B9BE8" stopOpacity="0.9" />
           </linearGradient>
           <linearGradient id="weaveGrad2" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor="#5eead4" stopOpacity="0.7" />
-            <stop offset="60%" stopColor="#0f766e" stopOpacity="0.3" />
-            <stop offset="100%" stopColor="#2dd4bf" stopOpacity="0.6" />
+            <stop offset="0%" stopColor="#9CC7FA" stopOpacity="0.7" />
+            <stop offset="60%" stopColor="#1B4FD0" stopOpacity="0.3" />
+            <stop offset="100%" stopColor="#27C7EA" stopOpacity="0.6" />
           </linearGradient>
         </defs>
         <path
@@ -765,29 +799,29 @@ function FabricFooter() {
         />
         <path
           d="M0 50 C 65 28, 115 60, 170 38 S 220 26, 260 46"
-          stroke="#2dd4bf"
+          stroke="#7DB4F6"
           strokeWidth="0.8"
           strokeOpacity="0.35"
         />
       </svg>
 
       {/* Decorative ambient radial glow */}
-      <div className="absolute -right-6 -bottom-6 w-20 h-20 rounded-full bg-teal-400/10 blur-xl pointer-events-none" />
+      <div className="absolute -right-6 -bottom-6 w-20 h-20 rounded-full bg-sky-400/10 blur-xl pointer-events-none" />
 
       {/* Oscar ERP Textile Tagline & Icon */}
       <div className="relative z-10 flex items-center justify-between min-w-0">
         <div className="flex items-center gap-2 min-w-0">
-          <div className="w-1 h-6 rounded-full bg-gradient-to-b from-teal-300 to-teal-500 shadow-sm shadow-teal-400/50 shrink-0" />
+          <div className="w-1 h-6 rounded-full bg-gradient-to-b from-sky-300 to-blue-500 shadow-sm shadow-sky-400/50 shrink-0" />
           <div className="min-w-0">
             <p className="text-[10px] font-black tracking-[0.22em] text-white/95 uppercase truncate leading-tight font-mono">
               WEAVE • PROCESS • GROW
             </p>
-            <p className="text-[9px] font-semibold text-teal-300/80 tracking-wider truncate mt-0.5">
+            <p className="text-[9px] font-semibold text-sky-300/80 tracking-wider truncate mt-0.5">
               OSCAR TEXTILE ERP
             </p>
           </div>
         </div>
-        <Waves size={15} className="text-teal-400/70 shrink-0 ml-1.5" />
+        <Waves size={15} className="text-sky-400/70 shrink-0 ml-1.5" />
       </div>
     </div>
   );
@@ -1148,7 +1182,7 @@ export default function Sidebar() {
       <div
         className={
           theme === 'oscar'
-            ? 'mt-auto pt-2 px-2 pb-2 border-t border-teal-500/20 bg-gradient-to-b from-transparent via-[#071f2b]/40 to-[#071f2b]/90 relative'
+            ? 'mt-auto pt-2 px-2 pb-2 border-t border-white/10 bg-gradient-to-b from-transparent via-[#0E1627]/40 to-[#0E1627]/90 relative'
             : 'mt-auto pt-2 px-1 pb-1 border-t border-white/10 relative'
         }
         ref={profileRef}
@@ -1267,6 +1301,14 @@ export default function Sidebar() {
                 <Settings size={13} className="text-purple-400 group-hover:scale-110 transition-transform" />
                 <span className="text-[11px] font-medium">System Preferences & Currency</span>
               </Link>
+              <Link
+                to="/account/security"
+                onClick={() => setIsProfileOpen(false)}
+                className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl hover:bg-white/10 text-slate-200 hover:text-white transition group"
+              >
+                <Lock size={13} className="text-sky-400 group-hover:scale-110 transition-transform" />
+                <span className="text-[11px] font-medium">Security & Signed-in Devices</span>
+              </Link>
               <button
                 type="button"
                 onClick={() => {
@@ -1282,9 +1324,10 @@ export default function Sidebar() {
               {/* Sign Out / Switch User Button in Person Profile */}
               <button
                 type="button"
-                onClick={() => {
+                onClick={async () => {
                   setIsProfileOpen(false);
-                  clearStoredAuth();
+                  // Revokes the refresh token on the server, then clears locally.
+                  await logout();
                   navigate('/login');
                 }}
                 className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-xl hover:bg-rose-500/15 text-rose-300 hover:text-rose-200 transition text-left cursor-pointer group mt-1"
@@ -1304,9 +1347,10 @@ export default function Sidebar() {
               <span className="text-[9px] text-slate-400">Evenmore Cloud v2.6</span>
               <button
                 type="button"
-                onClick={() => {
+                onClick={async () => {
                   setIsProfileOpen(false);
-                  clearStoredAuth();
+                  // Revokes the refresh token on the server, then clears locally.
+                  await logout();
                   navigate('/login');
                 }}
                 className="hover:text-rose-400 flex items-center gap-1 cursor-pointer transition text-slate-300"

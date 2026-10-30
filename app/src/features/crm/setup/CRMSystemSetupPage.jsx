@@ -87,11 +87,13 @@ function StatusPill({ status, onToggle }) {
       type="button"
       onClick={onToggle}
       title="Click to toggle status"
-      className={active
-        ? 'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-green-50 text-green-700 border border-green-100'
-        : 'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-slate-100 text-slate-500 border border-slate-200'}
+      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold transition-all cursor-pointer ${
+        active
+          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100/70'
+          : 'bg-slate-100 text-slate-600 border border-slate-200 hover:bg-slate-200/70'
+      }`}
     >
-      <span className={active ? 'w-1.5 h-1.5 rounded-full bg-green-600' : 'w-1.5 h-1.5 rounded-full bg-slate-400'} />
+      <span className={`w-1.5 h-1.5 rounded-full ${active ? 'bg-emerald-500' : 'bg-slate-400'}`} />
       {status}
     </button>
   );
@@ -249,53 +251,62 @@ export default function CRMSystemSetupPage() {
       )}
 
       <div className="grid grid-cols-1 gap-4">
-        <div id="lead-panel" className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-          <div className="flex items-center justify-between gap-3 p-4">
-            <div className="flex items-center gap-3 min-w-0">
-              <span className="w-10 h-10 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+        <div id="lead-panel" className="bg-white rounded-xl border border-slate-200/90 shadow-sm overflow-hidden">
+          <div className="flex items-center justify-between gap-3 p-4 sm:p-5 border-b border-slate-100">
+            <div className="flex items-center gap-3.5 min-w-0">
+              <span className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 border border-blue-100">
                 <Users size={20} />
               </span>
               <div className="min-w-0">
-                <h3 className="font-bold text-[15px] text-slate-800 leading-tight">Lead Stages</h3>
-                <p className="text-xs text-slate-500 truncate">Manage stages for your lead follow-up process.</p>
+                <h3 className="font-bold text-[16px] text-slate-800 leading-tight">Lead Stages</h3>
+                <p className="text-xs text-slate-500 truncate mt-0.5">Manage stages for your lead follow-up process.</p>
               </div>
             </div>
-            <button type="button" onClick={openAddLead} className="btn-primary shrink-0">
-              <Plus size={14} /> Add Lead Stage
+            <button type="button" onClick={openAddLead} className="btn-primary shrink-0 cursor-pointer">
+              <Plus size={15} /> Add Lead Stage
             </button>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 px-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 p-4 bg-slate-50/40">
             <CrmKpiCard label="Total Stages" value={leadStages.length} icon={Users} tone="blue" />
             <CrmKpiCard label="Active" value={leadActive} icon={ShieldCheck} tone="emerald" />
             <CrmKpiCard label="Inactive" value={leadInactive} icon={GitBranch} tone="rose" />
           </div>
 
-          <div className="flex gap-2 px-4 mt-3">
-            <div className="relative flex-1">
+          <div className="flex flex-col sm:flex-row items-center gap-3 px-4 pt-3 pb-1">
+            <div className="relative flex-1 w-full">
               <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input value={leadQuery} onChange={(e) => setLeadQuery(e.target.value)} placeholder="Search lead stages..." className="w-full h-9 border border-slate-200 rounded-lg pl-8 pr-3 text-xs outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" />
+              <input
+                value={leadQuery}
+                onChange={(e) => setLeadQuery(e.target.value)}
+                placeholder="Search lead stages..."
+                className="w-full h-9 border border-slate-200 rounded-lg pl-8 pr-3 text-xs outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all bg-white text-slate-800"
+              />
             </div>
-            <select value={leadFilter} onChange={(e) => setLeadFilter(e.target.value)} className="h-9 border border-slate-200 rounded-lg px-2.5 text-xs font-medium text-slate-600 outline-none bg-white">
+            <select
+              value={leadFilter}
+              onChange={(e) => setLeadFilter(e.target.value)}
+              className="h-9 border border-slate-200 rounded-lg px-3 text-xs font-semibold text-slate-700 outline-none bg-white cursor-pointer hover:border-slate-300 w-full sm:w-auto"
+            >
               <option value="All">All Status</option>
               <option value="Active">Active</option>
               <option value="Inactive">Inactive</option>
             </select>
           </div>
 
-          <div className="mt-2 overflow-x-auto">
-            <table className="w-full text-xs min-w-[520px]">
+          <div className="mt-3 overflow-x-auto">
+            <table className="w-full text-xs">
               <thead>
-                <tr className="text-left text-[11px] uppercase tracking-wide text-slate-400 border-y border-slate-100">
-                  <th className="py-2.5 pl-4 pr-1 font-semibold w-10"></th>
-                  <th className="py-2.5 px-2 font-semibold w-8">#</th>
-                  <th className="py-2.5 px-2 font-semibold">Stage Name</th>
-                  <th className="py-2.5 px-2 font-semibold">Status</th>
-                  <th className="py-2.5 px-2 font-semibold">Leads</th>
-                  <th className="py-2.5 px-2 pr-4 font-semibold">Actions</th>
+                <tr className="text-left text-[11px] uppercase tracking-wider text-slate-500 bg-slate-50/75 border-y border-slate-200">
+                  <th className="py-3 pl-4 pr-1 font-semibold w-12 text-center" title="Drag handle"></th>
+                  <th className="py-3 px-3 font-semibold w-14 text-center">#</th>
+                  <th className="py-3 px-4 font-semibold">Stage Name</th>
+                  <th className="py-3 px-4 font-semibold w-36">Status</th>
+                  <th className="py-3 px-4 font-semibold w-32 text-center">Leads</th>
+                  <th className="py-3 px-6 font-semibold w-40 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-slate-100">
                 {visibleLeads.map((s, idx) => (
                   <tr
                     key={s.id}
@@ -303,34 +314,85 @@ export default function CRMSystemSetupPage() {
                     onDragStart={() => setDragLead(idx)}
                     onDragOver={(e) => e.preventDefault()}
                     onDrop={() => dropLead(idx)}
-                    className="border-b border-slate-50 hover:bg-slate-50/70"
+                    className="hover:bg-blue-50/30 transition-colors group"
                   >
-                    <td className="pl-4 pr-1 py-2.5 text-slate-300 cursor-grab"><GripVertical size={15} /></td>
-                    <td className="px-2 py-2.5 text-slate-500 font-medium">{leadStages.findIndex((x) => x.id === s.id) + 1}</td>
-                    <td className="px-2 py-2.5">
-                      <span className="flex items-center gap-2 font-semibold text-slate-700">
+                    <td className="pl-4 pr-1 py-3 text-slate-300 group-hover:text-slate-400 cursor-grab active:cursor-grabbing text-center" title="Drag to reorder">
+                      <div className="flex items-center justify-center">
+                        <GripVertical size={16} />
+                      </div>
+                    </td>
+                    <td className="px-3 py-3 text-slate-500 font-semibold text-center">
+                      {leadStages.findIndex((x) => x.id === s.id) + 1}
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2.5 font-semibold text-slate-800">
                         <LeadStageIcon icon={s.icon} bg={s.bg} fg={s.fg} />
-                        {s.name}
+                        <span className="text-sm font-semibold text-slate-800 hover:text-blue-600 transition-colors">
+                          {s.name}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <StatusPill status={s.status} onToggle={() => toggleLeadStatus(s.id)} />
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100/90 text-slate-700 border border-slate-200">
+                        <Users size={12} className="text-slate-400" />
+                        {s.count ?? 0}
                       </span>
                     </td>
-                    <td className="px-2 py-2.5"><StatusPill status={s.status} onToggle={() => toggleLeadStatus(s.id)} /></td>
-                    <td className="px-2 py-2.5 text-slate-600 font-medium">{s.count}</td>
-                    <td className="px-2 pr-4 py-2.5">
-                      <span className="flex items-center gap-1.5">
-                        <button type="button" onClick={() => openEditLead(s)} className="w-7 h-7 rounded-md bg-blue-50 text-blue-600 flex items-center justify-center hover:bg-blue-100" title="Edit"><Pencil size={13} /></button>
-                        <button type="button" onClick={() => duplicateLead(s.id)} className="w-7 h-7 rounded-md bg-slate-100 text-slate-500 flex items-center justify-center hover:bg-slate-200" title="Duplicate"><Copy size={13} /></button>
-                        <button type="button" onClick={() => setDeleteModal({ id: s.id, name: s.name, row: s })} className="w-7 h-7 rounded-md bg-red-50 text-red-500 flex items-center justify-center hover:bg-red-100" title="Delete"><Trash2 size={13} /></button>
-                      </span>
+                    <td className="px-6 py-3 text-right">
+                      <div className="flex items-center justify-end gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => openEditLead(s)}
+                          className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 hover:text-blue-700 border border-blue-200 flex items-center justify-center transition-all cursor-pointer shadow-2xs hover:shadow-xs"
+                          title="Edit Stage"
+                        >
+                          <Pencil size={13} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => duplicateLead(s.id)}
+                          className="w-8 h-8 rounded-lg bg-slate-50 text-slate-600 hover:bg-slate-100 hover:text-slate-800 border border-slate-200 flex items-center justify-center transition-all cursor-pointer shadow-2xs hover:shadow-xs"
+                          title="Duplicate Stage"
+                        >
+                          <Copy size={13} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setDeleteModal({ id: s.id, name: s.name, row: s })}
+                          className="w-8 h-8 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-100 hover:text-rose-700 border border-rose-200 flex items-center justify-center transition-all cursor-pointer shadow-2xs hover:shadow-xs"
+                          title="Delete Stage"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
                 {visibleLeads.length === 0 && (
-                  <tr><td colSpan={6} className="text-center py-8 text-slate-400">No lead stages found.</td></tr>
+                  <tr>
+                    <td colSpan={6} className="text-center py-12 text-slate-400">
+                      <div className="flex flex-col items-center justify-center gap-2">
+                        <AlertCircle size={24} className="text-slate-300" />
+                        <span className="text-xs font-medium text-slate-500">No lead stages found matching your search.</span>
+                      </div>
+                    </td>
+                  </tr>
                 )}
               </tbody>
             </table>
           </div>
-          <div className="h-3" />
+
+          <div className="px-5 py-3 bg-slate-50/50 border-t border-slate-200/80 flex items-center justify-between text-xs text-slate-500">
+            <span>
+              Showing <strong className="text-slate-700 font-semibold">{visibleLeads.length}</strong> of <strong className="text-slate-700 font-semibold">{leadStages.length}</strong> stages
+            </span>
+            <span className="text-[11px] text-slate-400">
+              Drag rows using <GripVertical size={12} className="inline -mt-0.5" /> to reorder pipeline sequence
+            </span>
+          </div>
         </div>
 
       </div>

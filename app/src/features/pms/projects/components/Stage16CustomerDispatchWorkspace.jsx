@@ -45,6 +45,8 @@ import {
 import { usePmsStore } from '../../../../stores/pmsStore';
 import { Modal } from '../../../../components/ui/Modal';
 import { Button } from '../../../../components/ui/Button';
+import { useTableSort } from '../../../../hooks/useTableSort';
+import { SortableTh } from '../../../../components/ui/SortableTh';
 
 const n = (v) => Number(v || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 });
 const todayISO = () => new Date().toISOString().slice(0, 10);
@@ -357,6 +359,15 @@ export function Stage16CustomerDispatchWorkspace({
     setSelectedChallan(ch);
     setIsPrintModalOpen(true);
   };
+
+  const challanSort = useTableSort(challans, {
+    accessors: {
+      dispatchDate: (ch) => ch.dispatchDate || ch.docDate,
+      rolls: (ch) => ch.rollsCount || ch.lines?.length || 1,
+      totalQty: (ch) => Number(ch.totalQty || 0),
+      allocatedFreightCost: (ch) => Number(ch.allocatedFreightCost || 0),
+    },
+  });
 
   return (
     <div className="space-y-6">
@@ -804,16 +815,16 @@ export function Stage16CustomerDispatchWorkspace({
               <table className="w-full text-xs text-left border-collapse min-w-[950px]">
                 <thead className="bg-slate-50/80 text-slate-600 font-semibold border-b border-slate-200">
                   <tr>
-                    <th className="py-2.5 px-3">Delivery Challan</th>
-                    <th className="py-2.5 px-3">Date</th>
-                    <th className="py-2.5 px-3">Customer Consignee</th>
-                    <th className="py-2.5 px-3">Transporter</th>
-                    <th className="py-2.5 px-3">Vehicle No</th>
-                    <th className="py-2.5 px-3">LR / Bilty No</th>
-                    <th className="py-2.5 px-3 text-center">Rolls</th>
-                    <th className="py-2.5 px-3 text-right">Dispatched (M)</th>
-                    <th className="py-2.5 px-3 text-right">Freight (₹)</th>
-                    <th className="py-2.5 px-3 text-center">Status</th>
+                    <SortableTh sort={challanSort} sortKey="challanNumber" className="py-2.5 px-3">Delivery Challan</SortableTh>
+                    <SortableTh sort={challanSort} sortKey="dispatchDate" className="py-2.5 px-3">Date</SortableTh>
+                    <SortableTh sort={challanSort} sortKey="customerName" className="py-2.5 px-3">Customer Consignee</SortableTh>
+                    <SortableTh sort={challanSort} sortKey="transporter" className="py-2.5 px-3">Transporter</SortableTh>
+                    <SortableTh sort={challanSort} sortKey="vehicleNumber" className="py-2.5 px-3">Vehicle No</SortableTh>
+                    <SortableTh sort={challanSort} sortKey="lrNumber" className="py-2.5 px-3">LR / Bilty No</SortableTh>
+                    <SortableTh sort={challanSort} sortKey="rolls" className="py-2.5 px-3 text-center" align="center">Rolls</SortableTh>
+                    <SortableTh sort={challanSort} sortKey="totalQty" className="py-2.5 px-3 text-right" align="right">Dispatched (M)</SortableTh>
+                    <SortableTh sort={challanSort} sortKey="allocatedFreightCost" className="py-2.5 px-3 text-right" align="right">Freight (₹)</SortableTh>
+                    <SortableTh sort={challanSort} sortKey="status" className="py-2.5 px-3 text-center" align="center">Status</SortableTh>
                     <th className="py-2.5 px-3 text-center">Actions</th>
                   </tr>
                 </thead>
@@ -829,7 +840,7 @@ export function Stage16CustomerDispatchWorkspace({
                       </td>
                     </tr>
                   ) : (
-                    challans.map((ch) => (
+                    challanSort.rows.map((ch) => (
                       <tr key={ch.id} className="hover:bg-slate-50/80 transition-colors">
                         <td className="py-2.5 px-3">
                           <div className="font-mono font-bold text-slate-900">{ch.challanNumber}</div>

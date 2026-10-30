@@ -20,6 +20,8 @@ import PageHeader from "../../../components/ui/PageHeader";
 import { MetricCard } from "../../../components/hrms/MetricCard";
 import { useIncentiveStore } from "../../../stores/incentiveStore";
 import { describeError } from "../../../services/resourceSync";
+import { useTableSort } from "../../../hooks/useTableSort";
+import SortableTh from "../../../components/ui/SortableTh";
 
 const BASIS_LABELS = {
   INVOICE: "Invoice Value",
@@ -219,6 +221,29 @@ export default function IncentivesPage() {
     });
   }, [accruals, search, statusFilter]);
 
+  const accrualSort = useTableSort(filteredAccruals, {
+    accessors: {
+      employeeName: (r) => r.employeeName || r.employee?.name || "",
+      periodName: (r) => r.period_name || r.periodName || "",
+      grossSales: (r) => Number(r.gross_sales || r.grossSales || 0),
+      returnsDeduction: (r) => Number(r.returns_deduction || r.returnsDeduction || 0),
+      netEligibleSales: (r) => Number(r.net_eligible_sales || r.netEligibleSales || 0),
+      applicableRate: (r) => Number(r.applicable_rate || r.applicableRate || 0),
+      calculatedIncentive: (r) => Number(r.calculated_incentive || r.calculatedIncentive || 0),
+    },
+  });
+
+  const schemeSort = useTableSort(schemes || [], {
+    accessors: {
+      basis: (s) => BASIS_LABELS[s.basis] || s.basis,
+      rate: (s) => {
+        const slabs = Array.isArray(s.slabs) ? s.slabs : [];
+        return slabs.length ? Number(slabs[0].rate_pct ?? slabs[0].rate ?? 0) : Number(s.ratePct || 0);
+      },
+      payoutAfterDays: (s) => s.payoutAfterDays ?? 90,
+    },
+  });
+
   const stats = useMemo(() => {
     let gross = 0;
     let returns = 0;
@@ -332,16 +357,16 @@ export default function IncentivesPage() {
             <table className="w-full text-left text-sm">
               <thead className="bg-soft border-b border-border text-xs font-semibold text-muted uppercase tracking-wider">
                 <tr>
-                  <th className="py-2.5 px-4">Scheme</th>
-                  <th className="py-2.5 px-4">Basis</th>
-                  <th className="py-2.5 px-4">Rate</th>
-                  <th className="py-2.5 px-4">Rules</th>
-                  <th className="py-2.5 px-4 text-center">Status</th>
+                  <SortableTh sort={schemeSort} sortKey="name" className="py-2.5 px-4">Scheme</SortableTh>
+                  <SortableTh sort={schemeSort} sortKey="basis" className="py-2.5 px-4">Basis</SortableTh>
+                  <SortableTh sort={schemeSort} sortKey="rate" className="py-2.5 px-4">Rate</SortableTh>
+                  <SortableTh sort={schemeSort} sortKey="payoutAfterDays" className="py-2.5 px-4">Rules</SortableTh>
+                  <SortableTh sort={schemeSort} sortKey="isActive" className="py-2.5 px-4 text-center" align="center">Status</SortableTh>
                   <th className="py-2.5 px-4 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {schemes.map((s) => (
+                {schemeSort.rows.map((s) => (
                   <tr key={s.id} className="hover:bg-soft/50 transition">
                     <td className="py-2.5 px-4">
                       <div className="font-medium text-text">{s.name}</div>
@@ -423,14 +448,14 @@ export default function IncentivesPage() {
           <table className="w-full text-left text-sm">
             <thead className="bg-soft border-b border-border text-xs font-semibold text-muted uppercase tracking-wider">
               <tr>
-                <th className="py-3.5 px-4">Salesperson</th>
-                <th className="py-3.5 px-4">Period</th>
-                <th className="py-3.5 px-4 text-right">Gross Sales</th>
-                <th className="py-3.5 px-4 text-right">Returns Cut</th>
-                <th className="py-3.5 px-4 text-right">Net Sales Base</th>
-                <th className="py-3.5 px-4 text-center">Rate (%)</th>
-                <th className="py-3.5 px-4 text-right">Incentive</th>
-                <th className="py-3.5 px-4 text-center">Status</th>
+                <SortableTh sort={accrualSort} sortKey="employeeName" className="py-3.5 px-4">Salesperson</SortableTh>
+                <SortableTh sort={accrualSort} sortKey="periodName" className="py-3.5 px-4">Period</SortableTh>
+                <SortableTh sort={accrualSort} sortKey="grossSales" className="py-3.5 px-4 text-right" align="right">Gross Sales</SortableTh>
+                <SortableTh sort={accrualSort} sortKey="returnsDeduction" className="py-3.5 px-4 text-right" align="right">Returns Cut</SortableTh>
+                <SortableTh sort={accrualSort} sortKey="netEligibleSales" className="py-3.5 px-4 text-right" align="right">Net Sales Base</SortableTh>
+                <SortableTh sort={accrualSort} sortKey="applicableRate" className="py-3.5 px-4 text-center" align="center">Rate (%)</SortableTh>
+                <SortableTh sort={accrualSort} sortKey="calculatedIncentive" className="py-3.5 px-4 text-right" align="right">Incentive</SortableTh>
+                <SortableTh sort={accrualSort} sortKey="status" className="py-3.5 px-4 text-center" align="center">Status</SortableTh>
                 <th className="py-3.5 px-4 text-right">Actions</th>
               </tr>
             </thead>
@@ -442,7 +467,7 @@ export default function IncentivesPage() {
                   </td>
                 </tr>
               ) : (
-                filteredAccruals.map((row) => (
+                accrualSort.rows.map((row) => (
                   <tr key={row.id} className="hover:bg-soft/50 transition">
                     <td className="py-3 px-4">
                       <div className="font-medium text-text">{row.employeeName || row.employee?.name || "Salesperson"}</div>

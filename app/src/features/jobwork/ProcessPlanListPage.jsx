@@ -15,6 +15,8 @@ import {
 import { numIN, toDDMMYYYY, purgeLegacyJobWorkCache } from './jobWorkOrdersStore';
 import PageHeader from '../../components/ui/PageHeader';
 import TablePagination from '../../components/ui/TablePagination';
+import SortableTh from '../../components/ui/SortableTh';
+import { useTableSort } from '../../hooks/useTableSort';
 import { useERP } from '../../context/ERPContext';
 import { api } from '../../services/api';
 import MasterSourceLink from '../../components/common/MasterSourceLink';
@@ -790,10 +792,20 @@ export default function ProcessPlanListPage() {
     setPage(1);
   }, [processFilter, fabricFilter, vendorFilter, statusFilter, fromDate, toDate]);
 
+  const sort = useTableSort(filteredRows, {
+    accessors: {
+      plannedQty: (p) => Number(p.plannedQty || p.expectedQty) || 0,
+      expectedLoss: (p) => Number(p.expectedLoss) || 0,
+      expectedReturnQty: (p) => {
+        const pQty = Number(p.plannedQty || p.expectedQty) || 0;
+        return Number(p.expectedReturnQty) || Math.round(pQty * (1 - (Number(p.expectedLoss) || 0) / 100));
+      },
+    },
+  });
   const pagedPlans = useMemo(() => {
     const start = (page - 1) * pageSize;
-    return filteredRows.slice(start, start + pageSize);
-  }, [filteredRows, page, pageSize]);
+    return sort.rows.slice(start, start + pageSize);
+  }, [sort.rows, page, pageSize]);
 
   const handleOpenCreate = () => {
     setEditingPlan(null);
@@ -974,17 +986,17 @@ export default function ProcessPlanListPage() {
             <thead>
               <tr className="border-b border-slate-200/80 bg-[#f8fafc] text-[11px] font-bold text-slate-700">
                 <th className="px-3.5 py-2.5 w-10 text-center">#</th>
-                <th className="px-3.5 py-2.5">Plan No.</th>
-                <th className="px-3.5 py-2.5">Date</th>
-                <th className="px-3.5 py-2.5">Process</th>
-                <th className="px-3.5 py-2.5">Fabric Item</th>
-                <th className="px-3.5 py-2.5">Fabric Quality</th>
-                <th className="px-3.5 py-2.5">Shade / Colour</th>
-                <th className="px-3.5 py-2.5">Vendor</th>
-                <th className="px-3.5 py-2.5 text-center">Planned Qty (M)</th>
-                <th className="px-3.5 py-2.5 text-center">Expected Loss (%)</th>
-                <th className="px-3.5 py-2.5 text-center">Expected Return (M)</th>
-                <th className="px-3.5 py-2.5 text-center">Status</th>
+                <SortableTh sort={sort} sortKey="planNo" className="px-3.5 py-2.5">Plan No.</SortableTh>
+                <SortableTh sort={sort} sortKey="date" className="px-3.5 py-2.5">Date</SortableTh>
+                <SortableTh sort={sort} sortKey="process" className="px-3.5 py-2.5">Process</SortableTh>
+                <SortableTh sort={sort} sortKey="fabricItem" className="px-3.5 py-2.5">Fabric Item</SortableTh>
+                <SortableTh sort={sort} sortKey="fabricQuality" className="px-3.5 py-2.5">Fabric Quality</SortableTh>
+                <SortableTh sort={sort} sortKey="shade" className="px-3.5 py-2.5">Shade / Colour</SortableTh>
+                <SortableTh sort={sort} sortKey="vendor" className="px-3.5 py-2.5">Vendor</SortableTh>
+                <SortableTh sort={sort} sortKey="plannedQty" className="px-3.5 py-2.5 text-center" align="center">Planned Qty (M)</SortableTh>
+                <SortableTh sort={sort} sortKey="expectedLoss" className="px-3.5 py-2.5 text-center" align="center">Expected Loss (%)</SortableTh>
+                <SortableTh sort={sort} sortKey="expectedReturnQty" className="px-3.5 py-2.5 text-center" align="center">Expected Return (M)</SortableTh>
+                <SortableTh sort={sort} sortKey="status" className="px-3.5 py-2.5 text-center" align="center">Status</SortableTh>
                 <th className="px-3.5 py-2.5 text-center w-28">Actions</th>
               </tr>
             </thead>

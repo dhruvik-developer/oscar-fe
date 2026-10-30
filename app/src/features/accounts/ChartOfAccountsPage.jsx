@@ -9,7 +9,7 @@ const INR = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR',
 const SYSTEM_HINT ='System account -- used by automatic postings, so this cannot be changed.';
 
 const FIELDS = [
-  { key: 'code', label: 'Account Code', required: true, placeholder: 'e.g. 5100', locked: isSystem, lockedHint: SYSTEM_HINT },
+  { key: 'code', label: 'Account Code (auto if blank)', placeholder: 'Next free number, e.g. 5101', locked: isSystem, lockedHint: SYSTEM_HINT },
   { key: 'name', label: 'Account Name', required: true, placeholder: 'e.g. Office Rent' },
   { key: 'type', label: 'Account Type', type: 'select', required: true, options: ACCOUNT_TYPES, locked: isSystem, lockedHint: SYSTEM_HINT },
   { key: 'subtype', label: 'Sub-type', placeholder: 'e.g. Bank, Cash, Indirect Expense' },

@@ -242,6 +242,40 @@ export const GoodsReceiptPage = () => {
     );
   }, [purchaseOrders, standaloneForm.vendorId]);
 
+  const resolveMasterItemId = useCallback((it, poRef) => {
+    let resolvedId = it?.itemId || it?.item_id || (typeof it?.item === 'string' ? it.item : it?.item?.id) || '';
+    if (!resolvedId && masterItems?.length) {
+      const candidates = [
+        it?.name,
+        it?.itemName,
+        it?.fabric,
+        it?.description,
+        poRef?.fabric,
+        poRef?.fabricItem,
+      ].filter(Boolean);
+
+      for (const raw of candidates) {
+        const trimmed = String(raw).trim().toLowerCase();
+        let match = masterItems.find(
+          (m) => String(m.id) === String(raw) ||
+                 (m.name && m.name.trim().toLowerCase() === trimmed) ||
+                 (m.sku && m.sku.trim().toLowerCase() === trimmed) ||
+                 (m.itemCode && m.itemCode.trim().toLowerCase() === trimmed)
+        );
+        if (!match) {
+          match = masterItems.find(
+            (m) => m.name && (trimmed.includes(m.name.trim().toLowerCase()) || m.name.trim().toLowerCase().includes(trimmed))
+          );
+        }
+        if (match) {
+          resolvedId = match.id;
+          break;
+        }
+      }
+    }
+    return resolvedId;
+  }, [masterItems]);
+
   const handleVendorSelect = (vendorId) => {
     setStandaloneForm((prev) => ({
       ...prev,
@@ -256,26 +290,30 @@ export const GoodsReceiptPage = () => {
       setStandaloneForm((prev) => ({ ...prev, poId: '', lines: [] }));
       return;
     }
-    const po = purchaseOrders.find((p) => p.id === poId);
+    const po = purchaseOrders.find((p) => String(p.id) === String(poId));
     if (!po) return;
 
     const poLines = (po.lineItems || po.items || []).map((it, idx) => {
-      const remaining = Math.max(0, Number(it.qty || 0) - Number(it.receivedQty || 0));
-      const targetQty = remaining > 0 ? remaining : Number(it.qty || 0);
+      const lineOrdered = Number(it.qty ?? it.orderedQty ?? 0);
+      const lineReceived = Number(it.receivedQty ?? 0);
+      const remaining = Math.max(0, lineOrdered - lineReceived);
+      const targetQty = remaining > 0 ? remaining : lineOrdered;
+      const itemId = resolveMasterItemId(it, po);
       return {
         id: `line-${idx + 1}`,
-        itemId: it.itemId || it.item_id || it.item,
-        itemName: it.name || it.itemName || it.description || '',
+        itemId,
+        itemName: it.name || it.itemName || it.fabric || it.description || (masterItems.find((m) => m.id === itemId)?.name) || '',
         poLineId: it.id,
-        orderedQty: Number(it.qty || 0),
-        receivedQty: targetQty,
+        orderedQty: lineOrdered,
+        remainingQty: remaining,
+        receivedQty: targetQty > 0 ? targetQty : '',
         unitCost: Number(it.rate || it.unitPrice || 0),
         uom: it.uom || '',
         batchNumber: '',
         fabricWidth: it.fabricWidth || '',
         remarks: '',
         takas: [
-          { id: `t-${idx + 1}-1`, takaNumber: '1', qty: targetQty, weight: '', width: it.fabricWidth ? String(it.fabricWidth) : '', remarks: '' },
+          { id: `t-${idx + 1}-1`, takaNumber: '1', qty: targetQty > 0 ? targetQty : '', weight: '', width: it.fabricWidth ? String(it.fabricWidth) : '', remarks: '' },
         ],
         showTakas: true,
       };
@@ -287,6 +325,19 @@ export const GoodsReceiptPage = () => {
       lines: poLines,
     }));
   };
+
+  useEffect(() => {
+    if (masterItems?.length > 0 && standaloneForm.lines.some((l) => !l.itemId)) {
+      setStandaloneForm((prev) => ({
+        ...prev,
+        lines: prev.lines.map((l) => {
+          if (l.itemId) return l;
+          const resolvedId = resolveMasterItemId(l, purchaseOrders.find((p) => String(p.id) === String(prev.poId)));
+          return resolvedId ? { ...l, itemId: resolvedId } : l;
+        }),
+      }));
+    }
+  }, [masterItems, standaloneForm.lines, standaloneForm.poId, purchaseOrders, resolveMasterItemId]);
 
   // "Record GRN" on a purchase order lands here with that PO preselected.
   const grnForPo = location.state?.grnForPo;
@@ -428,6 +479,12 @@ export const GoodsReceiptPage = () => {
       for (let i = 0; i < standaloneForm.lines.length; i++) {
         const l = standaloneForm.lines[i];
         const rQty = Number(l.receivedQty);
+        if (!l.itemId) {
+          l.itemId = resolveMasterItemId(l, purchaseOrders.find((p) => String(p.id) === String(standaloneForm.poId)));
+        }
+        if (!l.itemId && masterItems.length === 1) {
+          l.itemId = masterItems[0].id;
+        }
         if (!l.itemId) throw new Error(`Line ${i + 1}: Select the item received.`);
         if (!(rQty > 0)) throw new Error(`Line ${i + 1}: Received quantity must be greater than zero.`);
 
@@ -842,21 +899,36 @@ export const GoodsReceiptPage = () => {
                       <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
                         <div className="sm:col-span-4">
                           <label className="block text-[11px] font-semibold text-slate-500 mb-1">Fabric Item *</label>
-                          {standaloneForm.poId && line.itemName ? (
-                            <div className="px-3 py-1.5 bg-slate-100 rounded-lg font-medium text-slate-800 border border-slate-200 truncate">
-                              {line.itemName}
+                          {standaloneForm.poId && line.itemName && line.itemId ? (
+                            <div className="px-3 py-1.5 bg-slate-100 rounded-lg font-medium text-slate-800 border border-slate-200 truncate flex items-center justify-between">
+                              <span className="truncate">{line.itemName}</span>
+                              <span className="text-[10px] text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded font-mono font-medium shrink-0 ml-1">Linked</span>
                             </div>
                           ) : (
-                            <select
-                              value={line.itemId}
-                              onChange={(e) => handleUpdateLine(line.id, 'itemId', e.target.value)}
-                              className="w-full px-3 py-1.5 border border-slate-300 rounded-lg bg-white font-medium focus:border-blue-500 focus:outline-none"
-                            >
-                              <option value="">Select item...</option>
-                              {masterItems.map((it) => (
-                                <option key={it.id} value={it.id}>{it.name} ({it.sku || 'Fabric'})</option>
-                              ))}
-                            </select>
+                            <div>
+                              <select
+                                value={line.itemId}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  const matched = masterItems.find((m) => String(m.id) === String(val));
+                                  handleUpdateLine(line.id, 'itemId', val);
+                                  if (matched && !line.itemName) handleUpdateLine(line.id, 'itemName', matched.name);
+                                }}
+                                className={`w-full px-3 py-1.5 border rounded-lg bg-white font-medium focus:border-blue-500 focus:outline-none ${
+                                  !line.itemId && standaloneForm.poId ? 'border-amber-400 bg-amber-50/20' : 'border-slate-300'
+                                }`}
+                              >
+                                <option value="">Select item...</option>
+                                {masterItems.map((it) => (
+                                  <option key={it.id} value={it.id}>{it.name} ({it.sku || 'Fabric'})</option>
+                                ))}
+                              </select>
+                              {standaloneForm.poId && line.itemName && !line.itemId && (
+                                <div className="text-[10px] text-amber-600 font-medium mt-0.5">
+                                  PO Fabric: <strong>{line.itemName}</strong> (Please map item)
+                                </div>
+                              )}
+                            </div>
                           )}
                         </div>
 
@@ -869,6 +941,17 @@ export const GoodsReceiptPage = () => {
                             onChange={(e) => handleUpdateLine(line.id, 'orderedQty', e.target.value)}
                             className="w-full px-3 py-1.5 border border-slate-200 rounded-lg bg-slate-50 font-mono text-slate-700"
                           />
+                          {Boolean(standaloneForm.poId) && typeof line.remainingQty !== 'undefined' && (
+                            <div className="mt-1">
+                              {line.remainingQty > 0 ? (
+                                <span className="text-[10px] font-bold text-emerald-700">{line.remainingQty} {line.uom || 'm'} remaining</span>
+                              ) : (
+                                <span className="text-[10px] font-semibold text-amber-800 bg-amber-50 border border-amber-200/80 px-1.5 py-0.5 rounded inline-flex items-center gap-1">
+                                  Reprocess / Replacement
+                                </span>
+                              )}
+                            </div>
+                          )}
                         </div>
 
                         <div className="sm:col-span-2">

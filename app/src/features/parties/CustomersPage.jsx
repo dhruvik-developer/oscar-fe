@@ -131,17 +131,17 @@ export const CustomersPage = () => {
         if (!newCust.name)
             return;
         addCustomer({
-            code: newCust.code || `CUST-${String(customers.length + 1).padStart(3, '0')}`,
+            code: newCust.code,
             name: newCust.name,
             contactPerson: newCust.contactPerson || 'General Contact',
             email: newCust.email || 'billing@client.com',
-            phone: newCust.phone || '+1 (555) 000-0000',
+            phone: newCust.phone || '+91 ',
             balance: 0,
             creditLimit: Number(newCust.creditLimit) || 50000,
             status: 'Active',
         });
         setIsModalOpen(false);
-        setNewCust({ name: '', code: '', contactPerson: '', email: '', phone: '', creditLimit: 50000 });
+        setNewCust({ name: '', code: '', contactPerson: '', email: '', phone: '+91 ', creditLimit: 50000 });
     };
     return (<div className="space-y-6">
       <PageHeader title="Customer Master & Statements" subtitle="Corporate client accounts, active credit thresholds, multi-year invoice billing history, and real-time running statements." guide={customerGuide} actions={<Button icon={Plus} onClick={() => setIsModalOpen(true)}>
@@ -186,7 +186,7 @@ export const CustomersPage = () => {
                 </div>
                 <div>
                   <label className="font-semibold text-slate-700 block mb-1">Customer Code</label>
-                  <input type="text" placeholder="e.g. CUST-010" value={newCust.code} onChange={(e) => setNewCust({ ...newCust, code: e.target.value })} className="w-full p-2 border border-slate-300 rounded bg-white text-slate-800 font-mono"/>
+                  <input type="text" placeholder="Auto-generated (CUST-…)" value={newCust.code} onChange={(e) => setNewCust({ ...newCust, code: e.target.value })} className="w-full p-2 border border-slate-300 rounded bg-white text-slate-800 font-mono"/>
                 </div>
               </div>
 
@@ -208,7 +208,27 @@ export const CustomersPage = () => {
                 </div>
                 <div>
                   <label className="font-semibold text-slate-700 block mb-1">Phone</label>
-                  <input type="text" value={newCust.phone} onChange={(e) => setNewCust({ ...newCust, phone: e.target.value })} className="w-full p-2 border border-slate-300 rounded bg-white text-slate-800"/>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-[10px] text-slate-400 font-mono ml-auto">
+                      {newCust.phone ? `${newCust.phone.replace(/\D/g, '').length}/10` : '10 digits'}
+                    </span>
+                  </div>
+                  <input
+                    type="tel"
+                    inputMode="numeric"
+                    maxLength={10}
+                    value={newCust.phone}
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/\D/g, '').slice(0, 10);
+                      setNewCust({ ...newCust, phone: val });
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Backspace' || e.key === 'Delete' || e.key === 'Tab' || e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.ctrlKey || e.metaKey) return;
+                      if (!/^[0-9]$/.test(e.key)) e.preventDefault();
+                    }}
+                    placeholder="e.g. 9825012345"
+                    className="w-full p-2 border border-slate-300 rounded bg-white text-slate-800 font-mono text-xs"
+                  />
                 </div>
               </div>
 

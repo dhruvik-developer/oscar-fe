@@ -26,6 +26,7 @@ const SEGMENT_LABELS = {
   crm: 'CRM',
   pms: 'PMS',
   hrms: 'HRMS',
+  qc: 'Quality Control',
 };
 
 const segmentLabel = (part) => SEGMENT_LABELS[part] || toTitleCase(part, part);
@@ -57,7 +58,7 @@ export function PageHeader({ title, subtitle, breadcrumb, guide, actions, titleE
     <div className="flex flex-col gap-2 pb-2">
       {/* Breadcrumb */}
       {activeBreadcrumb && activeBreadcrumb.length > 0 && (
-        <nav className="flex items-center gap-1.5 overflow-x-auto whitespace-nowrap text-[12px] font-medium text-slate-500 scrollbar-none">
+        <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 overflow-x-auto whitespace-nowrap text-[12px] font-medium text-slate-500 scrollbar-none">
           {activeBreadcrumb.map((bc, idx) => {
             const isLast = idx === activeBreadcrumb.length - 1;
             const label = safeString(bc?.label || bc?.name, 'Section');

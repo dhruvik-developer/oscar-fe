@@ -34,6 +34,7 @@ import { SignatureSlot, useDocumentSignatures } from '../../components/common/Si
 import { api } from '../../services/api';
 import { useERP } from '../../context/ERPContext';
 import { useAppStore } from '../../stores/appStore';
+import MasterSourceLink from '../../components/common/MasterSourceLink';
 
 function fmtM(n) {
   if (n === null || n === undefined || n === '') return '0.00';
@@ -48,7 +49,7 @@ function fmtINR(n) {
 }
 
 function fmtDate(d) {
-  if (!d) return '—';
+  if (!d) return 'â€”';
   const parts = String(d).slice(0, 10).split('-');
   return parts.length === 3 ? `${parts[2]}-${parts[1]}-${parts[0]}` : d;
 }
@@ -216,7 +217,7 @@ export function FinalJobWorkPoInlineSlide({
   }, [piId, po?.id]);
 
   // Derived Summary Quantities
-  const originalPoNumber = po?.poNumber || completionData?.orderReference || '—';
+  const originalPoNumber = po?.poNumber || completionData?.orderReference || 'â€”';
   const originalPoDate = po?.date || '';
   const originalPoRate = po?.items?.[0]?.rate || 0;
   const originalPoQty = Number(po?.items?.[0]?.qty || completionData?.orderQty || 0);
@@ -395,7 +396,7 @@ export function FinalJobWorkPoInlineSlide({
               Supplier / Vendor
             </span>
             <strong className="text-slate-900 text-[13px] block mt-0.5">
-              {vendorName || '—'}
+              {vendorName || 'â€”'}
             </strong>
             <span className="text-[11px] text-slate-500 flex items-center gap-1 mt-0.5">
               <MapPin size={11} className="text-slate-400" /> Maharashtra
@@ -408,7 +409,7 @@ export function FinalJobWorkPoInlineSlide({
               Fabric Quality
             </span>
             <strong className="text-slate-900 text-[13px] block mt-0.5">
-              {fabricQuality || '—'}
+              {fabricQuality || 'â€”'}
             </strong>
           </div>
 
@@ -428,7 +429,7 @@ export function FinalJobWorkPoInlineSlide({
                 UOM: <strong className="text-slate-800">Mtr</strong>
               </div>
               <div>
-                Rate: <strong className="text-slate-800 font-mono">₹{Number(originalPoRate).toFixed(2)}</strong>
+                Rate: <strong className="text-slate-800 font-mono">â‚¹{Number(originalPoRate).toFixed(2)}</strong>
               </div>
             </div>
           </div>
@@ -550,9 +551,9 @@ export function FinalJobWorkPoInlineSlide({
                     required
                     value={poDate}
                     onChange={(e) => setPoDate(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-slate-800 font-medium bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 shadow-2xs"
+                    className="w-full px-3 py-2 pr-9 border border-slate-200 rounded-lg text-slate-800 font-medium bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 shadow-2xs"
                   />
-                  <Calendar size={14} className="absolute right-3 top-2.5 text-slate-400 pointer-events-none" />
+                  <Calendar size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                 </div>
               </div>
             </div>
@@ -560,34 +561,40 @@ export function FinalJobWorkPoInlineSlide({
             {/* Row 2: Vendor / Agency & Fabric Quality */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
               <div>
-                <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                  Vendor / Agency <span className="text-rose-500">*</span>
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-[11px] font-bold text-slate-700">
+                    Vendor / Agency <span className="text-rose-500">*</span>
+                  </label>
+                  <MasterSourceLink source="vendors" />
+                </div>
                 <div className="relative">
                   <select
                     value={vendorName}
                     onChange={(e) => setVendorName(e.target.value)}
                     className="w-full px-3 py-2 border border-slate-200 rounded-lg text-slate-800 font-semibold bg-white appearance-none pr-8 shadow-2xs"
                   >
-                    <option value={vendorName}>{vendorName || '—'}</option>
+                    <option value={vendorName}>{vendorName || 'â€”'}</option>
                   </select>
-                  <ChevronDown size={14} className="absolute right-3 top-3 text-slate-400 pointer-events-none" />
+                  <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                 </div>
               </div>
 
               <div>
-                <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                  Fabric Quality
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-[11px] font-bold text-slate-700">
+                    Fabric Quality
+                  </label>
+                  <MasterSourceLink source="fabricQualities" />
+                </div>
                 <div className="relative">
                   <select
                     value={fabricQuality}
                     onChange={(e) => setFabricQuality(e.target.value)}
                     className="w-full px-3 py-2 border border-slate-200 rounded-lg text-slate-800 font-semibold bg-white appearance-none pr-8 shadow-2xs"
                   >
-                    <option value={fabricQuality}>{fabricQuality || '—'}</option>
+                    <option value={fabricQuality}>{fabricQuality || 'â€”'}</option>
                   </select>
-                  <ChevronDown size={14} className="absolute right-3 top-3 text-slate-400 pointer-events-none" />
+                  <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                 </div>
               </div>
             </div>
@@ -609,7 +616,7 @@ export function FinalJobWorkPoInlineSlide({
 
               <div>
                 <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                  Approved Rate (₹/Mtr) <span className="text-rose-500">*</span>
+                  Approved Rate (â‚¹/Mtr) <span className="text-rose-500">*</span>
                 </label>
                 <input
                   type="number"
@@ -624,7 +631,7 @@ export function FinalJobWorkPoInlineSlide({
 
               <div>
                 <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                  Amount (₹)
+                  Amount (â‚¹)
                 </label>
                 <input
                   type="text"
@@ -646,9 +653,9 @@ export function FinalJobWorkPoInlineSlide({
                   type="date"
                   value={expectedCompletionDate}
                   onChange={(e) => setExpectedCompletionDate(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-slate-800 font-medium bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 shadow-2xs"
-                />
-                <Calendar size={14} className="absolute right-3 top-2.5 text-slate-400 pointer-events-none" />
+                  className="w-full px-3 py-2 pr-9 border border-slate-200 rounded-lg text-slate-800 font-medium bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 shadow-2xs"
+                  />
+                  <Calendar size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
               </div>
             </div>
 
@@ -715,14 +722,14 @@ export function FinalJobWorkPoInlineSlide({
               </div>
 
               <div className="flex items-center justify-between text-slate-600 pt-1">
-                <span>Rate (₹/Mtr)</span>
+                <span>Rate (â‚¹/Mtr)</span>
                 <span className="font-mono font-bold text-slate-900">{Number(approvedRate).toFixed(2)}</span>
               </div>
 
               {/* Highlighted Row: Final PO Amount */}
               <div className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-emerald-50/60 border border-emerald-200/80">
                 <span className="font-extrabold text-emerald-800 text-[11.5px]">
-                  Final PO Amount (₹)
+                  Final PO Amount (â‚¹)
                 </span>
                 <span className="font-mono font-black text-emerald-950 text-sm">
                   {fmtINR(calculatedPoAmount)}
@@ -796,8 +803,8 @@ export function FinalJobWorkPoInlineSlide({
                 <th className="px-3 py-2.5">HSN</th>
                 <th className="px-3 py-2.5">UOM</th>
                 <th className="px-3 py-2.5 text-right">Final Quantity (Mtr)</th>
-                <th className="px-3 py-2.5 text-right">Rate (₹/Mtr)</th>
-                <th className="px-3 py-2.5 text-right">Amount (₹)</th>
+                <th className="px-3 py-2.5 text-right">Rate (â‚¹/Mtr)</th>
+                <th className="px-3 py-2.5 text-right">Amount (â‚¹)</th>
                 <th className="px-2 py-2.5 w-10 text-center"></th>
               </tr>
             </thead>
@@ -1079,7 +1086,7 @@ export function FinalJobWorkPoInlineSlide({
                 </div>
                 <div className="space-y-1">
                   <div><span className="text-slate-500">Original PO Reference:</span> <strong className="font-mono text-slate-900">{originalPoNumber}</strong></div>
-                  <div><span className="text-slate-500">Production Instruction:</span> <strong className="font-mono text-slate-900">{propInstruction?.instruction_number || completionData?.piNo || '—'}</strong></div>
+                  <div><span className="text-slate-500">Production Instruction:</span> <strong className="font-mono text-slate-900">{propInstruction?.instruction_number || completionData?.piNo || 'â€”'}</strong></div>
                   <div><span className="text-slate-500">Completion Verification:</span> <strong className="text-emerald-700 font-bold">Approved ({fmtM(physicallyVerifiedQty)} Mtr)</strong></div>
                   <div><span className="text-slate-500">Expected Completion:</span> <strong className="text-slate-900">{fmtDate(expectedCompletionDate)}</strong></div>
                 </div>
@@ -1097,8 +1104,8 @@ export function FinalJobWorkPoInlineSlide({
                         <th className="px-3 py-2">HSN</th>
                         <th className="px-3 py-2 text-center">UOM</th>
                         <th className="px-3 py-2 text-right">Eligible Accepted Qty</th>
-                        <th className="px-3 py-2 text-right">Rate (₹)</th>
-                        <th className="px-3 py-2 text-right">Amount (₹)</th>
+                        <th className="px-3 py-2 text-right">Rate (â‚¹)</th>
+                        <th className="px-3 py-2 text-right">Amount (â‚¹)</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -1109,7 +1116,7 @@ export function FinalJobWorkPoInlineSlide({
                           <td className="px-3 py-2 font-mono text-slate-600">{item.hsn}</td>
                           <td className="px-3 py-2 text-center font-mono text-slate-600">{item.uom}</td>
                           <td className="px-3 py-2 text-right font-mono font-bold text-slate-900">{fmtM(item.finalQty)}</td>
-                          <td className="px-3 py-2 text-right font-mono text-slate-700">₹{Number(item.rate).toFixed(2)}</td>
+                          <td className="px-3 py-2 text-right font-mono text-slate-700">â‚¹{Number(item.rate).toFixed(2)}</td>
                           <td className="px-3 py-2 text-right font-mono font-black text-slate-900">{fmtINR(item.amount)}</td>
                         </tr>
                       ))}
@@ -1119,7 +1126,7 @@ export function FinalJobWorkPoInlineSlide({
                         <td colSpan={4} className="px-3 py-2 text-right text-slate-600">Grand Total:</td>
                         <td className="px-3 py-2 text-right font-mono text-slate-900">{fmtM(lineItemsTotalQty)} Mtr</td>
                         <td></td>
-                        <td className="px-3 py-2 text-right font-mono text-emerald-950 font-black text-sm">₹{fmtINR(lineItemsTotalAmount)}</td>
+                        <td className="px-3 py-2 text-right font-mono text-emerald-950 font-black text-sm">â‚¹{fmtINR(lineItemsTotalAmount)}</td>
                       </tr>
                     </tfoot>
                   </table>
@@ -1138,7 +1145,7 @@ export function FinalJobWorkPoInlineSlide({
                 <div className="flex flex-col justify-end items-end text-right">
                   <div className="border-b border-slate-300 w-48 mb-1 pb-1">
                     <SignatureSlot doc={poSigs} signatory="authorized" label="Authorized Signatory" modalType="authorized" className="h-10"
-                      defaultName={currentUser?.name || ''} defaultDesignation="Authorized Signatory — Commercial Operations" />
+                      defaultName={currentUser?.name || ''} defaultDesignation="Authorized Signatory â€” Commercial Operations" />
                   </div>
                   <span className="font-bold text-slate-900">Authorized Signatory</span>
                   <span className="text-[10px] text-slate-400">OSCAR ERP Commercial Operations</span>

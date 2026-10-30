@@ -38,6 +38,8 @@ import { getGreyStockAllocation } from '../../../../services/pmsSync';
 import { usePmsStore } from '../../../../stores/pmsStore';
 import { useJobWorkLookups } from '../../../jobwork/ProcessPlanListPage';
 import MasterSourceLink from '../../../../components/common/MasterSourceLink';
+import { useTableSort } from '../../../../hooks/useTableSort';
+import { SortableTh } from '../../../../components/ui/SortableTh';
 
 const n = (v) => Number(v || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 });
 const todayISO = () => new Date().toISOString().slice(0, 10);
@@ -486,6 +488,25 @@ export function ProcessPlanStageWorkspace({
       setBusyAction(false);
     }
   };
+
+  const planSort = useTableSort(plans, {
+    accessors: {
+      projectCode: (p) => p.projectCode || code,
+      sourcePo: (p) => p.selectedTakas?.[0]?.sourcePoNumber || 'PO-GRN',
+      projectDestination: (p) => p.projectDestination || 'Customer Project',
+      rolls: (p) => (Array.isArray(p.selectedTakas) ? p.selectedTakas.length : p.noOfRolls || 1),
+      expectedQty: (p) => Number(p.expectedQty || 0),
+      rate: (p) => (p.charges || []).reduce((s, c) => s + Number(c.rate || 0), 0),
+    },
+  });
+  const viewPlanTakaSort = useTableSort(viewPlanModal?.selectedTakas || [], {
+    accessors: {
+      sourcePoNumber: (tk) => tk.sourcePoNumber || 'PO-GRN',
+      takaNumber: (tk) => tk.takaNumber || tk.takaId,
+      allocationType: (tk) => tk.allocationType || 'Customer Project',
+      meters: (tk) => Number(tk.meters || 0),
+    },
+  });
 
   return (
     <div className="space-y-5">
@@ -1130,19 +1151,19 @@ export function ProcessPlanStageWorkspace({
           <table className="w-full text-left text-xs text-slate-700">
             <thead className="bg-slate-50 text-[11px] font-bold text-slate-600 uppercase border-b border-slate-200">
               <tr>
-                <th className="p-3">Plan No</th>
-                <th className="p-3">Project</th>
-                <th className="p-3">Source PO</th>
-                <th className="p-3">Source Lot / Taka</th>
-                <th className="p-3">Fabric / Quality</th>
-                <th className="p-3">Destination</th>
-                <th className="p-3 text-center">Rolls</th>
-                <th className="p-3 text-right">Planned (m)</th>
-                <th className="p-3">Process</th>
-                <th className="p-3">Processor</th>
-                <th className="p-3">Target Shade</th>
-                <th className="p-3 text-right">Rate & UOM</th>
-                <th className="p-3">Return Date</th>
+                <SortableTh sort={planSort} sortKey="planNo" className="p-3">Plan No</SortableTh>
+                <SortableTh sort={planSort} sortKey="projectCode" className="p-3">Project</SortableTh>
+                <SortableTh sort={planSort} sortKey="sourcePo" className="p-3">Source PO</SortableTh>
+                <SortableTh sort={planSort} sortKey="greyLotNo" className="p-3">Source Lot / Taka</SortableTh>
+                <SortableTh sort={planSort} sortKey="fabricItem" className="p-3">Fabric / Quality</SortableTh>
+                <SortableTh sort={planSort} sortKey="projectDestination" className="p-3">Destination</SortableTh>
+                <SortableTh sort={planSort} sortKey="rolls" className="p-3 text-center" align="center">Rolls</SortableTh>
+                <SortableTh sort={planSort} sortKey="expectedQty" className="p-3 text-right" align="right">Planned (m)</SortableTh>
+                <SortableTh sort={planSort} sortKey="process" className="p-3">Process</SortableTh>
+                <SortableTh sort={planSort} sortKey="vendor" className="p-3">Processor</SortableTh>
+                <SortableTh sort={planSort} sortKey="shade" className="p-3">Target Shade</SortableTh>
+                <SortableTh sort={planSort} sortKey="rate" className="p-3 text-right" align="right">Rate & UOM</SortableTh>
+                <SortableTh sort={planSort} sortKey="expectedCompletionDate" className="p-3">Return Date</SortableTh>
                 <th className="p-3 text-center">Status & Actions</th>
               </tr>
             </thead>
@@ -1154,7 +1175,7 @@ export function ProcessPlanStageWorkspace({
                   </td>
                 </tr>
               ) : (
-                plans.map((p) => {
+                planSort.rows.map((p) => {
                   const rateVal = (p.charges || []).reduce((s, c) => s + Number(c.rate || 0), 0);
                   const linkedJwo = orders.find((o) => o.processPlanId === p.id);
                   const takasCount = Array.isArray(p.selectedTakas)
@@ -1373,15 +1394,15 @@ export function ProcessPlanStageWorkspace({
                   <table className="w-full text-left text-[11px]">
                     <thead className="bg-slate-50 font-bold text-slate-600">
                       <tr>
-                        <th className="p-2">PO #</th>
-                        <th className="p-2">Lot #</th>
-                        <th className="p-2">Taka / Roll #</th>
-                        <th className="p-2">Destination</th>
-                        <th className="p-2 text-right">Metres</th>
+                        <SortableTh sort={viewPlanTakaSort} sortKey="sourcePoNumber" className="p-2">PO #</SortableTh>
+                        <SortableTh sort={viewPlanTakaSort} sortKey="lotNumber" className="p-2">Lot #</SortableTh>
+                        <SortableTh sort={viewPlanTakaSort} sortKey="takaNumber" className="p-2">Taka / Roll #</SortableTh>
+                        <SortableTh sort={viewPlanTakaSort} sortKey="allocationType" className="p-2">Destination</SortableTh>
+                        <SortableTh sort={viewPlanTakaSort} sortKey="meters" className="p-2 text-right" align="right">Metres</SortableTh>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 font-mono">
-                      {viewPlanModal.selectedTakas.map((tk, idx) => (
+                      {viewPlanTakaSort.rows.map((tk, idx) => (
                         <tr key={idx}>
                           <td className="p-2 text-slate-600">{tk.sourcePoNumber || 'PO-GRN'}</td>
                           <td className="p-2 font-bold">{tk.lotNumber}</td>

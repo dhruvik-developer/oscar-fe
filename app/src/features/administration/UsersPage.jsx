@@ -2,17 +2,22 @@ import InfoBanner from '../../components/ui/InfoBanner';
 import PageHeader from '../../components/ui/PageHeader';
 import AdministrationGuideButton from './AdministrationGuideButton';
 import KpiCard from '../../components/ui/KpiCard';
+import AppPagination from '../../components/ui/AppPagination';
 import { useAppStore } from '../../stores/appStore';
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import {
   adminSync,
   activateUser,
   deactivateUser,
+  resetUserPassword,
   setUserPermissions,
   pullPermissionCatalogue,
   describeError,
 } from '../../services/adminSync';
+import { hrmsSync } from '../../services/hrmsSync';
+import { phoneError, formatPhone } from '../../utils/phone';
+import MasterSourceLink, { useMasterDataRefresh } from '../../components/common/MasterSourceLink';
 import {
   Users,
   UserCheck,
@@ -30,8 +35,6 @@ import {
   User,
   Building2,
   CheckCircle2,
-  ChevronLeft,
-  ChevronRight,
   ChevronDown,
   LayoutGrid,
   List,
@@ -47,6 +50,20 @@ import {
 } from 'lucide-react';
 
 const USERS_PER_PAGE = 16;
+
+/** A blank create/edit form. Role, department and manager come from their masters. */
+const EMPTY_USER_FORM = {
+  name: '',
+  email: '',
+  phone: '',
+  roleId: '',
+  role: '',
+  department: '',
+  status: 'Active',
+  employeeId: '',
+  location: '',
+  reportingManagerId: '',
+};
 
 // Temporary password from the browser's cryptographic RNG; the user changes it on first login.
 function generateTempPassword() {
@@ -203,22 +220,34 @@ export function UsersPage() {
   const [userToModify, setUserToModify] = useState(null);
 
   // ── Form State for Create / Edit ─────────────────────────────
-  const [userForm, setUserForm] = useState({
-    name: '',
-    email: '',
-    phone: '',
-    role: 'BDE',
-    department: 'Sales',
-    status: 'Active',
-    employeeId: '',
-    location: 'Mumbai, India',
-    reportingManager: 'Jayesh Nair',
-    permissions: ['View Leads', 'Create Tasks', 'Manage Deals'],
-  });
+  const [userForm, setUserForm] = useState(EMPTY_USER_FORM);
+
+  // Role options from Administration → Roles, departments from HRMS →
+  // Departments, so a saved user carries a real role (and its permissions).
+  const [roleOptions, setRoleOptions] = useState([]);
+  const [departmentOptions, setDepartmentOptions] = useState([]);
+  const loadRoles = useCallback(() => {
+    adminSync.pull('roles').then((rows) => setRoleOptions(rows || [])).catch(() => {});
+  }, []);
+  const loadDepartments = useCallback(() => {
+    hrmsSync.pull('departments')
+      .then((rows) => setDepartmentOptions(
+        (rows || [])
+          .filter((d) => d?.name && (d.status || 'Active') === 'Active')
+          .map((d) => d.name),
+      ))
+      .catch(() => {});
+  }, []);
+  useEffect(loadRoles, [loadRoles]);
+  useEffect(loadDepartments, [loadDepartments]);
+  useMasterDataRefresh(loadRoles, ['roles']);
+  useMasterDataRefresh(loadDepartments, ['departments']);
 
   // ── Password Reset State ─────────────────────────────────────
-  const [newPassword, setNewPassword] = useState('Evenmore@2026!');
-  const [passwordSuccess, setPasswordSuccess] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  // { type: 'success' | 'error', text } after a reset attempt.
+  const [passwordResult, setPasswordResult] = useState(null);
+  const [passwordBusy, setPasswordBusy] = useState(false);
 
   // ── Notification toast ───────────────────────────────────────
   const [toastMessage, setToastMessage] = useState(null);
@@ -271,14 +300,10 @@ export function UsersPage() {
   }, [users, searchQuery, selectedRole, selectedDepartment, selectedStatus, selectedSource]);
 
   // ── Pagination Calculation ───────────────────────────────────
-  const totalPages = Math.max(1, Math.ceil(filteredUsers.length / USERS_PER_PAGE));
   const paginatedUsers = useMemo(() => {
     const start = (currentPage - 1) * USERS_PER_PAGE;
     return filteredUsers.slice(start, start + USERS_PER_PAGE);
   }, [filteredUsers, currentPage]);
-
-  const startCount = filteredUsers.length === 0 ? 0 : (currentPage - 1) * USERS_PER_PAGE + 1;
-  const endCount = Math.min(currentPage * USERS_PER_PAGE, filteredUsers.length);
 
   // ── Stats Summary Calculation ────────────────────────────────
   const stats = useMemo(() => {
@@ -312,39 +337,33 @@ export function UsersPage() {
   };
 
   const openCreateModal = () => {
-    const nextEmpNum = users.length + 1;
-    setUserForm({
-      name: '',
-      email: '',
-      phone: '+91 ',
-      role: 'Sales support execut.',
-      department: 'Sales',
-      status: 'Active',
-      employeeId: `EMP00${nextEmpNum < 10 ? '0' + nextEmpNum : nextEmpNum}`,
-      location: 'Mumbai, India',
-      reportingManager: 'Jayesh Nair',
-      permissions: ['View Leads', 'Manage Deals', 'Create Tasks', 'View Reports'],
-    });
+    setUserForm(EMPTY_USER_FORM);
     setIsCreateModalOpen(true);
   };
 
   const handleCreateSubmit = async (e) => {
     e.preventDefault();
     if (!userForm.name || !userForm.email) return;
+    if (phoneError(userForm.phone)) {
+      showNotification(phoneError(userForm.phone));
+      return;
+    }
+    if (!userForm.roleId) {
+      showNotification('Select a role for the user.');
+      return;
+    }
 
     let newUser;
     try {
       newUser = await adminSync.create('users', {
         name: userForm.name,
         email: userForm.email,
-        phone: userForm.phone,
-        role: userForm.role,
+        phone: formatPhone(userForm.phone),
         roleId: userForm.roleId,
         department: userForm.department,
         status: userForm.status,
-        employeeId: userForm.employeeId,
         location: userForm.location,
-        reportingManager: userForm.reportingManager,
+        reportingManagerId: userForm.reportingManagerId || undefined,
       });
     } catch (err) {
       showNotification(`User not created — ${describeError(err)}`);
@@ -367,13 +386,13 @@ export function UsersPage() {
       name: target.name,
       email: target.email,
       phone: target.phone,
+      roleId: target.roleId || '',
       role: target.role,
-      department: target.department,
+      department: target.department || '',
       status: target.status,
       employeeId: target.employeeId,
-      location: target.location,
-      reportingManager: target.reportingManager,
-      permissions: target.permissions || [],
+      location: target.location || '',
+      reportingManagerId: target.reportingManagerId || '',
     });
     setIsEditModalOpen(true);
   };
@@ -381,20 +400,32 @@ export function UsersPage() {
   const handleEditSubmit = (e) => {
     e.preventDefault();
     if (!userToModify) return;
+    if (phoneError(userForm.phone)) {
+      showNotification(phoneError(userForm.phone));
+      return;
+    }
+    if (!userForm.roleId) {
+      showNotification('Select a role for the user.');
+      return;
+    }
 
     const updates = {
       name: userForm.name,
       email: userForm.email,
-      phone: userForm.phone,
-      role: userForm.role,
+      phone: formatPhone(userForm.phone),
       roleId: userForm.roleId,
       department: userForm.department,
       status: userForm.status,
-      employeeId: userForm.employeeId,
       location: userForm.location,
-      reportingManager: userForm.reportingManager,
+      reportingManagerId: userForm.reportingManagerId || null,
     };
-    setUsers((prev) => prev.map((u) => (u.id === userToModify.id ? { ...u, ...updates } : u)));
+    const shown = {
+      ...updates,
+      reportingManagerId: userForm.reportingManagerId,
+      role: roleOptions.find((r) => String(r.id) === String(userForm.roleId))?.name || userForm.role,
+      reportingManager: users.find((u) => String(u.id) === String(userForm.reportingManagerId))?.name || '',
+    };
+    setUsers((prev) => prev.map((u) => (u.id === userToModify.id ? { ...u, ...shown } : u)));
     adminSync.update('users', userToModify.id, updates)
       .then((saved) => {
         if (saved) setUsers((prev) => prev.map((u) => (u.id === saved.id ? saved : u)));
@@ -403,6 +434,137 @@ export function UsersPage() {
     setIsEditModalOpen(false);
     showNotification(`User details updated for "${userForm.name}"!`);
     useAppStore.getState().refreshHrms?.('employees');
+  };
+
+  const inputClass = 'w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500';
+
+  /**
+   * Employee ID, role, department, location and reporting manager — the same
+   * fields on the create and edit forms. A role or department the masters no
+   * longer list stays selectable so editing does not silently drop it.
+   */
+  const renderPhoneField = () => {
+    const error = phoneError(userForm.phone);
+    return (
+      <div>
+        <label htmlFor="user-phone" className="block font-semibold text-slate-700 mb-1">Phone Number</label>
+        <div className="flex items-center justify-between mb-1">
+          <span className="text-[10px] text-slate-400 font-mono ml-auto">
+            {userForm.phone ? `${userForm.phone.replace(/\D/g, '').length}/10` : '10 digits'}
+          </span>
+        </div>
+        <input
+          id="user-phone"
+          type="tel"
+          inputMode="numeric"
+          autoComplete="tel"
+          maxLength={10}
+          placeholder="e.g. 9876543210"
+          value={userForm.phone ? userForm.phone.replace(/\D/g, '').slice(0, 10) : ''}
+          onChange={(e) => {
+            const val = e.target.value.replace(/\D/g, '').slice(0, 10);
+            setUserForm({ ...userForm, phone: val });
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Backspace' || e.key === 'Delete' || e.key === 'Tab' || e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.ctrlKey || e.metaKey) return;
+            if (!/^[0-9]$/.test(e.key)) e.preventDefault();
+          }}
+          aria-invalid={Boolean(error)}
+          aria-describedby={error ? 'user-phone-error' : undefined}
+          className={`${inputClass} font-mono ${error ? 'border-rose-400 focus:ring-rose-400' : ''}`}
+        />
+        {error && (
+          <p id="user-phone-error" className="mt-1 text-[11px] text-rose-600">{error}</p>
+        )}
+      </div>
+    );
+  };
+
+  const renderOrgFields = (editingUser) => {
+    const departments = [...departmentOptions];
+    if (userForm.department && !departments.includes(userForm.department)) departments.push(userForm.department);
+    const managers = users.filter((u) => !editingUser || u.id !== editingUser.id);
+    return (
+      <>
+        <div>
+          <label className="block font-semibold text-slate-700 mb-1">Employee ID</label>
+          <input
+            type="text"
+            readOnly
+            value={userForm.employeeId || ''}
+            placeholder="Set when linked to an HRMS employee"
+            title="Comes from the linked HRMS employee record"
+            className={`${inputClass} text-slate-500 cursor-not-allowed`}
+          />
+        </div>
+
+        <div>
+          <div className="flex items-center justify-between mb-1">
+            <label className="block font-semibold text-slate-700">Role *</label>
+            <MasterSourceLink source="roles" />
+          </div>
+          <select
+            required
+            value={userForm.roleId}
+            onChange={(e) => {
+              const picked = roleOptions.find((r) => String(r.id) === e.target.value);
+              setUserForm({ ...userForm, roleId: e.target.value, role: picked?.name || '' });
+            }}
+            className={inputClass}
+          >
+            <option value="">Select role</option>
+            {userForm.roleId && !roleOptions.some((r) => String(r.id) === String(userForm.roleId)) && (
+              <option value={userForm.roleId}>{userForm.role || 'Current role'}</option>
+            )}
+            {roleOptions.map((r) => (
+              <option key={r.id} value={String(r.id)}>{r.name}</option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <div className="flex items-center justify-between mb-1">
+            <label className="block font-semibold text-slate-700">Department</label>
+            <MasterSourceLink source="departments" />
+          </div>
+          <select
+            value={userForm.department}
+            onChange={(e) => setUserForm({ ...userForm, department: e.target.value })}
+            className={inputClass}
+          >
+            <option value="">Select department</option>
+            {departments.map((d) => (
+              <option key={d} value={d}>{d}</option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label className="block font-semibold text-slate-700 mb-1">Location</label>
+          <input
+            type="text"
+            placeholder="e.g. Surat, Gujarat"
+            value={userForm.location}
+            onChange={(e) => setUserForm({ ...userForm, location: e.target.value })}
+            className={inputClass}
+          />
+        </div>
+
+        <div>
+          <label className="block font-semibold text-slate-700 mb-1">Reporting Manager</label>
+          <select
+            value={userForm.reportingManagerId}
+            onChange={(e) => setUserForm({ ...userForm, reportingManagerId: e.target.value })}
+            className={inputClass}
+          >
+            <option value="">No reporting manager</option>
+            {managers.map((u) => (
+              <option key={u.id} value={String(u.id)}>{u.name}{u.role ? ` — ${u.role}` : ''}</option>
+            ))}
+          </select>
+        </div>
+      </>
+    );
   };
 
   const handleToggleStatus = (user) => {
@@ -444,19 +606,50 @@ export function UsersPage() {
     const target = user || activeUser;
     if (!target) return;
     setUserToModify(target);
-    setNewPassword('Evenmore@2026!');
-    setPasswordSuccess(false);
+    setNewPassword(generateTempPassword());
+    setPasswordResult(null);
+    setPasswordBusy(false);
     setIsResetPasswordModalOpen(true);
   };
 
-  const handlePasswordResetSubmit = (e) => {
+  // PATCH /admin/users/{id}/ with `password`: the server sets it and makes the
+  // user replace it at their next sign-in.
+  const handlePasswordResetSubmit = async (e) => {
     e.preventDefault();
-    setPasswordSuccess(true);
-    setTimeout(() => {
-      setIsResetPasswordModalOpen(false);
-      setPasswordSuccess(false);
-      showNotification(`Password has been reset for "${userToModify?.name}".`);
-    }, 1200);
+    if (!userToModify || passwordBusy) return;
+    setPasswordBusy(true);
+    setPasswordResult(null);
+    try {
+      const saved = await adminSync.update('users', userToModify.id, { password: newPassword });
+      if (!saved) throw new Error('You are not signed in to the server — nothing was changed.');
+      setPasswordResult({
+        type: 'success',
+        text: `Password set. ${userToModify.name} must change it at their next sign-in — share it with them securely.`,
+      });
+      showNotification(`Password has been reset for "${userToModify.name}".`);
+    } catch (err) {
+      setPasswordResult({ type: 'error', text: `Password not reset — ${describeError(err)}` });
+    } finally {
+      setPasswordBusy(false);
+    }
+  };
+
+  // POST /admin/users/{id}/reset-password/: emails the user a reset link.
+  const handleSendResetLink = async () => {
+    if (!userToModify || passwordBusy) return;
+    setPasswordBusy(true);
+    setPasswordResult(null);
+    try {
+      const body = await resetUserPassword(userToModify.id);
+      setPasswordResult({
+        type: body?.emailed === false ? 'error' : 'success',
+        text: body?.message || `A password reset email has been sent to ${userToModify.email}.`,
+      });
+    } catch (err) {
+      setPasswordResult({ type: 'error', text: `Reset link not sent — ${describeError(err)}` });
+    } finally {
+      setPasswordBusy(false);
+    }
   };
 
   const openPermissionsModal = (user) => {
@@ -733,45 +926,14 @@ export function UsersPage() {
           )}
 
           {/* ── Footer / Pagination ─────────────────────────────── */}
-          <div className="bg-white border border-slate-200 rounded-2xl px-5 py-3.5 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-600">
-            <div>
-              Showing <span className="font-semibold text-slate-800">{startCount}</span> to{' '}
-              <span className="font-semibold text-slate-800">{endCount}</span> of{' '}
-              <span className="font-semibold text-slate-800">{filteredUsers.length}</span> users
-            </div>
-
-            <div className="flex items-center gap-1.5">
-              <button
-                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                disabled={currentPage === 1}
-                className="w-8 h-8 flex items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-              >
-                <ChevronLeft size={16} />
-              </button>
-
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map((pg) => (
-                <button
-                  key={pg}
-                  onClick={() => setCurrentPage(pg)}
-                  className={`w-8 h-8 flex items-center justify-center rounded-lg text-xs font-semibold transition-colors ${
-                    currentPage === pg
-                      ? 'bg-[#1f6bff] text-white shadow-xs'
-                      : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
-                  }`}
-                >
-                  {pg}
-                </button>
-              ))}
-
-              <button
-                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                disabled={currentPage === totalPages}
-                className="w-8 h-8 flex items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-              >
-                <ChevronRight size={16} />
-              </button>
-            </div>
-          </div>
+          <AppPagination
+            total={filteredUsers.length}
+            page={currentPage}
+            pageSize={USERS_PER_PAGE}
+            onPageChange={setCurrentPage}
+            bordered={false}
+            className="bg-card border border-border rounded-2xl px-5 py-3.5"
+          />
         </div>
 
         {/* ── Right Side Details Panel ("User Details") ─────────── */}
@@ -1036,87 +1198,9 @@ export function UsersPage() {
                   />
                 </div>
 
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Phone Number</label>
-                  <input
-                    type="text"
-                    placeholder="+91 98765 43210"
-                    value={userForm.phone}
-                    onChange={(e) => setUserForm({ ...userForm, phone: e.target.value })}
-                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
+                {renderPhoneField()}
 
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Employee ID</label>
-                  <input
-                    type="text"
-                    placeholder="EMP0027"
-                    value={userForm.employeeId}
-                    onChange={(e) => setUserForm({ ...userForm, employeeId: e.target.value })}
-                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Role</label>
-                  <select
-                    value={userForm.role}
-                    onChange={(e) => setUserForm({ ...userForm, role: e.target.value })}
-                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="Accountant">Accountant</option>
-                    <option value="BDE">BDE</option>
-                    <option value="Tele sales coordinator">Tele sales coordinator</option>
-                    <option value="Relation ship manager">Relation ship manager</option>
-                    <option value="Sales support execut.">Sales support execut.</option>
-                    <option value="Area sales manager">Area sales manager</option>
-                    <option value="HR Manager">HR Manager</option>
-                    <option value="Driver">Driver</option>
-                    <option value="CIW">CIW</option>
-                    <option value="DIC">DIC</option>
-                    <option value="Employee">Employee</option>
-                    <option value="Super Administrator">Super Administrator</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Department</label>
-                  <select
-                    value={userForm.department}
-                    onChange={(e) => setUserForm({ ...userForm, department: e.target.value })}
-                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="Sales">Sales</option>
-                    <option value="Accounts">Accounts</option>
-                    <option value="HR">HR</option>
-                    <option value="Logistics">Logistics</option>
-                    <option value="Executive">Executive</option>
-                    <option value="Warehouse">Warehouse</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Location</label>
-                  <input
-                    type="text"
-                    placeholder="Mumbai, India"
-                    value={userForm.location}
-                    onChange={(e) => setUserForm({ ...userForm, location: e.target.value })}
-                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Reporting Manager</label>
-                  <input
-                    type="text"
-                    placeholder="Mahesh Kubawat"
-                    value={userForm.reportingManager}
-                    onChange={(e) => setUserForm({ ...userForm, reportingManager: e.target.value })}
-                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
+                {renderOrgFields(null)}
               </div>
 
               <div>
@@ -1210,83 +1294,9 @@ export function UsersPage() {
                   />
                 </div>
 
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Phone Number</label>
-                  <input
-                    type="text"
-                    value={userForm.phone}
-                    onChange={(e) => setUserForm({ ...userForm, phone: e.target.value })}
-                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
+                {renderPhoneField()}
 
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Employee ID</label>
-                  <input
-                    type="text"
-                    value={userForm.employeeId}
-                    onChange={(e) => setUserForm({ ...userForm, employeeId: e.target.value })}
-                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Role</label>
-                  <select
-                    value={userForm.role}
-                    onChange={(e) => setUserForm({ ...userForm, role: e.target.value })}
-                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="Accountant">Accountant</option>
-                    <option value="BDE">BDE</option>
-                    <option value="Tele sales coordinator">Tele sales coordinator</option>
-                    <option value="Relation ship manager">Relation ship manager</option>
-                    <option value="Sales support execut.">Sales support execut.</option>
-                    <option value="Area sales manager">Area sales manager</option>
-                    <option value="HR Manager">HR Manager</option>
-                    <option value="Driver">Driver</option>
-                    <option value="CIW">CIW</option>
-                    <option value="DIC">DIC</option>
-                    <option value="Employee">Employee</option>
-                    <option value="Super Administrator">Super Administrator</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Department</label>
-                  <select
-                    value={userForm.department}
-                    onChange={(e) => setUserForm({ ...userForm, department: e.target.value })}
-                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="Sales">Sales</option>
-                    <option value="Accounts">Accounts</option>
-                    <option value="HR">HR</option>
-                    <option value="Logistics">Logistics</option>
-                    <option value="Executive">Executive</option>
-                    <option value="Warehouse">Warehouse</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Location</label>
-                  <input
-                    type="text"
-                    value={userForm.location}
-                    onChange={(e) => setUserForm({ ...userForm, location: e.target.value })}
-                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Reporting Manager</label>
-                  <input
-                    type="text"
-                    value={userForm.reportingManager}
-                    onChange={(e) => setUserForm({ ...userForm, reportingManager: e.target.value })}
-                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
+                {renderOrgFields(userToModify)}
               </div>
 
               <div>
@@ -1436,6 +1446,7 @@ export function UsersPage() {
               <p className="text-slate-600">
                 Set a new temporary password for{' '}
                 <strong className="text-slate-900">{userToModify.name}</strong> ({userToModify.email}).
+                They will be asked to change it at their next sign-in.
               </p>
 
               <div>
@@ -1444,6 +1455,8 @@ export function UsersPage() {
                   <input
                     type="text"
                     required
+                    minLength={8}
+                    disabled={passwordBusy}
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
                     className="flex-1 p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
@@ -1460,12 +1473,32 @@ export function UsersPage() {
                 </div>
               </div>
 
-              {passwordSuccess && (
-                <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-xl text-xs flex items-center gap-2">
-                  <CheckCircle2 size={16} />
-                  <span>Password successfully reset and invitation sent!</span>
+              {passwordResult && (
+                <div
+                  role={passwordResult.type === 'error' ? 'alert' : 'status'}
+                  className={`p-3 rounded-xl text-xs flex items-start gap-2 border ${
+                    passwordResult.type === 'error'
+                      ? 'bg-rose-50 border-rose-200 text-rose-700'
+                      : 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                  }`}
+                >
+                  {passwordResult.type === 'error' ? <AlertTriangle size={16} className="shrink-0" /> : <CheckCircle2 size={16} className="shrink-0" />}
+                  <span>{passwordResult.text}</span>
                 </div>
               )}
+
+              <p className="text-slate-500">
+                Or{' '}
+                <button
+                  type="button"
+                  onClick={handleSendResetLink}
+                  disabled={passwordBusy}
+                  className="font-semibold text-blue-600 hover:text-blue-700 underline-offset-2 hover:underline disabled:opacity-50 cursor-pointer"
+                >
+                  email {userToModify.name} a reset link
+                </button>{' '}
+                so they choose their own password.
+              </p>
 
               <div className="flex flex-wrap lg:flex-nowrap items-center justify-end gap-2 pt-3 border-t border-slate-100">
                 <button
@@ -1473,13 +1506,14 @@ export function UsersPage() {
                   onClick={() => setIsResetPasswordModalOpen(false)}
                   className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold"
                 >
-                  Cancel
+                  {passwordResult?.type === 'success' ? 'Close' : 'Cancel'}
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-[#1f6bff] hover:bg-blue-700 text-white rounded-xl font-semibold shadow-xs"
+                  disabled={passwordBusy}
+                  className="px-5 py-2 bg-[#1f6bff] hover:bg-blue-700 text-white rounded-xl font-semibold shadow-xs disabled:opacity-60"
                 >
-                  Confirm Reset
+                  {passwordBusy ? 'Saving…' : 'Confirm Reset'}
                 </button>
               </div>
             </form>

@@ -230,6 +230,8 @@ export const PrintInvoiceModal = ({ isOpen, onClose, invoice, balanceDue = 0, })
                 }, { net: 0, cgst: 0, sgst: 0, igst: 0 });
                 // [PHASE-2E.1] effective combined GST rate when no state info is available
                 const gstSplit = tx.net > 0 ? `${Math.round(((tx.cgst + tx.sgst + tx.igst) / tx.net) * 100)}%` : '0%';
+                const freight = Number(invoice.freightCharges) || 0;
+                const other = Number(invoice.otherCharges) || 0;
                 return (
                   <>
                     <div className="flex justify-between text-slate-600">
@@ -244,9 +246,11 @@ export const PrintInvoiceModal = ({ isOpen, onClose, invoice, balanceDue = 0, })
                           </>
                         : <div className="flex justify-between text-slate-600"><span>IGST (inter-state):</span><span>{money(tx.igst)}</span></div>)
                       : <div className="flex justify-between text-slate-600"><span>GST ({gstSplit}):</span><span>{money(tx.cgst + tx.sgst + tx.igst)}</span></div>}
+                    {freight > 0 && <div className="flex justify-between text-slate-600"><span>Freight Charges:</span><span>{money(freight)}</span></div>}
+                    {other > 0 && <div className="flex justify-between text-slate-600"><span>Other Charges:</span><span>{money(other)}</span></div>}
                     <div className="flex justify-between text-sm font-bold text-slate-900 pt-2 border-t border-slate-300">
                       <span>Grand Invoice Total:</span>
-                      <span>{money(tx.net + tx.cgst + tx.sgst + tx.igst)}</span>
+                      <span>{money(tx.net + tx.cgst + tx.sgst + tx.igst + freight + other)}</span>
                     </div>
                   </>
                 );

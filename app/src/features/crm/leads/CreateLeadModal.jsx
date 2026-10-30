@@ -6,29 +6,47 @@ import { defaultLeadFormSections, TEXTILE_FABRIC_OPTIONS, LEGACY_FABRIC_OPTIONS 
 import { matchKnownLeadField } from './leadColumns';
 import { CalendarDays, ChevronDown, Clock3, ImagePlus, Plus, X, Building2, ShieldCheck, Percent } from "lucide-react";
 import { salesService } from "../../../services/domainServices";
-import MasterSourceLink from "../../../components/common/MasterSourceLink";
-
-/** Shipped Lead Source options — only these are offered for new selection. */
-export const DEFAULT_LEAD_SOURCES = [
-  "Broker",
-  "Sales Person",
-];
+import MasterSourceLink, { useMasterDataRefresh } from "../../../components/common/MasterSourceLink";
+import SalespersonSelect from "../../../components/common/SalespersonSelect";
+import { pullIncentiveSchemes } from "../../../services/crmSync";
 
 /**
- * Options for the Lead Source dropdown: the backend sources are the source
- * of truth; the shipped pair only fills gaps when the workspace has no
- * sources configured yet, and the lead's current value is preserved so
- * existing rows never render blank or lose data on save.
+ * Options for the Lead Source dropdown: exactly the sources under CRM Setup →
+ * Lead Sources (the server seeds Broker / Sales Person for a new workspace).
+ * Nothing is added in the browser — a name-only option was never a real
+ * source, so a lead saved with it lost its source. The lead's current value
+ * is kept so an existing row never renders blank.
  */
+/** "Sales Person", "Salesperson", "sales-person" … all name the same source. */
+function isSalespersonSource(name) {
+  return String(name || '').toLowerCase().replace(/[^a-z]/g, '') === 'salesperson';
+}
+
+const PERIOD_LABEL = { Monthly: 'Monthly', Quarterly: 'Quarterly (3 months)', Custom: 'Custom period' };
+const BASIS_LABEL = { INVOICE: 'Net sales (invoice value)', COLLECTION: 'Collections', GROSS_PROFIT: 'Gross profit' };
+
+/** One line describing how a scheme pays, e.g. "Flat 2% of Net sales". */
+function describeScheme(scheme) {
+  const basis = BASIS_LABEL[scheme.basis] || scheme.basis;
+  const slabs = Array.isArray(scheme.slabs) ? scheme.slabs : [];
+  if (slabs.length > 0) {
+    const tiers = slabs
+      .map((sl) => {
+        const rate = sl.rate_pct ?? sl.rate ?? 0;
+        const min = Number(sl.min || 0).toLocaleString('en-IN');
+        const max = sl.max === null || sl.max === undefined || sl.max === '' ? '+' : `–${Number(sl.max).toLocaleString('en-IN')}`;
+        return `₹${min}${max}: ${rate}%`;
+      })
+      .join(', ');
+    return `${scheme.slabType === 'TIERED' ? 'Tiered' : 'Slab'} on ${basis} (${tiers})`;
+  }
+  return `Flat ${Number(scheme.ratePct || 0)}% of ${basis}`;
+}
+
 export function leadSourceOptions(sources, current) {
   // Sources deactivated under CRM Setup -> Lead Sources are not offered for
   // new selection (a lead already carrying one keeps it, see below).
   const rows = (sources || []).filter((s) => s?.isActive !== false);
-  for (const name of DEFAULT_LEAD_SOURCES) {
-    if (!(sources || []).some((s) => String(s?.name ?? '').toLowerCase() === name.toLowerCase())) {
-      rows.push({ id: name, name });
-    }
-  }
   const cur = String(current ?? '');
   if (cur && !rows.some((s) => String(s.id) === cur || String(s?.name ?? '').toLowerCase() === cur.toLowerCase())) {
     const known = (sources || []).find((s) => String(s.id) === cur);
@@ -58,8 +76,13 @@ function withFabricDefaults(sections) {
 /** Resolve the active form sections from the store, falling back to defaults. */
 function useFormSections() {
   // Subscribe so the modal re-renders when the builder saves a new layout.
-  useCrmStore((s) => s.forms);
-  return getActiveLeadFormSections();
+  const forms = useCrmStore((s) => s.forms);
+  // Memoised: getActiveLeadFormSections() builds a new array on every call,
+  // and effects keyed on `sections` then ran on every render. With the modal
+  // mounted (even closed) on the Leads page that looped forever ("Maximum
+  // update depth exceeded") and froze navigation, e.g. clicking a Lead No.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  return useMemo(() => getActiveLeadFormSections(), [forms]);
 }
 
 /**
@@ -91,6 +114,38 @@ function useSources() {
 // ---------------------------------------------------------------------------
 // Individual field renderers
 // ---------------------------------------------------------------------------
+
+function PhoneField({ field, value, onChange }) {
+  const digits = String(value || '').replace(/\D/g, '').slice(0, 10);
+
+  const handleChange = (e) => {
+    const cleaned = e.target.value.replace(/\D/g, '').slice(0, 10);
+    onChange(cleaned);
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Backspace' || e.key === 'Delete' || e.key === 'Tab' || e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.ctrlKey || e.metaKey) return;
+    if (!/^[0-9]$/.test(e.key)) e.preventDefault();
+  };
+
+  return (
+    <div className="relative">
+      <input
+        type="tel"
+        inputMode="numeric"
+        maxLength={10}
+        placeholder={field.placeholder || "Enter 10-digit number"}
+        value={digits}
+        onChange={handleChange}
+        onKeyDown={handleKeyDown}
+        className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-700 placeholder:text-slate-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 font-mono"
+      />
+      <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 font-mono pointer-events-none">
+        {digits ? `${digits.length}/10` : '10 digits'}
+      </span>
+    </div>
+  );
+}
 
 function TextField({ field, value, onChange }) {
   const type =
@@ -385,7 +440,7 @@ function MultiSelectField({ field, value, onChange }) {
         <input
           ref={inputRef}
           type="text"
-          className="flex-1 min-w-[120px] text-xs bg-transparent border-none outline-none focus:ring-0 text-slate-800 placeholder-slate-400 p-0"
+          className="lead-multi-search flex-1 min-w-[120px] text-xs bg-transparent border-none outline-none focus:ring-0 text-slate-800 placeholder-slate-400 p-0"
           placeholder={selected.length === 0 ? (field.placeholder || "Search or type products...") : "Add more..."}
           value={search}
           onChange={(e) => {
@@ -547,7 +602,9 @@ export function DynamicField({ field, values, onChange, sources, userOptions }) 
     field.type === "Multi Select" ||
     field.id === "lead-users";
 
+  const isPhone = field.type === "Phone" || field.id === "lead-phone" || /phone|mobile/i.test(field.label);
   const inner = (() => {
+    if (isPhone) return <PhoneField field={field} value={value} onChange={set} />;
     switch (field.type) {
       case "Single Line":
       case "Number":
@@ -556,7 +613,7 @@ export function DynamicField({ field, values, onChange, sources, userOptions }) 
       case "Email":
         return <TextField field={field} value={value} onChange={set} />;
       case "Phone":
-        return <TextField field={field} value={value} onChange={set} />;
+        return <PhoneField field={field} value={value} onChange={set} />;
       case "Multi Line":
         return <TextAreaField field={field} value={value} onChange={set} />;
       case "Date":
@@ -604,8 +661,15 @@ export function DynamicField({ field, values, onChange, sources, userOptions }) 
           ? "items"
           : null;
 
+  // A <label> forwards every click inside it to its first control. For fields
+  // with their own buttons (multi-select chips with an ✕, image picker,
+  // checkbox/radio groups) that turned "pick an option" into "pick, then
+  // remove": the click landed on the option, then on the new chip's ✕.
+  // Those fields get a plain wrapper; simple inputs keep the label.
+  const Wrapper = ["Multi Select", "Lead Image", "Checkbox", "Radio", "User"].includes(field.type) ? "div" : "label";
+
   return (
-    <label className={`lead-create-field${isWide ? " lead-create-field-wide" : ""}`}>
+    <Wrapper className={`lead-create-field${isWide ? " lead-create-field-wide" : ""}`}>
       {masterSource ? (
         <span className="flex items-center justify-between gap-2">
           <span>{field.label}{field.required && " *"}</span>
@@ -616,7 +680,7 @@ export function DynamicField({ field, values, onChange, sources, userOptions }) 
       )}
       {inner}
       {field.helpText && <small className="lead-create-help">{field.helpText}</small>}
-    </label>
+    </Wrapper>
   );
 }
 
@@ -645,7 +709,9 @@ export function leadFormValuesToPayload(values, sections, { sources = [], userOp
   // Only a real store row may travel as sourceId (the API field is a PK —
   // a shipped-default name would 400). Unknown names still ride along as
   // `source` for local rows; the backend seed covers server rows.
-  const storeSource = (sources || []).find((s) => String(s.id) === rawSource) || null;
+  const storeSource = (sources || []).find(
+    (s) => String(s.id) === rawSource || String(s?.name || "").trim().toLowerCase() === rawSource.trim().toLowerCase()
+  ) || null;
   const rawOwner = ownerField ? String(get(ownerField.id) || "") : "";
   const storeOwner = (userOptions || []).find((m) => String(m.id) === rawOwner) || null;
   // Every captured value, keyed by field id — the leads table renders
@@ -658,7 +724,10 @@ export function leadFormValuesToPayload(values, sections, { sources = [], userOp
     leadName:    getValue("lead-name", /^\s*lead\s*name\s*$/i),
     company:     getValue("company", /comp/),
     email:       getValue("email", /^\s*e-?mail\s*$/i),
-    phone:       getValue("phone", /^\s*phone\s*$/i),
+    phone:       (() => {
+      const p = getValue("phone", /^\s*phone\s*$/i);
+      return (p && String(p).trim() !== '+91' && String(p).trim() !== '+91 ') ? String(p).trim() : '';
+    })(),
     sourceId:    storeSource ? storeSource.id : undefined,
     source:      storeSource ? storeSource.name : rawSource,
     titleValue:  getValue("title", /^\s*title\s*$/i),
@@ -681,6 +750,11 @@ export function leadFormValuesToPayload(values, sections, { sources = [], userOp
       commission_basis: values.commission_basis || undefined,
       commission_rate: values.commission_rate || undefined,
       commission_notes: values.commission_notes || undefined,
+      salesperson_id: values.salesperson_id || undefined,
+      salesperson_name: values.salesperson_name || undefined,
+      salesperson_notes: values.salesperson_notes || undefined,
+      salesperson_commission_basis: values.salesperson_commission_rate ? (values.salesperson_commission_basis || 'percent') : undefined,
+      salesperson_commission_rate: values.salesperson_commission_rate || undefined,
       expected_meters: values.expected_meters || undefined,
       expected_takas: values.expected_takas || undefined,
       fabric_quality: values.fabric_quality || undefined,
@@ -699,6 +773,9 @@ export default function CreateLeadModal({ isOpen, onClose, onCreate, onEditLayou
   // Flat map of fieldId → value
   const [values, setValues] = useState({});
   const [brokers, setBrokers] = useState([]);
+  const [incentiveSchemes, setIncentiveSchemes] = useState([]);
+  const loadIncentiveSchemes = () => { pullIncentiveSchemes().then(setIncentiveSchemes); };
+  useMasterDataRefresh(loadIncentiveSchemes, ['incentiveSchemes']);
 
   useEffect(() => {
     if (isOpen) {
@@ -706,6 +783,7 @@ export default function CreateLeadModal({ isOpen, onClose, onCreate, onEditLayou
         const rows = res?.data || res?.results || res || [];
         if (Array.isArray(rows)) setBrokers(rows);
       }).catch(() => {});
+      pullIncentiveSchemes().then(setIncentiveSchemes);
     }
   }, [isOpen]);
 
@@ -723,8 +801,26 @@ export default function CreateLeadModal({ isOpen, onClose, onCreate, onEditLayou
   const isFormComplete = String(values[nameField?.id] ?? '').trim() !== '';
 
   useEffect(() => {
-    if (!isOpen) setValues({});
-  }, [isOpen]);
+    if (!isOpen) {
+      // Keep the same object when already empty, so this cannot re-render.
+      setValues((prev) => (Object.keys(prev).length ? {} : prev));
+    } else {
+      const initVals = {};
+      sections.forEach((sec) => {
+        (sec.fields || []).forEach((f) => {
+          if (f.type === "Phone" || f.id === "lead-phone" || /phone|mobile/i.test(f.label)) {
+            initVals[f.id] = "+91 ";
+          }
+        });
+      });
+      // Only fill phone prefixes that are missing; unchanged → same object.
+      setValues((prev) => {
+        const missing = Object.keys(initVals).filter((id) => !(id in prev));
+        if (missing.length === 0) return prev;
+        return { ...initVals, ...prev };
+      });
+    }
+  }, [isOpen, sections]);
 
   if (!isOpen) return null;
 
@@ -865,6 +961,106 @@ export default function CreateLeadModal({ isOpen, onClose, onCreate, onEditLayou
                       className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg bg-white focus:ring-2 focus:ring-indigo-500 text-slate-800"
                     />
                   </div>
+                </div>
+              </div>
+            );
+          })()}
+          {(() => {
+            // Salesperson attribution (PDF §11 "ownership and commission
+            // linkage"); the pick flows to the quotation, order and invoice as
+            // salesperson. An agreed rate pays this lead's invoices at that
+            // rate instead of the incentive scheme (PDF §12); blank = scheme.
+            const sourceField = fieldBy('lead-source', /source/);
+            const currentSourceVal = String(values[sourceField?.id] ?? '');
+            const matchedSource = (sources || []).find((s) => String(s.id) === currentSourceVal || String(s.name).toLowerCase() === currentSourceVal.toLowerCase());
+            if (!isSalespersonSource(matchedSource?.name || currentSourceVal) && !values.salesperson_id) return null;
+
+            return (
+              <div className="col-span-full bg-emerald-50/70 p-4 rounded-xl border border-emerald-200 mb-2 space-y-3">
+                <div className="text-xs font-bold text-emerald-950 uppercase tracking-wide flex items-center gap-1.5">
+                  <Percent size={15} className="text-emerald-600" />
+                  Salesperson Attribution & Incentive
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-xs font-semibold text-slate-700">
+                        Select Salesperson <span className="text-rose-500">*</span>
+                      </label>
+                      <MasterSourceLink source="salespeople" />
+                    </div>
+                    <SalespersonSelect
+                      value={values.salesperson_id || ''}
+                      name={values.salesperson_name || ''}
+                      onChange={(person) => setValues((prev) => ({
+                        ...prev,
+                        salesperson_id: person.id,
+                        salesperson_name: person.name,
+                      }))}
+                      className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg bg-white focus:ring-2 focus:ring-emerald-500 font-medium text-slate-800"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">Commission Basis</label>
+                    <select
+                      value={values.salesperson_commission_basis || 'percent'}
+                      onChange={(e) => setValues((prev) => ({ ...prev, salesperson_commission_basis: e.target.value }))}
+                      className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg bg-white focus:ring-2 focus:ring-emerald-500 font-medium text-slate-800"
+                    >
+                      <option value="percent">Percentage of Net Value (%)</option>
+                      <option value="per_meter">Fixed per Meter (₹/m)</option>
+                      <option value="per_taka">Fixed per Taka (₹/taka)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">Agreed Rate</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="any"
+                      placeholder="e.g. 2.0 or 2.50"
+                      value={values.salesperson_commission_rate ?? ''}
+                      onChange={(e) => setValues((prev) => ({ ...prev, salesperson_commission_rate: e.target.value }))}
+                      className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg bg-white focus:ring-2 focus:ring-emerald-500 font-semibold text-slate-800"
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">Notes</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Referred by the salesperson at the trade fair"
+                      value={values.salesperson_notes ?? ''}
+                      onChange={(e) => setValues((prev) => ({ ...prev, salesperson_notes: e.target.value }))}
+                      className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg bg-white focus:ring-2 focus:ring-emerald-500 text-slate-800"
+                    />
+                  </div>
+                </div>
+                <div className="rounded-lg border border-emerald-200 bg-white p-3">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-xs font-semibold text-slate-700">
+                      {values.salesperson_commission_rate
+                        ? 'Incentive scheme (not applied to this lead — the agreed rate above is used instead)'
+                        : 'Incentive terms (applied when no agreed rate is set)'}
+                    </span>
+                    <MasterSourceLink source="incentiveSchemes" />
+                  </div>
+                  {incentiveSchemes.length === 0 ? (
+                    <p className="text-[11px] text-slate-500">
+                      No active incentive scheme. Set one under HRMS → Incentives; until then this lead only records who brought it.
+                    </p>
+                  ) : (
+                    <ul className="space-y-1">
+                      {incentiveSchemes.map((scheme) => (
+                        <li key={scheme.id} className="text-[11px] text-slate-600">
+                          <span className="font-semibold text-slate-800">{scheme.name}</span>
+                          {' — '}{PERIOD_LABEL[scheme.periodType] || scheme.periodType}, {describeScheme(scheme)}
+                          {scheme.payoutAfterDays ? `, paid ${scheme.payoutAfterDays} days after the customer pays` : ''}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
               </div>
             );

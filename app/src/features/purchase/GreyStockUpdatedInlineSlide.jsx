@@ -16,6 +16,8 @@ import {
 } from 'lucide-react';
 import { api } from '../../services/api';
 import { useERP } from '../../context/ERPContext';
+import { useTableSort } from '../../hooks/useTableSort';
+import SortableTh from '../../components/ui/SortableTh';
 
 function numIN(val) {
   const n = Number(val) || 0;
@@ -117,6 +119,17 @@ export function GreyStockUpdatedInlineSlide({ po, onClose, onNextStep, onPrevSte
     };
   }, [takas, po]);
 
+  const passedTakaRows = useMemo(() => takas.filter((t) => t.qcStatus === 'Passed'), [takas]);
+  const takaSort = useTableSort(passedTakaRows, {
+    accessors: {
+      takaId: (t) => t.takaId || t.barcode || t.id,
+      lotNo: (t) => t.lotNo || t.lot_number,
+      takaRoll: (t) => t.takaRoll || t.taka_number,
+      availableQty: (t) => Number(t.availableQty || t.receivedQty || t.received_quantity) || 0,
+      location: (t) => t.location || 'WH-MAIN / Godown',
+    },
+  });
+
   return (
     <div className="rounded-2xl border-2 border-teal-400/80 bg-gradient-to-b from-teal-50/60 via-white to-white p-4 sm:p-5 shadow-md space-y-4 animate-in fade-in slide-in-from-top-3 duration-300">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-teal-100">
@@ -200,16 +213,16 @@ export function GreyStockUpdatedInlineSlide({ po, onClose, onNextStep, onPrevSte
           <table className="w-full text-left text-xs">
             <thead className="bg-slate-50 font-bold text-slate-600 border-b border-slate-200 uppercase text-[10px] sticky top-0 z-10">
               <tr>
-                <th className="py-2 px-3">Barcode / Taka ID</th>
-                <th className="py-2 px-3">Lot Number</th>
-                <th className="py-2 px-3">Roll #</th>
-                <th className="py-2 px-3">Available Qty</th>
-                <th className="py-2 px-3">Current Location</th>
+                <SortableTh sort={takaSort} sortKey="takaId" className="py-2 px-3">Barcode / Taka ID</SortableTh>
+                <SortableTh sort={takaSort} sortKey="lotNo" className="py-2 px-3">Lot Number</SortableTh>
+                <SortableTh sort={takaSort} sortKey="takaRoll" className="py-2 px-3">Roll #</SortableTh>
+                <SortableTh sort={takaSort} sortKey="availableQty" className="py-2 px-3">Available Qty</SortableTh>
+                <SortableTh sort={takaSort} sortKey="location" className="py-2 px-3">Current Location</SortableTh>
                 <th className="py-2 px-3">Stock Status</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-slate-700">
-              {takas.filter((t) => t.qcStatus === 'Passed').map((t, idx) => (
+              {takaSort.rows.map((t, idx) => (
                 <tr key={t.id || idx} className="hover:bg-slate-50/70 font-mono text-[11px]">
                   <td className="py-1.5 px-3 font-bold text-teal-700 flex items-center gap-1">
                     <QrCode size={12} className="text-teal-500" />

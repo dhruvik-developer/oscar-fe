@@ -4,6 +4,7 @@ import Modal from '../../../components/ui/Modal';
 import PageHeader from '../../../components/ui/PageHeader';
 import MasterSourceLink from '../../../components/common/MasterSourceLink';
 import React, { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Plus,
@@ -44,6 +45,8 @@ import {
 import { loadDeals, buildDeal, EMPTY_DEAL_FORM, getInitialsFromName, getAvatarColorFromName } from '../../../services/dealService';
 import { useCrmStore } from '../../../stores/crmStore';
 import { useERP } from '../../../context/ERPContext';
+import AppPagination from '../../../components/ui/AppPagination';
+import { TEXTILE_FABRIC_OPTIONS } from '../../../data/crm/leadFormSchema';
 import { useAppStore } from '../../../stores/appStore';
 import { api } from '../../../services/api';
 
@@ -62,8 +65,6 @@ const GRID_CLASSES = [
   'lg:grid-cols-1', 'lg:grid-cols-2', 'lg:grid-cols-3', 'lg:grid-cols-4',
   'lg:grid-cols-5', 'lg:grid-cols-6', 'lg:grid-cols-7', 'lg:grid-cols-8',
 ];
-const PRODUCTS = ['All Products', 'Diamond Jewelry', 'Gold Ornaments', 'Silver Collection', 'Laser Machine', 'CNC Spindle', 'AMC Service'];
-const SOURCES = ['All Sources', 'Website', 'Referral', 'Walk-in', 'Trade Show', 'Social Media'];
 // User list is loaded dynamically from /admin/users/
 
 const STAGE_STYLES = {
@@ -145,6 +146,15 @@ function formatStageSummary(totalAmount, count) {
 function formatColumnSummary(totalAmount, dealCount, leadCount) {
   const base = formatStageSummary(totalAmount, dealCount);
   return leadCount > 0 ? `${base} • ${leadCount} lead${leadCount === 1 ? '' : 's'}` : base;
+}
+
+function getProductLabel(product) {
+  if (typeof product === 'string') return product.trim();
+  if (!product || typeof product !== 'object') return '';
+  return String(
+    product.productName || product.fabricQuality || product.name ||
+    product.product || product.itemName || product.fabric || '',
+  ).trim();
 }
 
 // Stages beyond the hardcoded five (Revised, Declined, or anything a tenant
@@ -244,11 +254,32 @@ export default function DealsPage() {
   const [selectedStage, setSelectedStage] = useState('All Stages');
   const [selectedSource, setSelectedSource] = useState('All Sources');
   const [selectedUser, setSelectedUser] = useState('All Users');
-  const [dateRange, setDateRange] = useState('01 Sep 2025 - 30 Sep 2025');
+  const [dateRange, setDateRange] = useState('All Time');
   const [viewMode, setViewMode] = useState('kanban');
+  const [listPage, setListPage] = useState(1);
+  const [listPageSize, setListPageSize] = useState(10);
 
   const [expandedColumns, setExpandedColumns] = useState({});
-  const [openMenuDealId, setOpenMenuDealId] = useState(null);
+  const [dealMenu, setDealMenu] = useState(null); // { deal, top, left }
+  const DEAL_MENU_WIDTH = 180;
+
+  const handleToggleDealMenu = (e, deal) => {
+    e.stopPropagation();
+    if (dealMenu?.deal?.id === deal.id) {
+      setDealMenu(null);
+      return;
+    }
+    const rect = e.currentTarget.getBoundingClientRect();
+    const menuHeight = 185;
+    const openUp = rect.bottom + menuHeight > window.innerHeight;
+    setDealMenu({
+      deal,
+      top: openUp ? Math.max(8, rect.top - menuHeight) : rect.bottom + 6,
+      left: Math.max(8, Math.min(rect.right - DEAL_MENU_WIDTH, window.innerWidth - DEAL_MENU_WIDTH - 8)),
+    });
+  };
+
+  const closeDealMenu = () => setDealMenu(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [editingDeal, setEditingDeal] = useState(null);
   const [dealToDelete, setDealToDelete] = useState(null);
@@ -257,18 +288,32 @@ export default function DealsPage() {
   const [formState, setFormState] = useState(EMPTY_DEAL_FORM);
   const [formError, setFormError] = useState('');
   const [showFilters, setShowFilters] = useState(false);
-  const [showLearnMoreBanner, setShowLearnMoreBanner] = useState(true);
-  const [isLearnMoreOpen, setIsLearnMoreOpen] = useState(false);
 
   useEffect(() => {
-    const handleOutsideClick = (e) => {
-      if (!e.target.closest('.deal-action-menu-container')) {
-        setOpenMenuDealId(null);
+    if (!dealMenu) return;
+    const handleOutside = (e) => {
+      if (!e.target.closest?.('.deal-floating-menu') && !e.target.closest?.('.deal-menu-trigger-btn')) {
+        closeDealMenu();
       }
     };
-    document.addEventListener('mousedown', handleOutsideClick);
-    return () => document.removeEventListener('mousedown', handleOutsideClick);
-  }, []);
+    const handleKey = (e) => {
+      if (e.key === 'Escape') closeDealMenu();
+    };
+    const handleScroll = (e) => {
+      if (e.target?.closest?.('.deal-floating-menu')) return;
+      closeDealMenu();
+    };
+    document.addEventListener('mousedown', handleOutside);
+    document.addEventListener('keydown', handleKey);
+    document.addEventListener('scroll', handleScroll, true);
+    window.addEventListener('resize', handleScroll);
+    return () => {
+      document.removeEventListener('mousedown', handleOutside);
+      document.removeEventListener('keydown', handleKey);
+      document.removeEventListener('scroll', handleScroll, true);
+      window.removeEventListener('resize', handleScroll);
+    };
+  }, [dealMenu]);
 
   const showNotification = (msg) => {
     setToastMessage(msg);
@@ -277,24 +322,137 @@ export default function DealsPage() {
 
   // Assignable users from the CRM team roster, plus any name already on a deal
   // so the filter can still find deals assigned to someone no longer listed.
+  const crmSources = useCrmStore((s) => s.sources);
+  const { items = [], fabrics = [] } = useERP() || {};
+
+  const getDealSource = (deal) => {
+    if (deal?.source) return deal.source;
+    const linkedLead = (allLeads || []).find(
+      (l) => (deal?.leadId && String(l.id) === String(deal.leadId)) ||
+             (deal?.name && String(l.name).trim().toLowerCase() === String(deal.name).trim().toLowerCase())
+    );
+    return linkedLead?.source || linkedLead?.customValues?.fields?.['lead-source'] || linkedLead?.customValues?.source || '';
+  };
+
+  const getDealProduct = (deal) => {
+    const savedProduct = getProductLabel(deal?.product) ||
+      getProductLabel(Array.isArray(deal?.products) ? deal.products[0] : '');
+    if (savedProduct) return savedProduct;
+    const linkedLead = (allLeads || []).find(
+      (l) => (deal?.leadId && String(l.id) === String(deal.leadId)) ||
+             (deal?.name && String(l.name).trim().toLowerCase() === String(deal.name).trim().toLowerCase())
+    );
+    const prods = linkedLead?.products || linkedLead?.customValues?.products || linkedLead?.customValues?.fields?.products;
+    if (Array.isArray(prods) && prods.length > 0) return getProductLabel(prods[0]);
+    return getProductLabel(prods);
+  };
+
+  const getDealUser = (deal) => {
+    if (deal?.assignedUser) return deal.assignedUser;
+    if (deal?.ownerName) return deal.ownerName;
+    const linkedLead = (allLeads || []).find(
+      (l) => (deal?.leadId && String(l.id) === String(deal.leadId)) ||
+             (deal?.name && String(l.name).trim().toLowerCase() === String(deal.name).trim().toLowerCase())
+    );
+    return linkedLead?.ownerName || linkedLead?.owner || '';
+  };
+
+  const productOptions = useMemo(() => {
+    const list = new Set();
+    (items || []).forEach((i) => {
+      const name = i.name || i.itemName || i.item_name || i.fabricQuality;
+      if (name) list.add(String(name).trim());
+    });
+    (fabrics || []).forEach((f) => {
+      const name = f.name || f.fabric || f.quality;
+      if (name) list.add(String(name).trim());
+    });
+    (deals || []).forEach((d) => {
+      const prod = getDealProduct(d);
+      if (prod) list.add(prod);
+      if (Array.isArray(d.products)) d.products.forEach((p) => {
+        const name = getProductLabel(p);
+        if (name) list.add(name);
+      });
+    });
+    (allLeads || []).forEach((l) => {
+      const prods = l.products || l.customValues?.products || l.customValues?.fields?.products;
+      if (Array.isArray(prods)) prods.forEach((p) => {
+        const name = getProductLabel(p);
+        if (name) list.add(name);
+      });
+      else {
+        const name = getProductLabel(prods);
+        if (name) list.add(name);
+      }
+    });
+    if (list.size === 0) {
+      (TEXTILE_FABRIC_OPTIONS || []).forEach((p) => list.add(p));
+    }
+    return ['All Products', ...Array.from(list).sort((a, b) => a.localeCompare(b))];
+  }, [items, fabrics, deals, allLeads]);
+
+  const sourceOptions = useMemo(() => {
+    const list = new Set();
+    (Array.isArray(crmSources) ? crmSources : []).forEach((s) => {
+      const name = typeof s === 'string' ? s : s?.name;
+      if (name) list.add(String(name).trim());
+    });
+    (deals || []).forEach((d) => {
+      const s = getDealSource(d);
+      if (s) list.add(String(s).trim());
+    });
+    (allLeads || []).forEach((l) => {
+      const s = l.source || l.customValues?.fields?.['lead-source'] || l.customValues?.source;
+      if (s) list.add(String(s).trim());
+    });
+    return ['All Sources', ...Array.from(list).sort((a, b) => a.localeCompare(b))];
+  }, [crmSources, deals, allLeads]);
+
   const usersList = useMemo(() => {
     const names = new Set();
     (Array.isArray(teamMembers) ? teamMembers : []).forEach((m) => m?.name && names.add(m.name));
-    deals.forEach((d) => d.assignedUser && names.add(d.assignedUser));
+    (deals || []).forEach((d) => {
+      const u = getDealUser(d);
+      if (u) names.add(u);
+    });
     return ['All Users', ...[...names].sort((a, b) => a.localeCompare(b))];
-  }, [teamMembers, deals]);
+  }, [teamMembers, deals, allLeads]);
 
   const filteredDeals = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     return deals.filter((d) => {
-      if (selectedProduct !== 'All Products' && d.product !== selectedProduct) return false;
+      const dealProduct = getDealProduct(d);
+      const dealSource = getDealSource(d);
+      const dealUser = getDealUser(d);
+
+      if (selectedProduct !== 'All Products' && dealProduct !== selectedProduct) return false;
       if (selectedStage !== 'All Stages' && d.stage !== selectedStage) return false;
-      if (selectedSource !== 'All Sources' && d.source !== selectedSource) return false;
-      if (selectedUser !== 'All Users' && d.assignedUser !== selectedUser) return false;
-      if (q && !`${d.name} ${d.client} ${d.phone} ${d.product}`.toLowerCase().includes(q)) return false;
+      if (selectedSource !== 'All Sources' && dealSource !== selectedSource) return false;
+      if (selectedUser !== 'All Users' && dealUser !== selectedUser) return false;
+      if (dateRange !== 'All Time') {
+        const dealDateStr = d.createdAt || d.date;
+        if (dealDateStr) {
+          const dealDate = new Date(dealDateStr);
+          if (!isNaN(dealDate.getTime())) {
+            const now = new Date();
+            const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            if (dateRange === 'Today' && dealDate < startOfDay) return false;
+            if (dateRange === 'Last 7 Days' && dealDate < new Date(startOfDay.getTime() - 7 * 86400000)) return false;
+            if (dateRange === 'This Month' && dealDate < new Date(now.getFullYear(), now.getMonth(), 1)) return false;
+            if (dateRange === 'Last 30 Days' && dealDate < new Date(startOfDay.getTime() - 30 * 86400000)) return false;
+            if (dateRange === 'This Quarter') {
+              const qMonth = Math.floor(now.getMonth() / 3) * 3;
+              if (dealDate < new Date(now.getFullYear(), qMonth, 1)) return false;
+            }
+            if (dateRange === 'This Year' && dealDate < new Date(now.getFullYear(), 0, 1)) return false;
+          }
+        }
+      }
+      if (q && !`${d.name} ${d.client} ${d.phone} ${dealProduct} ${dealSource} ${dealUser}`.toLowerCase().includes(q)) return false;
       return true;
     });
-  }, [deals, searchQuery, selectedProduct, selectedStage, selectedSource, selectedUser]);
+  }, [deals, allLeads, searchQuery, selectedProduct, selectedStage, selectedSource, selectedUser, dateRange]);
 
   /**
    * Board columns come from the DealStage catalogue, not a hardcoded array, so
@@ -379,13 +537,20 @@ export default function DealsPage() {
       Open: [],
       Won: [],
       Lost: [],
-    };
-
-    (allLeads || []).forEach((lead) => {
+    };    (allLeads || []).forEach((lead) => {
       if (!lead) return;
       if (leadsWithDeals.has(String(lead.id))) return;
 
-      if (q && !`${lead.name} ${lead.company} ${lead.phone} ${lead.email}`.toLowerCase().includes(q)) {
+      const leadSource = lead.source || lead.customValues?.fields?.['lead-source'] || lead.customValues?.source || '';
+      const leadProds = lead.products || lead.customValues?.products || lead.customValues?.fields?.products;
+      const leadProd = Array.isArray(leadProds) && leadProds.length > 0 ? leadProds[0] : (typeof leadProds === 'string' ? leadProds : '');
+      const leadUser = lead.ownerName || lead.owner || '';
+
+      if (selectedProduct !== 'All Products' && leadProd !== selectedProduct) return;
+      if (selectedSource !== 'All Sources' && leadSource !== selectedSource) return;
+      if (selectedUser !== 'All Users' && leadUser !== selectedUser) return;
+
+      if (q && !`${lead.name} ${lead.company} ${lead.phone} ${lead.email} ${leadSource} ${leadProd}`.toLowerCase().includes(q)) {
         return;
       }
 
@@ -425,7 +590,7 @@ export default function DealsPage() {
     });
 
     return result;
-  }, [allLeads, deals, leadStages, quotations, searchQuery]);
+  }, [allLeads, deals, leadStages, quotations, searchQuery, selectedProduct, selectedSource, selectedUser]);
 
   const visibleLostLeads = useMemo(() => leadsByStage.Lost || [], [leadsByStage]);
 
@@ -452,7 +617,7 @@ export default function DealsPage() {
     setSelectedStage('All Stages');
     setSelectedSource('All Sources');
     setSelectedUser('All Users');
-    setDateRange('01 Sep 2025 - 30 Sep 2025');
+    setDateRange('All Time');
     showNotification('Filters reset.');
   };
 
@@ -462,7 +627,7 @@ export default function DealsPage() {
     if (selectedStage !== 'All Stages') count += 1;
     if (selectedSource !== 'All Sources') count += 1;
     if (selectedUser !== 'All Users') count += 1;
-    if (dateRange !== '01 Sep 2025 - 30 Sep 2025') count += 1;
+    if (dateRange !== 'All Time') count += 1;
     return count;
   }, [dateRange, selectedProduct, selectedSource, selectedStage, selectedUser]);
 
@@ -472,6 +637,7 @@ export default function DealsPage() {
       ...EMPTY_DEAL_FORM,
       assignedUser: currentUser?.name || '',
       stage: stageName,
+      phone: '+91 ',
       date: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
     });
     setFormError('');
@@ -485,89 +651,225 @@ export default function DealsPage() {
       return;
     }
 
-    const rows = filteredDeals.map((deal, index) => `
-      <tr>
-        <td>${index + 1}</td>
-        <td>${escapeHtml(deal.name)}</td>
-        <td>${escapeHtml(deal.client)}</td>
-        <td>${escapeHtml(deal.phone)}</td>
-        <td>${escapeHtml(deal.stage)}</td>
-        <td>${escapeHtml(deal.product)}</td>
-        <td>${escapeHtml(deal.source)}</td>
-        <td>${escapeHtml(deal.assignedUser)}</td>
-        <td>${escapeHtml(deal.date)}</td>
-        <td>${escapeHtml(formatPriceINR(deal.price))}</td>
-      </tr>
-    `).join('');
-
     const today = new Date().toLocaleDateString('en-GB');
+    const summaryValue = filteredDeals.reduce((sum, deal) => sum + (Number(deal.price) || 0), 0);
+
     const activeFilters = [
       selectedProduct !== 'All Products' ? `Product: ${selectedProduct}` : '',
       selectedStage !== 'All Stages' ? `Stage: ${selectedStage}` : '',
       selectedSource !== 'All Sources' ? `Source: ${selectedSource}` : '',
       selectedUser !== 'All Users' ? `Assigned User: ${selectedUser}` : '',
-      dateRange !== '01 Sep 2025 - 30 Sep 2025' ? `Date Range: ${dateRange}` : '',
+      dateRange !== 'All Time' ? `Date Range: ${dateRange}` : '',
       searchQuery.trim() ? `Search: ${searchQuery.trim()}` : '',
     ].filter(Boolean);
-    const summaryValue = filteredDeals.reduce((sum, deal) => sum + (Number(deal.price) || 0), 0);
+
+    const rows = filteredDeals.length > 0
+      ? filteredDeals.map((deal, index) => `
+        <tr>
+          <td class="text-center">${index + 1}</td>
+          <td class="font-bold">${escapeHtml(deal.name || 'Untitled Deal')}</td>
+          <td>${escapeHtml(deal.client || '—')}</td>
+          <td>${escapeHtml(deal.phone || '—')}</td>
+          <td class="text-center">
+            <span class="stage-pill stage-${escapeHtml(deal.stage || 'Draft')}">
+              ${escapeHtml(deal.stage || 'Draft')}
+            </span>
+          </td>
+          <td>${escapeHtml(deal.product || getDealProduct(deal) || '—')}</td>
+          <td>${escapeHtml(deal.source || getDealSource(deal) || '—')}</td>
+          <td>${escapeHtml(deal.assignedUser || getDealUser(deal) || '—')}</td>
+          <td>${escapeHtml(deal.date || '—')}</td>
+          <td class="text-right font-bold">${escapeHtml(formatPriceINR(deal.price))}</td>
+        </tr>
+      `).join('')
+      : `
+        <tr>
+          <td colspan="10" class="empty-cell">
+            No deals recorded matching the selected criteria.
+          </td>
+        </tr>
+      `;
 
     const reportHtml = `
       <!doctype html>
       <html>
         <head>
-          <title>Deals Report</title>
+          <title>Deals Report - OSCAR ERP</title>
           <style>
-            body { font-family: Arial, sans-serif; color: #0f172a; margin: 0; padding: 32px; }
-            h1 { margin: 0 0 6px; font-size: 28px; }
-            .sub { margin: 0; color: #64748b; font-size: 13px; }
-            .meta { margin-top: 18px; display: flex; gap: 12px; flex-wrap: wrap; }
-            .pill { background: #eff6ff; color: #1d4ed8; border-radius: 999px; padding: 6px 10px; font-size: 12px; font-weight: 700; }
-            .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 20px 0; }
-            .card { border: 1px solid #e2e8f0; border-radius: 14px; padding: 14px 16px; }
-            .card small { color: #64748b; display: block; margin-bottom: 6px; font-size: 12px; font-weight: 700; }
-            .card strong { font-size: 24px; }
-            table { width: 100%; border-collapse: collapse; margin-top: 18px; }
-            th, td { border: 1px solid #e2e8f0; padding: 10px 12px; text-align: left; font-size: 12px; }
-            th { background: #f8fafc; color: #475569; text-transform: uppercase; letter-spacing: .04em; }
-            .filters { margin-top: 12px; color: #475569; font-size: 12px; }
-            .empty { margin-top: 24px; padding: 18px; border: 1px dashed #cbd5e1; border-radius: 14px; color: #64748b; font-size: 13px; }
-            @media print { body { padding: 18px; } }
+            @page {
+              size: landscape;
+              margin: 12mm 15mm;
+            }
+            * { box-sizing: border-box; }
+            body {
+              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+              color: #0f172a;
+              margin: 0;
+              padding: 24px;
+              background: #ffffff;
+            }
+            .header {
+              display: flex;
+              justify-content: space-between;
+              align-items: flex-start;
+              padding-bottom: 14px;
+              border-bottom: 2px solid #0284c7;
+              margin-bottom: 14px;
+            }
+            .brand-title {
+              font-size: 22px;
+              font-weight: 800;
+              color: #0f172a;
+              margin: 0 0 4px;
+              letter-spacing: -0.02em;
+            }
+            .brand-subtitle {
+              font-size: 13px;
+              color: #64748b;
+              margin: 0;
+            }
+            .meta-box {
+              text-align: right;
+              font-size: 12px;
+              color: #475569;
+              line-height: 1.6;
+            }
+            .meta-box strong {
+              color: #0f172a;
+            }
+            .filter-bar {
+              background: #f8fafc;
+              border: 1px solid #e2e8f0;
+              border-radius: 8px;
+              padding: 8px 14px;
+              font-size: 11.5px;
+              color: #475569;
+              margin-bottom: 16px;
+            }
+            .filter-bar strong {
+              color: #1e293b;
+            }
+            table {
+              width: 100%;
+              border-collapse: collapse;
+              font-size: 11.5px;
+              margin-top: 8px;
+            }
+            th {
+              background: #f1f5f9;
+              color: #334155;
+              font-weight: 700;
+              text-transform: uppercase;
+              letter-spacing: 0.04em;
+              font-size: 10.5px;
+              border: 1px solid #cbd5e1;
+              padding: 9px 8px;
+              text-align: left;
+            }
+            td {
+              border: 1px solid #e2e8f0;
+              padding: 8px;
+              vertical-align: middle;
+              color: #1e293b;
+            }
+            tr:nth-child(even) td {
+              background: #fafafa;
+            }
+            .text-center { text-align: center; }
+            .text-right { text-align: right; }
+            .font-bold { font-weight: 700; }
+            .stage-pill {
+              display: inline-block;
+              padding: 3px 8px;
+              border-radius: 9999px;
+              font-size: 10.5px;
+              font-weight: 700;
+              text-transform: capitalize;
+            }
+            .stage-Draft { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; }
+            .stage-Sent { background: #faf5ff; color: #7e22ce; border: 1px solid #e9d5ff; }
+            .stage-Open { background: #fffbeb; color: #b45309; border: 1px solid #fde68a; }
+            .stage-Won { background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; }
+            .stage-Lost { background: #fff1f2; color: #be123c; border: 1px solid #fecdd3; }
+            .empty-cell {
+              text-align: center;
+              padding: 32px 16px;
+              color: #64748b;
+              font-style: italic;
+              font-size: 13px;
+              background: #ffffff !important;
+            }
+            tfoot td {
+              background: #f8fafc;
+              border-top: 2px solid #94a3b8;
+              font-weight: 700;
+              padding: 10px 8px;
+              font-size: 12px;
+            }
+            .footer {
+              margin-top: 24px;
+              padding-top: 10px;
+              border-top: 1px solid #e2e8f0;
+              display: flex;
+              justify-content: space-between;
+              font-size: 11px;
+              color: #94a3b8;
+            }
+            @media print {
+              body { padding: 0; }
+              .no-print { display: none; }
+            }
           </style>
         </head>
         <body>
-          <h1>Deals Report</h1>
-          <p class="sub">Printed on ${escapeHtml(today)}</p>
-          <div class="meta">
-            <span class="pill">${escapeHtml(`${filteredDeals.length} deals`)}</span>
-            <span class="pill">${escapeHtml(dateRange)}</span>
+          <div class="header">
+            <div>
+              <h1 class="brand-title">Deals Report</h1>
+              <p class="brand-subtitle">OSCAR ERP &bull; CRM Deals & Pipeline Tracking</p>
+            </div>
+            <div class="meta-box">
+              <div>Printed on: <strong>${escapeHtml(today)}</strong></div>
+              <div>Total Deals: <strong>${filteredDeals.length}</strong> | Total Value: <strong>${escapeHtml(formatPriceINR(summaryValue))}</strong></div>
+            </div>
           </div>
-          ${activeFilters.length > 0 ? `<p class="filters"><strong>Active Filters:</strong> ${escapeHtml(activeFilters.join(' | '))}</p>` : ''}
-          <div class="grid">
-            <div class="card"><small>Total Deals</small><strong>${escapeHtml(String(filteredDeals.length))}</strong></div>
-            <div class="card"><small>Total Value</small><strong>${escapeHtml(formatPriceINR(summaryValue))}</strong></div>
-            <div class="card"><small>View</small><strong>${escapeHtml(viewMode === 'kanban' ? 'Kanban' : 'List')}</strong></div>
+
+          ${activeFilters.length > 0 ? `
+            <div class="filter-bar">
+              <strong>Active Filters:</strong> ${escapeHtml(activeFilters.join(' • '))}
+            </div>
+          ` : ''}
+
+          <table>
+            <thead>
+              <tr>
+                <th style="width: 40px;" class="text-center">#</th>
+                <th>Deal Name</th>
+                <th>Client</th>
+                <th>Phone</th>
+                <th style="width: 80px;" class="text-center">Stage</th>
+                <th>Product</th>
+                <th>Source</th>
+                <th>Assigned User</th>
+                <th style="width: 90px;">Date</th>
+                <th style="width: 120px;" class="text-right">Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rows}
+            </tbody>
+            <tfoot>
+              <tr>
+                <td colspan="4" class="font-bold">Total (${filteredDeals.length} Deals)</td>
+                <td colspan="5"></td>
+                <td class="text-right font-bold">${escapeHtml(formatPriceINR(summaryValue))}</td>
+              </tr>
+            </tfoot>
+          </table>
+
+          <div class="footer">
+            <span>Generated via OSCAR ERP - CRM Module</span>
+            <span>Confidential - For Internal Use Only</span>
           </div>
-          ${filteredDeals.length === 0 ? `
-            <div class="empty">No deals match the current filters.</div>
-          ` : `
-            <table>
-              <thead>
-                <tr>
-                  <th>#</th>
-                  <th>Deal Name</th>
-                  <th>Client</th>
-                  <th>Phone</th>
-                  <th>Stage</th>
-                  <th>Product</th>
-                  <th>Source</th>
-                  <th>Assigned User</th>
-                  <th>Date</th>
-                  <th>Amount</th>
-                </tr>
-              </thead>
-              <tbody>${rows}</tbody>
-            </table>
-          `}
         </body>
       </html>
     `;
@@ -592,8 +894,8 @@ export default function DealsPage() {
       name: deal.name,
       price: deal.price,
       client: deal.client,
-      phone: deal.phone,
-      product: deal.product || 'Diamond Jewelry',
+      phone: deal.phone ? (deal.phone.startsWith('+91') ? deal.phone : `+91 ${deal.phone}`) : '+91 ',
+      product: getDealProduct(deal),
       stage: deal.stage || 'Draft',
       source: deal.source || 'Website',
       assignedUser: deal.assignedUser || currentUser?.name || '',
@@ -601,14 +903,14 @@ export default function DealsPage() {
       tag: deal.tag || '',
     });
     setFormError('');
-    setOpenMenuDealId(null);
+    closeDealMenu();
     setIsCreateModalOpen(true);
   };
 
   const handleOpenDealDetail = (deal) => {
     setIsCreateModalOpen(false);
     setEditingDeal(null);
-    setOpenMenuDealId(null);
+    closeDealMenu();
     setSearchParams({ deal: String(deal.id) });
   };
 
@@ -693,13 +995,14 @@ export default function DealsPage() {
           : d
       )
     );
-    setOpenMenuDealId(null);
+    closeDealMenu();
     useCrmStore.getState().updateRecord('deals', dealId, { stage: targetStage }).catch((err) => {
       console.warn('[CRM Deals] Server stage update error:', err);
     });
     showNotification(`Deal moved to ${targetStage}`);
   };
 
+  // [Quotation & Proforma Invoice modules are commented out] — kept for when the module returns; no button calls it now.
   const handleCreateErpQuotation = (deal) => {
     const matchedCustomer = (customers || []).find((c) => 
       c.name?.toLowerCase() === deal.client?.toLowerCase() ||
@@ -731,7 +1034,7 @@ export default function DealsPage() {
       notes: `Created from CRM Deal: ${deal.name} (${deal.stage || 'Draft'})`,
     });
 
-    setOpenMenuDealId(null);
+    closeDealMenu();
     showNotification(`Quotation ${quote?.quoteNumber || ''} created in ERP!`);
     if (quote?.id) {
       navigate('/sales/quotations');
@@ -762,6 +1065,9 @@ export default function DealsPage() {
       customer: deal.client || matchedCustomer?.name || '',
       dealId: String(deal.id || ''),
       dealName: deal.name || '',
+      // The order links the lead itself (no quotation), so the lead's agreed
+      // broker / salesperson terms reach its invoices.
+      leadId: deal.leadId ? String(deal.leadId) : undefined,
       amount: dealAmount,
       stage: deal.stage === 'Won' ? 'Confirmed' : 'Draft',
       status: deal.stage === 'Won' ? 'Confirmed' : 'Draft',
@@ -769,7 +1075,7 @@ export default function DealsPage() {
       notes: `Created from CRM Deal: ${deal.name}`,
     });
 
-    setOpenMenuDealId(null);
+    closeDealMenu();
     showNotification(`Sales Order ${order?.orderNumber || ''} created in ERP!`);
     if (order?.id) {
       navigate('/sales/orders');
@@ -792,7 +1098,7 @@ export default function DealsPage() {
         </div>
       )}
 
-      {linkedDealId ? <DealDetailView key={linkedDealId} deal={deals.find((item) => String(item.id) === linkedDealId)} onEdit={handleOpenEditModal} onNotify={showNotification} onDelete={setDealToDelete} onUpdate={(patch) => {
+      {linkedDealId ? <DealDetailView key={linkedDealId} deal={deals.find((item) => String(item.id) === linkedDealId)} onEdit={handleOpenEditModal} onNotify={showNotification} onDelete={setDealToDelete} onMoveStage={handleMoveStage} onUpdate={(patch) => {
         // Header fields reach `/crm/deals/` through an explicit update —
         // nested arrays have their own endpoints (wired in the view).
         const updated = loadDeals().map((item) => String(item.id) === linkedDealId ? { ...item, ...patch } : item);
@@ -802,7 +1108,7 @@ export default function DealsPage() {
         });
         window.dispatchEvent(new Event('crm:data-updated'));
       }} onDuplicate={(deal) => {
-        const copy = buildDeal({ name: `${deal.name} (copy)`, client: deal.client, phone: deal.phone, price: deal.price, product: deal.product, products: deal.products, source: deal.source, assignedUser: deal.assignedUser, team: deal.team, description: deal.description, stage: 'Draft', createdAt: new Date().toISOString() }, `dl-${crypto.randomUUID()}`);
+        const copy = buildDeal({ name: `${deal.name} (copy)`, client: deal.client, phone: deal.phone ? (deal.phone.startsWith('+91') ? deal.phone : `+91 ${deal.phone}`) : '+91 ', price: deal.price, product: deal.product, products: deal.products, source: deal.source, assignedUser: deal.assignedUser, team: deal.team, description: deal.description, stage: 'Draft', createdAt: new Date().toISOString() }, `dl-${crypto.randomUUID()}`);
         const updated = [copy, ...loadDeals()];
         setDeals(updated);
         useCrmStore.getState().createRecord('deals', copy).catch((err) => {
@@ -825,51 +1131,11 @@ export default function DealsPage() {
               <Printer size={16} />
               <span>Print</span>
             </button>
-
-            <button
-              onClick={() => handleOpenCreateModal()}
-              className="btn-primary"
-            >
-              <Plus size={16} strokeWidth={2.5} />
-              <span>Add Deal</span>
-            </button>
           </div>
         }
       />
 
-      {showLearnMoreBanner && (
-        <div className="rounded-2xl border border-blue-100 bg-[#eef5ff] px-4 py-3 shadow-2xs">
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex min-w-0 items-start gap-3">
-              <span className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-blue-100 bg-white text-[#2f6fed]">
-                <Info size={16} />
-              </span>
-              <div className="min-w-0">
-                <p className="text-[14px] font-bold text-[#1d3f6e]">Understand the Difference</p>
-                <p className="mt-1 text-[12px] text-slate-600">
-                  Lead Stages are used to track and nurture potential leads. Deal Stages are used to track confirmed deals in the sales pipeline.
-                </p>
-                <button
-                  type="button"
-                  onClick={() => setIsLearnMoreOpen(true)}
-                  aria-haspopup="dialog"
-                  className="mt-3 text-[14px] font-medium text-[#2457ff] transition hover:text-[#1d4ed8]"
-                >
-                  Learn More -&gt;
-                </button>
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={() => setShowLearnMoreBanner(false)}
-              className="shrink-0 p-1 text-slate-400 hover:text-slate-600"
-              aria-label="Close information banner"
-            >
-              <X size={16} />
-            </button>
-          </div>
-        </div>
-      )}
+
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5 my-4">
         <CrmKpiCard label="Total Deals" value={stats.totalDeals} icon={Handshake} tone="blue" />
@@ -958,7 +1224,7 @@ export default function DealsPage() {
                   onChange={(e) => setSelectedProduct(e.target.value)}
                   className="w-full pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-700 appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
-                  {PRODUCTS.map((p) => (
+                  {productOptions.map((p) => (
                     <option key={p} value={p}>
                       {p}
                     </option>
@@ -997,7 +1263,7 @@ export default function DealsPage() {
                   onChange={(e) => setSelectedSource(e.target.value)}
                   className="w-full pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-700 appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
-                  {SOURCES.map((s) => (
+                  {sourceOptions.map((s) => (
                     <option key={s} value={s}>
                       {s}
                     </option>
@@ -1035,7 +1301,10 @@ export default function DealsPage() {
                   onChange={(e) => setDateRange(e.target.value)}
                   className="w-full pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-700 appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
-                  <option value="01 Sep 2025 - 30 Sep 2025">01 Sep 2025 - 30 Sep 2025</option>
+                  <option value="All Time">All Time</option>
+                  <option value="Today">Today</option>
+                  <option value="Last 7 Days">Last 7 Days</option>
+                  <option value="This Month">This Month</option>
                   <option value="Last 30 Days">Last 30 Days</option>
                   <option value="This Quarter">This Quarter</option>
                   <option value="This Year">This Year</option>
@@ -1045,11 +1314,6 @@ export default function DealsPage() {
             </div>
           </div>
         )}
-
-        <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-blue-50/70 border border-blue-200/60 text-[11px] text-blue-700">
-          <FileText size={12} className="shrink-0 text-blue-600" />
-          <span>Automated Lifecycle: Incoming Lead/Deal › <strong>Draft</strong> • Quotation Sent › <strong>Sent</strong> • Quotation Approved › <strong>Won</strong> • Quotation Rejected › <strong>Open</strong></span>
-        </div>
 
         <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-1">
           <div className="relative flex-1 w-full">
@@ -1130,8 +1394,7 @@ export default function DealsPage() {
                     </div>
                   ) : (
                     visibleItems.map((deal) => {
-                      const isMenuOpen = openMenuDealId === deal.id;
-                      return (
+                                            return (
                         <div
                           key={deal.id}
                           tabIndex={0}
@@ -1151,70 +1414,18 @@ export default function DealsPage() {
                               <Link to={`?deal=${encodeURIComponent(deal.id)}`} className="hover:text-blue-600 hover:underline">{deal.name}</Link>
                             </h4>
 
-                            <div className="relative deal-action-menu-container flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+                            <div className="relative flex-shrink-0" onClick={(e) => e.stopPropagation()}>
                               <button
                                 type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setOpenMenuDealId((prev) => (prev === deal.id ? null : deal.id));
-                                }}
-                                className={`w-6 h-6 rounded-lg flex items-center justify-center transition-colors cursor-pointer ${
-                                  isMenuOpen
-                                    ? 'bg-slate-200 text-slate-800'
-                                    : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'
+                                onClick={(e) => handleToggleDealMenu(e, deal)}
+                                className={`deal-menu-trigger-btn w-6 h-6 rounded-lg flex items-center justify-center transition-colors cursor-pointer ${
+                                  dealMenu?.deal?.id === deal.id
+                                    ? "bg-slate-200 text-slate-800"
+                                    : "text-slate-400 hover:text-slate-700 hover:bg-slate-100"
                                 }`}
                               >
                                 <MoreVertical size={14} />
                               </button>
-
-                              {isMenuOpen && (
-                                <div className="absolute right-0 top-full mt-1.5 w-44 bg-white border border-slate-200 rounded-xl shadow-xl z-30 py-1.5 animate-in fade-in zoom-in-95 duration-150">
-                                  <button
-                                    type="button"
-                                    onClick={() => handleOpenDealDetail(deal)}
-                                    className="w-full px-3.5 py-2 text-left text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-2.5 cursor-pointer"
-                                  >
-                                    <Edit2 size={13} className="text-blue-600" />
-                                    <span>View Deal</span>
-                                  </button>
-
-
-
-                                  <div className="px-3.5 py-1 text-[10px] uppercase font-bold text-slate-400 border-t border-slate-100 mt-1">
-                                    ERP Conversion
-                                  </div>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleCreateErpQuotation(deal)}
-                                    className="w-full px-3.5 py-1.5 text-left text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-2 cursor-pointer"
-                                  >
-                                    <FileText size={12} className="text-blue-600" />
-                                    <span>Create Quotation</span>
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleCreateErpSalesOrder(deal)}
-                                    className="w-full px-3.5 py-1.5 text-left text-xs font-semibold text-emerald-700 hover:bg-emerald-50 flex items-center gap-2 cursor-pointer"
-                                  >
-                                    <ShoppingCart size={12} className="text-emerald-600" />
-                                    <span>Create Sales Order</span>
-                                  </button>
-
-                                  <div className="my-1 border-t border-slate-100" />
-
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setDealToDelete(deal);
-                                      setOpenMenuDealId(null);
-                                    }}
-                                    className="w-full px-3.5 py-2 text-left text-xs font-semibold text-rose-600 hover:bg-rose-50 flex items-center gap-2.5 cursor-pointer"
-                                  >
-                                    <Trash2 size={13} className="text-rose-500" />
-                                    <span>Delete Deal</span>
-                                  </button>
-                                </div>
-                              )}
                             </div>
                           </div>
 
@@ -1240,11 +1451,11 @@ export default function DealsPage() {
                           </div>
 
                           {/* Product Pill */}
-                          {deal.product && (
+                          {(deal.product || getDealProduct(deal)) && (
                             <div>
                               <span className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-500 bg-slate-50 border border-slate-200 px-2 py-0.5 rounded-md truncate max-w-full">
                                 <Tag size={10} className="text-slate-400 flex-shrink-0" />
-                                <span className="truncate">{deal.product}</span>
+                                <span className="truncate">{deal.product || getDealProduct(deal)}</span>
                               </span>
                             </div>
                           )}
@@ -1398,7 +1609,7 @@ export default function DealsPage() {
                         <span className="font-medium text-slate-700">{deal.client}</span>
                       </div>
                     </td>
-                    <td className="py-3.5 px-4 text-slate-600">{deal.product}</td>
+                    <td className="py-3.5 px-4 text-slate-600">{deal.product || getDealProduct(deal)}</td>
                     <td className="py-3.5 px-4">
                       <span
                         className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-full border ${
@@ -1414,6 +1625,7 @@ export default function DealsPage() {
                     <td className="py-3.5 px-4 text-slate-500">{deal.date}</td>
                     <td className="py-3.5 px-4 text-right">
                       <div className="flex items-center justify-end gap-1.5">
+                        {/* [Quotation & Proforma Invoice modules are commented out]
                         <button
                           type="button"
                           onClick={() => handleCreateErpQuotation(deal)}
@@ -1423,6 +1635,7 @@ export default function DealsPage() {
                         >
                           <FileText size={13} />
                         </button>
+                        */}
                         <button
                           type="button"
                           onClick={() => handleCreateErpSalesOrder(deal)}
@@ -1506,38 +1719,116 @@ export default function DealsPage() {
               </tbody>
             </table>
           </div>
+          <div className="border-t border-slate-100">
+            <AppPagination
+              total={filteredDeals.length}
+              page={listPage}
+              pageSize={listPageSize}
+              onPageChange={setListPage}
+              onPageSizeChange={setListPageSize}
+              pageSizeOptions={[10, 20, 50]}
+              bordered={false}
+            />
+          </div>
         </div>
       )}
 
       </>}
-      <Modal
-        isOpen={isLearnMoreOpen}
-        onClose={() => setIsLearnMoreOpen(false)}
-        title="Lead Stages vs Deal Stages"
-        size="lg"
-        footer={
-          <button type="button" onClick={() => setIsLearnMoreOpen(false)} className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">
-            Got it
+
+
+            {dealMenu && createPortal(
+        <div
+          className="deal-floating-menu fixed bg-white border border-slate-200 rounded-xl shadow-2xl z-[9999] py-1.5 w-48 text-xs font-semibold text-slate-700 animate-in fade-in zoom-in-95 duration-100"
+          style={{
+            top: dealMenu.top,
+            left: dealMenu.left,
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            type="button"
+            onClick={() => {
+              handleOpenDealDetail(dealMenu.deal);
+              closeDealMenu();
+            }}
+            className="w-full px-3.5 py-2 text-left text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-2.5 cursor-pointer"
+          >
+            <Edit2 size={13} className="text-blue-600" />
+            <span>View Deal</span>
           </button>
-        }
-      >
-        <div className="space-y-4">
-          <p className="text-sm leading-relaxed text-slate-600">Use lead stages to track a potential customer's interest and deal stages to track a specific sales opportunity through to its outcome.</p>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="rounded-2xl border border-blue-100 bg-blue-50 p-4">
-              <h3 className="text-sm font-bold text-slate-900">Lead Stages</h3>
-              <p className="mt-2 text-sm leading-relaxed text-slate-600">Track enquiries, collect requirements and follow up with potential customers as you assess their needs.</p>
-              <p className="mt-3 text-xs font-semibold text-blue-700">Example: New Lead → Details Collected → Demo Done</p>
-            </div>
-            <div className="rounded-2xl border border-purple-100 bg-purple-50 p-4">
-              <h3 className="text-sm font-bold text-slate-900">Deal Stages</h3>
-              <p className="mt-2 text-sm leading-relaxed text-slate-600">Track a sales opportunity, its value and progress. Update its stage as the proposal moves forward, then record whether it was won or lost.</p>
-              <p className="mt-3 text-xs font-semibold text-purple-700">Stages: Draft, Sent, Open, Won and Lost</p>
-            </div>
+
+          <div className="px-3.5 py-1 text-[10px] uppercase font-bold text-slate-400 border-t border-slate-100 mt-1">
+            ERP Conversion
           </div>
-          <p className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm leading-relaxed text-slate-600">For example, a customer asking about a product starts as a lead. A proposal for that product is a deal whose value and outcome you can track here.</p>
-        </div>
-      </Modal>
+          {/* [Quotation & Proforma Invoice modules are commented out]
+          <button
+            type="button"
+            onClick={() => {
+              handleCreateErpQuotation(dealMenu.deal);
+              closeDealMenu();
+            }}
+            className="w-full px-3.5 py-1.5 text-left text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-2 cursor-pointer"
+          >
+            <FileText size={12} className="text-blue-600" />
+            <span>Create Quotation</span>
+          </button>
+          */}
+          <button
+            type="button"
+            onClick={() => {
+              handleCreateErpSalesOrder(dealMenu.deal);
+              closeDealMenu();
+            }}
+            className="w-full px-3.5 py-1.5 text-left text-xs font-semibold text-emerald-700 hover:bg-emerald-50 flex items-center gap-2 cursor-pointer"
+          >
+            <ShoppingCart size={12} className="text-emerald-600" />
+            <span>Create Sales Order</span>
+          </button>
+
+          <div className="my-1 border-t border-slate-100" />
+
+          {dealMenu.deal?.stage !== 'Lost' && (
+            <button
+              type="button"
+              onClick={() => {
+                handleMoveStage(dealMenu.deal.id, 'Lost');
+              }}
+              className="w-full px-3.5 py-1.5 text-left text-xs font-semibold text-rose-600 hover:bg-rose-50 flex items-center gap-2 cursor-pointer"
+            >
+              <XCircle size={13} className="text-rose-500" />
+              <span>Lost Deal</span>
+            </button>
+          )}
+
+          {dealMenu.deal?.stage !== 'Won' && (
+            <button
+              type="button"
+              onClick={() => {
+                handleMoveStage(dealMenu.deal.id, 'Won');
+              }}
+              className="w-full px-3.5 py-1.5 text-left text-xs font-semibold text-emerald-600 hover:bg-emerald-50 flex items-center gap-2 cursor-pointer"
+            >
+              <Trophy size={13} className="text-emerald-500" />
+              <span>Won Deal</span>
+            </button>
+          )}
+
+          <div className="my-1 border-t border-slate-100" />
+
+          <button
+            type="button"
+            onClick={() => {
+              setDealToDelete(dealMenu.deal);
+              closeDealMenu();
+            }}
+            className="w-full px-3.5 py-2 text-left text-xs font-semibold text-rose-600 hover:bg-rose-50 flex items-center gap-2.5 cursor-pointer"
+          >
+            <Trash2 size={13} className="text-rose-500" />
+            <span>Delete Deal</span>
+          </button>
+        </div>,
+        document.body
+      )}
 
       {isCreateModalOpen && (
         <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
@@ -1573,7 +1864,7 @@ export default function DealsPage() {
                   <input
                     type="text"
                     required
-                    placeholder="e.g. Diamond Ring Inquiry"
+                    placeholder="e.g. Cotton Grey Fabric Order"
                     value={formState.name}
                     onChange={(e) => setFormState({ ...formState, name: e.target.value })}
                     className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs"
@@ -1603,7 +1894,19 @@ export default function DealsPage() {
                     required
                     placeholder="e.g. +91 98765 43210"
                     value={formState.phone}
-                    onChange={(e) => setFormState({ ...formState, phone: e.target.value })}
+                    onChange={(e) => {
+                      let v = e.target.value;
+                      if (!v || v === '+' || v.trim() === '') {
+                        setFormState({ ...formState, phone: '+91 ' });
+                        return;
+                      }
+                      if (!v.startsWith('+91')) {
+                        const cleaned = v.replace(/^\+?91\s*/, '');
+                        setFormState({ ...formState, phone: `+91 ${cleaned}` });
+                        return;
+                      }
+                      setFormState({ ...formState, phone: v });
+                    }}
                     className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs"
                   />
                 </div>
@@ -1627,7 +1930,8 @@ export default function DealsPage() {
                     onChange={(e) => setFormState({ ...formState, product: e.target.value })}
                     className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs font-medium"
                   >
-                    {PRODUCTS.filter((p) => p !== 'All Products').map((p) => (
+                    <option value="">Select product</option>
+                    {[...new Set([...productOptions.filter((p) => p !== 'All Products'), formState.product].filter(Boolean))].map((p) => (
                       <option key={p} value={p}>
                         {p}
                       </option>
@@ -1636,10 +1940,7 @@ export default function DealsPage() {
                 </div>
 
                 <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="block font-semibold text-slate-700">Stage</label>
-                    <MasterSourceLink source="dealStages" />
-                  </div>
+                  <label className="block font-semibold text-slate-700 mb-1">Stage</label>
                   <select
                     value={formState.stage}
                     onChange={(e) => setFormState({ ...formState, stage: e.target.value })}
@@ -1654,13 +1955,20 @@ export default function DealsPage() {
                 </div>
 
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Source</label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block font-semibold text-slate-700">Source</label>
+                    <MasterSourceLink source="leadSources" />
+                  </div>
                   <select
                     value={formState.source}
                     onChange={(e) => setFormState({ ...formState, source: e.target.value })}
                     className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs font-medium"
                   >
-                    {SOURCES.filter((s) => s !== 'All Sources').map((s) => (
+                    <option value="">Select Source</option>
+                    {formState.source && !sourceOptions.includes(formState.source) && (
+                      <option value={formState.source}>{formState.source}</option>
+                    )}
+                    {sourceOptions.filter((s) => s !== 'All Sources').map((s) => (
                       <option key={s} value={s}>
                         {s}
                       </option>

@@ -34,6 +34,7 @@ import {
   FileText,
   UserCheck,
   ShoppingBag,
+  ShoppingCart,
   Briefcase,
   SlidersHorizontal,
   ChevronDown,
@@ -107,6 +108,7 @@ export default function OwnerMISDashboardPage() {
   // Server API states
   const [serverLeakage, setServerLeakage] = useState(null);
   const [serverParties, setServerParties] = useState(null);
+  const [serverSalespersons, setServerSalespersons] = useState(null);
   const [serverDesigns, setServerDesigns] = useState(null);
   const [serverAgeing, setServerAgeing] = useState(null);
   const [serverAgencies, setServerAgencies] = useState(null);
@@ -147,9 +149,13 @@ export default function OwnerMISDashboardPage() {
         productionService.getAgencyDashboard({ day: endDate }),
         productionService.getEmployeeDashboard({ day: endDate }),
         salesService.getBrokerAnalytics(query),
+        misService.getSalespersonProfitability(query),
       ]);
 
-      const [leakRes, partyRes, desRes, ageRes, agencyRes, empRes, brokerRes] = results;
+      const [leakRes, partyRes, desRes, ageRes, agencyRes, empRes, brokerRes, spRes] = results;
+      if (spRes?.status === 'fulfilled') {
+        setServerSalespersons(spRes.value?.results || []);
+      }
 
       if (leakRes.status === 'fulfilled' && leakRes.value?.grossSales) {
         setServerLeakage(leakRes.value);
@@ -359,43 +365,52 @@ export default function OwnerMISDashboardPage() {
     };
   }, [salesOrders, deliveryChallans, invoices, paymentIns, salesReturns, todayFinancials]);
 
-  // 8. Salesperson Profitability
-  const salespersonData = useMemo(() => {
-    const spMap = {};
-    invoices.forEach((inv) => {
-      const name = inv.salesperson || inv.salesPerson || 'Direct Sales';
-      const amt = Number(inv.grandTotal || inv.total || inv.amount) || 0;
-      const disc = Number(inv.discountTotal) || 0;
-      if (!spMap[name]) {
-        spMap[name] = { name, netSales: 0, discount: 0, count: 0 };
-      }
-      spMap[name].netSales += amt;
-      spMap[name].discount += disc;
-      spMap[name].count += 1;
-    });
+  // Commercial leakage waterfall -- the server's actual figures per line
+  // (discounts, incentives, brokerage, returns, sampling, freight), never a
+  // fixed percentage of sales.
+  const leakageRows = useMemo(() => {
+    const bars = {
+      grossSales: 'bg-slate-900', partyDiscount: 'bg-amber-500', salesIncentive: 'bg-orange-500',
+      brokerage: 'bg-purple-500', salesReturns: 'bg-rose-500', samplingCost: 'bg-rose-400',
+      transportSupport: 'bg-rose-300', netContribution: 'bg-emerald-600',
+    };
+    const text = {
+      grossSales: 'text-slate-900', partyDiscount: 'text-amber-800', salesIncentive: 'text-orange-700',
+      brokerage: 'text-purple-700', salesReturns: 'text-rose-700', samplingCost: 'text-rose-700',
+      transportSupport: 'text-rose-700', netContribution: 'text-emerald-700',
+    };
+    return (serverLeakage?.items || [])
+      .filter((r) => r.type !== 'cost')
+      .map((r) => {
+        const pct = Number(r.pct || 0);
+        const leak = r.type === 'leakage';
+        return {
+          item: r.label,
+          pct: `${leak ? '-' : ''}${pct.toFixed(1)}%`,
+          amt: r.amount,
+          sign: leak ? '−' : '',
+          textColor: text[r.key] || 'text-slate-700',
+          bar: bars[r.key] || 'bg-slate-400',
+          width: leak ? Math.max(0, 100 - pct) : Math.min(100, pct),
+        };
+      });
+  }, [serverLeakage]);
 
-    const sourceList = Object.values(spMap).length ? Object.values(spMap) : [
-      { name: 'Rajesh Sharma', netSales: 1250000, discount: 28000, count: 18 },
-      { name: 'Pooja Verma', netSales: 980000, discount: 15000, count: 14 },
-      { name: 'Manish Patel', netSales: 820000, discount: 21000, count: 11 },
-      { name: 'Direct Counter Sales', netSales: 450000, discount: 5000, count: 8 },
-    ];
-
-    return sourceList.map((sp) => {
-      const collection = Math.round(sp.netSales * 0.82);
-      const incentive = Math.round(sp.netSales * 0.015);
-      const gpMargin = 19.5;
-      const contribution = Math.round(sp.netSales * 0.18 - sp.discount - incentive);
-      return {
-        ...sp,
-        collection,
-        incentive,
-        gpMargin,
-        returns: Math.round(sp.netSales * 0.01),
-        contribution: Math.max(0, contribution),
-      };
-    });
-  }, [invoices]);
+  // 8. Salesperson Profitability -- from /reports/salesperson-profitability/:
+  // collection, incentive and COGS are actual figures, never ratios of sales.
+  const salespersonData = useMemo(() => (serverSalespersons || []).map((sp) => ({
+    name: sp.name,
+    count: sp.invoiceCount,
+    netSales: sp.netSales,
+    discount: sp.discount,
+    returns: sp.returns,
+    collection: sp.collection,
+    cogs: sp.cogs,
+    gpMargin: Number(sp.gpMarginPct || 0).toFixed(1),
+    incentive: sp.incentive,
+    contribution: sp.contribution,
+    costStatus: sp.costStatus,
+  })), [serverSalespersons]);
 
   // 9. Broker Performance
   const brokerData = useMemo(() => {
@@ -434,50 +449,23 @@ export default function OwnerMISDashboardPage() {
     });
   }, [serverBrokers, invoices]);
 
-  // 10. Party Profitability
-  const partyProfitability = useMemo(() => {
-    if (serverParties && serverParties.length) return serverParties;
-    const partyMap = {};
-    invoices.forEach((inv) => {
-      const party = inv.customer || 'Retail Party';
-      const code = inv.customerId || 'CUST-001';
-      const sales = Number(inv.grandTotal || inv.total || inv.amount) || 0;
-      const disc = Number(inv.discountTotal) || 0;
-      if (!partyMap[party]) {
-        partyMap[party] = { party_name: party, code, sales_value: 0, discount: 0 };
-      }
-      partyMap[party].sales_value += sales;
-      partyMap[party].discount += disc;
-    });
-
-    const sourceList = Object.values(partyMap).length ? Object.values(partyMap) : [
-      { party_name: 'Metro Sarees & Dress Materials', code: 'CUST-101', sales_value: 1250000, discount: 25000 },
-      { party_name: 'Surat Fashion Hub Pvt Ltd', code: 'CUST-102', sales_value: 940000, discount: 18000 },
-      { party_name: 'Radhika Textiles Delhi', code: 'CUST-103', sales_value: 780000, discount: 12000 },
-      { party_name: 'Vogue Silk & Cotton Mumbai', code: 'CUST-104', sales_value: 620000, discount: 22000 },
-      { party_name: 'Jaipur Ethnic Collection', code: 'CUST-105', sales_value: 410000, discount: 8000 },
-    ];
-
-    return sourceList.map((p) => {
-      const cogs = Math.round(p.sales_value * 0.72);
-      const brokerage = Math.round(p.sales_value * 0.02);
-      const incentive = Math.round(p.sales_value * 0.01);
-      const freight = Math.round(p.sales_value * 0.015);
-      const returns = 0;
-      const net_contribution = Math.max(0, p.sales_value - cogs - p.discount - brokerage - incentive - freight);
-      const margin_pct = p.sales_value > 0 ? ((net_contribution / p.sales_value) * 100).toFixed(1) : '18.5';
-      return {
-        ...p,
-        cogs,
-        brokerage,
-        incentive,
-        freight,
-        returns,
-        net_contribution,
-        margin_pct,
-      };
-    });
-  }, [serverParties, invoices]);
+  // 10. Party Profitability -- from /reports/party-profitability/ only:
+  // COGS is the ledger's actual cost of the stock sold, never a fixed ratio,
+  // and nothing is invented when the server has no rows.
+  const partyProfitability = useMemo(() => (serverParties || []).map((p) => ({
+    party_name: p.partyName,
+    code: p.partyId,
+    sales_value: p.netSales ?? p.sales,
+    cogs: p.cogs,
+    gross_profit: p.grossProfit,
+    discount: p.discount,
+    brokerage: p.brokerage,
+    freight: p.transport,
+    net_contribution: p.netContribution,
+    margin_pct: Number(p.marginPct || 0).toFixed(1),
+    cost_status: p.costStatus,
+    missing_cost_invoices: p.invoicesWithoutActualCost || [],
+  })), [serverParties]);
 
   // 11. Stock Ageing MIS
   const stockAgeing = useMemo(() => {
@@ -994,14 +982,7 @@ export default function OwnerMISDashboardPage() {
                 </div>
 
                 <div className="space-y-2.5 pt-3">
-                  {[
-                    { item: 'Gross Invoiced Sales', pct: '100.0%', amt: todayFinancials.sales, sign: '', color: 'text-slate-900', bar: 'bg-slate-900' },
-                    { item: 'Party Discounts (Approved)', pct: '-2.8%', amt: Math.round(todayFinancials.sales * 0.028), sign: '−', color: 'text-amber-800', bar: 'bg-amber-500' },
-                    { item: 'Salesperson Incentives', pct: '-1.5%', amt: Math.round(todayFinancials.sales * 0.015), sign: '−', color: 'text-orange-700', bar: 'bg-orange-500' },
-                    { item: 'Broker Commissions', pct: '-1.2%', amt: Math.round(todayFinancials.sales * 0.012), sign: '−', color: 'text-purple-700', bar: 'bg-purple-500' },
-                    { item: 'Sales Returns / Claims', pct: '-2.1%', amt: Math.round(todayFinancials.sales * 0.021), sign: '−', color: 'text-rose-700', bar: 'bg-rose-500' },
-                    { item: 'Sampling & Freight Support', pct: '-1.4%', amt: Math.round(todayFinancials.sales * 0.014), sign: '−', color: 'text-rose-700', bar: 'bg-rose-400' },
-                  ].map((row, i) => (
+                  {leakageRows.map((row) => ({ ...row, color: row.textColor })).map((row, i) => (
                     <div key={i} className="flex items-center justify-between text-xs p-2 rounded-xl bg-slate-50/70 border border-slate-100">
                       <div className="flex items-center gap-2">
                         <span className={`w-2 h-2 rounded-full ${row.bar}`} />
@@ -1116,7 +1097,7 @@ export default function OwnerMISDashboardPage() {
                 { id: '5_inventory', label: '5. Inventory (9s)', val: inr(inventoryStages.totalValue), sub: `${num(inventoryStages.totalMeters)} m`, color: 'border-amber-500/40 text-amber-400' },
                 { id: '6_qc_wastage', label: '6. QC Wastage', val: `${qcWastage.passPct}% Pass`, sub: `Rej: ${qcWastage.rejectPct}%`, color: 'border-rose-500/40 text-rose-400' },
                 { id: '7_sales', label: '7. Sales Pipeline', val: `${salesPipeline.ordersBooked} Orders`, sub: inr(salesPipeline.invoicedValue), color: 'border-blue-500/40 text-blue-400' },
-                { id: '8_salesperson', label: '8. Salesperson', val: `${salespersonData.length} Reps`, sub: '19.5% GP', color: 'border-teal-500/40 text-teal-400' },
+                { id: '8_salesperson', label: '8. Salesperson', val: `${salespersonData.length} Reps`, sub: 'Actual GP', color: 'border-teal-500/40 text-teal-400' },
                 { id: '9_broker', label: '9. Broker Ledger', val: `${brokerData.length} Brokers`, sub: 'Commission split', color: 'border-orange-500/40 text-orange-400' },
                 { id: '10_party', label: '10. Party Profit', val: inr(partyProfitability[0]?.net_contribution || 0), sub: `${partyProfitability.length} Parties`, color: 'border-emerald-500/40 text-emerald-400' },
                 { id: '11_ageing', label: '11. Stock Ageing', val: inr(stockAgeing.summary?.totalStockValue), sub: '0-180+ Days', color: 'border-indigo-500/40 text-indigo-400' },
@@ -2008,7 +1989,7 @@ export default function OwnerMISDashboardPage() {
 
             <div className="space-y-4 pt-4">
               {salespersonData.map((sp, i) => {
-                const maxVal = 1500000;
+                const maxVal = Math.max(1, ...salespersonData.map((x) => x.netSales || 0));
                 const salesPct = Math.min(100, Math.round((sp.netSales / maxVal) * 100));
                 const contribPct = Math.min(100, Math.round((sp.contribution / (sp.netSales || 1)) * 100));
                 return (
@@ -2073,7 +2054,12 @@ export default function OwnerMISDashboardPage() {
                       <td className="py-3 px-3 text-right font-mono text-slate-500">{sp.count}</td>
                       <td className="py-3 px-3 text-right font-mono font-semibold">{inr(sp.netSales)}</td>
                       <td className="py-3 px-3 text-right font-mono text-emerald-700">{inr(sp.collection)}</td>
-                      <td className="py-3 px-3 text-center font-bold text-indigo-700">{sp.gpMargin}%</td>
+                      <td className="py-3 px-3 text-center font-bold text-indigo-700">
+                        {sp.gpMargin}%
+                        {sp.costStatus && sp.costStatus !== 'actual' && (
+                          <span className="block text-[10px] font-semibold text-amber-700">{sp.costStatus === 'incomplete' ? 'Cost incomplete' : 'Partly estimated'}</span>
+                        )}
+                      </td>
                       <td className="py-3 px-3 text-right font-mono text-rose-600">{inr(sp.discount)}</td>
                       <td className="py-3 px-3 text-right font-mono text-slate-600">{inr(sp.incentive)}</td>
                       <td className="py-3 px-4 text-right font-mono font-black text-emerald-700">{inr(sp.contribution)}</td>
@@ -2249,7 +2235,7 @@ export default function OwnerMISDashboardPage() {
                     <th className="py-3 px-3 text-right">COGS (₹)</th>
                     <th className="py-3 px-3 text-right">Discounts</th>
                     <th className="py-3 px-3 text-right">Brokerage</th>
-                    <th className="py-3 px-3 text-right">Incentive</th>
+                    <th className="py-3 px-3 text-right">Gross Profit</th>
                     <th className="py-3 px-3 text-right">Freight</th>
                     <th className="py-3 px-3 text-right font-bold text-slate-900">Contribution (₹)</th>
                     <th className="py-3 px-3 text-right font-bold text-slate-900">Margin %</th>
@@ -2263,10 +2249,20 @@ export default function OwnerMISDashboardPage() {
                         <div className="text-[11px] text-slate-400">{p.code || ''}</div>
                       </td>
                       <td className="py-2.5 px-3 text-right font-semibold">{inr(p.sales_value)}</td>
-                      <td className="py-2.5 px-3 text-right text-slate-500">{inr(p.cogs)}</td>
+                      <td className="py-2.5 px-3 text-right text-slate-500">
+                        {inr(p.cogs)}
+                        {p.cost_status && p.cost_status !== 'actual' && (
+                          <span
+                            className="block text-[10px] font-semibold text-amber-700"
+                            title={`Invoices without full actual cost: ${p.missing_cost_invoices.join(', ')}`}
+                          >
+                            {p.cost_status === 'incomplete' ? 'Cost incomplete' : 'Partly estimated'}
+                          </span>
+                        )}
+                      </td>
                       <td className="py-2.5 px-3 text-right text-rose-600">{inr(p.discount)}</td>
                       <td className="py-2.5 px-3 text-right text-slate-600">{inr(p.brokerage)}</td>
-                      <td className="py-2.5 px-3 text-right text-slate-600">{inr(p.incentive)}</td>
+                      <td className="py-2.5 px-3 text-right text-slate-600">{inr(p.gross_profit)}</td>
                       <td className="py-2.5 px-3 text-right text-slate-600">{inr(p.freight)}</td>
                       <td className="py-2.5 px-3 text-right font-bold text-emerald-700">{inr(p.net_contribution)}</td>
                       <td className="py-2.5 px-3 text-right font-bold">
@@ -2476,15 +2472,7 @@ export default function OwnerMISDashboardPage() {
             </h3>
 
             <div className="space-y-3.5 pt-4">
-              {[
-                { item: 'Gross Invoiced Sales', pct: '100.0%', amt: todayFinancials.sales, width: 100, color: 'bg-slate-900' },
-                { item: 'Party Discounts (Approved)', pct: '-2.8%', amt: Math.round(todayFinancials.sales * 0.028), width: 97.2, color: 'bg-amber-500' },
-                { item: 'Salesperson Incentives', pct: '-1.5%', amt: Math.round(todayFinancials.sales * 0.015), width: 95.7, color: 'bg-orange-500' },
-                { item: 'Broker Commissions', pct: '-1.2%', amt: Math.round(todayFinancials.sales * 0.012), width: 94.5, color: 'bg-purple-500' },
-                { item: 'Sales Returns / Quality Claims', pct: '-2.1%', amt: Math.round(todayFinancials.sales * 0.021), width: 92.4, color: 'bg-rose-500' },
-                { item: 'Sampling & Freight Support', pct: '-1.4%', amt: Math.round(todayFinancials.sales * 0.014), width: 91.0, color: 'bg-rose-400' },
-                { item: 'Net Realized Operating Contribution', pct: '91.0%', amt: Math.round(todayFinancials.sales * 0.91), width: 91.0, color: 'bg-emerald-600' },
-              ].map((row, i) => (
+              {leakageRows.map((row) => ({ ...row, color: row.bar })).map((row, i) => (
                 <div key={i} className="space-y-1">
                   <div className="flex items-center justify-between text-xs">
                     <span className="font-semibold text-slate-700">{row.item}</span>

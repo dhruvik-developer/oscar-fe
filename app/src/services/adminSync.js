@@ -8,7 +8,7 @@
  * drifts.
  */
 import { createSync, compact, asText, isBackendEnabled, isServerId, describeError } from './resourceSync';
-import { api } from './api';
+import { api, getAllPages } from './api';
 
 export { isBackendEnabled, isServerId, describeError };
 
@@ -47,7 +47,8 @@ export const ADMIN_RESOURCES = {
       department: u.department || undefined,
       employeeId: u.employeeId || undefined,
       location: u.location || undefined,
-      reportingManager: u.reportingManager || undefined,
+      // Only an explicit null clears the manager; '' (unset on a row) leaves it.
+      reportingManagerId: u.reportingManagerId === null ? null : (u.reportingManagerId || undefined),
       status: u.status || undefined,
       password: u.password || undefined,
       crmRoles: u.crmRoles || u.crm_roles || undefined,
@@ -68,6 +69,8 @@ export const ADMIN_RESOURCES = {
         'name', 'email', 'phone', 'role', 'department', 'designation',
         'employeeId', 'employeeStatus', 'location', 'reportingManager',
       ]),
+      roleId: row.roleId ? String(row.roleId) : '',
+      reportingManagerId: row.reportingManagerId ? String(row.reportingManagerId) : '',
       status: row.status || 'Active',
       isFromHrms: Boolean(row.isFromHrms),
       _synced: true,
@@ -81,10 +84,12 @@ export const ADMIN_RESOURCES = {
       code: r.code || undefined,
       description: r.description || undefined,
       permissions: Array.isArray(r.permissions) ? r.permissions : undefined,
+      requiresTwoFactor: typeof r.requiresTwoFactor === 'boolean' ? r.requiresTwoFactor : undefined,
     }),
     fromApi: (row) => ({
       ...asText(row, ['name', 'code', 'description']),
       permissions: row.permissions || [],
+      requiresTwoFactor: Boolean(row.requiresTwoFactor),
       _synced: true,
     }),
   },
@@ -121,15 +126,7 @@ export const adminSync = createSync(ADMIN_RESOURCES, { label: 'adminSync' });
 export async function pullCustomerClients() {
   if (!isBackendEnabled()) throw new Error('Sign in to view clients.');
   const resource = ADMIN_RESOURCES.customerClients;
-  const rows = [];
-  let page = 1;
-  let body;
-  do {
-    body = await api.get(resource.path, { query: { page, page_size: 200 } });
-    rows.push(...(body.results || []).map(resource.fromApi));
-    page += 1;
-  } while (body.next);
-  return rows;
+  return (await getAllPages(resource.path)).map(resource.fromApi);
 }
 
 /**

@@ -22,7 +22,7 @@ import {
 } from 'lucide-react';
 import { inventoryService } from '../../../services/domainServices';
 import { useERP } from '../../../context/ERPContext';
-import PageInfoButton from '../../../components/ui/PageInfoButton';
+import QCPageHeader from './QCPageHeader';
 import MasterSourceLink from '../../../components/common/MasterSourceLink';
 
 export default function QCInspectionRegisterPage() {
@@ -471,46 +471,37 @@ export default function QCInspectionRegisterPage() {
         </div>
       )}
 
-      {/* TOP HEADER */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
-        <div>
-          <div className="flex items-center space-x-3">
-            <div className="w-8 h-8 rounded-full bg-blue-600 text-white font-bold flex items-center justify-center text-sm">
-              2
+      {/* ── Standard QC Page Header ─────────────────────────────── */}
+      <QCPageHeader
+        title="QC Inspection Register"
+        subtitle="Record inspection details, roll-by-roll defect scoring, length verification, and grading for each lot/taka."
+        actions={
+          <div className="flex flex-wrap items-center gap-2.5">
+            <div className="hidden sm:flex items-center space-x-2 bg-slate-100 text-slate-600 text-xs px-3 py-1.5 rounded-lg border border-slate-200">
+              <span className="font-semibold text-slate-700 bg-white px-1.5 py-0.5 rounded text-[11px] border border-slate-200 shadow-2xs">
+                Live DB
+              </span>
+              <span>Real database records</span>
             </div>
-            <h1 className="text-xl font-bold text-slate-900">QC Inspection Register</h1>
-            <PageInfoButton title="QC Inspection Register" />
+
+            <button
+              onClick={() => setShowNewQCModal(true)}
+              className="inline-flex items-center space-x-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs md:text-sm font-semibold rounded-lg shadow-xs transition cursor-pointer"
+            >
+              <Plus className="w-4 h-4" />
+              <span>New QC</span>
+            </button>
+
+            <button
+              onClick={() => setShowExportModal(true)}
+              className="inline-flex items-center space-x-1.5 px-3.5 py-2 bg-white hover:bg-slate-50 text-slate-700 text-xs md:text-sm font-medium rounded-lg border border-slate-300 shadow-2xs transition cursor-pointer"
+            >
+              <Download className="w-4 h-4 text-slate-500" />
+              <span>Export</span>
+            </button>
           </div>
-          <p className="text-xs md:text-sm text-slate-500 mt-1 pl-11">
-            Record inspection details and measurement for each lot/taka.
-          </p>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-3 pl-11 md:pl-0">
-          <div className="flex items-center space-x-2 bg-slate-100 text-slate-600 text-xs px-3 py-1.5 rounded-lg border border-slate-200">
-            <span className="font-semibold text-slate-700 bg-white px-1.5 py-0.5 rounded text-[11px] border border-slate-200 shadow-2xs">
-              Live DB
-            </span>
-            <span>Real database records only (zero dummy data).</span>
-          </div>
-
-          <button
-            onClick={() => setShowNewQCModal(true)}
-            className="inline-flex items-center space-x-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs md:text-sm font-semibold rounded-lg shadow-xs transition"
-          >
-            <Plus className="w-4 h-4" />
-            <span>+ New QC</span>
-          </button>
-
-          <button
-            onClick={() => setShowExportModal(true)}
-            className="inline-flex items-center space-x-1.5 px-3.5 py-2 bg-white hover:bg-slate-50 text-slate-700 text-xs md:text-sm font-medium rounded-lg border border-slate-300 shadow-2xs transition"
-          >
-            <Download className="w-4 h-4 text-slate-500" />
-            <span>Export</span>
-          </button>
-        </div>
-      </div>
+        }
+      />
 
       {/* FILTER BAR (Panel 1) */}
       <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-4">
@@ -618,7 +609,7 @@ export default function QCInspectionRegisterPage() {
         {/* Search bar & Apply/Reset */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 border-t border-slate-100">
           <div className="relative flex-1 max-w-sm">
-            <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
+            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
               placeholder="Search by QC No, GRN, supplier, item or lot..."
@@ -896,13 +887,12 @@ export default function QCInspectionRegisterPage() {
                     </div>
 
                     <div>
-                      <label className="block text-slate-700 font-medium mb-1">Lot Number *</label>
+                      <label className="block text-slate-700 font-medium mb-1">Lot Number <span className="font-normal text-slate-400">(auto if blank)</span></label>
                       <input
                         type="text"
-                        placeholder="e.g. LOT-FAB-200"
+                        placeholder="Auto-generated"
                         value={newLotNo}
                         onChange={(e) => setNewLotNo(e.target.value)}
-                        required
                         className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white text-slate-800 font-mono font-bold"
                       />
                     </div>

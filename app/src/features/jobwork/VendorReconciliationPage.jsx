@@ -17,6 +17,8 @@ import { api } from '../../services/api';
 import { numIN } from './jobWorkOrdersStore';
 import PageHeader from '../../components/ui/PageHeader';
 import TablePagination from '../../components/ui/TablePagination';
+import SortableTh from '../../components/ui/SortableTh';
+import { useTableSort } from '../../hooks/useTableSort';
 import KpiCard from '../../components/ui/KpiCard';
 
 const statusPill = (s) =>
@@ -87,10 +89,11 @@ export default function VendorReconciliationPage() {
     setPage(1);
   }, [fJwo, fVendor, fProcess, fFabric, fStatus, fFrom, fTo]);
 
+  const sort = useTableSort(filtered);
   const paginated = useMemo(() => {
     const start = (page - 1) * pageSize;
-    return filtered.slice(start, start + pageSize);
-  }, [filtered, page, pageSize]);
+    return sort.rows.slice(start, start + pageSize);
+  }, [sort.rows, page, pageSize]);
 
   const totals = useMemo(() => {
     const t = { count: 0, outward: 0, inward: 0, accepted: 0, rejected: 0, pending: 0 };
@@ -188,8 +191,8 @@ export default function VendorReconciliationPage() {
             <thead>
               <tr className="border-b border-slate-100 text-[11px] font-bold text-slate-500">
                 <th className="px-3 py-2.5 w-10 text-center">#</th>
-                {['JWO No.', 'Vendor / Processor', 'Process', 'Fabric Item', 'Fabric Quality', 'Shade / Colour', 'Total Outward Qty (M)', 'Total Inward Qty (M)', 'Accepted Qty (M)', 'Rejected Qty (M)', 'Pending Qty (M)', 'Difference (M)', 'Status'].map((h, i) => (
-                  <th key={h} className={`px-3 py-2.5 whitespace-nowrap ${(i >= 6 && i <= 11) ? 'text-right' : ''} ${i === 12 ? 'text-center' : ''}`}>{h}</th>
+                {[['JWO No.', 'jwoNo'], ['Vendor / Processor', 'vendor'], ['Process', 'process'], ['Fabric Item', 'fabricItem'], ['Fabric Quality', 'fabricQuality'], ['Shade / Colour', 'shade'], ['Total Outward Qty (M)', 'totalOutward'], ['Total Inward Qty (M)', 'totalInward'], ['Accepted Qty (M)', 'acceptedQty'], ['Rejected Qty (M)', 'rejectedQty'], ['Pending Qty (M)', 'pendingQty'], ['Difference (M)', 'difference'], ['Status', 'status']].map(([h, key], i) => (
+                  <SortableTh key={h} sort={sort} sortKey={key} align={(i >= 6 && i <= 11) ? 'right' : i === 12 ? 'center' : 'left'} className={`px-3 py-2.5 whitespace-nowrap ${(i >= 6 && i <= 11) ? 'text-right' : ''} ${i === 12 ? 'text-center' : ''}`}>{h}</SortableTh>
                 ))}
                 <th className="px-3 py-2.5 text-center">Actions</th>
               </tr>

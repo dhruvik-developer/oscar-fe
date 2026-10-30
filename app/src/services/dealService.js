@@ -66,9 +66,17 @@ export function buildDeal(input, id = `dl-${Date.now()}`) {
     tag: value.stage === 'Won' ? 'Won' : value.stage === 'Lost' ? 'Lost' : value.tag || '' };
 }
 
-export function findDealForLead(leadId) {
+export function findDealForLead(leadId, leadNumber) {
   try {
-    return loadDeals().find((deal) => deal.leadId != null && String(deal.leadId) === String(leadId)) || null;
+    const deals = [...(loadDeals() || []), ...(useCrmStore?.getState?.()?.deals || [])];
+    return deals.find((deal) => {
+      if (!deal) return false;
+      const dLeadId = deal.leadId || deal.lead_id;
+      const dLeadNum = deal.leadNumber || deal.lead_number;
+      if (leadId && (String(dLeadId) === String(leadId) || String(dLeadNum) === String(leadId))) return true;
+      if (leadNumber && (String(dLeadId) === String(leadNumber) || String(dLeadNum) === String(leadNumber))) return true;
+      return false;
+    }) || null;
   } catch (error) {
     console.error('[CRM Deals] Unable to read linked deal:', error);
     return null;

@@ -430,15 +430,15 @@ export function SupplierBillMatchingInlineSlide({ po, instruction, onClose, onBi
           {/* Variance Breakdown Grid */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-rose-200/80 text-xs">
             <div className="bg-white/80 p-2 rounded-lg border border-rose-200">
-              <span className="text-[10px] text-slate-500 block uppercase font-bold">Job Work PO Total</span>
+              <span className="text-[10px] text-slate-500 block uppercase font-bold">Expected Amount</span>
               <strong className="font-mono text-slate-900 font-extrabold">₹{numIN(effectivePoAmount)}</strong>
             </div>
             <div className="bg-white/80 p-2 rounded-lg border border-rose-200">
-              <span className="text-[10px] text-slate-500 block uppercase font-bold">Vendor Bill Total</span>
+              <span className="text-[10px] text-slate-500 block uppercase font-bold">Entered Invoice Amount</span>
               <strong className="font-mono text-rose-700 font-extrabold">₹{numIN(billedAmount)}</strong>
             </div>
             <div className="bg-white/80 p-2 rounded-lg border border-rose-200">
-              <span className="text-[10px] text-slate-500 block uppercase font-bold">Net Difference</span>
+              <span className="text-[10px] text-slate-500 block uppercase font-bold">Difference</span>
               <strong className={`font-mono font-black ${amountDifference > 0 ? 'text-rose-700' : 'text-amber-700'}`}>
                 {amountDifference > 0 ? '+' : '-'}₹{numIN(amountVariance)}
               </strong>

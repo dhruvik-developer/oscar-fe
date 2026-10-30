@@ -262,11 +262,13 @@ export function InstructionStageWorkspace({ project, lifecycle, stageKey, onStag
           instruction={slideInstruction}
           onClose={() => go('production_completion')}
           onPrevStep={() => go('production_completion')}
-          onNextStep={(key) => go(key === 'final_job_work_po' ? 'final_job_work_po' : key)}
+          onNextStep={(key) => go(key === 'final_job_work_po' ? 'agency_bill_match' : key)}
           onUpdated={() => { load(); onUpdated?.(); }}
         />
       );
 
+    // [DISABLED] Final Job Work PO concept commented out
+    /*
     case 'final_job_work_po':
       return (
         <FinalJobWorkPoInlineSlide
@@ -278,6 +280,7 @@ export function InstructionStageWorkspace({ project, lifecycle, stageKey, onStag
           onUpdated={() => { load(); onUpdated?.(); }}
         />
       );
+    */
 
     case 'agency_bill_match':
       return <AgencyMatch pi={pi} originalPo={po} slideInstruction={slideInstruction} go={go} onUpdated={() => { load(); onUpdated?.(); }} />;
@@ -400,8 +403,8 @@ function AgencyMatch({ pi, originalPo, slideInstruction, go, onUpdated }) {
       .catch(() => {});
   }, [pi.finalPoId]);
 
-  if (!pi.finalPoId) {
-    return <Card><div className="text-slate-500">Generate and approve the Final Job Work PO first; the agency invoice is matched against it.</div></Card>;
+  if (!pi.finalPoId && !originalPo) {
+    return <Card><div className="text-slate-500">Associate an approved Purchase Order first; the agency invoice is matched against it.</div></Card>;
   }
   if (!finalPo && !originalPo) return <div className="text-xs text-slate-500 p-3">Loading Final Job Work PO…</div>;
   return (

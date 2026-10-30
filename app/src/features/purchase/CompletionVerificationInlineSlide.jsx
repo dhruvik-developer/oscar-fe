@@ -920,7 +920,7 @@ export function CompletionVerificationInlineSlide({
             {isApproved ? 'Approved & Completed' : 'Approve & Complete'}
           </button>
 
-          {/* Generate Final Job Work PO */}
+          {/* [DISABLED] Generate Final Job Work PO concept commented out
           {onNextStep && (
             <button
               type="button"
@@ -934,6 +934,7 @@ export function CompletionVerificationInlineSlide({
               <FileSpreadsheet size={14} /> Generate Final Job Work PO
             </button>
           )}
+          */}
 
         </div>
 

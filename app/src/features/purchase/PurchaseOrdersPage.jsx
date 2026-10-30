@@ -8,7 +8,7 @@ import {
   Clock, CheckCircle2, Package, Maximize2, Minimize2, Trash2, Ban, MapPin,
   ShoppingCart, FileText, Search, Filter, MoreVertical, ChevronDown, FileSpreadsheet,
   Truck, Factory, Info, PackageCheck, Layers, ShieldCheck, Warehouse, FileCheck2, CreditCard, Receipt,
-  Building2, Calendar, Sparkles,
+  Building2, Calendar, Sparkles, QrCode,
 } from 'lucide-react';
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { toISODate } from '../../utils/dateUtils';
@@ -38,11 +38,6 @@ import UomSelect from '../../components/common/UomSelect';
 import MasterSourceLink from '../../components/common/MasterSourceLink';
 import useUnits from '../../hooks/useUnits';
 import { formatQty, formatUnitTotals, sumByUnit, unitKey, resolveUnit } from '../../utils/uom';
-import {
-  FabricFlowCards, FabricFlowSteps, YarnLinesEditor, OpeningCostsEditor, fabricFlowPayload, flowLabel,
-  FABRIC_FLOW_B,
-} from './FabricFlowForm';
-import { PoFabricFlowPanel } from './PoFabricFlowPanel';
 
 const purchaseOrderGuide = {
     title: 'Purchase Orders',
@@ -107,7 +102,7 @@ const PURCHASE_TYPE_OPTIONS = [
     label: 'Vendor A Production (Daily Entry)',
     hint: 'Produce fabric through Vendor A and record daily output',
     icon: Factory,
-    flow: 'PO → Production Instruction → Daily Entry → Quality Control (QC) → Completion Verification → Final Job Work PO → Vendor Bill → Bill Matching',
+    flow: 'PO → Production Instruction → Daily Entry → Quality Control (QC) → Completion Verification → Vendor Bill → Bill Matching',
   },
 ];
 const purchaseTypeOf = (po) => po?.purchaseType || PURCHASE_TYPE_GREY;
@@ -134,7 +129,7 @@ const STATUS_PILL = {
 
 export const PurchaseOrdersPage = () => {
     const navigate = useNavigate();
-    const { purchaseOrders, vendors, items: inventoryItems, locations: erpLocations = [], fabrics: fabricMasters, addPurchaseOrder, updatePurchaseOrderStatus, cancelPurchaseOrder, deletePurchaseOrder, getPoBilledStatus, convertPurchaseOrderToBill, purchaseBills, paymentOuts, formatCurrency, formatDateDDMMYYYY, getCurrentDateFormatted, getCurrentISODate, addDaysISO, showToast, refreshCollections } = useERP();
+    const { purchaseOrders, vendors, items: inventoryItems, fabrics: fabricMasters, addPurchaseOrder, updatePurchaseOrderStatus, cancelPurchaseOrder, deletePurchaseOrder, getPoBilledStatus, convertPurchaseOrderToBill, purchaseBills, paymentOuts, formatCurrency, formatDateDDMMYYYY, getCurrentDateFormatted, getCurrentISODate, addDaysISO, showToast, refreshCollections } = useERP();
     const { units } = useUnits();
     const [showAddModal, setShowAddModal] = useState(false);
     const [isFullscreen, setIsFullscreen] = useState(false);
@@ -267,16 +262,6 @@ export const PurchaseOrdersPage = () => {
     const [lineItems, setLineItems] = useState([]);
     const [remarks, setRemarks] = useState('');
     const [purchaseType, setPurchaseType] = useState('');
-    // Factory fabric flow (Factory -> OSCAR / Factory -> Dyeing Mill -> OSCAR);
-    // empty for the older purchase types.
-    const [fabricFlow, setFabricFlow] = useState('');
-    const [dyeingMillId, setDyeingMillId] = useState('');
-    const [yarnRows, setYarnRows] = useState([]);
-    const [costRows, setCostRows] = useState([]);
-    const resetFabricFlow = () => { setFabricFlow(''); setDyeingMillId(''); setYarnRows([]); setCostRows([]); };
-    const chooseFabricFlow = (flow) => { setFabricFlow(flow); setPurchaseType(PURCHASE_TYPE_GREY); if (flow !== FABRIC_FLOW_B) setDyeingMillId(''); };
-    // Used by the "Other purchase types" cards, hidden for now in the Create PO form.
-    // const choosePurchaseType = (type) => { setPurchaseType(type); setFabricFlow(''); setDyeingMillId(''); };
     // Project association is separate from purchase type: a ready grey stock
     // purchase may be for a project or for general warehouse stock.
     const [projectMode, setProjectMode] = useState('general');
@@ -366,7 +351,6 @@ export const PurchaseOrdersPage = () => {
         setLineItems([{ id: `li-${Date.now()}`, itemId: '', sku: '', itemSku: '', name: '', qty: '', rate: '', amount: 0 }]);
         setRemarks('');
         setPurchaseType('');
-        resetFabricFlow();
         setProjectMode('general');
         setProjectId('');
         setIsFullscreen(false);
@@ -396,7 +380,6 @@ export const PurchaseOrdersPage = () => {
         setLineItems([]);
         setRemarks('');
         setPurchaseType('');
-        resetFabricFlow();
         setProjectMode('general');
         setProjectId('');
         setIsFullscreen(false);
@@ -440,8 +423,6 @@ export const PurchaseOrdersPage = () => {
         setRemarks(po.notes || '');
         const clonedType = purchaseTypeOf(po);
         setPurchaseType(clonedType === PURCHASE_TYPE_FINAL_JW ? '' : clonedType);
-        resetFabricFlow();
-        if (po.fabricFlow) { setFabricFlow(po.fabricFlow); setDyeingMillId(po.dyeingMillId || ''); }
         setProjectMode(po.projectId ? 'project' : 'general');
         setProjectId(po.projectId || '');
         setIsFullscreen(false);
@@ -451,13 +432,7 @@ export const PurchaseOrdersPage = () => {
     const handleCreate = async (e) => {
         e.preventDefault();
         const validLines = lineItems.filter((it) => it.itemId && Number(it.qty) > 0 && Number(it.rate) > 0);
-        if (!purchaseType && !fabricFlow) { alert('Select how the fabric reaches OSCAR.'); return; }
-        let flowExtras = {};
-        if (fabricFlow) {
-            const built = fabricFlowPayload({ flow: fabricFlow, dyeingMillId, yarnRows, costRows });
-            if (built.error) { alert(built.error); return; }
-            flowExtras = built.payload;
-        }
+        if (!purchaseType) { alert('Select the purchase type.'); return; }
         if (projectMode === 'project' && !projectId) { alert('Select the project, or choose General Stock.'); return; }
         if (!selectedVendorId) { alert('Vendor is required.'); return; }
         if (!poDate) { alert('PO Date is required.'); return; }
@@ -485,11 +460,10 @@ export const PurchaseOrdersPage = () => {
                 date: poDate,
                 expectedDate,
                 status: 'Draft',
-                purchaseType: fabricFlow ? PURCHASE_TYPE_GREY : purchaseType,
+                purchaseType,
                 projectId: projectMode === 'project' ? projectId : undefined,
                 items: normalizedLines,
                 notes: remarks || '',
-                ...flowExtras,
             });
             handleCloseCreateModal();
         } catch {
@@ -609,12 +583,15 @@ export const PurchaseOrdersPage = () => {
                       ? 'Verified'
                       : (activeTimelineSlide === 'completion_verification' ? 'In Progress' : (isQcComplete ? 'Pending Verification' : undefined)),
                 },
+                // [DISABLED] Final Job Work PO concept commented out
+                /*
                 {
                     label: 'Final Job Work PO',
                     key: 'final_job_work_po',
                     docNumber: piObj?.finalPoNumber,
                     status: hasFinalPo ? 'completed' : (isPiVerified ? 'current' : 'pending'),
                 },
+                */
                 {
                     label: 'Agency Bill Match',
                     key: 'agency_bill_match',
@@ -623,7 +600,7 @@ export const PurchaseOrdersPage = () => {
                     date: formatDateDDMMYYYY(latestBill?.date || latestBill?.billDate),
                     status: (isMatchApproved || isPaid)
                         ? 'completed'
-                        : (hasFinalPo || isBilled || activeTimelineSlide === 'agency_bill_match' || activeTimelineSlide === 'supplier_bill_matching')
+                        : (isPiVerified || hasFinalPo || isBilled || activeTimelineSlide === 'agency_bill_match' || activeTimelineSlide === 'supplier_bill_matching')
                         ? 'current'
                         : 'pending',
                 },
@@ -1032,6 +1009,16 @@ export const PurchaseOrdersPage = () => {
       const hasRemaining = poStatusInfo.totalRemainingQty > 0;
       return (
         <div className="flex items-center justify-end gap-1.5 whitespace-nowrap">
+          {getOscarStatus(p) !== 'Cancelled' && (
+            <button
+              type="button"
+              onClick={() => navigate(`/inventory/batches?po=${encodeURIComponent(p.id)}&poNumber=${encodeURIComponent(p.poNumber || '')}&view=po`)}
+              className="px-2.5 py-1 bg-blue-50 border border-blue-200 text-blue-700 rounded-md text-xs font-semibold hover:bg-blue-100 shadow-2xs whitespace-nowrap inline-flex items-center gap-1 cursor-pointer"
+              title={`Manage receipt, batches, QC & dispatch for ${p.poNumber || 'this PO'} in Batch Registry`}
+            >
+              <Package size={12} /> Batch Registry
+            </button>
+          )}
           <button onClick={() => setPrintPoTarget(p)} className="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Print Official Purchase Order">
             <Printer size={13}/>
           </button>
@@ -1055,15 +1042,7 @@ export const PurchaseOrdersPage = () => {
             <button onClick={() => startProductionPo(p.id)} className="px-2.5 py-1 bg-violet-600 text-white rounded-md text-xs font-semibold hover:bg-violet-700 shadow-xs transition-colors whitespace-nowrap inline-flex items-center gap-1">
               <ArrowRight size={11}/> Start Production
             </button>
-          ) : RECEIVABLE_STATUSES.includes(getOscarStatus(p)) && purchaseTypeOf(p) === PURCHASE_TYPE_GREY ? (
-            <div className="flex items-center gap-1.5">
-              <button onClick={() => navigate(`/purchase/deliveries?po=${p.id}`)} className="px-2 py-1 bg-indigo-50 border border-indigo-200 text-indigo-700 rounded-md text-xs font-semibold hover:bg-indigo-100 shadow-2xs whitespace-nowrap inline-flex items-center gap-1" title="Track or record supplier dispatch">
-                <Truck size={11}/> Dispatch
-              </button>
-              <button onClick={() => recordGrnForPo(p)} className="px-2.5 py-1 bg-sky-600 text-white rounded-md text-xs font-semibold hover:bg-sky-700 shadow-xs transition-colors whitespace-nowrap inline-flex items-center gap-1" title="Record supplier delivery: GRN → Lot/Taka → QC">
-                <PackageCheck size={11}/> Record GRN
-              </button>
-            </div>
+
           ) : getOscarStatus(p) === 'Cancelled' ? (
             <span className="text-xs text-rose-600 font-semibold inline-flex items-center gap-1"><Ban size={11}/> Cancelled</span>
           ) : getOscarStatus(p) === 'Fully Received' ? (
@@ -1094,6 +1073,7 @@ export const PurchaseOrdersPage = () => {
         guide={purchaseOrderGuide}
         actions={
           <div className="flex items-center gap-2">
+            {/* [DISABLED] Final Job Work POs concept commented out
             <button
               type="button"
               onClick={() => navigate('/purchase/final-job-work-pos')}
@@ -1101,6 +1081,7 @@ export const PurchaseOrdersPage = () => {
             >
               <FileSpreadsheet size={14} /> Final Job Work POs
             </button>
+            */}
             <Button icon={Plus} onClick={handleOpenCreateModal} className="!rounded-lg !bg-[#2563eb] hover:!bg-[#1d4ed8]">
               Create Purchase Order
             </Button>
@@ -1162,9 +1143,7 @@ export const PurchaseOrdersPage = () => {
                     <td className="px-4 py-2.5">
                       <button onClick={() => setSelectedPo(p)} className="flex items-center gap-1.5 font-mono font-bold text-blue-600 hover:underline whitespace-nowrap"><ClipboardList size={13} className="text-slate-400" /> {p.poNumber}</button>
                       <div className="mt-1 flex flex-wrap items-center gap-1">
-                        {p.fabricFlow
-                          ? <span className="inline-block rounded border px-1.5 py-px text-[9.5px] font-bold bg-teal-50 text-teal-700 border-teal-200">{p.fabricFlow === FABRIC_FLOW_B ? 'Factory → Mill → OSCAR' : 'Factory → OSCAR'}</span>
-                          : <span className={`inline-block rounded border px-1.5 py-px text-[9.5px] font-bold ${TYPE_BADGE[purchaseTypeOf(p)]?.cls || TYPE_BADGE[PURCHASE_TYPE_GREY].cls}`}>{TYPE_BADGE[purchaseTypeOf(p)]?.label || purchaseTypeOf(p)}</span>}
+                        <span className={`inline-block rounded border px-1.5 py-px text-[9.5px] font-bold ${TYPE_BADGE[purchaseTypeOf(p)]?.cls || TYPE_BADGE[PURCHASE_TYPE_GREY].cls}`}>{TYPE_BADGE[purchaseTypeOf(p)]?.label || purchaseTypeOf(p)}</span>
                         <span className="text-[9.5px] font-semibold text-slate-400">{p.projectCode || 'General Stock'}</span>
                       </div>
                     </td>
@@ -1330,27 +1309,14 @@ export const PurchaseOrdersPage = () => {
 
             <form onSubmit={handleCreate} className="space-y-4 mt-4 overflow-y-auto pr-1 flex-1">
               <div>
-                <label className="block font-semibold text-slate-700 mb-1.5">How does the fabric reach OSCAR? <span className="text-rose-500">*</span></label>
-                <FabricFlowCards value={fabricFlow} onChange={chooseFabricFlow} />
-                {fabricFlow && (
-                  <div className="mt-2 rounded-lg bg-slate-50 px-2.5 py-2 space-y-1">
-                    <p className="text-[11px] text-slate-600"><strong>After approval:</strong> one batch is created for every actual receipt — never for the ordered quantity.</p>
-                    <FabricFlowSteps flow={fabricFlow} />
-                  </div>
-                )}
-              </div>
-              {/* "Other purchase types" (Ready Grey Fabric Purchase / Vendor A Production) is hidden
-                  for now: new POs use the two factory fabric flows above. Restore by uncommenting
-                  this block and `choosePurchaseType`.
-              <div>
-                <label className="block font-semibold text-slate-600 mb-1.5 text-[11px] uppercase tracking-wide">Other purchase types</label>
+                <label className="block font-semibold text-slate-700 mb-1.5">Purchase Type <span className="text-rose-500">*</span></label>
                 <div role="radiogroup" aria-label="Purchase Type" className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {PURCHASE_TYPE_OPTIONS.map((opt) => {
                     const Icon = opt.icon;
-                    const active = !fabricFlow && purchaseType === opt.value;
+                    const active = purchaseType === opt.value;
                     return (
                       <label key={opt.value} className={`flex cursor-pointer items-center gap-3 rounded-xl border p-3 transition-colors ${active ? 'border-blue-500 bg-blue-50/70 ring-1 ring-blue-200' : 'border-slate-200 bg-white hover:border-slate-300'}`}>
-                        <input type="radio" name="purchaseType" value={opt.value} checked={active} onChange={() => choosePurchaseType(opt.value)} className="h-4 w-4 accent-blue-600" />
+                        <input type="radio" name="purchaseType" value={opt.value} checked={active} onChange={() => setPurchaseType(opt.value)} className="h-4 w-4 accent-blue-600" />
                         <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-lg ${active ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-500'}`}><Icon size={18} /></span>
                         <span className="min-w-0">
                           <span className="block text-[12.5px] font-bold text-slate-800">{opt.label}</span>
@@ -1362,14 +1328,11 @@ export const PurchaseOrdersPage = () => {
                 </div>
                 <p className="mt-2 flex items-start gap-1.5 rounded-lg bg-slate-50 px-2.5 py-1.5 text-[11px] text-slate-600">
                   <Info size={13} className="mt-px shrink-0 text-blue-500" />
-                  {fabricFlow
-                    ? <span>Selected: <strong>{flowLabel(fabricFlow)}</strong>. Choose one of these instead for a ready-fabric purchase or Vendor A production.</span>
-                    : purchaseType
-                      ? <span><strong>Next steps after approval:</strong> {PURCHASE_TYPE_OPTIONS.find((o) => o.value === purchaseType)?.flow}</span>
-                      : <span>Selected cycle determines the next workflow after PO.</span>}
+                  {purchaseType
+                    ? <span><strong>Next steps after approval:</strong> {PURCHASE_TYPE_OPTIONS.find((o) => o.value === purchaseType)?.flow}</span>
+                    : <span>Selected cycle determines the next workflow after PO.</span>}
                 </p>
               </div>
-              */}
               <div>
                 <label className="block font-semibold text-slate-700 mb-1.5">Project Association</label>
                 <div className="flex flex-wrap items-center gap-2">
@@ -1397,7 +1360,7 @@ export const PurchaseOrdersPage = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <div className="flex items-center justify-between mb-1">
-                    <label className="block font-semibold text-slate-700">{fabricFlow ? 'Factory / Vendor *' : 'Vendor / Supplier *'}</label>
+                    <label className="block font-semibold text-slate-700">Vendor / Supplier *</label>
                     <MasterSourceLink source="vendors" />
                   </div>
                   <select value={selectedVendorId} onChange={(e) => setSelectedVendorId(e.target.value)} className="w-full border border-slate-300 rounded-lg p-2 bg-white text-slate-800 font-medium">
@@ -1510,37 +1473,6 @@ export const PurchaseOrdersPage = () => {
                 <button type="button" onClick={addBlankLine} className="mt-2 inline-flex items-center gap-1 text-[12px] font-semibold text-blue-600 hover:underline"><Plus size={13}/> Add Fabric Line</button>
               </div>
 
-              {fabricFlow === FABRIC_FLOW_B && (
-                <div className="rounded-xl border border-violet-200 bg-violet-50/40 p-3.5">
-                  <label className="block font-semibold text-slate-700 mb-1" htmlFor="po-dyeing-mill">Dyeing Mill</label>
-                  <select id="po-dyeing-mill" value={dyeingMillId} onChange={(e) => setDyeingMillId(e.target.value)} className="w-full sm:w-96 border border-slate-300 rounded-lg p-2 bg-white text-slate-800 font-medium">
-                    <option value="">Not decided yet</option>
-                    {vendors.filter((v) => v.id !== selectedVendorId).map((v) => <option key={v.id} value={v.id}>{v.name}{v.code ? ` (${v.code})` : ''}</option>)}
-                  </select>
-                  <p className="mt-1 text-[10.5px] text-slate-500">The factory sends the grey fabric straight to this mill. It is tracked on the PO but never becomes OSCAR grey stock; OSCAR stock starts when the dyed fabric arrives.</p>
-                </div>
-              )}
-
-              {fabricFlow && (
-                <div>
-                  <label className="font-semibold text-slate-700 block mb-2">Yarn Details <span className="font-normal text-slate-400">(optional)</span></label>
-                  <YarnLinesEditor
-                    rows={yarnRows}
-                    onChange={setYarnRows}
-                    yarnItems={(inventoryItems || []).filter((i) => /yarn/i.test(`${i.itemKind || ''} ${i.category || ''} ${i.name || ''}`))}
-                    vendors={vendors}
-                    formatCurrency={formatCurrency}
-                  />
-                </div>
-              )}
-
-              {fabricFlow && (
-                <div>
-                  <label className="font-semibold text-slate-700 block mb-2">Costs &amp; Expenses <span className="font-normal text-slate-400">(optional now — add or update on the PO later)</span></label>
-                  <OpeningCostsEditor rows={costRows} onChange={setCostRows} flow={fabricFlow} formatCurrency={formatCurrency} />
-                </div>
-              )}
-
               {/* Remarks + Order Summary */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 <div>
@@ -1609,6 +1541,14 @@ export const PurchaseOrdersPage = () => {
               </div>
 
               <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => navigate(`/inventory/batches?po=${encodeURIComponent(selectedPo.poNumber)}&view=po`)}
+                  className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-lg font-semibold flex items-center gap-1.5 text-xs shadow-2xs transition cursor-pointer"
+                  title="View Batches in Batch Registry"
+                >
+                  <QrCode size={13}/> View Batches
+                </button>
                 <button
                   type="button"
                   onClick={() => setPrintPoTarget(selectedPo)}
@@ -1685,7 +1625,7 @@ export const PurchaseOrdersPage = () => {
                       <Receipt size={12} className="text-indigo-600" /> Commercial Snapshot
                     </span>
                     <span className="px-2 py-0.5 rounded-full text-[9.5px] font-bold bg-indigo-100 text-indigo-800 border border-indigo-200">
-                      {selectedPo.fabricFlow ? flowLabel(selectedPo.fabricFlow) : purchaseTypeOf(selectedPo)}
+                      {purchaseTypeOf(selectedPo)}
                     </span>
                   </div>
                   <div className="flex items-baseline justify-between pt-0.5">
@@ -1720,7 +1660,8 @@ export const PurchaseOrdersPage = () => {
                   else if (lbl.includes('lot') || lbl.includes('taka')) setActiveTimelineSlide('lot_taka_creation');
                   else if (lbl.includes('qc') || lbl.includes('quality')) setActiveTimelineSlide('grey_fabric_qc');
                   else if (lbl.includes('completion') || lbl.includes('verification')) setActiveTimelineSlide('completion_verification');
-                  else if (lbl.includes('final') || lbl.includes('job work')) setActiveTimelineSlide('final_job_work_po');
+                  // [DISABLED] Final Job Work PO concept commented out
+                  // else if (lbl.includes('final') || lbl.includes('job work')) setActiveTimelineSlide('final_job_work_po');
                   else if (lbl.includes('stock')) setActiveTimelineSlide('grey_stock_updated');
                   else if (lbl.includes('agency')) setActiveTimelineSlide('agency_bill_match');
                   else if (lbl.includes('vendor bill')) setActiveTimelineSlide(isVendorA ? 'agency_bill_match' : 'vendor_bill');
@@ -1728,19 +1669,6 @@ export const PurchaseOrdersPage = () => {
                   else if (lbl.includes('payment') || lbl.includes('disbursement')) setActiveTimelineSlide('disbursement_payment');
                 }}
               />
-
-              {/* Factory fabric flow: PO, yarn, dispatch, mill, receipts & batches, costs, reconciliation. */}
-              {selectedPo.fabricFlow && (
-                <PoFabricFlowPanel
-                  key={selectedPo.id}
-                  po={selectedPo}
-                  vendors={vendors}
-                  items={inventoryItems || []}
-                  locations={erpLocations}
-                  formatCurrency={formatCurrency}
-                  onChanged={() => refreshCollections?.(['purchaseOrders'])}
-                />
-              )}
 
               {/* ── Stage Execution Workspace Container ── */}
               {(() => {
@@ -1750,9 +1678,10 @@ export const PurchaseOrdersPage = () => {
                   { key: 'daily_production_entry', label: 'Daily Entry', icon: Factory, num: 2 },
                   { key: 'grey_fabric_qc', label: 'QC Stage', icon: ShieldCheck, num: 3 },
                   { key: 'completion_verification', label: 'Verification', icon: ClipboardCheck, num: 4 },
-                  { key: 'final_job_work_po', label: 'Final JW PO', icon: FileSpreadsheet, num: 5 },
-                  { key: 'agency_bill_match', label: 'Agency Bill Match', icon: FileCheck2, num: 6 },
-                  { key: 'disbursement_payment', label: 'Payment', icon: CreditCard, num: 7 },
+                  // [DISABLED] Final Job Work PO concept commented out
+                  // { key: 'final_job_work_po', label: 'Final JW PO', icon: FileSpreadsheet, num: 5 },
+                  { key: 'agency_bill_match', label: 'Agency Bill Match', icon: FileCheck2, num: 5 },
+                  { key: 'disbursement_payment', label: 'Payment', icon: CreditCard, num: 6 },
                 ] : [
                   { key: 'supplier_delivery', label: 'Delivery', icon: Truck, num: 1 },
                   { key: 'grn_inward', label: 'GRN Inward', icon: Warehouse, num: 2 },
@@ -1938,8 +1867,8 @@ export const PurchaseOrdersPage = () => {
                         </div>
                       )}
 
-                      {/* 8. Final Job Work PO (Vendor A) */}
-                      {activeTimelineSlide === 'final_job_work_po' && (
+                      {/* [DISABLED] 8. Final Job Work PO (Vendor A) concept commented out
+                      activeTimelineSlide === 'final_job_work_po' && (
                         <div ref={finalJobWorkPoRef}>
                           <FinalJobWorkPoInlineSlide
                             po={selectedPo}
@@ -1953,7 +1882,8 @@ export const PurchaseOrdersPage = () => {
                             }}
                           />
                         </div>
-                      )}
+                      )
+                      */}
 
                       {/* 9. Grey Stock Position (Standard PO) */}
                       {activeTimelineSlide === 'grey_stock_updated' && (

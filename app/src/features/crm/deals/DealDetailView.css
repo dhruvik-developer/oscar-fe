@@ -60,6 +60,7 @@
 .deal-header-actions { flex-shrink: 0; }
 .deal-stage { display: inline-block; padding: 3px 9px; border-radius: 999px; background: #edf2fa; color: #425575; font-size: 10px; font-weight: 600; }
 .deal-stage[data-won='true'] { background: #dcfce7; color: #047857; }
+.deal-stage[data-lost='true'] { background: #fee2e2; color: #b91c1c; }
 .deal-more { position: relative; }
 .deal-more summary { cursor: pointer; list-style: none; }
 .deal-more summary::-webkit-details-marker { display: none; }

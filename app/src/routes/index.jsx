@@ -140,7 +140,8 @@ const BrokerCommissionPage = lazy(() => import('../features/sales/commercial/Bro
 // ── ERP — Purchase (Lazy Loaded) ──────────────────────────────
 const PurchaseOrdersPage = lazy(() => import('../features/purchase/PurchaseOrdersPage').then(m => ({ default: m.PurchaseOrdersPage })));
 const SupplierDeliveryPage = lazy(() => import('../features/purchase/SupplierDeliveryPage'));
-const FinalJobWorkPOsPage = lazy(() => import('../features/purchase/FinalJobWorkPOsPage'));
+// [DISABLED] Final Job Work POs concept commented out
+// const FinalJobWorkPOsPage = lazy(() => import('../features/purchase/FinalJobWorkPOsPage'));
 const PurchaseBillsPage = lazy(() => import('../features/purchase/PurchaseBillsPage').then(m => ({ default: m.PurchaseBillsPage })));
 const VendorBillsPage = lazy(() => import('../features/purchase/VendorBillsPage').then(m => ({ default: m.VendorBillsPage })));
 const BillMatchingPage = lazy(() => import('../features/purchase/BillMatchingPage').then(m => ({ default: m.BillMatchingPage })));
@@ -472,7 +473,9 @@ const router = createBrowserRouter([
       { path: 'purchase/orders', element: <Page component={PurchaseOrdersPage} /> },
       { path: 'purchase/deliveries', element: <Page component={SupplierDeliveryPage} /> },
       { path: 'purchase/supplier-delivery', element: <Page component={SupplierDeliveryPage} /> },
-      { path: 'purchase/final-job-work-pos', element: <Page component={FinalJobWorkPOsPage} /> },
+      // [DISABLED] Final Job Work POs concept commented out
+      // { path: 'purchase/final-job-work-pos', element: <Page component={FinalJobWorkPOsPage} /> },
+      { path: 'purchase/final-job-work-pos', element: <Navigate to="/purchase/orders" replace /> },
       { path: 'purchase/receipts', element: <Page component={GoodsReceiptPage} /> },
       { path: 'purchase/reconciliation', element: <Page component={SupplierReconciliationPage} /> },
       { path: 'purchase/supplier-ledger', element: <Page component={SupplierLedgerPage} /> },

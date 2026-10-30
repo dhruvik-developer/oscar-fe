@@ -13,7 +13,7 @@ import { inventoryService } from '../../../services/domainServices';
 import { formatINR, formatNumberIN, describeApiError } from '../../accounts/accountingShared';
 import { printBatchTags } from './printBatchTag';
 import BatchChargeModal from './BatchChargeModal';
-import { CustomerReceiptModal, PhysicalStockSummary } from './CustomerMaterialPanels';
+import { PhysicalStockSummary } from './CustomerMaterialPanels';
 import AddBatchModal, { useTextileMasters } from './AddBatchModal';
 import { useERP } from '../../../context/ERPContext';
 import { GoodsReceiptInlineSlide } from '../../purchase/GoodsReceiptInlineSlide';
@@ -45,7 +45,6 @@ const STOCK_TILES = [
   ['rework', 'Rework', 'rework', 'text-violet-700', RefreshCcw, 'bg-violet-50 text-violet-600'],
   ['rejected', 'Rejected', 'rejected', 'text-rose-700', XCircle, 'bg-rose-50 text-rose-600'],
   ['withJobWorker', 'At job worker', 'withJobWorker', 'text-indigo-700', Truck, 'bg-indigo-50 text-indigo-600'],
-  ['customerMaterial', 'Customer material', '', 'text-slate-700', UserRound, 'bg-slate-100 text-slate-600'],
 ];
 /** Where a batch came from, with its icon. */
 const ORIGIN_ICON = { PURCHASE: ShoppingCart, PRODUCTION: Factory, JOB_WORK: Truck, MERGE: GitMerge, MANUAL: PenLine };
@@ -288,6 +287,7 @@ function BatchGroupCard({
                 >
                   View Batches
                 </button>
+                {/* [DISABLED] Open PO button commented out as requested
                 <button
                   type="button"
                   onClick={onOpenPo}
@@ -295,6 +295,7 @@ function BatchGroupCard({
                 >
                   Open PO
                 </button>
+                */}
               </>
             )}
           </div>
@@ -911,7 +912,6 @@ export default function BatchRegistryPage() {
   const [selected, setSelected] = useState({});
   const [chargeOpen, setChargeOpen] = useState(false);
   const [notice, setNotice] = useState('');
-  const [receiving, setReceiving] = useState(false);
   const [adding, setAdding] = useState(false);
   const [showPhysical, setShowPhysical] = useState(false);
 
@@ -968,8 +968,10 @@ export default function BatchRegistryPage() {
 
   useEffect(() => {
     const poParam = searchParams.get('po') || searchParams.get('poId') || searchParams.get('poNumber') || '';
-    if (poParam && poParam !== filters.poId) {
-      setView('po');
+    if (poParam !== (filters.poId || '')) {
+      if (poParam) {
+        setView('po');
+      }
       setFilters((prev) => ({ ...prev, poId: poParam }));
       setQuery((prev) => ({ ...prev, poId: poParam }));
       setPage(1);
@@ -979,6 +981,7 @@ export default function BatchRegistryPage() {
   const setF = (key, value) => {
     setFilters((prev) => ({ ...prev, [key]: value }));
     if (key === 'poId') {
+      setQuery((prev) => ({ ...prev, poId: value }));
       const next = new URLSearchParams(searchParams);
       if (value) {
         next.set('po', value);
@@ -986,6 +989,7 @@ export default function BatchRegistryPage() {
         next.delete('po');
         next.delete('poId');
         next.delete('poNumber');
+        next.delete('view');
       }
       setSearchParams(next, { replace: true });
     }
@@ -1187,43 +1191,72 @@ export default function BatchRegistryPage() {
   // Effective PO object to pass to action slides
   const effectivePo = useMemo(() => {
     if (poDetails) {
+      const enrichedLines = (poDetails.lineItems || poDetails.items || []).map((it, i) => {
+        let itId = it.itemId || it.item_id || (typeof it.item === 'string' ? it.item : it.item?.id) || '';
+        if (!itId) {
+          const itName = (it.name || it.itemName || it.fabric || it.description || '').trim().toLowerCase();
+          const matched = items.find(
+            (m) => m.name?.trim().toLowerCase() === itName ||
+                   m.sku?.trim().toLowerCase() === itName ||
+                   m.itemCode?.trim().toLowerCase() === itName
+          );
+          if (matched) itId = matched.id;
+        }
+        return {
+          ...it,
+          id: it.id || `line-${i + 1}`,
+          itemId: itId,
+          qty: Number(it.qty ?? it.orderedQty ?? selectedPoGroup?.orderedQty ?? 0),
+        };
+      });
+
       return {
         ...poDetails,
-        items: poDetails.lineItems || poDetails.items || [],
-        lineItems: poDetails.lineItems || poDetails.items || [],
+        items: enrichedLines,
+        lineItems: enrichedLines,
         vendor: poDetails.partyName || poDetails.vendorName || selectedPoGroup?.vendorName || '',
-        vendorId: poDetails.vendorId || poDetails.partyId || '',
+        vendorId: poDetails.vendorId || poDetails.partyId || selectedPoGroup?.vendorId || '',
+        qcReprocessQty: Number(selectedPoGroup?.qcReprocessQty || flowData?.quantities?.reprocessAtQc || 0),
       };
     }
     if (!selectedPoGroup) return null;
+
+    const matchedVendor = vendors.find(
+      (v) => (v.name && selectedPoGroup.vendorName && v.name.trim().toLowerCase() === selectedPoGroup.vendorName.trim().toLowerCase()) ||
+             (v.code && selectedPoGroup.vendorCode && v.code === selectedPoGroup.vendorCode)
+    );
+
+    const fallbackLines = (selectedPoGroup.fabricNames || []).map((name, i) => {
+      const trimmed = (name || '').trim().toLowerCase();
+      const matched = items.find(
+        (m) => m.name?.trim().toLowerCase() === trimmed ||
+               m.sku?.trim().toLowerCase() === trimmed ||
+               m.itemCode?.trim().toLowerCase() === trimmed
+      );
+      return {
+        id: `line-${i + 1}`,
+        itemId: selectedPoGroup.itemId || matched?.id || '',
+        itemName: name,
+        name,
+        qty: Number(selectedPoGroup.orderedQty || 0),
+        rate: 0,
+        uom: selectedPoGroup.uom || 'MTR',
+      };
+    });
+
     return {
       id: selectedPoGroup.poId,
       poNumber: selectedPoGroup.poNumber,
-      vendorId: '',
+      vendorId: selectedPoGroup.vendorId || matchedVendor?.id || '',
       vendor: selectedPoGroup.vendorName,
       partyName: selectedPoGroup.vendorName,
       status: selectedPoGroup.status,
       fabricFlow: selectedPoGroup.fabricFlow,
-      items: (selectedPoGroup.fabricNames || []).map((name, i) => ({
-        id: `line-${i + 1}`,
-        itemId: '',
-        itemName: name,
-        name,
-        qty: Number(selectedPoGroup.remainingQty || selectedPoGroup.orderedQty || 0),
-        rate: 0,
-        uom: selectedPoGroup.uom || 'MTR',
-      })),
-      lineItems: (selectedPoGroup.fabricNames || []).map((name, i) => ({
-        id: `line-${i + 1}`,
-        itemId: '',
-        itemName: name,
-        name,
-        qty: Number(selectedPoGroup.remainingQty || selectedPoGroup.orderedQty || 0),
-        rate: 0,
-        uom: selectedPoGroup.uom || 'MTR',
-      })),
+      items: fallbackLines,
+      lineItems: fallbackLines,
+      qcReprocessQty: Number(selectedPoGroup.qcReprocessQty || flowData?.quantities?.reprocessAtQc || 0),
     };
-  }, [poDetails, selectedPoGroup]);
+  }, [poDetails, selectedPoGroup, items, vendors, flowData]);
 
   // Context-sensitive status calculations
   const poStatus = selectedPoGroup?.status || poDetails?.status || '';
@@ -1235,17 +1268,29 @@ export default function BatchRegistryPage() {
 
   return (
     <div className="space-y-4">
-      {/* Back to Purchase Orders Bar when viewing a specific PO */}
+      {/* Navigation Bar when viewing a specific PO */}
       {selectedPoGroup && (
         <div className="flex flex-wrap items-center justify-between gap-3 p-3 rounded-xl bg-gradient-to-r from-blue-50/80 to-slate-50 border border-blue-200 shadow-2xs">
-          <div className="flex items-center gap-2.5">
+          <div className="flex flex-wrap items-center gap-2.5">
+            <button
+              type="button"
+              onClick={() => {
+                setF('poId', '');
+                setQuery((prev) => ({ ...prev, poId: '' }));
+                setSearchParams({});
+              }}
+              className="h-8 px-3.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors"
+              title="Return to full Batch Registry showing all batches and orders"
+            >
+              <ArrowLeft size={14} /> Back to Batch Registry
+            </button>
             <button
               type="button"
               onClick={() => navigate('/purchase/orders')}
-              className="h-8 px-3 rounded-lg bg-white border border-blue-300 text-blue-700 hover:bg-blue-50 text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer shadow-2xs transition-colors"
+              className="h-8 px-3 rounded-lg bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 text-xs font-semibold inline-flex items-center gap-1.5 cursor-pointer shadow-2xs transition-colors"
               title="Return to Purchase Orders list"
             >
-              <ArrowLeft size={14} className="text-blue-600" /> Back to Purchase Orders
+              <ExternalLink size={13} className="text-slate-500" /> Back to Purchase Orders
             </button>
             <span className="text-slate-300">|</span>
             <span className="text-xs text-slate-700 font-medium">
@@ -1254,7 +1299,11 @@ export default function BatchRegistryPage() {
           </div>
           <button
             type="button"
-            onClick={() => { setF('poId', ''); setSearchParams({}); }}
+            onClick={() => {
+              setF('poId', '');
+              setQuery((prev) => ({ ...prev, poId: '' }));
+              setSearchParams({});
+            }}
             className="text-xs font-semibold text-blue-700 hover:text-blue-900 hover:underline cursor-pointer"
           >
             Clear PO Filter (View all POs) &rarr;
@@ -1267,18 +1316,16 @@ export default function BatchRegistryPage() {
         subtitle={selectedPoGroup
           ? `Central hub for managing goods receipts, batch tracking, quality control inspections, and dispatches for ${selectedPoGroup.poNumber}.`
           : "Every grey and dyed fabric batch — its ID, QR tag, where its metres are now and its status. Click a batch for its Batch 360° view."}
+        breadcrumb={selectedPoGroup ? [
+          { label: 'Dashboard', path: '/dashboard' },
+          { label: 'Inventory', path: '/inventory/dashboard' },
+          { label: 'Batch Registry', path: '/inventory/batches' },
+          { label: selectedPoGroup.poNumber },
+        ] : undefined}
         actions={(
-          <div className="flex flex-wrap gap-2">
-            <button type="button" onClick={() => setShowPhysical((v) => !v)} className={ghostBtn} aria-pressed={showPhysical}>
-              <Layers size={14} /> {showPhysical ? 'Hide own vs customer' : 'Own vs customer'}
-            </button>
-            <button type="button" onClick={() => setReceiving(true)} className={ghostBtn}>
-              <Users size={14} /> Customer material
-            </button>
-            <button type="button" onClick={() => setAdding(true)} className="h-9 px-4 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold inline-flex items-center gap-1.5 cursor-pointer">
-              <Plus size={14} /> Create Batch
-            </button>
-          </div>
+          <button type="button" onClick={() => setAdding(true)} className="h-9 px-4 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold inline-flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors">
+            <Plus size={14} /> Create Batch
+          </button>
         )}
       />
 
@@ -1323,6 +1370,7 @@ export default function BatchRegistryPage() {
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
+              {/* [DISABLED] Open Full PO button commented out as requested
               <button
                 type="button"
                 onClick={() => navigate(`/purchase/orders?po=${encodeURIComponent(selectedPoGroup.poId)}`)}
@@ -1331,27 +1379,42 @@ export default function BatchRegistryPage() {
               >
                 <ExternalLink size={13} className="text-slate-500" /> Open Full PO
               </button>
+              */}
             </div>
           </div>
 
-          {/* 6 Backend KPI Metric Tiles */}
-          <dl className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
-            {[
+          {/* Backend KPI Metric Tiles */}
+          {(() => {
+            const reprocessVal = Number(selectedPoGroup.qcReprocessQty || flowData?.quantities?.reprocessAtQc || 0);
+            const rejectedVal = Number(selectedPoGroup.qcRejectedQty || flowData?.quantities?.rejectedAtQc || 0);
+            const tiles = [
               ['Ordered Quantity', selectedPoGroup.orderedQty, 'text-slate-900', 'bg-slate-50'],
               ['Received at OSCAR', selectedPoGroup.receivedQty, 'text-slate-900', 'bg-slate-50'],
               ['Remaining to Receive', selectedPoGroup.remainingQty, Number(selectedPoGroup.remainingQty || 0) > 0 ? 'text-amber-800' : 'text-slate-900', Number(selectedPoGroup.remainingQty || 0) > 0 ? 'bg-amber-50/50 border border-amber-200/60' : 'bg-slate-50'],
               ['Linked Batches', selectedPoGroup.batches?.length || selectedPoGroup.batchCount || 0, 'text-blue-700', 'bg-blue-50/50 border border-blue-200/60'],
               ['QC Pending Quantity', selectedPoGroup.qcPendingQty, qcPendingMetres > 0 ? 'text-amber-700' : 'text-slate-700', qcPendingMetres > 0 ? 'bg-amber-50 border border-amber-200' : 'bg-slate-50'],
               ['QC Passed Quantity', selectedPoGroup.qcPassedQty, 'text-emerald-700', 'bg-emerald-50 border border-emerald-200'],
-            ].map(([label, value, txtCls, bgCls]) => (
-              <div key={label} className={`rounded-xl p-3 ${bgCls}`}>
-                <dt className="text-[10px] font-bold uppercase tracking-wider text-slate-500">{label}</dt>
-                <dd className={`mt-1 text-base font-extrabold tabular-nums ${txtCls}`}>
-                  {label === 'Linked Batches' ? value : `${formatNumberIN(value)} ${selectedPoGroup.uom || 'm'}`}
-                </dd>
-              </div>
-            ))}
-          </dl>
+            ];
+            if (reprocessVal > 0) {
+              tiles.push(['QC Reprocess Quantity', reprocessVal, 'text-purple-700', 'bg-purple-50 border border-purple-200']);
+            }
+            if (rejectedVal > 0) {
+              tiles.push(['QC Rejected Quantity', rejectedVal, 'text-rose-700', 'bg-rose-50 border border-rose-200']);
+            }
+            const gridColsCls = tiles.length >= 7 ? 'grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-7' : 'grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6';
+            return (
+              <dl className={gridColsCls}>
+                {tiles.map(([label, value, txtCls, bgCls]) => (
+                  <div key={label} className={`rounded-xl p-3 ${bgCls}`}>
+                    <dt className="text-[10px] font-bold uppercase tracking-wider text-slate-500">{label}</dt>
+                    <dd className={`mt-1 text-base font-extrabold tabular-nums ${txtCls}`}>
+                      {label === 'Linked Batches' ? value : `${formatNumberIN(value)} ${selectedPoGroup.uom || 'm'}`}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            );
+          })()}
 
           {/* Context-Sensitive Operations Toolbar */}
           <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100">
@@ -1447,6 +1510,18 @@ export default function BatchRegistryPage() {
             >
               <Receipt size={14} /> Match Bill
             </button>
+
+            {/* 7. Reprocess Stock (Contextual Shortcut) */}
+            {Number(selectedPoGroup.qcReprocessQty || flowData?.quantities?.reprocessAtQc || 0) > 0 && (
+              <button
+                type="button"
+                onClick={() => navigate('/inventory/stock-position?type=reprocess')}
+                className="h-9 px-3 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 transition-all shadow-2xs cursor-pointer bg-purple-50 border border-purple-200 text-purple-700 hover:bg-purple-100"
+                title="View defective rolls sitting in Reprocess Godown"
+              >
+                <RefreshCcw size={14} /> Reprocess Stock ({formatNumberIN(Number(selectedPoGroup.qcReprocessQty || flowData?.quantities?.reprocessAtQc || 0))} {selectedPoGroup.uom || 'm'})
+              </button>
+            )}
           </div>
 
           {/* ACTIVE ACTION SLIDE CONTAINER */}
@@ -1533,19 +1608,9 @@ export default function BatchRegistryPage() {
       {adding && (
         <AddBatchModal
           onClose={() => setAdding(false)}
-          onCustomerMaterial={() => { setAdding(false); setReceiving(true); }}
           onDone={(batch, tab) => {
             setAdding(false);
             navigate(`/inventory/batches/${encodeURIComponent(batch.batchCode)}${tab && tab !== 'overview' ? `?tab=${tab}` : ''}`);
-          }}
-        />
-      )}
-      {receiving && (
-        <CustomerReceiptModal
-          onClose={() => setReceiving(false)}
-          onDone={(batch) => {
-            setReceiving(false);
-            open(batch.batchCode);
           }}
         />
       )}
@@ -1899,14 +1964,6 @@ export default function BatchRegistryPage() {
                     >
                       <PackageCheck size={14} /> Record First Goods Receipt (GRN)
                     </button>
-                  ) : isDraftOrPending ? (
-                    <button
-                      type="button"
-                      onClick={() => navigate(`/purchase/orders?po=${encodeURIComponent(selectedPoGroup.poId)}`)}
-                      className="h-9 px-4 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold inline-flex items-center gap-1.5 cursor-pointer shadow-xs"
-                    >
-                      <ExternalLink size={14} /> Open PO to Submit / Approve
-                    </button>
                   ) : null}
                   <button
                     type="button"
@@ -1960,8 +2017,20 @@ export default function BatchRegistryPage() {
                             {batch.qcStatus === 'Mixed' ? 'Partially Approved' : batch.qcStatus}
                           </span>
                         </td>
-                        <td className="px-4 py-3 text-right tabular-nums font-bold text-emerald-700">
-                          {formatNumberIN(batch.availableQty)} {batch.uom}
+                        <td className="px-4 py-3 text-right tabular-nums">
+                          <div className="font-bold text-emerald-700">
+                            {formatNumberIN(batch.availableQty)} {batch.uom}
+                          </div>
+                          {Number(batch.reworkQty || 0) > 0 && (
+                            <div className="text-[10px] font-semibold text-purple-700 mt-0.5" title="Defective quantity moved to Reprocess stock">
+                              {formatNumberIN(batch.reworkQty)} {batch.uom} Reprocess
+                            </div>
+                          )}
+                          {Number(batch.rejectedQty || 0) > 0 && (
+                            <div className="text-[10px] font-semibold text-rose-600 mt-0.5" title="Defective quantity rejected">
+                              {formatNumberIN(batch.rejectedQty)} {batch.uom} Rejected
+                            </div>
+                          )}
                         </td>
                         <td className="px-4 py-3">
                           <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-[10px] font-semibold whitespace-nowrap ${STATUS_STYLE[batch.status] || STATUS_STYLE.Closed}`}>
@@ -2123,7 +2192,7 @@ export default function BatchRegistryPage() {
                       group={group}
                       expanded={Boolean(expandedGroups[group.key])}
                       onToggle={() => toggleGroup(group.key)}
-                      onOpenPo={() => navigate(`/purchase/orders?po=${encodeURIComponent(group.poId)}`)}
+                      // onOpenPo={() => navigate(`/purchase/orders?po=${encodeURIComponent(group.poId)}`)}
                       onViewBatches={() => viewBatchesForPo(group.poId)}
                       onOpenBatch={open}
                       onReceiveGoods={group.type === 'po' ? () => {

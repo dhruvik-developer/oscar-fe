@@ -5,10 +5,8 @@ import { useERP } from '../../../../context/ERPContext';
 import { inventoryService } from '../../../../services/domainServices';
 import { describeApiError } from '../../../accounts/accountingShared';
 import { batchUrl } from '../printBatchTag';
-import { DeliverToOwnerForm } from '../CustomerMaterialPanels';
 import RegisterTakasForm from '../RegisterTakasForm';
 import { Card, Stat, btnGhost, btnPrimary, useBatchAction } from './shared';
-import PurchaseTraceCard from './PurchaseTraceCard';
 
 const QTY_TILES = [
   ['received', 'Received / produced'],
@@ -43,26 +41,14 @@ export default function OverviewTab({ batch, onBatch, goTo }) {
   const q = batch.quantities || {};
   const uom = q.uom || 'm';
   const perms = batch.permissions || {};
-  const [owner, setOwner] = useState(null);
-  const [ownerError, setOwnerError] = useState('');
   const [typeForm, setTypeForm] = useState(null);
   const { busy, error, run } = useBatchAction(batch, onBatch);
 
-  const saveOwner = async () => {
-    setOwnerError('');
-    try {
-      onBatch(await inventoryService.setBatchOwnership(batch.batchCode, owner));
-      setOwner(null);
-    } catch (err) {
-      setOwnerError(describeApiError(err) || 'Ownership could not be saved.');
-    }
-  };
-
-  const own = batch.ownership === 'OSCAR';
+  const own = true;
   const hasRejected = Number(q.rejected) > 0;
   const actions = [
     { key: 'qc', icon: ClipboardCheck, label: 'Perform QC', hint: batch.qc?.state, show: true },
-    { key: 'sales', icon: ShoppingCart, label: 'Sell fabric', hint: own ? `${q.available} ${uom} available` : 'Customer material — deliver to owner', show: own },
+    { key: 'sales', icon: ShoppingCart, label: 'Sell fabric', hint: `${q.available} ${uom} available`, show: true },
     { key: 'dyeing', icon: Droplets, label: 'Send for dyeing', hint: Number(q.withJobWorker) > 0 ? `${q.withJobWorker} ${uom} at job worker` : 'Job work / processing', show: true },
     { key: 'qc', icon: RefreshCcw, label: 'Send for reprocessing', hint: Number(q.rework) > 0 ? `${q.rework} ${uom} in rework` : 'From QC rework stock', show: true },
     { key: 'qc', icon: Undo2, label: 'Return to vendor', hint: hasRejected ? `${q.rejected} ${uom} rejected` : 'Needs rejected stock', show: batch.origin === 'PURCHASE' || hasRejected },
@@ -120,8 +106,6 @@ export default function OverviewTab({ batch, onBatch, goTo }) {
         </Card>
       </div>
 
-      <PurchaseTraceCard trace={batch.purchaseTrace} />
-
       <Card title="What do you want to do?" subtitle="Every step is optional — pick the one this batch needs. QC is not compulsory.">
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
           {actions.map(({ key, icon: Icon, label, hint }) => (
@@ -140,41 +124,9 @@ export default function OverviewTab({ batch, onBatch, goTo }) {
         ))}
       </section>
 
-      <Card title="Material owner">
-        {owner ? (
-          <div className="flex flex-wrap items-center gap-2">
-            <select value={owner.ownership} onChange={(e) => setOwner({ ...owner, ownership: e.target.value })} className="h-8 px-2 rounded-lg border border-slate-200" aria-label="Ownership">
-              <option value="OSCAR">OSCAR (own stock)</option>
-              <option value="CUSTOMER">Customer</option>
-              <option value="THIRD_PARTY">Third party</option>
-            </select>
-            {owner.ownership !== 'OSCAR' && (
-              <select value={owner.ownerPartyId || ''} onChange={(e) => setOwner({ ...owner, ownerPartyId: e.target.value })} className="h-8 px-2 rounded-lg border border-slate-200 max-w-56" aria-label="Owner">
-                <option value="">Select party</option>
-                {parties.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-              </select>
-            )}
-            <button type="button" onClick={saveOwner} className={btnPrimary}>Save</button>
-            <button type="button" onClick={() => { setOwner(null); setOwnerError(''); }} className={btnGhost}>Cancel</button>
-            {ownerError && <span role="alert" className="text-rose-700">{ownerError}</span>}
-          </div>
-        ) : (
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-slate-800">{own ? 'OSCAR (own stock — sellable)' : `${batch.ownerPartyName} (${batch.ownership === 'CUSTOMER' ? 'customer' : 'third-party'} material — not sellable, delivered to owner only)`}</span>
-            {perms.adjustStock && <button type="button" onClick={() => setOwner({ ownership: batch.ownership, ownerPartyId: '' })} className="h-7 px-2 rounded-md border border-slate-200 font-semibold text-slate-600 hover:bg-slate-50 cursor-pointer">Change</button>}
-          </div>
-        )}
-      </Card>
-
       {Number(q.unregistered) > 0 && perms.adjustStock && (
         <Card title="Register takas" subtitle={`${q.unregistered} ${uom} were received as a total; cut them into takas to sell or send them roll by roll.`}>
           <RegisterTakasForm batch={batch} onDone={onBatch} />
-        </Card>
-      )}
-
-      {!own && perms.adjustStock && (
-        <Card title={`Deliver to owner (${batch.ownerPartyName})`}>
-          <DeliverToOwnerForm batch={batch} onDone={onBatch} />
         </Card>
       )}
     </div>

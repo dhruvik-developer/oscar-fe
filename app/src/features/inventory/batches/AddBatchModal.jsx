@@ -12,7 +12,7 @@ const METHODS = [
   ['manual', 'Manual entry', 'Opening stock, stock found on a count, or fabric bought / made outside the system.'],
   ['production', 'In-house production', 'Weave / knit grey fabric: enter yarn and production day by day.'],
   ['auto', 'From PO / GRN (automatic)', 'Created by itself from the quantity actually received.'],
-  ['customer', 'Customer material', 'Fabric a customer sends for processing — never OSCAR stock.'],
+
 ];
 
 /** Fabric quality / design / shade masters, for the optional pickers. */
@@ -34,7 +34,7 @@ export function useTextileMasters() {
  * are made automatically from the goods actually received (GRN), so a
  * partial delivery never counts the PO quantity as stock.
  */
-export default function AddBatchModal({ onClose, onDone, onCustomerMaterial, defaultFabricType = 'GREY' }) {
+export default function AddBatchModal({ onClose, onDone, defaultFabricType = 'GREY' }) {
   const { items = [], locations = [], parties = [] } = useERP() || {};
   const { qualities, designs, shades } = useTextileMasters();
   const godowns = locations.filter((l) => !String(l.code || '').startsWith('SYS-'));
@@ -153,17 +153,12 @@ export default function AddBatchModal({ onClose, onDone, onCustomerMaterial, def
             </div>
           )}
 
-          {method === 'customer' && (
-            <div className="p-3 rounded-lg bg-blue-50 border border-blue-200 text-blue-900">
-              Customer material is kept apart from OSCAR stock and carries no cost.{' '}
-              <button type="button" onClick={onCustomerMaterial} className="font-bold underline cursor-pointer">Receive customer material</button>
-            </div>
-          )}
+          
 
           {method === 'production' && (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <p className="sm:col-span-2 p-2.5 rounded-lg bg-slate-50 border border-slate-200 text-slate-600">
-                Opens a production run and its Grey Fabric batch together. Then, in Inventory → Production Runs, open the run to issue yarn and enter each day&apos;s rolls; complete the run to book the cost.
+                Opens a production run and its Grey Fabric batch together. Then, on the batch&apos;s Daily Production and Yarn tabs, issue yarn and enter each day&apos;s rolls; complete the run to book the cost.
               </p>
               <label className="block sm:col-span-2"><span className="block font-semibold mb-1">Fabric to produce *</span>
                 <select required value={run.outputItemId} onChange={setR('outputItemId')} className={inputCls}>
@@ -179,11 +174,6 @@ export default function AddBatchModal({ onClose, onDone, onCustomerMaterial, def
               {masterSelect('Shade', run.shadeId, setR('shadeId'), shades)}
               <label className="block"><span className="block font-semibold mb-1">Machine / loom</span>
                 <input value={run.machine} onChange={setR('machine')} className={inputCls} /></label>
-              <label className="block"><span className="block font-semibold mb-1">For customer (optional)</span>
-                <select value={run.customerId} onChange={setR('customerId')} className={inputCls}>
-                  <option value="">OSCAR stock</option>
-                  {parties.filter((p) => /customer|both/i.test(p.type || '')).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-                </select></label>
               <div className="grid grid-cols-2 gap-2">
                 <label className="block"><span className="block font-semibold mb-1">Width</span><input type="number" min="0" step="any" value={run.width} onChange={setR('width')} className={inputCls} /></label>
                 <label className="block"><span className="block font-semibold mb-1">GSM</span><input type="number" min="0" step="any" value={run.gsm} onChange={setR('gsm')} className={inputCls} /></label>

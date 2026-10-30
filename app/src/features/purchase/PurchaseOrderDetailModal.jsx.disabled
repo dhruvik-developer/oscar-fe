@@ -1,0 +1,6 @@
+// ARCHIVE / BACKUP of PO Detail & Lifecycle Progression Modal (Disabled per user request)
+// To re-enable, this component can be imported and rendered in PurchaseOrdersPage.jsx.
+
+export const PurchaseOrderDetailModalBackup = () => {
+  return null;
+};

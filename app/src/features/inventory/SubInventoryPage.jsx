@@ -27,7 +27,7 @@ import { inventoryService } from '../../services/domainServices';
 import { formatINR, formatNumberIN, describeApiError } from '../accounts/accountingShared';
 import { printBatchTags } from './batches/printBatchTag';
 import BatchChargeModal from './batches/BatchChargeModal';
-import { CustomerReceiptModal, PhysicalStockSummary } from './batches/CustomerMaterialPanels';
+import { PhysicalStockSummary } from './batches/CustomerMaterialPanels';
 import AddBatchModal from './batches/AddBatchModal';
 
 const ORIGINS = [
@@ -86,7 +86,6 @@ export default function SubInventoryPage() {
   const [selected, setSelected] = useState({});
   const [chargeOpen, setChargeOpen] = useState(false);
   const [notice, setNotice] = useState('');
-  const [receiving, setReceiving] = useState(false);
   const [adding, setAdding] = useState(false);
   const [showPhysical, setShowPhysical] = useState(false);
 
@@ -282,13 +281,6 @@ export default function SubInventoryPage() {
               className="h-9 px-3 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer shadow-2xs transition-colors"
             >
               {showPhysical ? 'Hide' : 'Physical Stock'}
-            </button>
-            <button
-              type="button"
-              onClick={() => setReceiving(true)}
-              className="h-9 px-3 rounded-lg border border-blue-200 bg-white text-blue-700 text-xs font-semibold hover:bg-blue-50 cursor-pointer shadow-2xs transition-colors"
-            >
-              Receive Customer Material
             </button>
             <button
               type="button"
@@ -802,26 +794,11 @@ export default function SubInventoryPage() {
         />
       )}
 
-      {/* Customer Receipt Modal */}
-      {receiving && (
-        <CustomerReceiptModal
-          onClose={() => setReceiving(false)}
-          onDone={(batch) => {
-            setReceiving(false);
-            navigate(`/inventory/batches/${encodeURIComponent(batch.batchCode)}`);
-          }}
-        />
-      )}
-
       {/* Add Batch Modal */}
       {adding && (
         <AddBatchModal
           defaultFabricType={activeSub}
           onClose={() => setAdding(false)}
-          onCustomerMaterial={() => {
-            setAdding(false);
-            setReceiving(true);
-          }}
           onDone={(batch, tab) => {
             setAdding(false);
             load();

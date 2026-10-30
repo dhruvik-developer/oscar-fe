@@ -1,7 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { TablePagination } from '../../components/ui/TablePagination';
-import { useTableSort } from '../../hooks/useTableSort';
-import SortableTh from '../../components/ui/SortableTh';
 import { useERP } from '../../context/ERPContext';
 import { StatusBadge } from '../../components/ui/StatusBadge';
 import { StatCard } from '../../components/ui/StatCard';
@@ -28,7 +26,7 @@ import {
   Search,
 } from 'lucide-react';
 import api from '../../services/api';
-import { useLocation, useNavigate, Link } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { numIN } from '../../utils/formatters';
 import MasterSourceLink from '../../components/common/MasterSourceLink';
 import GrnDetailDrawer from './GrnDetailDrawer';
@@ -89,8 +87,6 @@ export const GoodsReceiptPage = () => {
   const [grnIdempotencyKey, setGrnIdempotencyKey] = useState('');
   const [standaloneSubmitting, setStandaloneSubmitting] = useState(false);
   const [standaloneError, setStandaloneError] = useState('');
-  // Earlier GRNs against the PO picked in the intake form (date, qty, rate per delivery).
-  const [poHistory, setPoHistory] = useState([]);
   const [standaloneSuccess, setStandaloneSuccess] = useState('');
 
   const todayStr = new Date().toISOString().split('T')[0];
@@ -246,6 +242,40 @@ export const GoodsReceiptPage = () => {
     );
   }, [purchaseOrders, standaloneForm.vendorId]);
 
+  const resolveMasterItemId = useCallback((it, poRef) => {
+    let resolvedId = it?.itemId || it?.item_id || (typeof it?.item === 'string' ? it.item : it?.item?.id) || '';
+    if (!resolvedId && masterItems?.length) {
+      const candidates = [
+        it?.name,
+        it?.itemName,
+        it?.fabric,
+        it?.description,
+        poRef?.fabric,
+        poRef?.fabricItem,
+      ].filter(Boolean);
+
+      for (const raw of candidates) {
+        const trimmed = String(raw).trim().toLowerCase();
+        let match = masterItems.find(
+          (m) => String(m.id) === String(raw) ||
+                 (m.name && m.name.trim().toLowerCase() === trimmed) ||
+                 (m.sku && m.sku.trim().toLowerCase() === trimmed) ||
+                 (m.itemCode && m.itemCode.trim().toLowerCase() === trimmed)
+        );
+        if (!match) {
+          match = masterItems.find(
+            (m) => m.name && (trimmed.includes(m.name.trim().toLowerCase()) || m.name.trim().toLowerCase().includes(trimmed))
+          );
+        }
+        if (match) {
+          resolvedId = match.id;
+          break;
+        }
+      }
+    }
+    return resolvedId;
+  }, [masterItems]);
+
   const handleVendorSelect = (vendorId) => {
     setStandaloneForm((prev) => ({
       ...prev,
@@ -256,36 +286,34 @@ export const GoodsReceiptPage = () => {
   };
 
   const handlePoSelect = (poId) => {
-    setPoHistory([]);
     if (!poId) {
       setStandaloneForm((prev) => ({ ...prev, poId: '', lines: [] }));
       return;
     }
-    api.get('/purchase/receipts/', { query: { page_size: 200 } })
-      .then((res) => setPoHistory((res?.results || res || []).filter((r) => String(r.purchaseOrder ?? r.purchase_order) === String(poId))))
-      .catch(() => setPoHistory([]));
-    const po = purchaseOrders.find((p) => p.id === poId);
+    const po = purchaseOrders.find((p) => String(p.id) === String(poId));
     if (!po) return;
 
     const poLines = (po.lineItems || po.items || []).map((it, idx) => {
-      const remaining = Math.max(0, Number(it.qty || 0) - Number(it.receivedQty || 0));
-      const targetQty = remaining > 0 ? remaining : Number(it.qty || 0);
+      const lineOrdered = Number(it.qty ?? it.orderedQty ?? 0);
+      const lineReceived = Number(it.receivedQty ?? 0);
+      const remaining = Math.max(0, lineOrdered - lineReceived);
+      const targetQty = remaining > 0 ? remaining : lineOrdered;
+      const itemId = resolveMasterItemId(it, po);
       return {
         id: `line-${idx + 1}`,
-        itemId: it.itemId || it.item_id || it.item,
-        itemName: it.name || it.itemName || it.description || '',
+        itemId,
+        itemName: it.name || it.itemName || it.fabric || it.description || (masterItems.find((m) => m.id === itemId)?.name) || '',
         poLineId: it.id,
-        orderedQty: Number(it.qty || 0),
-        earlierQty: Number(it.receivedQty || 0),
-        pendingQty: remaining,
-        receivedQty: targetQty,
+        orderedQty: lineOrdered,
+        remainingQty: remaining,
+        receivedQty: targetQty > 0 ? targetQty : '',
         unitCost: Number(it.rate || it.unitPrice || 0),
         uom: it.uom || '',
         batchNumber: '',
         fabricWidth: it.fabricWidth || '',
         remarks: '',
         takas: [
-          { id: `t-${idx + 1}-1`, takaNumber: '1', qty: targetQty, weight: '', width: it.fabricWidth ? String(it.fabricWidth) : '', remarks: '' },
+          { id: `t-${idx + 1}-1`, takaNumber: '1', qty: targetQty > 0 ? targetQty : '', weight: '', width: it.fabricWidth ? String(it.fabricWidth) : '', remarks: '' },
         ],
         showTakas: true,
       };
@@ -297,6 +325,19 @@ export const GoodsReceiptPage = () => {
       lines: poLines,
     }));
   };
+
+  useEffect(() => {
+    if (masterItems?.length > 0 && standaloneForm.lines.some((l) => !l.itemId)) {
+      setStandaloneForm((prev) => ({
+        ...prev,
+        lines: prev.lines.map((l) => {
+          if (l.itemId) return l;
+          const resolvedId = resolveMasterItemId(l, purchaseOrders.find((p) => String(p.id) === String(prev.poId)));
+          return resolvedId ? { ...l, itemId: resolvedId } : l;
+        }),
+      }));
+    }
+  }, [masterItems, standaloneForm.lines, standaloneForm.poId, purchaseOrders, resolveMasterItemId]);
 
   // "Record GRN" on a purchase order lands here with that PO preselected.
   const grnForPo = location.state?.grnForPo;
@@ -438,6 +479,12 @@ export const GoodsReceiptPage = () => {
       for (let i = 0; i < standaloneForm.lines.length; i++) {
         const l = standaloneForm.lines[i];
         const rQty = Number(l.receivedQty);
+        if (!l.itemId) {
+          l.itemId = resolveMasterItemId(l, purchaseOrders.find((p) => String(p.id) === String(standaloneForm.poId)));
+        }
+        if (!l.itemId && masterItems.length === 1) {
+          l.itemId = masterItems[0].id;
+        }
         if (!l.itemId) throw new Error(`Line ${i + 1}: Select the item received.`);
         if (!(rQty > 0)) throw new Error(`Line ${i + 1}: Received quantity must be greater than zero.`);
 
@@ -511,24 +558,10 @@ export const GoodsReceiptPage = () => {
     setGrnPage(1);
   }, [grnSearch]);
 
-  const grnSort = useTableSort(filteredGrnList, {
-    accessors: {
-      lines: (g) => g.lines?.length || 0,
-      qc_status: (g) => g.qc_status || 'Pending',
-    },
-  });
-
   const paginatedGrnList = useMemo(() => {
     const start = (grnPage - 1) * grnPageSize;
-    return grnSort.rows.slice(start, start + grnPageSize);
-  }, [grnSort.rows, grnPage, grnPageSize]);
-
-  const pendingSort = useTableSort(pendingReceipts, {
-    accessors: {
-      items: (b) => b.items?.length || 0,
-      total: (b) => Number(b.total || b.amount) || 0,
-    },
-  });
+    return filteredGrnList.slice(start, start + grnPageSize);
+  }, [filteredGrnList, grnPage, grnPageSize]);
 
   return (
     <div className="space-y-6">
@@ -613,14 +646,13 @@ export const GoodsReceiptPage = () => {
                 <table className="w-full text-left text-xs">
                   <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200 uppercase tracking-wider text-[11px]">
                     <tr>
-                      <SortableTh sort={grnSort} sortKey="grn_number" className="px-4 py-3">GRN #</SortableTh>
-                      <SortableTh sort={grnSort} sortKey="receipt_date" className="px-4 py-3">Receipt Date</SortableTh>
-                      <SortableTh sort={grnSort} sortKey="vendorName" className="px-4 py-3">Supplier</SortableTh>
-                      <SortableTh sort={grnSort} sortKey="supplier_challan_no" className="px-4 py-3">Supplier Challan #</SortableTh>
-                      <SortableTh sort={grnSort} sortKey="poNumber" className="px-4 py-3">PO Number</SortableTh>
-                      <SortableTh sort={grnSort} sortKey="lines" className="px-4 py-3 text-right" align="right">Lines</SortableTh>
-                      <SortableTh sort={grnSort} sortKey="qc_status" className="px-4 py-3 text-center" align="center">QC Status</SortableTh>
-                      <th className="px-4 py-3 text-right">QC Action</th>
+                      <th className="px-4 py-3">GRN #</th>
+                      <th className="px-4 py-3">Receipt Date</th>
+                      <th className="px-4 py-3">Supplier</th>
+                      <th className="px-4 py-3">Supplier Challan #</th>
+                      <th className="px-4 py-3">PO Number</th>
+                      <th className="px-4 py-3 text-right">Lines</th>
+                      <th className="px-4 py-3 text-center">QC Status</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -643,26 +675,12 @@ export const GoodsReceiptPage = () => {
                         <td className="px-4 py-3 text-right font-semibold text-slate-800">{g.lines?.length || 0}</td>
                         <td className="px-4 py-3 text-center">
                           <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold border ${
-                            g.qc_status === 'Approved' || g.qc_status === 'Partially Approved' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                            g.qc_status === 'Approved' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
                             g.qc_status === 'Rejected' ? 'bg-rose-50 text-rose-700 border-rose-200' :
                             'bg-amber-50 text-amber-700 border-amber-200'
                           }`}>
                             {g.qc_status || 'Pending'}
                           </span>
-                        </td>
-                        <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
-                          <Link
-                            to={`/inventory/qc/results?receiptId=${g.id}`}
-                            className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-semibold border transition ${
-                              g.qc_status === 'Approved' || g.qc_status === 'Partially Approved'
-                                ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-200'
-                                : 'bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-200'
-                            }`}
-                            title="Open in QC Results & Disposition"
-                          >
-                            <ShieldCheck className="w-3.5 h-3.5" />
-                            <span>{g.qc_status === 'Approved' || g.qc_status === 'Partially Approved' ? 'View QC' : 'QC Disposition'}</span>
-                          </Link>
                         </td>
                       </tr>
                     ))}
@@ -699,16 +717,16 @@ export const GoodsReceiptPage = () => {
               <table className="w-full text-left text-xs text-slate-600">
                 <thead className="bg-slate-50 uppercase font-semibold text-slate-500 tracking-wider border-b border-slate-200 text-[11px]">
                   <tr>
-                    <SortableTh sort={pendingSort} sortKey="billNumber" className="py-2.5 px-4">Bill Number</SortableTh>
-                    <SortableTh sort={pendingSort} sortKey="vendor" className="py-2.5 px-4">Supplier</SortableTh>
-                    <SortableTh sort={pendingSort} sortKey="date" className="py-2.5 px-4">Date</SortableTh>
-                    <SortableTh sort={pendingSort} sortKey="items" className="py-2.5 px-4 text-right" align="right">Bill Items</SortableTh>
-                    <SortableTh sort={pendingSort} sortKey="total" className="py-2.5 px-4 text-right" align="right">Amount</SortableTh>
+                    <th className="py-2.5 px-4">Bill Number</th>
+                    <th className="py-2.5 px-4">Supplier</th>
+                    <th className="py-2.5 px-4">Date</th>
+                    <th className="py-2.5 px-4 text-right">Bill Items</th>
+                    <th className="py-2.5 px-4 text-right">Amount</th>
                     <th className="py-2.5 px-4 text-center">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {pendingSort.rows.map((bill) => (
+                  {pendingReceipts.map((bill) => (
                     <tr key={bill.id} className="hover:bg-slate-50/70">
                       <td className="p-4 font-mono font-bold text-slate-800">{bill.billNumber}</td>
                       <td className="p-4 font-medium text-slate-900">{bill.vendor}</td>
@@ -850,52 +868,6 @@ export const GoodsReceiptPage = () => {
                 </div>
               </div>
 
-              {standaloneForm.poId && (
-                <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-3 space-y-2">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <h4 className="font-bold text-slate-800 text-xs uppercase tracking-wider">Deliveries on this PO ({poHistory.length + 1})</h4>
-                    <span className="text-[11px] text-slate-500">Each delivery is its own GRN with its date, quantity and rate. The highlighted row is the one you are entering now.</span>
-                  </div>
-                  <div className="overflow-x-auto">
-                    <table className="w-full min-w-[560px] text-[11px]">
-                      <thead className="text-[10px] uppercase text-slate-400">
-                        <tr><th className="text-left py-1">Date</th><th className="text-left py-1">GRN</th><th className="text-left py-1">Fabric</th><th className="text-right py-1">Qty</th><th className="text-right py-1">Rate</th><th className="text-right py-1">Amount</th></tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-200/70">
-                        {poHistory.flatMap((g) => (g.lines || []).map((ln) => {
-                          const q = Number(ln.receivedQty ?? ln.received_qty ?? 0);
-                          const r = Number(ln.unitCost ?? ln.unit_cost ?? 0);
-                          return (
-                            <tr key={`${g.id}-${ln.id}`}>
-                              <td className="py-1.5 pl-1">{String(g.receiptDate ?? g.receipt_date ?? '').split('-').reverse().join('-')}</td>
-                              <td className="py-1.5 font-mono">{g.grnNumber ?? g.grn_number}</td>
-                              <td className="py-1.5">{ln.itemName}</td>
-                              <td className="py-1.5 text-right font-mono">{numIN(q)} {ln.uom || 'm'}</td>
-                              <td className="py-1.5 text-right font-mono">₹{numIN(r)}</td>
-                              <td className="py-1.5 text-right font-mono font-semibold">₹{numIN(q * r)}</td>
-                            </tr>
-                          );
-                        }))}
-                        {standaloneForm.lines.map((ln) => {
-                          const q = Number(ln.receivedQty) || 0;
-                          const r = Number(ln.unitCost) || 0;
-                          return (
-                            <tr key={`now-${ln.id}`} className="bg-blue-50/70 font-semibold text-blue-900">
-                              <td className="py-1.5 pl-1">{standaloneForm.receiptDate ? standaloneForm.receiptDate.split('-').reverse().join('-') : '—'}</td>
-                              <td className="py-1.5"><span className="px-1.5 py-0.5 rounded bg-blue-600 text-white text-[10px]">This delivery</span></td>
-                              <td className="py-1.5">{ln.itemName || '—'}</td>
-                              <td className="py-1.5 text-right font-mono">{numIN(q)} {ln.uom || 'm'}</td>
-                              <td className="py-1.5 text-right font-mono">₹{numIN(r)}</td>
-                              <td className="py-1.5 text-right font-mono">₹{numIN(q * r)}</td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-
               {/* Lines and Takas Section */}
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
@@ -915,9 +887,8 @@ export const GoodsReceiptPage = () => {
                 </div>
 
                 {standaloneForm.lines.map((line, lIdx) => {
-                  const baseQty = line.pendingQty != null ? Number(line.pendingQty) : Number(line.orderedQty || 0);
-                  const shortage = Math.max(0, baseQty - Number(line.receivedQty || 0));
-                  const excess = Math.max(0, Number(line.receivedQty || 0) - baseQty);
+                  const shortage = Math.max(0, Number(line.orderedQty || 0) - Number(line.receivedQty || 0));
+                  const excess = Math.max(0, Number(line.receivedQty || 0) - Number(line.orderedQty || 0));
                   const takaSum = (line.takas || []).reduce((s, t) => s + (Number(t.qty) || 0), 0);
                   const takaDiff = Math.round((Number(line.receivedQty || 0) - takaSum) * 100) / 100;
                   const takaMatch = Math.abs(takaDiff) < 0.001;
@@ -926,42 +897,60 @@ export const GoodsReceiptPage = () => {
                     <div key={line.id} className="border border-slate-200 rounded-xl p-4 bg-white shadow-xs space-y-3">
                       {/* Line Overview Row */}
                       <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
-                        <div className="sm:col-span-3">
+                        <div className="sm:col-span-4">
                           <label className="block text-[11px] font-semibold text-slate-500 mb-1">Fabric Item *</label>
-                          {standaloneForm.poId && line.itemName ? (
-                            <div className="px-3 py-1.5 bg-slate-100 rounded-lg font-medium text-slate-800 border border-slate-200 truncate">
-                              {line.itemName}
+                          {standaloneForm.poId && line.itemName && line.itemId ? (
+                            <div className="px-3 py-1.5 bg-slate-100 rounded-lg font-medium text-slate-800 border border-slate-200 truncate flex items-center justify-between">
+                              <span className="truncate">{line.itemName}</span>
+                              <span className="text-[10px] text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded font-mono font-medium shrink-0 ml-1">Linked</span>
                             </div>
                           ) : (
-                            <select
-                              value={line.itemId}
-                              onChange={(e) => handleUpdateLine(line.id, 'itemId', e.target.value)}
-                              className="w-full px-3 py-1.5 border border-slate-300 rounded-lg bg-white font-medium focus:border-blue-500 focus:outline-none"
-                            >
-                              <option value="">Select item...</option>
-                              {masterItems.map((it) => (
-                                <option key={it.id} value={it.id}>{it.name} ({it.sku || 'Fabric'})</option>
-                              ))}
-                            </select>
+                            <div>
+                              <select
+                                value={line.itemId}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  const matched = masterItems.find((m) => String(m.id) === String(val));
+                                  handleUpdateLine(line.id, 'itemId', val);
+                                  if (matched && !line.itemName) handleUpdateLine(line.id, 'itemName', matched.name);
+                                }}
+                                className={`w-full px-3 py-1.5 border rounded-lg bg-white font-medium focus:border-blue-500 focus:outline-none ${
+                                  !line.itemId && standaloneForm.poId ? 'border-amber-400 bg-amber-50/20' : 'border-slate-300'
+                                }`}
+                              >
+                                <option value="">Select item...</option>
+                                {masterItems.map((it) => (
+                                  <option key={it.id} value={it.id}>{it.name} ({it.sku || 'Fabric'})</option>
+                                ))}
+                              </select>
+                              {standaloneForm.poId && line.itemName && !line.itemId && (
+                                <div className="text-[10px] text-amber-600 font-medium mt-0.5">
+                                  PO Fabric: <strong>{line.itemName}</strong> (Please map item)
+                                </div>
+                              )}
+                            </div>
                           )}
                         </div>
 
                         <div className="sm:col-span-2">
-                          {standaloneForm.poId && line.pendingQty != null ? (
-                            <>
-                              <label className="block text-[11px] font-semibold text-slate-500 mb-1">Pending on PO</label>
-                              <div className="px-3 py-1.5 border border-slate-200 rounded-lg bg-slate-50 font-mono font-semibold text-slate-800">{numIN(line.pendingQty)}</div>
-                            </>
-                          ) : (
-                            <>
-                              <label className="block text-[11px] font-semibold text-slate-500 mb-1">PO Ordered</label>
-                              <input
-                                type="number"
-                                value={line.orderedQty}
-                                onChange={(e) => handleUpdateLine(line.id, 'orderedQty', e.target.value)}
-                                className="w-full px-3 py-1.5 border border-slate-200 rounded-lg bg-slate-50 font-mono text-slate-700"
-                              />
-                            </>
+                          <label className="block text-[11px] font-semibold text-slate-500 mb-1">PO Ordered</label>
+                          <input
+                            type="number"
+                            readOnly={Boolean(standaloneForm.poId)}
+                            value={line.orderedQty}
+                            onChange={(e) => handleUpdateLine(line.id, 'orderedQty', e.target.value)}
+                            className="w-full px-3 py-1.5 border border-slate-200 rounded-lg bg-slate-50 font-mono text-slate-700"
+                          />
+                          {Boolean(standaloneForm.poId) && typeof line.remainingQty !== 'undefined' && (
+                            <div className="mt-1">
+                              {line.remainingQty > 0 ? (
+                                <span className="text-[10px] font-bold text-emerald-700">{line.remainingQty} {line.uom || 'm'} remaining</span>
+                              ) : (
+                                <span className="text-[10px] font-semibold text-amber-800 bg-amber-50 border border-amber-200/80 px-1.5 py-0.5 rounded inline-flex items-center gap-1">
+                                  Reprocess / Replacement
+                                </span>
+                              )}
+                            </div>
                           )}
                         </div>
 
@@ -978,19 +967,6 @@ export const GoodsReceiptPage = () => {
                         </div>
 
                         <div className="sm:col-span-2">
-                          <label className="block text-[11px] font-semibold text-slate-700 mb-1">Rate (₹/m)</label>
-                          <input
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            value={line.unitCost}
-                            onChange={(e) => handleUpdateLine(line.id, 'unitCost', e.target.value)}
-                            aria-label="Rate per metre"
-                            className="w-full px-3 py-1.5 border border-slate-300 rounded-lg bg-white font-mono text-slate-900 focus:border-blue-500 focus:outline-none"
-                          />
-                        </div>
-
-                        <div className="sm:col-span-1">
                           <label className="block text-[11px] font-semibold text-slate-500 mb-1">Batch / Lot #</label>
                           <input
                             type="text"
@@ -1026,11 +1002,7 @@ export const GoodsReceiptPage = () => {
                       {/* Variance Indicator */}
                       {Number(line.orderedQty) > 0 && (
                         <div className="flex items-center gap-3 text-[11px] pt-1">
-                          {standaloneForm.poId && line.pendingQty != null && (
-                            <span className="text-slate-500">PO {numIN(line.orderedQty)} m · {numIN(line.earlierQty)} m received earlier ·</span>
-                          )}
-                          <span className="font-semibold text-slate-700">This delivery{standaloneForm.receiptDate ? ` on ${standaloneForm.receiptDate.split('-').reverse().join('-')}` : ''}: {numIN(line.receivedQty)} m × ₹{numIN(line.unitCost)} = ₹{numIN((Number(line.receivedQty) || 0) * (Number(line.unitCost) || 0))}</span>
-                          <span className="text-slate-500 font-medium">Variance vs pending:</span>
+                          <span className="text-slate-500 font-medium">Variance vs PO:</span>
                           {shortage > 0 ? (
                             <span className="text-amber-600 font-semibold flex items-center gap-1">
                               ⚠️ Shortage: {numIN(shortage)} m ({Math.round((shortage / line.orderedQty) * 100)}%)
@@ -1040,7 +1012,7 @@ export const GoodsReceiptPage = () => {
                               ℹ️ Excess: +{numIN(excess)} m ({Math.round((excess / line.orderedQty) * 100)}%)
                             </span>
                           ) : (
-                            <span className="text-emerald-600 font-semibold">{standaloneForm.poId && line.pendingQty != null ? '✓ Completes the pending quantity' : '✓ Exact match with PO'}</span>
+                            <span className="text-emerald-600 font-semibold">✓ Exact match with PO</span>
                           )}
                         </div>
                       )}

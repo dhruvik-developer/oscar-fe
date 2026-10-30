@@ -6962,6 +6962,188 @@ function GeneralTab({ lead, activities: propActivities = [], onActivity }) {
 
 
 
+// ── 3. Users | Requirements Tab ──────────────────────────────────
+// Used only until the UOM master has loaded (or when it is empty offline).
+const REQUIREMENT_UOM_OPTIONS = ['Meter', 'Kg', 'Taka', 'Roll'];
+const REQUIREMENT_STATUS_OPTIONS = ['Active', 'Draft'];
+
+const EMPTY_REQUIREMENT_DRAFT = {
+  fabricQuality: '',
+  fabricCode: '',
+  fabricType: '',
+  design: '',
+  colour: '',
+  width: '',
+  gsm: '',
+  qty: '1',
+  uom: 'Meter',
+  expectedRate: '',
+  remarks: '',
+  status: 'Active',
+};
+
+function tempRequirementId() {
+  return `req-${Date.now()}-${Math.random().toString(16).slice(2, 6)}`;
+}
+
+function formatExpectedRate(value) {
+  if (value === null || value === undefined || value === '') return '—';
+  const num = Number(value);
+  if (!Number.isFinite(num)) return '—';
+  return `Rs. ${num.toLocaleString('en-IN')}`;
+}
+
+function formatFabricDim(value, suffix = '') {
+  if (value === null || value === undefined || value === '') return '—';
+  return `${value}${suffix}`;
+}
+
+/**
+ * Fabric requirement form fields, shared by the add and edit requirement
+ * dialogs. Same input styling as the rest of the drawer; the draft object
+ * uses UI keys (`fabricQuality`, `colour`, `expectedRate`, ...) and the
+ * mapping layer translates them to the API payload.
+ */
+function RequirementFormFields({ draft, onChange, autoFocus = false }) {
+  const { activeUnits } = useUnits();
+  const uomOptions = activeUnits.length ? activeUnits.map((u) => u.code) : REQUIREMENT_UOM_OPTIONS;
+  if (draft.uom && !uomOptions.includes(draft.uom)) uomOptions.unshift(draft.uom);
+  const set = (key) => (event) => onChange({ ...draft, [key]: event.target.value });
+  const inputCls = 'mt-2 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs font-normal text-slate-700 focus:outline-none focus:border-blue-500';
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <label className="text-xs font-semibold text-slate-700 sm:col-span-2">
+        Fabric Quality / Item Name *
+        <input
+          type="text"
+          value={draft.fabricQuality}
+          onChange={set('fabricQuality')}
+          placeholder="e.g. Cotton Voile"
+          className={inputCls}
+          autoFocus={autoFocus}
+        />
+      </label>
+      <label className="text-xs font-semibold text-slate-700">
+        Fabric Code / SKU
+        <input
+          type="text"
+          value={draft.fabricCode}
+          onChange={set('fabricCode')}
+          placeholder="e.g. CTV-60-120"
+          className={inputCls}
+        />
+      </label>
+      <label className="text-xs font-semibold text-slate-700">
+        Fabric Type
+        <input
+          type="text"
+          value={draft.fabricType}
+          onChange={set('fabricType')}
+          placeholder="e.g. Cotton"
+          className={inputCls}
+        />
+      </label>
+      <label className="text-xs font-semibold text-slate-700">
+        Design
+        <input
+          type="text"
+          value={draft.design}
+          onChange={set('design')}
+          placeholder="e.g. Floral"
+          className={inputCls}
+        />
+      </label>
+      <label className="text-xs font-semibold text-slate-700">
+        Colour / Shade
+        <input
+          type="text"
+          value={draft.colour}
+          onChange={set('colour')}
+          placeholder="e.g. Red"
+          className={inputCls}
+        />
+      </label>
+      <label className="text-xs font-semibold text-slate-700">
+        Width (inches)
+        <input
+          type="number"
+          min="0"
+          step="0.01"
+          value={draft.width}
+          onChange={set('width')}
+          placeholder="e.g. 58"
+          className={inputCls}
+        />
+      </label>
+      <label className="text-xs font-semibold text-slate-700">
+        GSM
+        <input
+          type="number"
+          min="0"
+          step="0.01"
+          value={draft.gsm}
+          onChange={set('gsm')}
+          placeholder="e.g. 120"
+          className={inputCls}
+        />
+      </label>
+      <label className="text-xs font-semibold text-slate-700">
+        Required Quantity *
+        <input
+          type="number"
+          min="0"
+          step="0.01"
+          value={draft.qty}
+          onChange={set('qty')}
+          placeholder="e.g. 150"
+          className={inputCls}
+        />
+      </label>
+      <label className="text-xs font-semibold text-slate-700">
+        <span className="flex items-center justify-between">
+          UOM
+          <MasterSourceLink source="uom" />
+        </span>
+        <select value={draft.uom} onChange={set('uom')} className={`${inputCls} bg-white`}>
+          {uomOptions.map((opt) => (
+            <option key={opt} value={opt}>{opt}</option>
+          ))}
+        </select>
+      </label>
+      <label className="text-xs font-semibold text-slate-700">
+        Expected Rate
+        <input
+          type="number"
+          min="0"
+          step="0.01"
+          value={draft.expectedRate}
+          onChange={set('expectedRate')}
+          placeholder="Indicative rate (not final price)"
+          className={inputCls}
+        />
+      </label>
+      <label className="text-xs font-semibold text-slate-700">
+        Status
+        <select value={draft.status} onChange={set('status')} className={`${inputCls} bg-white`}>
+          {REQUIREMENT_STATUS_OPTIONS.map((opt) => (
+            <option key={opt} value={opt}>{opt}</option>
+          ))}
+        </select>
+      </label>
+      <label className="text-xs font-semibold text-slate-700 sm:col-span-2">
+        Remarks
+        <input
+          type="text"
+          value={draft.remarks}
+          onChange={set('remarks')}
+          placeholder="Any additional notes"
+          className={inputCls}
+        />
+      </label>
+    </div>
+  );
+}
+
 function UsersProductsTab({ lead, onCountsChange, onActivity }) {
 
   const initialState = useLeadDetailState(lead);

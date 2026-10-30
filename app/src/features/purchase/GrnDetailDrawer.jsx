@@ -6,8 +6,6 @@ import api from '../../services/api';
 import { formatDateDDMMYYYY } from '../../utils/dateUtils';
 import { formatQty } from '../../utils/uom';
 import { numIN } from '../../utils/formatters';
-import { useTableSort } from '../../hooks/useTableSort';
-import SortableTh from '../../components/ui/SortableTh';
 
 const QC_PILL = {
   Approved: 'bg-emerald-50 text-emerald-700 border-emerald-200',
@@ -77,16 +75,6 @@ export default function GrnDetailDrawer({ grn, onClose }) {
     return () => { active = false; };
   }, [grn]);
 
-  const detailLines = (detail || grn)?.lines;
-  const lineSort = useTableSort(Array.isArray(detailLines) ? detailLines : [], {
-    accessors: {
-      item: (l) => l.itemName || l.sku,
-      orderedQty: (l) => Number(l.orderedQty) || 0,
-      receivedQty: (l) => Number(l.receivedQty) || 0,
-      unitCost: (l) => Number(l.unitCost) || 0,
-    },
-  });
-
   if (!grn) return null;
 
   const g = detail || grn;
@@ -109,6 +97,7 @@ export default function GrnDetailDrawer({ grn, onClose }) {
       subtitle={[g.vendorName, formatDateDDMMYYYY(pick(g, 'receiptDate', 'receipt_date'))].filter(Boolean).join(' • ')}
       footer={
         <>
+          {/* [DISABLED] Open PO button commented out as requested
           {poId && (
             <button
               type="button"
@@ -118,16 +107,7 @@ export default function GrnDetailDrawer({ grn, onClose }) {
               <ExternalLink size={13} /> Open {g.poNumber || 'PO'}
             </button>
           )}
-          <button
-            type="button"
-            onClick={() => {
-              onClose();
-              navigate(`/inventory/qc/results?receiptId=${g.id}`);
-            }}
-            className="px-3.5 py-1.5 rounded-lg border border-blue-200 bg-blue-50 text-xs font-semibold text-blue-700 hover:bg-blue-100 inline-flex items-center gap-1.5 cursor-pointer"
-          >
-            <ShieldCheck size={13} /> {qcStatus === 'Approved' || qcStatus === 'Partially Approved' ? 'View QC Results' : 'Open QC Disposition'}
-          </button>
+          */}
           <button
             type="button"
             onClick={onClose}
@@ -180,15 +160,15 @@ export default function GrnDetailDrawer({ grn, onClose }) {
               <table className="w-full text-left">
                 <thead className="bg-slate-50 text-[10.5px] uppercase tracking-wider text-slate-500">
                   <tr>
-                    <SortableTh sort={lineSort} sortKey="item" className="px-4 py-2">Item</SortableTh>
-                    <SortableTh sort={lineSort} sortKey="orderedQty" className="px-3 py-2 text-right" align="right">Ordered</SortableTh>
-                    <SortableTh sort={lineSort} sortKey="receivedQty" className="px-3 py-2 text-right" align="right">Received</SortableTh>
-                    <SortableTh sort={lineSort} sortKey="rollCount" className="px-3 py-2 text-right" align="right">Taka / Roll</SortableTh>
-                    <SortableTh sort={lineSort} sortKey="unitCost" className="px-3 py-2 text-right" align="right">Rate</SortableTh>
+                    <th className="px-4 py-2">Item</th>
+                    <th className="px-3 py-2 text-right">Ordered</th>
+                    <th className="px-3 py-2 text-right">Received</th>
+                    <th className="px-3 py-2 text-right">Taka / Roll</th>
+                    <th className="px-3 py-2 text-right">Rate</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {lineSort.rows.map((l, i) => {
+                  {lines.map((l, i) => {
                     const short = Number(l.shortageQty) || 0;
                     const rejected = Number(l.rejectedQty) || 0;
                     const excess = Number(l.excessQty) || 0;

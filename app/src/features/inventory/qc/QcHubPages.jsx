@@ -1,6 +1,6 @@
 import React, { Suspense, lazy, useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { BarChart3, ClipboardCheck, ClipboardList, Gavel, LayoutDashboard, RefreshCcw } from 'lucide-react';
+import { ClipboardCheck, ClipboardList, Gavel, RefreshCcw } from 'lucide-react';
 import PageHeader from '../../../components/ui/PageHeader';
 import { inventoryService } from '../../../services/domainServices';
 import QcStageGate, { QcStageFilter } from './QcStageGate';
@@ -23,13 +23,6 @@ export const QC_STEPS = [
     hint: 'Route the inspected fabric: Good to godown, Hold, Reprocess, or Reject (debit note).' },
   { id: 'recheck', label: 'Re-check Rework', icon: RefreshCcw, component: QCReinspectionPage, count: 'recheck',
     hint: 'Inspect reprocessed / disputed fabric again: Pass, Repeat or Reject.' },
-];
-
-export const QC_REPORT_TABS = [
-  { id: 'overview', label: 'Overview', icon: LayoutDashboard, component: QCDashboardPage,
-    hint: 'Today at a glance: what is waiting, passed, held and rejected.' },
-  { id: 'analytics', label: 'Analytics', icon: BarChart3, component: QCReportsPage,
-    hint: 'Supplier rejection, defect analysis and reprocess recovery.' },
 ];
 
 /** Badge counts for the steps that are a worklist, for the QC type picked. */
@@ -122,14 +115,43 @@ export function QCAdvancedPage() {
   );
 }
 
-/** QC Reports: the dashboard and the analytics. */
+/** One QC page under its own title, with the All / Grey / Dyeing filter. */
+function SingleQcPage({ title, subtitle, component }) {
+  return (
+    <div className="space-y-4">
+      <PageHeader
+        title={title}
+        subtitle={subtitle}
+        breadcrumb={[{ label: 'Dashboard', path: '/dashboard' }, { label: 'Inventory', path: '/inventory' }, { label: 'QC', path: '/inventory/qc/dashboard' }, { label: title }]}
+      />
+      <div className="bg-white border border-slate-200 rounded-xl px-3 py-2.5"><QcStageFilter /></div>
+      <QcHubEmbed.Provider value>
+        <Suspense fallback={<div className="p-10 text-center text-sm text-slate-400">Loading…</div>}>
+          <QcStageGate inner={component} />
+        </Suspense>
+      </QcHubEmbed.Provider>
+    </div>
+  );
+}
+
+/** QC Dashboard: the first QC screen -- what is waiting, passed, held and rejected. */
+export function QCDashboardHubPage() {
+  return (
+    <SingleQcPage
+      title="QC Dashboard"
+      subtitle="Quality at a glance: what is waiting for QC, passed, on hold, in reprocess and rejected."
+      component={QCDashboardPage}
+    />
+  );
+}
+
+/** QC Reports: the analytics behind the dashboard. */
 export function QCReportsHubPage() {
   return (
-    <Hub
+    <SingleQcPage
       title="QC Reports"
-      subtitle="How quality is going: today's overview and the trends behind it."
-      tabs={QC_REPORT_TABS}
-      param="tab"
+      subtitle="Supplier rejection, defect analysis and reprocess recovery over time."
+      component={QCReportsPage}
     />
   );
 }

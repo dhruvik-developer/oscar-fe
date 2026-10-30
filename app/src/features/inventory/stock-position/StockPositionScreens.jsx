@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { Download, RotateCcw, Search, X } from 'lucide-react';
+import { ArrowRight, Download, Plus, RotateCcw, Search, X } from 'lucide-react';
 import PageHeader from '../../../components/ui/PageHeader';
 import AppPagination from '../../../components/ui/AppPagination';
 import { useERP } from '../../../context/ERPContext';
@@ -160,6 +160,7 @@ export default function StockPositionScreens() {
   const [drawer, setDrawer] = useState(null);
   const [action, setAction] = useState(null);
   const [notice, setNotice] = useState('');
+  const [reprocessView, setReprocessView] = useState('store');
 
   useEffect(() => {
     // Screen change: start from clean filters.
@@ -167,6 +168,7 @@ export default function StockPositionScreens() {
     setApplied(BLANK);
     setPage(1);
     setNotice('');
+    setReprocessView('store');
   }, [screen]);
 
   useEffect(() => {
@@ -203,7 +205,22 @@ export default function StockPositionScreens() {
   const withCost = Boolean(data?.canSeeCost);
   const columns = config.columns(withCost);
   const rows = data?.results || [];
+  const inStoreLots = data?.inStoreLots || [];
   const kpis = data?.kpis || {};
+
+  const filteredInStoreLots = useMemo(() => {
+    let lots = inStoreLots;
+    if (filters.q) {
+      const q = filters.q.toLowerCase();
+      lots = lots.filter((l) =>
+        (l.batchCode || '').toLowerCase().includes(q) ||
+        (l.lotNumber || '').toLowerCase().includes(q) ||
+        (l.takaNumber || '').toLowerCase().includes(q) ||
+        (l.fabric || '').toLowerCase().includes(q)
+      );
+    }
+    return lots;
+  }, [inStoreLots, filters.q]);
   const has = (f) => config.filters.includes(f);
   const statusKey = config.filters.find((f) => STATUS_FILTERS[f]);
   const apply = (e) => { e?.preventDefault(); setPage(1); setApplied(filters); };
@@ -243,14 +260,33 @@ export default function StockPositionScreens() {
       </nav>
 
       <section className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
-        {config.kpis.filter(([key, , kind]) => kind !== 'money' || withCost).map(([key, label, kind]) => (
-          <div key={key} className="bg-white border border-slate-200 rounded-xl p-3">
-            <div className="text-[10px] uppercase tracking-wide text-slate-400">{label}</div>
-            <div className="text-base font-bold text-slate-900 tabular-nums">
-              {loading ? '…' : kind === 'money' ? money(kpis[key] ?? 0) : kind === 'count' ? (kpis[key] ?? 0) : formatNumberIN(kpis[key] ?? 0)}
+        {config.kpis.filter(([key, , kind]) => kind !== 'money' || withCost).map(([key, label, kind]) => {
+          const isStoreKpi = key === 'awaitingReprocessInStore';
+          const isReprocessScreen = screen === 'reprocessing';
+          const isActiveKpi = isReprocessScreen && ((isStoreKpi && reprocessView === 'store') || (!isStoreKpi && reprocessView === 'vendors'));
+          return (
+            <div
+              key={key}
+              onClick={() => {
+                if (isReprocessScreen) {
+                  setReprocessView(isStoreKpi ? 'store' : 'vendors');
+                }
+              }}
+              className={`bg-white border rounded-xl p-3 transition-all ${
+                isReprocessScreen
+                  ? (isActiveKpi
+                      ? 'border-blue-500 ring-2 ring-blue-100 shadow-xs cursor-pointer'
+                      : 'border-slate-200 hover:border-slate-300 cursor-pointer')
+                  : 'border-slate-200'
+              }`}
+            >
+              <div className="text-[10px] uppercase tracking-wide text-slate-400">{label}</div>
+              <div className={`text-base font-bold tabular-nums ${isStoreKpi && isReprocessScreen ? 'text-purple-700' : 'text-slate-900'}`}>
+                {loading ? '…' : kind === 'money' ? money(kpis[key] ?? 0) : kind === 'count' ? (kpis[key] ?? 0) : formatNumberIN(kpis[key] ?? 0)}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </section>
 
       {screen === 'usable' && (data?.lowStock || []).length > 0 && (
@@ -318,6 +354,120 @@ export default function StockPositionScreens() {
       {error && <div role="alert" className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-xs text-rose-700 flex justify-between gap-2">{error}<button type="button" onClick={() => setError('')} aria-label="Dismiss"><X size={14} /></button></div>}
       {notice && <div role="status" className="p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-xs text-emerald-700">{notice}</div>}
 
+      {screen === 'reprocessing' && (
+        <div className="flex flex-wrap items-center justify-between gap-3 p-1.5 bg-slate-100 rounded-xl">
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => setReprocessView('store')}
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                reprocessView === 'store'
+                  ? 'bg-white text-blue-700 shadow-2xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              In Reprocess Store ({formatNumberIN(kpis.awaitingReprocessInStore ?? 0)} m · {inStoreLots.length} rolls)
+            </button>
+            <button
+              type="button"
+              onClick={() => setReprocessView('vendors')}
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                reprocessView === 'vendors'
+                  ? 'bg-white text-blue-700 shadow-2xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              With Processing Vendors ({rows.length} orders)
+            </button>
+          </div>
+          {reprocessView === 'store' && inStoreLots.length > 0 && (
+            <Link
+              to="/job-work/reprocess"
+              className="h-8 px-3 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold inline-flex items-center gap-1.5 shadow-2xs"
+            >
+              <Plus size={13} /> Create Reprocess Order
+            </Link>
+          )}
+        </div>
+      )}
+
+      {screen === 'reprocessing' && reprocessView === 'store' ? (
+        <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs">
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[850px] text-xs">
+              <thead className="bg-slate-50 text-[11px] uppercase text-slate-500 font-bold border-b border-slate-200">
+                <tr>
+                  <th className="px-3.5 py-2.5 text-left">Taka / Roll #</th>
+                  <th className="px-3.5 py-2.5 text-left">Lot Number</th>
+                  <th className="px-3.5 py-2.5 text-left">Batch Code</th>
+                  <th className="px-3.5 py-2.5 text-left">Fabric Item</th>
+                  <th className="px-3.5 py-2.5 text-right">Available Qty</th>
+                  <th className="px-3.5 py-2.5 text-center">QC Status</th>
+                  <th className="px-3.5 py-2.5 text-left">Godown / Location</th>
+                  <th className="px-3.5 py-2.5 text-left">Receipt Date</th>
+                  <th className="px-3.5 py-2.5 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {loading && <tr><td colSpan={9} className="px-3 py-10 text-center text-slate-400">Loading…</td></tr>}
+                {!loading && filteredInStoreLots.length === 0 && (
+                  <tr><td colSpan={9} className="px-3 py-10 text-center text-slate-400">No fabric rolls currently waiting in the in-house reprocess store.</td></tr>
+                )}
+                {!loading && filteredInStoreLots.map((lot) => (
+                  <tr key={lot.id} className="hover:bg-slate-50/80 align-middle">
+                    <td className="px-3.5 py-2.5 font-mono font-bold text-slate-900">
+                      #{lot.takaNumber}
+                    </td>
+                    <td className="px-3.5 py-2.5 font-mono text-slate-700">
+                      {lot.lotNumber || '—'}
+                    </td>
+                    <td className="px-3.5 py-2.5 font-mono font-bold text-blue-700">
+                      <button type="button" onClick={() => setDrawer(lot.batchCode)} className="hover:underline cursor-pointer">
+                        {lot.batchCode}
+                      </button>
+                    </td>
+                    <td className="px-3.5 py-2.5 font-medium text-slate-800">
+                      {lot.fabric}
+                    </td>
+                    <td className="px-3.5 py-2.5 text-right font-mono font-black text-purple-700 tabular-nums text-sm">
+                      {formatNumberIN(lot.quantity)} {lot.uom}
+                    </td>
+                    <td className="px-3.5 py-2.5 text-center">
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                        {lot.qcStatus}
+                      </span>
+                    </td>
+                    <td className="px-3.5 py-2.5 text-slate-600">
+                      <span className="inline-flex items-center gap-1.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-purple-500" />
+                        {lot.location}
+                      </span>
+                    </td>
+                    <td className="px-3.5 py-2.5 text-slate-500">
+                      {lot.receivedDate || '—'}
+                    </td>
+                    <td className="px-3.5 py-2.5 text-right whitespace-nowrap space-x-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setDrawer(lot.batchCode)}
+                        className="px-2.5 py-1 rounded-md border border-slate-200 text-blue-700 hover:bg-blue-50 text-xs font-semibold cursor-pointer"
+                      >
+                        Batch 360°
+                      </button>
+                      <Link
+                        to="/job-work/reprocess"
+                        className="px-2.5 py-1 rounded-md bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold inline-flex items-center gap-1 cursor-pointer"
+                      >
+                        Send to Mill <ArrowRight size={11} />
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : (
       <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[960px] text-xs">
@@ -356,6 +506,7 @@ export default function StockPositionScreens() {
         </div>
         <AppPagination total={data?.count || 0} page={page} pageSize={pageSize} onPageChange={setPage} onPageSizeChange={setPageSize} pageSizeOptions={[10, 25, 50, 100]} loading={loading} />
       </div>
+      )}
 
       {drawer && <BatchDrawer code={drawer} onClose={() => setDrawer(null)} />}
       {action && (

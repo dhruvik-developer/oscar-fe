@@ -140,7 +140,8 @@ const BrokerCommissionPage = lazy(() => import('../features/sales/commercial/Bro
 // ── ERP — Purchase (Lazy Loaded) ──────────────────────────────
 const PurchaseOrdersPage = lazy(() => import('../features/purchase/PurchaseOrdersPage').then(m => ({ default: m.PurchaseOrdersPage })));
 const SupplierDeliveryPage = lazy(() => import('../features/purchase/SupplierDeliveryPage'));
-const FinalJobWorkPOsPage = lazy(() => import('../features/purchase/FinalJobWorkPOsPage'));
+// [DISABLED] Final Job Work POs concept commented out
+// const FinalJobWorkPOsPage = lazy(() => import('../features/purchase/FinalJobWorkPOsPage'));
 const PurchaseBillsPage = lazy(() => import('../features/purchase/PurchaseBillsPage').then(m => ({ default: m.PurchaseBillsPage })));
 const VendorBillsPage = lazy(() => import('../features/purchase/VendorBillsPage').then(m => ({ default: m.VendorBillsPage })));
 const BillMatchingPage = lazy(() => import('../features/purchase/BillMatchingPage').then(m => ({ default: m.BillMatchingPage })));
@@ -177,6 +178,7 @@ const QCReprocessPage = lazy(() => import('../features/inventory/qc/QCReprocessH
 const QCHistoryPage = lazy(() => import('../features/inventory/qc/QCReprocessHistoryPages').then(m => ({ default: m.QCHistoryPage })));
 const QCAdvancedPage = lazy(() => import('../features/inventory/qc/QcHubPages').then(m => ({ default: m.QCAdvancedPage })));
 const QCReportsHubPage = lazy(() => import('../features/inventory/qc/QcHubPages').then(m => ({ default: m.QCReportsHubPage })));
+const QCDashboardHubPage = lazy(() => import('../features/inventory/qc/QcHubPages').then(m => ({ default: m.QCDashboardHubPage })));
 const NotificationsPage = lazy(() => import('../features/notifications/NotificationsPage'));
 const ServiceOrdersPage = lazy(() => import('../features/jobwork/service-orders/ServiceOrdersPage'));
 const LotTakaRegisterPage = lazy(() => import('../features/inventory/LotTakaRegisterPage'));
@@ -471,7 +473,9 @@ const router = createBrowserRouter([
       { path: 'purchase/orders', element: <Page component={PurchaseOrdersPage} /> },
       { path: 'purchase/deliveries', element: <Page component={SupplierDeliveryPage} /> },
       { path: 'purchase/supplier-delivery', element: <Page component={SupplierDeliveryPage} /> },
-      { path: 'purchase/final-job-work-pos', element: <Page component={FinalJobWorkPOsPage} /> },
+      // [DISABLED] Final Job Work POs concept commented out
+      // { path: 'purchase/final-job-work-pos', element: <Page component={FinalJobWorkPOsPage} /> },
+      { path: 'purchase/final-job-work-pos', element: <Navigate to="/purchase/orders" replace /> },
       { path: 'purchase/receipts', element: <Page component={GoodsReceiptPage} /> },
       { path: 'purchase/reconciliation', element: <Page component={SupplierReconciliationPage} /> },
       { path: 'purchase/supplier-ledger', element: <Page component={SupplierLedgerPage} /> },
@@ -506,12 +510,12 @@ const router = createBrowserRouter([
       { path: 'inventory/qc/advanced', element: <Page component={QCAdvancedPage} title="Detailed QC Screens" /> },
       { path: 'inventory/qc/reports', element: <Page component={QCReportsHubPage} title="QC Reports" /> },
       // The old one-page-per-step URLs open the matching step / tab.
-      { path: 'inventory/qc', element: <RedirectWith to="/inventory/qc/entry" set={{}} /> },
+      { path: 'inventory/qc', element: <RedirectWith to="/inventory/qc/dashboard" set={{}} /> },
       { path: 'inventory/qc/pending', element: <RedirectWith to="/inventory/qc/advanced" set={{ step: 'pending' }} /> },
       { path: 'inventory/qc/register', element: <RedirectWith to="/inventory/qc/advanced" set={{ step: 'inspect' }} /> },
       { path: 'inventory/qc/results', element: <RedirectWith to="/inventory/qc/advanced" set={{ step: 'decide' }} /> },
       { path: 'inventory/qc/reinspection', element: <RedirectWith to="/inventory/qc/advanced" set={{ step: 'recheck' }} /> },
-      { path: 'inventory/qc/dashboard', element: <RedirectWith to="/inventory/qc/reports" set={{ tab: 'overview' }} /> },
+      { path: 'inventory/qc/dashboard', element: <Page component={QCDashboardHubPage} title="QC Dashboard" /> },
       { path: 'job-work/service-orders', element: <Page component={ServiceOrdersPage} title="Dyeing Service Orders" /> },
       { path: 'inventory/lot-register', element: <Page component={LotTakaRegisterPage} title="Lot / Taka Register" /> },
       { path: 'inventory/lots-takas', element: <Navigate to="/inventory/lot-register" replace /> },

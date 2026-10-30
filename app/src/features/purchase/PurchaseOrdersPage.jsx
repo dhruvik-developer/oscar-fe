@@ -8,7 +8,7 @@ import {
   Clock, CheckCircle2, Package, Maximize2, Minimize2, Trash2, Ban, MapPin,
   ShoppingCart, FileText, Search, Filter, MoreVertical, ChevronDown, FileSpreadsheet,
   Truck, Factory, Info, PackageCheck, Layers, ShieldCheck, Warehouse, FileCheck2, CreditCard, Receipt,
-  Building2, Calendar, Sparkles,
+  Building2, Calendar, Sparkles, QrCode,
 } from 'lucide-react';
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { toISODate } from '../../utils/dateUtils';
@@ -38,6 +38,11 @@ import UomSelect from '../../components/common/UomSelect';
 import MasterSourceLink from '../../components/common/MasterSourceLink';
 import useUnits from '../../hooks/useUnits';
 import { formatQty, formatUnitTotals, sumByUnit, unitKey, resolveUnit } from '../../utils/uom';
+import {
+  FabricFlowCards, FabricFlowSteps, YarnLinesEditor, OpeningCostsEditor, fabricFlowPayload, flowLabel,
+  FABRIC_FLOW_B,
+} from './FabricFlowForm';
+import { PoFabricFlowPanel } from './PoFabricFlowPanel';
 
 const purchaseOrderGuide = {
     title: 'Purchase Orders',
@@ -129,7 +134,7 @@ const STATUS_PILL = {
 
 export const PurchaseOrdersPage = () => {
     const navigate = useNavigate();
-    const { purchaseOrders, vendors, items: inventoryItems, fabrics: fabricMasters, addPurchaseOrder, updatePurchaseOrderStatus, cancelPurchaseOrder, deletePurchaseOrder, getPoBilledStatus, convertPurchaseOrderToBill, purchaseBills, paymentOuts, formatCurrency, formatDateDDMMYYYY, getCurrentDateFormatted, getCurrentISODate, addDaysISO, showToast, refreshCollections } = useERP();
+    const { purchaseOrders, vendors, items: inventoryItems, locations: erpLocations = [], fabrics: fabricMasters, addPurchaseOrder, updatePurchaseOrderStatus, cancelPurchaseOrder, deletePurchaseOrder, getPoBilledStatus, convertPurchaseOrderToBill, purchaseBills, paymentOuts, formatCurrency, formatDateDDMMYYYY, getCurrentDateFormatted, getCurrentISODate, addDaysISO, showToast, refreshCollections } = useERP();
     const { units } = useUnits();
     const [showAddModal, setShowAddModal] = useState(false);
     const [isFullscreen, setIsFullscreen] = useState(false);
@@ -262,6 +267,16 @@ export const PurchaseOrdersPage = () => {
     const [lineItems, setLineItems] = useState([]);
     const [remarks, setRemarks] = useState('');
     const [purchaseType, setPurchaseType] = useState('');
+    // Factory fabric flow (Factory -> OSCAR / Factory -> Dyeing Mill -> OSCAR);
+    // empty for the older purchase types.
+    const [fabricFlow, setFabricFlow] = useState('');
+    const [dyeingMillId, setDyeingMillId] = useState('');
+    const [yarnRows, setYarnRows] = useState([]);
+    const [costRows, setCostRows] = useState([]);
+    const resetFabricFlow = () => { setFabricFlow(''); setDyeingMillId(''); setYarnRows([]); setCostRows([]); };
+    const chooseFabricFlow = (flow) => { setFabricFlow(flow); setPurchaseType(PURCHASE_TYPE_GREY); if (flow !== FABRIC_FLOW_B) setDyeingMillId(''); };
+    // Used by the "Other purchase types" cards, hidden for now in the Create PO form.
+    // const choosePurchaseType = (type) => { setPurchaseType(type); setFabricFlow(''); setDyeingMillId(''); };
     // Project association is separate from purchase type: a ready grey stock
     // purchase may be for a project or for general warehouse stock.
     const [projectMode, setProjectMode] = useState('general');
@@ -326,23 +341,14 @@ export const PurchaseOrdersPage = () => {
     const deepLinkPoId = searchParams.get('po');
     const deepLinkStage = searchParams.get('stage');
     React.useEffect(() => {
-        if (!deepLinkPoId) return;
-        const target = (purchaseOrders || []).find((p) => String(p.id) === String(deepLinkPoId));
-        if (target) {
-            setSelectedPo((prev) => (prev && String(prev.id) === String(target.id) ? prev : target));
-        } else {
-            api.get(`/purchase/orders/${deepLinkPoId}/`)
-                .then((po) => { if (po?.id) setSelectedPo((prev) => prev || po); })
-                .catch(() => showToast?.('Purchase order not found.', 'error'));
-        }
-        if (deepLinkStage && deepLinkStage !== 'purchase_order') setActiveTimelineSlide(deepLinkStage);
-        // Consume the link so closing the PO does not reopen it.
+        if (!deepLinkPoId && !deepLinkStage) return;
+        // [DISABLED] PO Detail deep link modal disabled as requested
         const next = new URLSearchParams(searchParams);
         next.delete('po');
         next.delete('stage');
         setSearchParams(next, { replace: true });
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [deepLinkPoId, deepLinkStage, purchaseOrders?.length]);
+    }, [deepLinkPoId, deepLinkStage]);
 
     const handleOpenCreateModal = () => {
         setSelectedVendorId(vendors[0]?.id || '');
@@ -351,6 +357,7 @@ export const PurchaseOrdersPage = () => {
         setLineItems([{ id: `li-${Date.now()}`, itemId: '', sku: '', itemSku: '', name: '', qty: '', rate: '', amount: 0 }]);
         setRemarks('');
         setPurchaseType('');
+        resetFabricFlow();
         setProjectMode('general');
         setProjectId('');
         setIsFullscreen(false);
@@ -380,6 +387,7 @@ export const PurchaseOrdersPage = () => {
         setLineItems([]);
         setRemarks('');
         setPurchaseType('');
+        resetFabricFlow();
         setProjectMode('general');
         setProjectId('');
         setIsFullscreen(false);
@@ -423,6 +431,8 @@ export const PurchaseOrdersPage = () => {
         setRemarks(po.notes || '');
         const clonedType = purchaseTypeOf(po);
         setPurchaseType(clonedType === PURCHASE_TYPE_FINAL_JW ? '' : clonedType);
+        resetFabricFlow();
+        if (po.fabricFlow) { setFabricFlow(po.fabricFlow); setDyeingMillId(po.dyeingMillId || ''); }
         setProjectMode(po.projectId ? 'project' : 'general');
         setProjectId(po.projectId || '');
         setIsFullscreen(false);
@@ -432,7 +442,13 @@ export const PurchaseOrdersPage = () => {
     const handleCreate = async (e) => {
         e.preventDefault();
         const validLines = lineItems.filter((it) => it.itemId && Number(it.qty) > 0 && Number(it.rate) > 0);
-        if (!purchaseType) { alert('Select the purchase type.'); return; }
+        if (!purchaseType && !fabricFlow) { alert('Select how the fabric reaches OSCAR.'); return; }
+        let flowExtras = {};
+        if (fabricFlow) {
+            const built = fabricFlowPayload({ flow: fabricFlow, dyeingMillId, yarnRows, costRows });
+            if (built.error) { alert(built.error); return; }
+            flowExtras = built.payload;
+        }
         if (projectMode === 'project' && !projectId) { alert('Select the project, or choose General Stock.'); return; }
         if (!selectedVendorId) { alert('Vendor is required.'); return; }
         if (!poDate) { alert('PO Date is required.'); return; }
@@ -460,10 +476,11 @@ export const PurchaseOrdersPage = () => {
                 date: poDate,
                 expectedDate,
                 status: 'Draft',
-                purchaseType,
+                purchaseType: fabricFlow ? PURCHASE_TYPE_GREY : purchaseType,
                 projectId: projectMode === 'project' ? projectId : undefined,
                 items: normalizedLines,
                 notes: remarks || '',
+                ...flowExtras,
             });
             handleCloseCreateModal();
         } catch {
@@ -1006,6 +1023,16 @@ export const PurchaseOrdersPage = () => {
       const hasRemaining = poStatusInfo.totalRemainingQty > 0;
       return (
         <div className="flex items-center justify-end gap-1.5 whitespace-nowrap">
+          {getOscarStatus(p) !== 'Cancelled' && (
+            <button
+              type="button"
+              onClick={() => navigate(`/inventory/batches?po=${encodeURIComponent(p.id)}&poNumber=${encodeURIComponent(p.poNumber || '')}&view=po`)}
+              className="px-2.5 py-1 bg-blue-50 border border-blue-200 text-blue-700 rounded-md text-xs font-semibold hover:bg-blue-100 shadow-2xs whitespace-nowrap inline-flex items-center gap-1 cursor-pointer"
+              title={`Manage receipt, batches, QC & dispatch for ${p.poNumber || 'this PO'} in Batch Registry`}
+            >
+              <Package size={12} /> Batch Registry
+            </button>
+          )}
           <button onClick={() => setPrintPoTarget(p)} className="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Print Official Purchase Order">
             <Printer size={13}/>
           </button>
@@ -1029,15 +1056,6 @@ export const PurchaseOrdersPage = () => {
             <button onClick={() => startProductionPo(p.id)} className="px-2.5 py-1 bg-violet-600 text-white rounded-md text-xs font-semibold hover:bg-violet-700 shadow-xs transition-colors whitespace-nowrap inline-flex items-center gap-1">
               <ArrowRight size={11}/> Start Production
             </button>
-          ) : RECEIVABLE_STATUSES.includes(getOscarStatus(p)) && purchaseTypeOf(p) === PURCHASE_TYPE_GREY ? (
-            <div className="flex items-center gap-1.5">
-              <button onClick={() => navigate(`/purchase/deliveries?po=${p.id}`)} className="px-2 py-1 bg-indigo-50 border border-indigo-200 text-indigo-700 rounded-md text-xs font-semibold hover:bg-indigo-100 shadow-2xs whitespace-nowrap inline-flex items-center gap-1" title="Track or record supplier dispatch">
-                <Truck size={11}/> Dispatch
-              </button>
-              <button onClick={() => recordGrnForPo(p)} className="px-2.5 py-1 bg-sky-600 text-white rounded-md text-xs font-semibold hover:bg-sky-700 shadow-xs transition-colors whitespace-nowrap inline-flex items-center gap-1" title="Record supplier delivery: GRN → Lot/Taka → QC">
-                <PackageCheck size={11}/> Record GRN
-              </button>
-            </div>
           ) : getOscarStatus(p) === 'Cancelled' ? (
             <span className="text-xs text-rose-600 font-semibold inline-flex items-center gap-1"><Ban size={11}/> Cancelled</span>
           ) : getOscarStatus(p) === 'Fully Received' ? (
@@ -1134,9 +1152,13 @@ export const PurchaseOrdersPage = () => {
                 return (
                   <tr key={p.id} className="border-b border-slate-50 hover:bg-slate-50/60">
                     <td className="px-4 py-2.5">
-                      <button onClick={() => setSelectedPo(p)} className="flex items-center gap-1.5 font-mono font-bold text-blue-600 hover:underline whitespace-nowrap"><ClipboardList size={13} className="text-slate-400" /> {p.poNumber}</button>
+                      <div className="flex items-center gap-1.5 font-mono font-bold text-slate-800 whitespace-nowrap">
+                        <ClipboardList size={13} className="text-slate-400" /> {p.poNumber}
+                      </div>
                       <div className="mt-1 flex flex-wrap items-center gap-1">
-                        <span className={`inline-block rounded border px-1.5 py-px text-[9.5px] font-bold ${TYPE_BADGE[purchaseTypeOf(p)]?.cls || TYPE_BADGE[PURCHASE_TYPE_GREY].cls}`}>{TYPE_BADGE[purchaseTypeOf(p)]?.label || purchaseTypeOf(p)}</span>
+                        {p.fabricFlow
+                          ? <span className="inline-block rounded border px-1.5 py-px text-[9.5px] font-bold bg-teal-50 text-teal-700 border-teal-200">{p.fabricFlow === FABRIC_FLOW_B ? 'Factory → Mill → OSCAR' : 'Factory → OSCAR'}</span>
+                          : <span className={`inline-block rounded border px-1.5 py-px text-[9.5px] font-bold ${TYPE_BADGE[purchaseTypeOf(p)]?.cls || TYPE_BADGE[PURCHASE_TYPE_GREY].cls}`}>{TYPE_BADGE[purchaseTypeOf(p)]?.label || purchaseTypeOf(p)}</span>}
                         <span className="text-[9.5px] font-semibold text-slate-400">{p.projectCode || 'General Stock'}</span>
                       </div>
                     </td>
@@ -1302,14 +1324,27 @@ export const PurchaseOrdersPage = () => {
 
             <form onSubmit={handleCreate} className="space-y-4 mt-4 overflow-y-auto pr-1 flex-1">
               <div>
-                <label className="block font-semibold text-slate-700 mb-1.5">Purchase Type <span className="text-rose-500">*</span></label>
+                <label className="block font-semibold text-slate-700 mb-1.5">How does the fabric reach OSCAR? <span className="text-rose-500">*</span></label>
+                <FabricFlowCards value={fabricFlow} onChange={chooseFabricFlow} />
+                {fabricFlow && (
+                  <div className="mt-2 rounded-lg bg-slate-50 px-2.5 py-2 space-y-1">
+                    <p className="text-[11px] text-slate-600"><strong>After approval:</strong> one batch is created for every actual receipt — never for the ordered quantity.</p>
+                    <FabricFlowSteps flow={fabricFlow} />
+                  </div>
+                )}
+              </div>
+              {/* "Other purchase types" (Ready Grey Fabric Purchase / Vendor A Production) is hidden
+                  for now: new POs use the two factory fabric flows above. Restore by uncommenting
+                  this block and `choosePurchaseType`.
+              <div>
+                <label className="block font-semibold text-slate-600 mb-1.5 text-[11px] uppercase tracking-wide">Other purchase types</label>
                 <div role="radiogroup" aria-label="Purchase Type" className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {PURCHASE_TYPE_OPTIONS.map((opt) => {
                     const Icon = opt.icon;
-                    const active = purchaseType === opt.value;
+                    const active = !fabricFlow && purchaseType === opt.value;
                     return (
                       <label key={opt.value} className={`flex cursor-pointer items-center gap-3 rounded-xl border p-3 transition-colors ${active ? 'border-blue-500 bg-blue-50/70 ring-1 ring-blue-200' : 'border-slate-200 bg-white hover:border-slate-300'}`}>
-                        <input type="radio" name="purchaseType" value={opt.value} checked={active} onChange={() => setPurchaseType(opt.value)} className="h-4 w-4 accent-blue-600" />
+                        <input type="radio" name="purchaseType" value={opt.value} checked={active} onChange={() => choosePurchaseType(opt.value)} className="h-4 w-4 accent-blue-600" />
                         <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-lg ${active ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-500'}`}><Icon size={18} /></span>
                         <span className="min-w-0">
                           <span className="block text-[12.5px] font-bold text-slate-800">{opt.label}</span>
@@ -1321,11 +1356,14 @@ export const PurchaseOrdersPage = () => {
                 </div>
                 <p className="mt-2 flex items-start gap-1.5 rounded-lg bg-slate-50 px-2.5 py-1.5 text-[11px] text-slate-600">
                   <Info size={13} className="mt-px shrink-0 text-blue-500" />
-                  {purchaseType
-                    ? <span><strong>Next steps after approval:</strong> {PURCHASE_TYPE_OPTIONS.find((o) => o.value === purchaseType)?.flow}</span>
-                    : <span>Selected cycle determines the next workflow after PO.</span>}
+                  {fabricFlow
+                    ? <span>Selected: <strong>{flowLabel(fabricFlow)}</strong>. Choose one of these instead for a ready-fabric purchase or Vendor A production.</span>
+                    : purchaseType
+                      ? <span><strong>Next steps after approval:</strong> {PURCHASE_TYPE_OPTIONS.find((o) => o.value === purchaseType)?.flow}</span>
+                      : <span>Selected cycle determines the next workflow after PO.</span>}
                 </p>
               </div>
+              */}
               <div>
                 <label className="block font-semibold text-slate-700 mb-1.5">Project Association</label>
                 <div className="flex flex-wrap items-center gap-2">
@@ -1353,7 +1391,7 @@ export const PurchaseOrdersPage = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <div className="flex items-center justify-between mb-1">
-                    <label className="block font-semibold text-slate-700">Vendor / Supplier *</label>
+                    <label className="block font-semibold text-slate-700">{fabricFlow ? 'Factory / Vendor *' : 'Vendor / Supplier *'}</label>
                     <MasterSourceLink source="vendors" />
                   </div>
                   <select value={selectedVendorId} onChange={(e) => setSelectedVendorId(e.target.value)} className="w-full border border-slate-300 rounded-lg p-2 bg-white text-slate-800 font-medium">
@@ -1466,6 +1504,37 @@ export const PurchaseOrdersPage = () => {
                 <button type="button" onClick={addBlankLine} className="mt-2 inline-flex items-center gap-1 text-[12px] font-semibold text-blue-600 hover:underline"><Plus size={13}/> Add Fabric Line</button>
               </div>
 
+              {fabricFlow === FABRIC_FLOW_B && (
+                <div className="rounded-xl border border-violet-200 bg-violet-50/40 p-3.5">
+                  <label className="block font-semibold text-slate-700 mb-1" htmlFor="po-dyeing-mill">Dyeing Mill</label>
+                  <select id="po-dyeing-mill" value={dyeingMillId} onChange={(e) => setDyeingMillId(e.target.value)} className="w-full sm:w-96 border border-slate-300 rounded-lg p-2 bg-white text-slate-800 font-medium">
+                    <option value="">Not decided yet</option>
+                    {vendors.filter((v) => v.id !== selectedVendorId).map((v) => <option key={v.id} value={v.id}>{v.name}{v.code ? ` (${v.code})` : ''}</option>)}
+                  </select>
+                  <p className="mt-1 text-[10.5px] text-slate-500">The factory sends the grey fabric straight to this mill. It is tracked on the PO but never becomes OSCAR grey stock; OSCAR stock starts when the dyed fabric arrives.</p>
+                </div>
+              )}
+
+              {fabricFlow && (
+                <div>
+                  <label className="font-semibold text-slate-700 block mb-2">Yarn Details <span className="font-normal text-slate-400">(optional)</span></label>
+                  <YarnLinesEditor
+                    rows={yarnRows}
+                    onChange={setYarnRows}
+                    yarnItems={(inventoryItems || []).filter((i) => /yarn/i.test(`${i.itemKind || ''} ${i.category || ''} ${i.name || ''}`))}
+                    vendors={vendors}
+                    formatCurrency={formatCurrency}
+                  />
+                </div>
+              )}
+
+              {fabricFlow && (
+                <div>
+                  <label className="font-semibold text-slate-700 block mb-2">Costs &amp; Expenses <span className="font-normal text-slate-400">(optional now — add or update on the PO later)</span></label>
+                  <OpeningCostsEditor rows={costRows} onChange={setCostRows} flow={fabricFlow} formatCurrency={formatCurrency} />
+                </div>
+              )}
+
               {/* Remarks + Order Summary */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 <div>
@@ -1499,690 +1568,8 @@ export const PurchaseOrdersPage = () => {
           </div>
         </div>)}
 
-      {/* PO Detail & Lifecycle Modal */}
-      {selectedPo && (<div className={`fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center transition-all duration-200 ${isDetailFullscreen ? 'p-0' : 'p-2 sm:p-4'}`}>
-          <div className={`bg-white border border-slate-200 shadow-2xl text-xs flex flex-col overflow-hidden transition-all duration-200 ${
-            isDetailFullscreen
-              ? 'w-full h-full rounded-none p-4 sm:p-8'
-              : 'rounded-2xl max-w-6xl xl:max-w-7xl 2xl:max-w-[1440px] w-full p-4 sm:p-6 max-h-[96vh] sm:max-h-[93vh]'
-          }`}>
-                        {/* ── Executive Modal Header ── */}
-            <div className="flex flex-wrap lg:flex-nowrap items-center justify-between gap-3 pb-3.5 border-b border-slate-200">
-              <div className="flex flex-wrap items-center gap-2 sm:gap-3 min-w-0">
-                <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-slate-900 to-[#1F2E4A] text-white flex items-center justify-center font-black text-xs shadow-xs">
-                  PO
-                </div>
-                <div className="flex items-center gap-2">
-                  <h3 className="font-extrabold text-lg sm:text-xl text-slate-900 tracking-tight">{selectedPo.poNumber}</h3>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      navigator.clipboard?.writeText(selectedPo.poNumber);
-                      showToast?.(`Copied ${selectedPo.poNumber} to clipboard!`);
-                    }}
-                    className="p-1 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-md transition cursor-pointer"
-                    title="Copy PO Number"
-                  >
-                    <Copy size={13} />
-                  </button>
-                </div>
-                <span className="font-semibold text-slate-700 bg-slate-100 border border-slate-200/90 px-2.5 py-0.5 rounded-lg text-xs flex items-center gap-1.5">
-                  <Building2 size={12} className="text-slate-500" />
-                  {selectedPo.vendor}
-                </span>
-                <StatusBadge status={getOscarStatus(selectedPo)}/>
-              </div>
+      {/* [DISABLED] PO Detail & Lifecycle Progression Modal removed as requested */}
 
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setPrintPoTarget(selectedPo)}
-                  className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-semibold flex items-center gap-1.5 text-xs shadow-2xs transition cursor-pointer"
-                >
-                  <Printer size={13}/> Print Official PO
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setIsDetailFullscreen((prev) => !prev)}
-                  className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-100 transition cursor-pointer"
-                  title={isDetailFullscreen ? 'Exit Fullscreen' : 'Expand Fullscreen'}
-                  aria-label={isDetailFullscreen ? 'Exit Fullscreen' : 'Expand Fullscreen'}
-                >
-                  {isDetailFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
-                </button>
-                <button
-                  onClick={() => setSelectedPo(null)}
-                  className="text-slate-400 hover:text-slate-700 p-1.5 hover:bg-slate-100 rounded-lg transition cursor-pointer"
-                >
-                  <X size={18}/>
-                </button>
-              </div>
-            </div>
-
-            {/* ── Scrollable Modal Content ── */}
-            <div className="space-y-4 mt-4 overflow-y-auto pr-1 flex-1">
-              {/* Executive Overview Tiles (3 Columns) */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                {/* 1. Supplier / Vendor Card */}
-                <div className="p-3.5 bg-slate-50/80 border border-slate-200/90 rounded-xl space-y-1.5 shadow-2xs">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 flex items-center gap-1">
-                      <Building2 size={12} className="text-slate-500" /> Supplier / Vendor
-                    </span>
-                    <span className="text-[10px] font-mono text-slate-400 font-semibold">ID: {selectedPo.vendorId || selectedPo.partyId || '—'}</span>
-                  </div>
-                  <strong className="text-slate-900 text-sm font-bold block truncate">{selectedPo.vendor}</strong>
-                  <div className="text-slate-600 text-[11px] flex items-start gap-1">
-                    <MapPin size={12} className="text-slate-400 shrink-0 mt-0.5" />
-                    <span className="line-clamp-2">
-                      {[selectedPo.billingAddress?.line1, selectedPo.billingAddress?.city, selectedPo.billingAddress?.state, selectedPo.billingAddress?.pincode].filter(Boolean).join(', ') || 'Maharashtra, India'}
-                    </span>
-                  </div>
-                </div>
-
-                {/* 2. Schedule & Project Terms */}
-                <div className="p-3.5 bg-slate-50/80 border border-slate-200/90 rounded-xl space-y-1.5 shadow-2xs">
-                  <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 flex items-center gap-1">
-                    <Calendar size={12} className="text-slate-500" /> Shipment & Schedule Terms
-                  </span>
-                  <div className="grid grid-cols-2 gap-2 text-[11px]">
-                    <div>
-                      <span className="text-slate-400 text-[10px] block">PO Date</span>
-                      <strong className="text-slate-800 font-mono">{formatDateDDMMYYYY(selectedPo.date)}</strong>
-                    </div>
-                    <div>
-                      <span className="text-slate-400 text-[10px] block">Expected Delivery</span>
-                      <strong className="text-emerald-700 font-mono font-bold">{formatDateDDMMYYYY(selectedPo.expectedDate)}</strong>
-                    </div>
-                  </div>
-                  <div className="pt-1 border-t border-slate-200/70 flex items-center justify-between text-[11px]">
-                    <span className="text-slate-500">Project:</span>
-                    <span className="font-semibold text-slate-800 truncate max-w-[170px]">
-                      {selectedPo.projectCode ? `${selectedPo.projectCode}${selectedPo.projectName ? ` — ${selectedPo.projectName}` : ''}` : 'General Stock'}
-                    </span>
-                  </div>
-                </div>
-
-                {/* 3. Commercial Contract Snapshot */}
-                <div className="p-3.5 bg-gradient-to-br from-indigo-50/40 via-white to-white border border-indigo-100 rounded-xl space-y-1.5 shadow-2xs">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-black uppercase tracking-wider text-indigo-700 flex items-center gap-1">
-                      <Receipt size={12} className="text-indigo-600" /> Commercial Snapshot
-                    </span>
-                    <span className="px-2 py-0.5 rounded-full text-[9.5px] font-bold bg-indigo-100 text-indigo-800 border border-indigo-200">
-                      {purchaseTypeOf(selectedPo)}
-                    </span>
-                  </div>
-                  <div className="flex items-baseline justify-between pt-0.5">
-                    <div>
-                      <span className="text-[10px] text-slate-400 block font-semibold">Total Order Value</span>
-                      <div className="text-base sm:text-lg font-black font-mono text-slate-900">
-                        {formatCurrency(selectedPo.amount || selectedPo.total || 0)}
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <span className="text-[10px] text-slate-400 block font-semibold">Total Ordered Qty</span>
-                      <div className="text-xs font-bold font-mono text-slate-700">
-                        {Number(selectedPo.totalQuantity || (selectedPo.items || []).reduce((s, it) => s + (Number(it.qty) || 0), 0)).toLocaleString('en-IN')} Mtr
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Document Lifecycle Stepper */}
-              <DocumentTimeline
-                steps={getPoTimelineSteps(selectedPo)}
-                onStepClick={(step) => {
-                  if (step.key) {
-                    setActiveTimelineSlide(step.key);
-                    return;
-                  }
-                  const lbl = (step.label || '').toLowerCase();
-                  const isVendorA = purchaseTypeOf(selectedPo) === PURCHASE_TYPE_VENDOR_A;
-                  if (lbl.includes('delivery')) setActiveTimelineSlide('supplier_delivery');
-                  else if (lbl.includes('grn') || lbl.includes('inward')) setActiveTimelineSlide('grn_inward');
-                  else if (lbl.includes('lot') || lbl.includes('taka')) setActiveTimelineSlide('lot_taka_creation');
-                  else if (lbl.includes('qc') || lbl.includes('quality')) setActiveTimelineSlide('grey_fabric_qc');
-                  else if (lbl.includes('completion') || lbl.includes('verification')) setActiveTimelineSlide('completion_verification');
-                  else if (lbl.includes('final') || lbl.includes('job work')) setActiveTimelineSlide('final_job_work_po');
-                  else if (lbl.includes('stock')) setActiveTimelineSlide('grey_stock_updated');
-                  else if (lbl.includes('agency')) setActiveTimelineSlide('agency_bill_match');
-                  else if (lbl.includes('vendor bill')) setActiveTimelineSlide(isVendorA ? 'agency_bill_match' : 'vendor_bill');
-                  else if (lbl.includes('bill') || lbl.includes('match')) setActiveTimelineSlide(isVendorA ? 'agency_bill_match' : 'supplier_bill_matching');
-                  else if (lbl.includes('payment') || lbl.includes('disbursement')) setActiveTimelineSlide('disbursement_payment');
-                }}
-              />
-
-              {/* ── Stage Execution Workspace Container ── */}
-              {(() => {
-                const isVendorA = purchaseTypeOf(selectedPo) === PURCHASE_TYPE_VENDOR_A;
-                const stageTabs = isVendorA ? [
-                  { key: 'production_instruction', label: 'Instruction', icon: FileText, num: 1 },
-                  { key: 'daily_production_entry', label: 'Daily Entry', icon: Factory, num: 2 },
-                  { key: 'grey_fabric_qc', label: 'QC Stage', icon: ShieldCheck, num: 3 },
-                  { key: 'completion_verification', label: 'Verification', icon: ClipboardCheck, num: 4 },
-                  { key: 'final_job_work_po', label: 'Final JW PO', icon: FileSpreadsheet, num: 5 },
-                  { key: 'agency_bill_match', label: 'Agency Bill Match', icon: FileCheck2, num: 6 },
-                  { key: 'disbursement_payment', label: 'Payment', icon: CreditCard, num: 7 },
-                ] : [
-                  { key: 'supplier_delivery', label: 'Delivery', icon: Truck, num: 1 },
-                  { key: 'grn_inward', label: 'GRN Inward', icon: Warehouse, num: 2 },
-                  { key: 'lot_taka_creation', label: 'Lot / Taka', icon: Layers, num: 3 },
-                  { key: 'grey_fabric_qc', label: 'QC Inspection', icon: ShieldCheck, num: 4 },
-                  { key: 'grey_stock_updated', label: 'Stock Update', icon: PackageCheck, num: 5 },
-                  { key: 'vendor_bill', label: 'Vendor Bill', icon: Receipt, num: 6 },
-                  { key: 'supplier_bill_matching', label: '3-Way Match', icon: FileCheck2, num: 7 },
-                  { key: 'disbursement_payment', label: 'Payment', icon: CreditCard, num: 8 },
-                ];
-
-                return (
-                  <div className="space-y-3 pt-1">
-                    {/* Segmented Stage Control Bar */}
-                    <div className="flex items-center justify-between border-b border-slate-200/70 pb-2">
-                      <div className="flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full bg-blue-600" />
-                        <h4 className="text-xs font-black uppercase tracking-wider text-slate-800">
-                          Active Stage Workspace
-                        </h4>
-                      </div>
-                      <span className="text-[11px] text-slate-500 font-medium">Select any stage tab below to switch active workflow</span>
-                    </div>
-
-                    <div className="bg-slate-100/90 p-1.5 rounded-xl border border-slate-200 flex flex-wrap items-center gap-1 shadow-2xs">
-                      {stageTabs.map((t) => {
-                        const Icon = t.icon;
-                        const isActive = activeTimelineSlide === t.key;
-                        return (
-                          <button
-                            key={t.key}
-                            type="button"
-                            onClick={() => setActiveTimelineSlide(t.key)}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
-                              isActive
-                                ? 'bg-[#1F2E4A] text-white shadow-xs scale-102'
-                                : 'text-slate-600 hover:text-slate-900 hover:bg-white/80'
-                            }`}
-                          >
-                            <span className={`w-4 h-4 rounded-full text-[10px] flex items-center justify-center font-mono font-bold ${
-                              isActive ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-600'
-                            }`}>
-                              {t.num}
-                            </span>
-                            <Icon size={12} />
-                            <span>{t.label}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-
-                    {/* Dedicated Active Stage Content Container */}
-                    <div className="pt-1">
-                      {/* 1. Supplier Delivery */}
-                      {activeTimelineSlide === 'supplier_delivery' && (
-                        <SupplierDeliveryInlineSlide
-                          po={selectedPo}
-                          onClose={() => {
-                            setSelectedDeliveryForGrn(null);
-                            setActiveTimelineSlide(null);
-                          }}
-                          onNextStep={(key, delivery) => {
-                            setSelectedDeliveryForGrn(delivery || null);
-                            setActiveTimelineSlide(key);
-                          }}
-                          onDeliverySaved={() => {
-                            loadPoLifecycle(selectedPo?.id, selectedPo?.poNumber);
-                            if (refreshCollections) refreshCollections(['purchaseOrders']);
-                          }}
-                        />
-                      )}
-
-                      {/* 2. GRN Inward */}
-                      {activeTimelineSlide === 'grn_inward' && (
-                        <GoodsReceiptInlineSlide
-                          po={selectedPo}
-                          delivery={selectedDeliveryForGrn}
-                          onClose={() => {
-                            setSelectedDeliveryForGrn(null);
-                            setActiveTimelineSlide(null);
-                          }}
-                          onNextStep={(key) => {
-                            setSelectedDeliveryForGrn(null);
-                            setActiveTimelineSlide(key);
-                          }}
-                          onPrevStep={(key) => {
-                            setSelectedDeliveryForGrn(null);
-                            setActiveTimelineSlide(key);
-                          }}
-                          onReceiptSaved={() => {
-                            loadPoLifecycle(selectedPo?.id, selectedPo?.poNumber);
-                            if (refreshCollections) refreshCollections(['purchaseOrders', 'inventory']);
-                          }}
-                        />
-                      )}
-
-                      {/* 3. Lot / Taka Creation */}
-                      {activeTimelineSlide === 'lot_taka_creation' && (
-                        <LotTakaInlineSlide
-                          po={selectedPo}
-                          onClose={() => setActiveTimelineSlide(null)}
-                          onNextStep={(key) => setActiveTimelineSlide(key)}
-                          onPrevStep={(key) => setActiveTimelineSlide(key)}
-                          onSwitchToGrn={() => setActiveTimelineSlide('grn_inward')}
-                          onLotSaved={() => {
-                            loadPoLifecycle(selectedPo?.id, selectedPo?.poNumber);
-                            if (refreshCollections) refreshCollections(['purchaseOrders', 'inventory']);
-                          }}
-                        />
-                      )}
-
-                      {/* 4. Production Instruction (Vendor A) */}
-                      {activeTimelineSlide === 'production_instruction' && (
-                        <PoProductionInstructionSection
-                          po={selectedPo}
-                          navigate={navigate}
-                          defaultCollapsed={false}
-                          onOpenDailyProduction={() => setActiveTimelineSlide('daily_production_entry')}
-                          onUpdated={() => {
-                            loadPoLifecycle(selectedPo?.id, selectedPo?.poNumber);
-                            if (refreshCollections) refreshCollections(['purchaseOrders']);
-                          }}
-                        />
-                      )}
-
-                      {/* 5. Daily Production Entry (Vendor A) */}
-                      {activeTimelineSlide === 'daily_production_entry' && (
-                        <PoDailyProductionEntrySection
-                          po={selectedPo}
-                          navigate={navigate}
-                          onSwitchToInstruction={() => setActiveTimelineSlide('production_instruction')}
-                          onProceedToQc={() => setActiveTimelineSlide('grey_fabric_qc')}
-                          onUpdated={() => {
-                            loadPoLifecycle(selectedPo?.id, selectedPo?.poNumber);
-                            if (refreshCollections) refreshCollections(['purchaseOrders']);
-                          }}
-                        />
-                      )}
-
-                      {/* 6. QC Inspection Section */}
-                      {activeTimelineSlide === 'grey_fabric_qc' && (
-                        isVendorA ? (
-                          <div ref={qcSectionRef}>
-                            <PoQualityControlSection
-                              po={selectedPo}
-                              navigate={navigate}
-                              defaultExpanded={true}
-                              onProceedToVerification={() => setActiveTimelineSlide('completion_verification')}
-                              onUpdated={() => {
-                                loadPoLifecycle(selectedPo?.id, selectedPo?.poNumber);
-                                if (refreshCollections) refreshCollections(['purchaseOrders']);
-                              }}
-                            />
-                          </div>
-                        ) : (
-                          <GreyQcInlineSlide
-                            po={selectedPo}
-                            onClose={() => setActiveTimelineSlide(null)}
-                            onNextStep={(key) => setActiveTimelineSlide(key)}
-                            onPrevStep={(key) => setActiveTimelineSlide(key)}
-                            onQcSaved={() => {
-                              loadPoLifecycle(selectedPo?.id, selectedPo?.poNumber);
-                              if (refreshCollections) refreshCollections(['purchaseOrders', 'inventory']);
-                            }}
-                          />
-                        )
-                      )}
-
-                      {/* 7. Completion Verification (Vendor A) */}
-                      {activeTimelineSlide === 'completion_verification' && (
-                        <div ref={completionVerificationRef}>
-                          <CompletionVerificationInlineSlide
-                            po={selectedPo}
-                            instruction={poLifecycleData?.instruction}
-                            onClose={() => setActiveTimelineSlide('grey_fabric_qc')}
-                            onNextStep={(key) => setActiveTimelineSlide(key)}
-                            onPrevStep={() => setActiveTimelineSlide('grey_fabric_qc')}
-                            onUpdated={() => {
-                              loadPoLifecycle(selectedPo?.id, selectedPo?.poNumber);
-                              if (refreshCollections) refreshCollections(['purchaseOrders']);
-                            }}
-                          />
-                        </div>
-                      )}
-
-                      {/* 8. Final Job Work PO (Vendor A) */}
-                      {activeTimelineSlide === 'final_job_work_po' && (
-                        <div ref={finalJobWorkPoRef}>
-                          <FinalJobWorkPoInlineSlide
-                            po={selectedPo}
-                            instruction={poLifecycleData?.instruction}
-                            onClose={() => setActiveTimelineSlide('completion_verification')}
-                            onNextStep={(key) => setActiveTimelineSlide(key)}
-                            onPrevStep={() => setActiveTimelineSlide('completion_verification')}
-                            onUpdated={() => {
-                              loadPoLifecycle(selectedPo?.id, selectedPo?.poNumber);
-                              if (refreshCollections) refreshCollections(['purchaseOrders']);
-                            }}
-                          />
-                        </div>
-                      )}
-
-                      {/* 9. Grey Stock Position (Standard PO) */}
-                      {activeTimelineSlide === 'grey_stock_updated' && (
-                        <GreyStockUpdatedInlineSlide
-                          po={selectedPo}
-                          onClose={() => setActiveTimelineSlide(null)}
-                          onNextStep={(key) => setActiveTimelineSlide(key)}
-                          onPrevStep={(key) => setActiveTimelineSlide(key)}
-                        />
-                      )}
-
-                      {/* 10. Vendor Bill Intake (Standard PO) */}
-                      {activeTimelineSlide === 'vendor_bill' && (
-                        isVendorA ? (
-                          <AgencyBillMatchingInlineSlide
-                            po={selectedPo}
-                            instruction={poLifecycleData?.instruction}
-                            onClose={() => setActiveTimelineSlide(null)}
-                            onNextStep={(key) => setActiveTimelineSlide(key)}
-                            onPrevStep={(key) => setActiveTimelineSlide(key)}
-                            onBillMatched={() => {
-                              loadPoLifecycle(selectedPo?.id, selectedPo?.poNumber);
-                              if (refreshCollections) refreshCollections(['purchaseOrders', 'purchaseBills', 'vendorBills']);
-                            }}
-                          />
-                        ) : (
-                          <VendorBillInlineSlide
-                            po={selectedPo}
-                            instruction={poLifecycleData?.instruction}
-                            onClose={() => setActiveTimelineSlide(null)}
-                            onNextStep={(key) => setActiveTimelineSlide(key)}
-                            onPrevStep={(key) => setActiveTimelineSlide(key)}
-                            onBillSaved={() => {
-                              loadPoLifecycle(selectedPo?.id, selectedPo?.poNumber);
-                              if (refreshCollections) refreshCollections(['purchaseOrders', 'purchaseBills', 'vendorBills']);
-                            }}
-                          />
-                        )
-                      )}
-
-                      {/* 11. Agency Bill Match (Vendor A) or Supplier 3-Way Match (Ready Grey) */}
-                      {(activeTimelineSlide === 'agency_bill_match' || (isVendorA && activeTimelineSlide === 'supplier_bill_matching')) && (
-                        <AgencyBillMatchingInlineSlide
-                          po={selectedPo}
-                          instruction={poLifecycleData?.instruction}
-                          onClose={() => setActiveTimelineSlide(null)}
-                          onNextStep={(key) => setActiveTimelineSlide(key)}
-                          onPrevStep={(key) => setActiveTimelineSlide(key)}
-                          onBillMatched={() => {
-                            loadPoLifecycle(selectedPo?.id, selectedPo?.poNumber);
-                            if (refreshCollections) refreshCollections(['purchaseOrders', 'purchaseBills', 'vendorBills']);
-                          }}
-                        />
-                      )}
-
-                      {(!isVendorA && activeTimelineSlide === 'supplier_bill_matching') && (
-                        <SupplierBillMatchingInlineSlide
-                          po={selectedPo}
-                          instruction={poLifecycleData?.instruction}
-                          onClose={() => setActiveTimelineSlide(null)}
-                          onNextStep={(key) => setActiveTimelineSlide(key)}
-                          onPrevStep={(key) => setActiveTimelineSlide(key)}
-                          onBillMatched={() => {
-                            loadPoLifecycle(selectedPo?.id, selectedPo?.poNumber);
-                            if (refreshCollections) refreshCollections(['purchaseOrders', 'purchaseBills', 'vendorBills']);
-                          }}
-                        />
-                      )}
-
-                      {/* 12. Disbursement Payment */}
-                      {activeTimelineSlide === 'disbursement_payment' && (
-                        <SupplierPaymentInlineSlide
-                          po={selectedPo}
-                          instruction={poLifecycleData?.instruction}
-                          onClose={() => setActiveTimelineSlide(null)}
-                          onPrevStep={(key) => setActiveTimelineSlide(key)}
-                          onPaymentSaved={() => {
-                            loadPoLifecycle(selectedPo?.id, selectedPo?.poNumber);
-                            if (refreshCollections) refreshCollections(['purchaseOrders', 'purchaseBills', 'paymentOuts']);
-                          }}
-                        />
-                      )}
-                    </div>
-                  </div>
-                );
-              })()}
-
-              {/* ── Fabric Line Items Section ── */}
-              <div className="bg-white border border-slate-200/90 rounded-xl p-4 shadow-2xs space-y-3">
-                <div className="flex items-center justify-between">
-                  <h4 className="font-bold text-slate-800 uppercase tracking-wider text-xs flex items-center gap-2">
-                    <Package size={14} className="text-indigo-600" />
-                    Fabric Line Items ({selectedPo.items?.length || 0})
-                  </h4>
-                  <span className="font-mono text-xs font-semibold text-slate-500">
-                    Contract Total: {formatCurrency(selectedPo.amount || selectedPo.total || 0)}
-                  </span>
-                </div>
-                <div className="border border-slate-200 rounded-xl overflow-x-auto">
-                  <table className="w-full min-w-[560px] text-left text-[12px]">
-                    <thead>
-                      <tr className="bg-slate-50 border-b border-slate-200 text-[10.5px] font-bold uppercase tracking-wider text-slate-500">
-                        <th className="px-4 py-2.5">Fabric Quality / Description</th>
-                        <th className="px-4 py-2.5 text-right">Quantity</th>
-                        <th className="px-4 py-2.5 text-right">Agreed Rate</th>
-                        <th className="px-4 py-2.5 text-right">Line Total</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {getPoLines(selectedPo).map((it, idx) => (
-                        <tr key={it.id || idx} className="hover:bg-slate-50/50 transition">
-                          <td className="px-4 py-2.5 font-semibold text-slate-900">{it.name || it.description}</td>
-                          <td className="px-4 py-2.5 text-right font-mono font-medium text-slate-800">{formatQty(it.qty || 0, lineUom(it), { units })}</td>
-                          <td className="px-4 py-2.5 text-right font-mono text-slate-700">₹{Number(it.rate || 0)}/{lineUom(it)}</td>
-                          <td className="px-4 py-2.5 text-right font-mono font-bold text-slate-900">{formatCurrency(it.amount ?? (Number(it.qty || 0) * Number(it.rate || 0)))}</td>
-                        </tr>
-                      ))}
-                      {getPoLines(selectedPo).length === 0 && (
-                        <tr><td colSpan={4} className="px-4 py-6 text-center text-slate-400">No line items recorded for this order.</td></tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              {/* ── Connected Transaction Documents ── */}
-              {getPoRelatedDocs(selectedPo).length > 0 ? (
-                <RelatedDocumentsCard documents={getPoRelatedDocs(selectedPo)}/>
-              ) : (
-                <div className="flex items-center justify-between px-4 py-2.5 rounded-xl border border-dashed border-slate-200 bg-slate-50/50 text-xs text-slate-500">
-                  <div className="flex items-center gap-2">
-                    <FileText size={14} className="text-slate-400" />
-                    <span>Connected Transaction Documents: <strong className="text-slate-700">0 linked records</strong></span>
-                  </div>
-                  <span className="text-[11px] text-slate-400">Related GRNs, Vendor Bills, and Vouchers link automatically as lifecycle proceeds.</span>
-                </div>
-              )}
-            </div>
-<div className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 lg:gap-0 pt-4 border-t border-slate-200 bg-slate-50 px-4 py-3 ${
-              isDetailFullscreen ? '-mx-4 -mb-4 sm:-mx-8 sm:-mb-8 sm:px-8' : '-mx-4 -mb-4 sm:-mx-6 sm:-mb-6 sm:px-6'
-            }`}>
-              {(() => {
-                const poInfo = getPoBilledStatus(selectedPo.id);
-                const isVendorA = purchaseTypeOf(selectedPo) === PURCHASE_TYPE_VENDOR_A;
-                return (
-                  <>
-                    <div className="font-mono text-xs space-y-0.5">
-                      <div>PO Value: <strong className="text-slate-900">{formatCurrency(selectedPo.amount || selectedPo.total || 0)}</strong></div>
-                      {poInfo.status === 'Partially Billed' && (
-                        <div className="text-[11px] text-amber-700 font-sans font-semibold">Intake Progress: {poInfo.totalBilledQty}/{poInfo.totalOrderedQty} items received ({poInfo.totalRemainingQty} remaining)</div>
-                      )}
-                    </div>
-                    <div className="flex flex-wrap lg:flex-nowrap items-center gap-2">
-                      {selectedPo.status === 'Draft' && (
-                        <button type="button" onClick={() => { deletePurchaseOrder(selectedPo.id); setSelectedPo(null); }} className="px-3 py-1.5 bg-rose-50 border border-rose-200 text-rose-600 hover:bg-rose-100 rounded-lg font-bold flex items-center gap-1.5">
-                          <Trash2 size={13} /> Delete Draft
-                        </button>
-                      )}
-                      {getOscarStatus(selectedPo) === 'Draft' && (<Button onClick={() => { issuePo(selectedPo.id); setSelectedPo(null); }}>Submit for Approval</Button>)}
-                      {getOscarStatus(selectedPo) === 'Pending Approval' && (<Button onClick={() => { approvePo(selectedPo.id); setSelectedPo(null); }}>Approve PO</Button>)}
-                      {getOscarStatus(selectedPo) === 'Approved' && purchaseTypeOf(selectedPo) === PURCHASE_TYPE_VENDOR_A && (<Button onClick={() => startProductionPo(selectedPo.id)}>Start Production</Button>)}
-                      {RECEIVABLE_STATUSES.includes(getOscarStatus(selectedPo)) && purchaseTypeOf(selectedPo) === PURCHASE_TYPE_GREY && (
-                        <>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setActiveTimelineSlide((prev) => (prev === 'supplier_delivery' ? null : 'supplier_delivery'));
-                            }}
-                            className={`px-3 py-1.5 border rounded-lg font-bold flex items-center gap-1.5 text-xs shadow-2xs transition-colors ${
-                              activeTimelineSlide === 'supplier_delivery'
-                                ? 'bg-blue-600 text-white border-blue-600'
-                                : 'bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100'
-                            }`}
-                          >
-                            <Truck size={13} /> {activeTimelineSlide === 'supplier_delivery' ? 'Hide Delivery Slide' : 'Supplier Delivery Slide'}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setActiveTimelineSlide((prev) => (prev === 'grn_inward' ? null : 'grn_inward'));
-                            }}
-                            className={`px-3 py-1.5 border rounded-lg font-bold flex items-center gap-1.5 text-xs shadow-2xs transition-colors ${
-                              activeTimelineSlide === 'grn_inward'
-                                ? 'bg-emerald-600 text-white border-emerald-600'
-                                : 'bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100'
-                            }`}
-                          >
-                            <PackageCheck size={13} /> {activeTimelineSlide === 'grn_inward' ? 'Hide GRN Slide' : 'Record GRN (Slide)'}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setActiveTimelineSlide((prev) => (prev === 'lot_taka_creation' ? null : 'lot_taka_creation'));
-                            }}
-                            className={`px-3 py-1.5 border rounded-lg font-bold flex items-center gap-1.5 text-xs shadow-2xs transition-colors cursor-pointer ${
-                              activeTimelineSlide === 'lot_taka_creation'
-                                ? 'bg-purple-600 text-white border-purple-600'
-                                : 'bg-purple-50 border-purple-200 text-purple-700 hover:bg-purple-100'
-                            }`}
-                          >
-                            <Layers size={13} /> {activeTimelineSlide === 'lot_taka_creation' ? 'Hide Lot / Taka' : 'Lot / Taka Slide'}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setActiveTimelineSlide((prev) => (prev === 'grey_fabric_qc' ? null : 'grey_fabric_qc'));
-                            }}
-                            className={`px-3 py-1.5 border rounded-lg font-bold flex items-center gap-1.5 text-xs shadow-2xs transition-colors cursor-pointer ${
-                              activeTimelineSlide === 'grey_fabric_qc'
-                                ? 'bg-indigo-600 text-white border-indigo-600'
-                                : 'bg-indigo-50 border-indigo-200 text-indigo-700 hover:bg-indigo-100'
-                            }`}
-                          >
-                            <ShieldCheck size={13} /> {activeTimelineSlide === 'grey_fabric_qc' ? 'Hide QC Slide' : 'QC Inspection Slide'}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setActiveTimelineSlide((prev) => (prev === 'grey_stock_updated' ? null : 'grey_stock_updated'));
-                            }}
-                            className={`px-3 py-1.5 border rounded-lg font-bold flex items-center gap-1.5 text-xs shadow-2xs transition-colors cursor-pointer ${
-                              activeTimelineSlide === 'grey_stock_updated'
-                                ? 'bg-teal-600 text-white border-teal-600'
-                                : 'bg-teal-50 border-teal-200 text-teal-700 hover:bg-teal-100'
-                            }`}
-                          >
-                            <Warehouse size={13} /> {activeTimelineSlide === 'grey_stock_updated' ? 'Hide Stock Slide' : 'Godown Stock Slide'}
-                          </button>
-                          {isVendorA ? (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setActiveTimelineSlide((prev) => (prev === 'agency_bill_match' ? null : 'agency_bill_match'));
-                              }}
-                              className={`px-3 py-1.5 border rounded-lg font-bold flex items-center gap-1.5 text-xs shadow-2xs transition-colors cursor-pointer ${
-                                activeTimelineSlide === 'agency_bill_match'
-                                  ? 'bg-blue-600 text-white border-blue-600'
-                                  : 'bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100'
-                              }`}
-                            >
-                              <FileCheck2 size={13} /> {activeTimelineSlide === 'agency_bill_match' ? 'Hide Agency Matching' : 'Agency Bill Matching Slide'}
-                            </button>
-                          ) : (
-                            <>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setActiveTimelineSlide((prev) => (prev === 'vendor_bill' ? null : 'vendor_bill'));
-                                }}
-                                className={`px-3 py-1.5 border rounded-lg font-bold flex items-center gap-1.5 text-xs shadow-2xs transition-colors cursor-pointer ${
-                                  activeTimelineSlide === 'vendor_bill'
-                                    ? 'bg-indigo-600 text-white border-indigo-600'
-                                    : 'bg-indigo-50 border-indigo-200 text-indigo-700 hover:bg-indigo-100'
-                                }`}
-                              >
-                                <Receipt size={13} /> {activeTimelineSlide === 'vendor_bill' ? 'Hide Vendor Bill' : 'Vendor Bill Slide'}
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setActiveTimelineSlide((prev) => (prev === 'supplier_bill_matching' ? null : 'supplier_bill_matching'));
-                                }}
-                                className={`px-3 py-1.5 border rounded-lg font-bold flex items-center gap-1.5 text-xs shadow-2xs transition-colors cursor-pointer ${
-                                  activeTimelineSlide === 'supplier_bill_matching'
-                                    ? 'bg-blue-600 text-white border-blue-600'
-                                    : 'bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100'
-                                }`}
-                              >
-                                <FileCheck2 size={13} /> {activeTimelineSlide === 'supplier_bill_matching' ? 'Hide Matching' : 'Bill Matching Slide'}
-                              </button>
-                            </>
-                          )}
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setActiveTimelineSlide((prev) => (prev === 'disbursement_payment' ? null : 'disbursement_payment'));
-                            }}
-                            className={`px-3 py-1.5 border rounded-lg font-bold flex items-center gap-1.5 text-xs shadow-2xs transition-colors cursor-pointer ${
-                              activeTimelineSlide === 'disbursement_payment'
-                                ? 'bg-emerald-600 text-white border-emerald-600'
-                                : 'bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100'
-                            }`}
-                          >
-                            <CreditCard size={13} /> {activeTimelineSlide === 'disbursement_payment' ? 'Hide Payment' : 'Payment Slide'}
-                          </button>
-                        </>
-                      )}
-                      {!['Draft', 'Cancelled'].includes(getOscarStatus(selectedPo)) && poInfo.status !== 'Billed' && getOscarStatus(selectedPo) !== 'Fully Received' && (
-                        <>
-                          {poInfo.totalBilledQty <= 0 && (
-                            <button type="button" onClick={() => { cancelPurchaseOrder(selectedPo.id); setSelectedPo(null); }} className="px-3 py-1.5 bg-rose-50 border border-rose-200 text-rose-600 hover:bg-rose-100 rounded-lg font-bold flex items-center gap-1.5">
-                              <Ban size={13} /> Cancel PO
-                            </button>
-                          )}
-                          {poInfo.totalRemainingQty > 0 && (
-                            <Button onClick={() => setActiveTimelineSlide(isVendorA ? 'agency_bill_match' : 'vendor_bill')}>
-                              <Receipt size={13} className="mr-1.5" />
-                              {poInfo.status === 'Partially Billed' ? (isVendorA ? 'Match Agency Bill' : `Bill Remaining (${poInfo.totalRemainingQty})`) : (isVendorA ? 'Agency Bill Match' : 'Convert to Vendor Bill & Intake Goods')}
-                            </Button>
-                          )}
-                        </>
-                      )}
-                      {poInfo.status === 'Billed' && (
-                        <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-200 inline-flex items-center gap-1.5"><CheckCircle2 size={13} /> Fully Billed & Received</span>
-                      )}
-                      {selectedPo.status === 'Cancelled' && (
-                        <span className="text-xs font-semibold text-rose-700 bg-rose-50 px-3 py-1.5 rounded-lg border border-rose-200 inline-flex items-center gap-1.5"><Ban size={13} /> Order Cancelled</span>
-                      )}
-                      <Button variant="outline" onClick={() => setSelectedPo(null)}>Close</Button>
-                    </div>
-                  </>
-                );
-              })()}
-            </div>
-          </div>
-        </div>)}
-
-      <PrintPurchaseOrderModal isOpen={Boolean(printPoTarget)} onClose={() => setPrintPoTarget(null)} po={printPoTarget} />
+ <PrintPurchaseOrderModal isOpen={Boolean(printPoTarget)} onClose={() => setPrintPoTarget(null)} po={printPoTarget} />
     </div>);
 };

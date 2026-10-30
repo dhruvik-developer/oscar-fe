@@ -49,7 +49,6 @@ export default function BatchDrawer({ code, onClose }) {
           <div className="p-5 space-y-4">
             <dl className="grid grid-cols-2 gap-2">
               {[
-                ['Owner', batch.ownership === 'OSCAR' ? 'OSCAR' : `${batch.ownerPartyName} (customer material)`],
                 ['HSN', batch.hsnCode],
                 ['Supplier', batch.supplierName],
                 ['Source', [batch.sourceDocumentType, batch.sourceDocumentNumber].filter(Boolean).join(' ')],

@@ -276,7 +276,7 @@
   background:
     radial-gradient(circle at 85% -5%, var(--brand-tint, rgba(43, 155, 232, 0.16)), transparent 45%),
     linear-gradient(180deg, rgba(28, 42, 68, 0.78) 0%, rgba(14, 22, 39, 0.9) 100%),
-    url("/images/login-bg.jpg") 30% center / cover no-repeat,
+    url("/images/login-bg.png") 30% center / cover no-repeat,
     linear-gradient(180deg, var(--sidebar-bg-from) 0%, var(--sidebar-bg-to) 100%);
 }
 /* --brand-* vars are only set when a custom brand colour is saved

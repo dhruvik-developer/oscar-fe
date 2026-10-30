@@ -1,4 +1,5 @@
 import { findDealForLead } from '../../../services/dealService';
+import { CRM_EVENT } from '../../../services/leadStageAutomation';
 
 import CrmKpiCard from '../common/CrmKpiCard';
 
@@ -734,6 +735,10 @@ function serverTaskToDrawerRow(task) {
 
     description: task.description || '',
 
+    dealId: task.dealId || task.deal || '',
+
+    leadId: task.leadId || task.lead || '',
+
     proposalId: '',
 
     deliveryChallanId: '',
@@ -748,66 +753,37 @@ function serverTaskToDrawerRow(task) {
 
 
 
-async function mirrorDrawerTaskToBackend({ leadId, row, taskDate, assigneeName, assigneeId }) {
-
+async function mirrorDrawerTaskToBackend({ leadId, dealId, row, taskDate, assigneeName, assigneeId }) {
   if (!isBackendEnabled() || !isServerId(leadId)) return null;
-
   const store = useCrmStore.getState();
-
   let resolvedId = isServerId(assigneeId) ? assigneeId : undefined;
-
   if (!resolvedId && assigneeName) {
-
     const target = String(assigneeName).trim().toLowerCase();
-
     const member = (store.teamMembers || []).find((m) => String(m.name || '').trim().toLowerCase() === target || String(m.email || '').trim().toLowerCase() === target);
-
     if (member && isServerId(member.id)) resolvedId = member.id;
-
   }
-
   const payload = {
-
     title: row.title,
-
     description: row.description || undefined,
-
     leadId,
-
+    dealId: dealId || undefined,
     assigneeId: resolvedId,
-
     dueDate: taskDate || undefined,
-
     dueTime: row.taskTime || undefined,
-
     startedAt: row.startedAt || undefined,
-
     endedAt: row.endedAt || undefined,
-
     durationSeconds: row.durationSeconds || undefined,
-
     icon: row.icon || undefined,
-
     department: row.department || undefined,
-
     priority: ['Low', 'Medium', 'High', 'Urgent'].includes(row.priority) ? row.priority : 'Medium',
-
     status: drawerTaskStatusToServer(row.status),
-
   };
-
   try {
-
     return await store.createTask(payload);
-
   } catch (err) {
-
     console.warn('[CRM] drawer task not saved:', err?.message || err);
-
     return null;
-
   }
-
 }
 
 
@@ -3034,113 +3010,84 @@ function LeadTasksTab({ lead, onCountsChange, onActivity }) {
 
   }, [lead?.id, tasks, onCountsChange]);
 
-
-
   const fetchLeadTasks = React.useCallback(async () => {
-
     if (!isBackendEnabled() || !isServerId(lead?.id)) return;
-
     try {
-
-      const body = await crmService.getTasks({ leadId: lead.id });
-
-      const rows = Array.isArray(body) ? body : (body?.results || []);
-
-      if (!Array.isArray(rows)) return;
-
-      setTasks((prev) => {
-
-        const serverMap = new Map(rows.filter((r) => r?.id).map((r) => [String(r.id), r]));
-
-        const merged = prev.map((t) => {
-
-          const sId = String(t.serverTaskId || '');
-
-          if (sId && serverMap.has(sId)) {
-
-            const sRow = serverMap.get(sId);
-
-            serverMap.delete(sId);
-
-            return {
-
-              ...t,
-
-              ...serverTaskToDrawerRow(sRow),
-
-              taskFormId: t.taskFormId || '',
-
-              customValues: t.customValues || {},
-
-              proposalId: t.proposalId || '',
-
-              deliveryChallanId: t.deliveryChallanId || '',
-
-            };
-
-          }
-
-          if (!sId && t.title) {
-
-            const matchEntry = Array.from(serverMap.entries()).find(
-
-              ([_, r]) => String(r.title).trim().toLowerCase() === String(t.title).trim().toLowerCase()
-
-            );
-
-            if (matchEntry) {
-
-              const [matchedId, sRow] = matchEntry;
-
-              serverMap.delete(matchedId);
-
-              return {
-
-                ...t,
-
-                ...serverTaskToDrawerRow(sRow),
-
-                taskFormId: t.taskFormId || '',
-
-                customValues: t.customValues || {},
-
-                proposalId: t.proposalId || '',
-
-                deliveryChallanId: t.deliveryChallanId || '',
-
-              };
-
-            }
-
-          }
-
-          return t;
-
-        });
-
-        const incoming = Array.from(serverMap.values()).map((r) => serverTaskToDrawerRow(r));
-
-        return incoming.length > 0 ? [...incoming, ...merged] : merged;
-
+      const convertedDeal = findDealForLead(lead?.id, lead?.lead_number || lead?.leadNumber);
+      const [body, dealBody] = await Promise.all([
+        crmService.getTasks({ leadId: lead.id }).catch(() => null),
+        convertedDeal?.id && isServerId(convertedDeal.id)
+          ? crmService.getTasks({ dealId: convertedDeal.id }).catch(() => null)
+          : null,
+      ]);
+      const rows1 = Array.isArray(body) ? body : (body?.results || []);
+      const rows2 = Array.isArray(dealBody) ? dealBody : (dealBody?.results || []);
+      const rowsMap = new Map();
+      [...rows1, ...rows2].forEach((r) => {
+        if (r?.id) rowsMap.set(String(r.id), r);
       });
-
+      const rows = Array.from(rowsMap.values());
+      if (!Array.isArray(rows)) return;
+      setTasks((prev) => {
+        const serverMap = new Map(rows.filter((r) => r?.id).map((r) => [String(r.id), r]));
+        const merged = prev.map((t) => {
+          const sId = String(t.serverTaskId || '');
+          if (sId && serverMap.has(sId)) {
+            const sRow = serverMap.get(sId);
+            serverMap.delete(sId);
+            return {
+              ...t,
+              ...serverTaskToDrawerRow(sRow),
+              taskFormId: t.taskFormId || '',
+              customValues: t.customValues || {},
+              proposalId: t.proposalId || '',
+              deliveryChallanId: t.deliveryChallanId || '',
+            };
+          }
+          if (!sId && t.title) {
+            const matchEntry = Array.from(serverMap.entries()).find(
+              ([_, r]) => String(r.title).trim().toLowerCase() === String(t.title).trim().toLowerCase()
+            );
+            if (matchEntry) {
+              const [matchedId, sRow] = matchEntry;
+              serverMap.delete(matchedId);
+              return {
+                ...t,
+                ...serverTaskToDrawerRow(sRow),
+                taskFormId: t.taskFormId || '',
+                customValues: t.customValues || {},
+                proposalId: t.proposalId || '',
+                deliveryChallanId: t.deliveryChallanId || '',
+              };
+            }
+          }
+          return t;
+        });
+        const incoming = Array.from(serverMap.values()).map((r) => serverTaskToDrawerRow(r));
+        return incoming.length > 0 ? [...incoming, ...merged] : merged;
+      });
     } catch (err) {
-
       console.warn('[CRM] Failed to fetch tasks for lead:', err);
-
     }
-
   }, [lead?.id]);
 
-
-
   React.useEffect(() => {
-
     fetchLeadTasks();
-
   }, [fetchLeadTasks]);
 
-
+  React.useEffect(() => {
+    const handleCrmUpdate = () => {
+      fetchLeadTasks();
+    };
+    window.addEventListener(CRM_EVENT, handleCrmUpdate);
+    window.addEventListener('crm:data-updated', handleCrmUpdate);
+    window.addEventListener('storage', handleCrmUpdate);
+    return () => {
+      window.removeEventListener(CRM_EVENT, handleCrmUpdate);
+      window.removeEventListener('crm:data-updated', handleCrmUpdate);
+      window.removeEventListener('storage', handleCrmUpdate);
+    };
+  }, [fetchLeadTasks]);
 
   React.useEffect(() => {
 
@@ -3316,6 +3263,9 @@ function LeadTasksTab({ lead, onCountsChange, onActivity }) {
 
         startedAt,
 
+      }).then(() => {
+        window.dispatchEvent(new Event(CRM_EVENT));
+        window.dispatchEvent(new Event('crm:data-updated'));
       }).catch((err) => console.warn('[CRM] drawer task start not saved:', err?.message || err));
 
     }
@@ -3376,6 +3326,9 @@ function LeadTasksTab({ lead, onCountsChange, onActivity }) {
 
         endedAt,
 
+      }).then(() => {
+        window.dispatchEvent(new Event(CRM_EVENT));
+        window.dispatchEvent(new Event('crm:data-updated'));
       }).catch((err) => console.warn('[CRM] drawer task stop not saved:', err?.message || err));
 
     }
@@ -3804,6 +3757,9 @@ function LeadTasksTab({ lead, onCountsChange, onActivity }) {
 
           status: drawerTaskStatusToServer(nextTask.status),
 
+        }).then(() => {
+          window.dispatchEvent(new Event(CRM_EVENT));
+          window.dispatchEvent(new Event('crm:data-updated'));
         }).catch((err) => console.warn('[CRM] drawer task not updated:', err?.message || err));
 
       }
@@ -3822,16 +3778,20 @@ function LeadTasksTab({ lead, onCountsChange, onActivity }) {
 
       ]);
 
+      const convertedDeal = findDealForLead(lead?.id, lead?.lead_number || lead?.leadNumber);
       mirrorDrawerTaskToBackend({
-
-        leadId: lead?.id, row: manualTask, taskDate: form.taskDate, assigneeName, assigneeId,
-
+        leadId: lead?.id,
+        dealId: convertedDeal?.id,
+        row: manualTask,
+        taskDate: form.taskDate,
+        assigneeName,
+        assigneeId,
       }).then((saved) => {
 
         if (saved?.id) {
-
           setTasks((prev) => prev.map((t) => (t.id === manualTask.id ? { ...t, serverTaskId: saved.id, assigneeId: saved.assigneeId || assigneeId, assigneeName: saved.assigneeName || assigneeName } : t)));
-
+          window.dispatchEvent(new Event(CRM_EVENT));
+          window.dispatchEvent(new Event('crm:data-updated'));
         }
 
       });
@@ -4064,7 +4024,10 @@ function LeadTasksTab({ lead, onCountsChange, onActivity }) {
 
     if (reopened?.serverTaskId && isBackendEnabled()) {
 
-      useCrmStore.getState().updateTask(reopened.serverTaskId, { status: 'Open' })
+      useCrmStore.getState().updateTask(reopened.serverTaskId, { status: 'Open' }).then(() => {
+        window.dispatchEvent(new Event(CRM_EVENT));
+        window.dispatchEvent(new Event('crm:data-updated'));
+      })
 
         .catch((err) => console.warn('[CRM] drawer task reopen not saved:', err?.message || err));
 
@@ -4330,7 +4293,10 @@ function LeadTasksTab({ lead, onCountsChange, onActivity }) {
 
     if (detailTask.serverTaskId && isBackendEnabled()) {
 
-      useCrmStore.getState().updateTask(detailTask.serverTaskId, { status: 'Completed' })
+      useCrmStore.getState().updateTask(detailTask.serverTaskId, { status: 'Completed' }).then(() => {
+        window.dispatchEvent(new Event(CRM_EVENT));
+        window.dispatchEvent(new Event('crm:data-updated'));
+      })
 
         .catch((err) => console.warn('[CRM] drawer task completion not saved:', err?.message || err));
 
@@ -4370,7 +4336,10 @@ function LeadTasksTab({ lead, onCountsChange, onActivity }) {
 
       useCrmStore.getState().deleteTask(target.serverTaskId)
 
-        .catch((err) => console.warn('[CRM] drawer task not deleted:', err?.message || err));
+        .then(() => {
+          window.dispatchEvent(new Event(CRM_EVENT));
+          window.dispatchEvent(new Event('crm:data-updated'));
+        }).catch((err) => console.warn('[CRM] drawer task not deleted:', err?.message || err));
 
     }
 
@@ -6603,632 +6572,577 @@ function ActivityTab({ lead, items }) {
 
 
 // ── 2. General Tab ────────────────────────────────────────────
-
-function GeneralTab({ lead }) {
+function GeneralTab({ lead, activities: propActivities = [], onActivity }) {
+  const showToast = useAppStore((s) => s.showToast);
+  const [localActivities, setLocalActivities] = useState([]);
+  const [isAddActivityOpen, setIsAddActivityOpen] = useState(false);
+  const [activityType, setActivityType] = useState('Call');
+  const [activityTitle, setActivityTitle] = useState('');
+  const [activityDesc, setActivityDesc] = useState('');
+  const [activityDate, setActivityDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [activityTime, setActivityTime] = useState(() => {
+    const now = new Date();
+    return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+  });
+  const [activityOutcome, setActivityOutcome] = useState('Completed');
+  const [activityError, setActivityError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const nameParts = String(lead.name || '').split(' ').filter(Boolean);
-
   const infoRows = [
-
     ['Company', lead.company || '—'],
-
     ['First Name', nameParts[0] || '—'],
-
     ['Last Name', nameParts.slice(1).join(' ') || '—'],
-
     ['Title', lead.jobTitle || '—'],
-
     ['Email', lead.email || '—'],
-
     ['Phone', lead.phone ? `+91 ${lead.phone}` : '—'],
-
     ['Mobile', lead.phone ? `+91 ${lead.phone}` : '—'],
-
     ['Lead Source', lead.source || '—'],
-
     ['Lead Status', lead.status || '—'],
-
     ['Industry', lead.industry || '—'],
-
     ['Annual Revenue', formatAmount(lead.amount)],
-
     ['Website', '—'],
-
   ];
-
-
 
   const addressRows = [
-
     ['Address', '—'],
-
     ['City', lead.city || '—'],
-
     ['State', lead.state || '—'],
-
     ['Country', lead.country || '—'],
-
     ['Zip Code', '—'],
-
   ];
 
-
-
   // Extra capture from the create form — products, lead users and the
-
   // optional task schedule. Only rows with values are shown.
-
   const extraRows = (() => {
-
     const extras = lead.customValues || {};
-
     const rows = [];
-
     if (Array.isArray(extras.products) && extras.products.length > 0) {
-
       rows.push(['Products', extras.products.join(', ')]);
-
     }
-
     if (Array.isArray(extras.leadUsers) && extras.leadUsers.length > 0) {
-
       rows.push(['Lead Users', extras.leadUsers.join(', ')]);
-
     }
-
     if (extras.taskDate) rows.push(['Task Date', extras.taskDate]);
-
     if (extras.taskTime) rows.push(['Task Time', extras.taskTime]);
-
     return rows;
-
   })();
 
+  const typeColors = {
+    Call: '#2563eb',
+    Meeting: '#8b5cf6',
+    Note: '#f59e0b',
+    Email: '#10b981',
+    'Follow-up': '#06b6d4',
+    'Site Visit': '#e11d48',
+    Other: '#64748b',
+  };
 
+  const displayActivities = useMemo(() => {
+    const combined = [...localActivities, ...(propActivities || [])];
+    const seen = new Set();
+    return combined.filter((item) => {
+      if (!item?.id) return true;
+      if (seen.has(item.id)) return false;
+      seen.add(item.id);
+      return true;
+    });
+  }, [localActivities, propActivities]);
 
-  const activities = [];
+  function handleOpenAdd() {
+    setActivityType('Call');
+    setActivityTitle('');
+    setActivityDesc('');
+    setActivityDate(new Date().toISOString().slice(0, 10));
+    const now = new Date();
+    setActivityTime(`${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`);
+    setActivityOutcome('Completed');
+    setActivityError('');
+    setIsAddActivityOpen(true);
+  }
 
+  async function handleAddActivitySubmit(e) {
+    e.preventDefault();
+    const titleTrimmed = activityTitle.trim();
+    if (!titleTrimmed) {
+      setActivityError('Activity title / summary is required.');
+      return;
+    }
 
+    setIsSubmitting(true);
+    setActivityError('');
+
+    try {
+      const color = typeColors[activityType] || '#2563eb';
+      const formattedTitle = `${activityType}: ${titleTrimmed}`;
+      const timeStr = activityDate ? `${activityDate}${activityTime ? `, ${activityTime}` : ''}` : 'Just now';
+
+      const newEntry = {
+        id: `act-${Date.now()}`,
+        type: activityType.toLowerCase(),
+        title: formattedTitle,
+        time: timeStr,
+        date: timeStr,
+        preview: activityDesc.trim(),
+        description: activityDesc.trim(),
+        outcome: activityOutcome || '',
+        color,
+        dotColor: color,
+      };
+
+      setLocalActivities((prev) => [newEntry, ...prev]);
+
+      onActivity?.(formattedTitle, color, newEntry);
+
+      if (isBackendEnabled() && isServerId(lead?.id)) {
+        const noteBody = `[${activityType}] ${titleTrimmed}${activityDesc.trim() ? '\n' + activityDesc.trim() : ''}${activityOutcome ? ` (Outcome: ${activityOutcome})` : ''}`;
+        useLeadDetailStore.getState().add(lead.id, 'notes', { body: noteBody }).catch((err) => {
+          console.warn('[CRM] Could not save activity note to backend:', err?.message || err);
+        });
+      }
+
+      showToast?.(`Activity "${titleTrimmed}" added successfully.`);
+      setIsAddActivityOpen(false);
+    } catch (err) {
+      setActivityError(err?.message || 'Failed to add activity.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
 
   return (
-
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 items-start">
-
       <div className="bg-white rounded-2xl border border-slate-200/90 p-6 shadow-xs">
-
         <h3 className="font-bold text-sm text-slate-900 mb-5">Lead Information</h3>
-
         <div className="space-y-3.5 text-xs">
-
           {infoRows.map(([label, val]) => (
-
             <div key={label} className="flex items-center justify-between gap-3">
-
               <span className="text-slate-400 font-normal shrink-0">{label}</span>
-
               <span className="text-slate-900 font-semibold text-right truncate min-w-0 lg:min-w-auto">{val}</span>
-
             </div>
-
           ))}
-
         </div>
-
       </div>
-
-
 
       <div className="bg-white rounded-2xl border border-slate-200/90 p-6 shadow-xs space-y-5">
-
         <h3 className="font-bold text-sm text-slate-900">Address Information</h3>
-
         <div className="space-y-3.5 text-xs">
-
           {addressRows.map(([label, val]) => (
-
             <div key={label} className="flex items-center justify-between gap-3">
-
               <span className="text-slate-400 font-normal shrink-0">{label}</span>
-
               <span className="text-slate-900 font-semibold text-right truncate min-w-0 lg:min-w-auto">{val}</span>
-
             </div>
-
           ))}
-
         </div>
-
-
 
         <div className="h-44 rounded-2xl bg-gradient-to-b from-slate-50 via-slate-50 to-emerald-50/40 border border-slate-100 flex flex-col items-center justify-center relative overflow-hidden">
-
           <div className="flex flex-col items-center">
-
             <div className="w-8 h-8 rounded-full bg-white shadow-md border border-slate-100 flex items-center justify-center text-rose-500 mb-2">
-
               <MapPin size={16} />
-
             </div>
-
             <div className="w-10 h-10 rounded-full bg-rose-500/15 -mt-6 mb-3" />
-
             <button
-
               type="button"
-
               className="px-3.5 py-1 bg-white hover:bg-slate-50 text-slate-700 text-xs font-medium rounded-md border border-slate-200 shadow-xs transition cursor-pointer"
-
             >
-
               View on Map
-
             </button>
-
           </div>
-
         </div>
-
       </div>
-
-
 
       <div className="bg-white rounded-2xl border border-slate-200/90 p-6 shadow-xs">
-
         <div className="flex items-center justify-between mb-5">
-
           <h3 className="font-bold text-sm text-slate-900">Recent Activity</h3>
-
           <button
-
             type="button"
-
-            className="inline-flex items-center gap-1 px-3 py-1 bg-white hover:bg-slate-50 text-slate-700 text-xs font-medium rounded-lg border border-slate-200 shadow-xs transition cursor-pointer"
-
+            onClick={handleOpenAdd}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-slate-50 text-blue-600 hover:text-blue-700 text-xs font-semibold rounded-lg border border-slate-200 shadow-xs transition cursor-pointer"
           >
-
             <Plus size={13} /> Add
-
           </button>
-
         </div>
-
-
 
         <div className="space-y-4">
-
-          {activities.length === 0 ? (
-
+          {displayActivities.length === 0 ? (
             <p className="text-[11px] text-slate-400">No activity yet.</p>
-
           ) : (
-
-            activities.map((item) => (
-
-            <div key={item.id} className="flex items-start gap-3">
-
-              <span
-
-                className="w-2.5 h-2.5 rounded-full mt-1 shrink-0"
-
-                style={{ backgroundColor: item.color }}
-
-              />
-
-              <div className="min-w-0">
-
-                <p className="text-xs font-semibold text-slate-900 leading-snug">{item.title}</p>
-
-                <span className="text-[11px] text-slate-400 mt-0.5 block">{item.time}</span>
-
+            displayActivities.slice(0, 8).map((item) => (
+              <div key={item.id} className="flex items-start gap-3">
+                <span
+                  className="w-2.5 h-2.5 rounded-full mt-1 shrink-0"
+                  style={{ backgroundColor: item.color || item.dotColor || '#3b82f6' }}
+                />
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-semibold text-slate-900 leading-snug">{item.title}</p>
+                  <span className="text-[11px] text-slate-400 mt-0.5 block">{item.time || item.date || item.at || 'Recently'}</span>
+                  {(item.preview || item.description || item.body) && (
+                    <p className="text-[11px] text-slate-500 mt-0.5 line-clamp-2 leading-relaxed">
+                      {item.preview || item.description || item.body}
+                    </p>
+                  )}
+                  {item.outcome && (
+                    <span className="inline-block mt-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-600">
+                      {item.outcome}
+                    </span>
+                  )}
+                </div>
               </div>
-
-            </div>
-
             ))
-
           )}
-
         </div>
-
       </div>
 
-      {extraRows.length > 0 && (
+      {isAddActivityOpen && (
+        <div
+          className="fixed inset-0 z-50 bg-slate-950/40 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4"
+          onClick={() => setIsAddActivityOpen(false)}
+        >
+          <div
+            className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-lg p-6 max-h-[92vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between pb-4 mb-4 border-b border-slate-100">
+              <div>
+                <h3 className="text-base font-bold text-slate-900">Add Recent Activity</h3>
+                <p className="text-xs text-slate-500 mt-0.5">Record a call, meeting, note or follow-up for {lead.name}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsAddActivityOpen(false)}
+                className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition"
+                aria-label="Close"
+              >
+                <X size={16} />
+              </button>
+            </div>
 
-        <div className="bg-white rounded-2xl border border-slate-200/90 p-6 shadow-xs">
+            {activityError && (
+              <div className="mb-4 p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
+                <AlertCircle size={14} className="shrink-0" />
+                <span>{activityError}</span>
+              </div>
+            )}
 
-          <h3 className="font-bold text-sm text-slate-900 mb-5">Additional Details</h3>
-
-          <div className="space-y-3.5 text-xs">
-
-            {extraRows.map(([label, val]) => (
-
-              <div key={label} className="flex items-center justify-between gap-3">
-
-                <span className="text-slate-400 font-normal shrink-0">{label}</span>
-
-                <span className="text-slate-900 font-semibold text-right truncate min-w-0 lg:min-w-auto">{val}</span>
-
+            <form onSubmit={handleAddActivitySubmit} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  Activity Type <span className="text-rose-500">*</span>
+                </label>
+                <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                  {['Call', 'Meeting', 'Note', 'Email', 'Follow-up', 'Site Visit', 'Other'].map((t) => {
+                    const active = activityType === t;
+                    const col = typeColors[t] || '#64748b';
+                    return (
+                      <button
+                        key={t}
+                        type="button"
+                        onClick={() => setActivityType(t)}
+                        className={`px-2.5 py-2 rounded-xl text-xs font-medium border flex items-center gap-1.5 justify-center transition cursor-pointer ${
+                          active
+                            ? 'border-blue-600 bg-blue-50 text-blue-700 font-semibold shadow-xs'
+                            : 'border-slate-200 hover:border-slate-300 text-slate-700 bg-white'
+                        }`}
+                      >
+                        <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: col }} />
+                        <span className="truncate">{t}</span>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
 
-            ))}
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  Summary / Title <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  autoFocus
+                  required
+                  placeholder="e.g. Phone call with client regarding fabric samples"
+                  value={activityTitle}
+                  onChange={(e) => setActivityTitle(e.target.value)}
+                  className="w-full h-10 px-3.5 bg-white border border-slate-300 rounded-xl text-xs text-slate-800 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition"
+                />
+              </div>
 
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">Date</label>
+                  <input
+                    type="date"
+                    value={activityDate}
+                    onChange={(e) => setActivityDate(e.target.value)}
+                    className="w-full h-10 px-3 bg-white border border-slate-300 rounded-xl text-xs text-slate-800 focus:outline-none focus:border-blue-500 transition"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">Time</label>
+                  <input
+                    type="time"
+                    value={activityTime}
+                    onChange={(e) => setActivityTime(e.target.value)}
+                    className="w-full h-10 px-3 bg-white border border-slate-300 rounded-xl text-xs text-slate-800 focus:outline-none focus:border-blue-500 transition"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">Outcome / Status</label>
+                <select
+                  value={activityOutcome}
+                  onChange={(e) => setActivityOutcome(e.target.value)}
+                  className="w-full h-10 px-3 bg-white border border-slate-300 rounded-xl text-xs text-slate-800 focus:outline-none focus:border-blue-500 transition"
+                >
+                  <option value="Completed">Completed / Successful</option>
+                  <option value="Follow-up Required">Follow-up Required</option>
+                  <option value="Client Interested">Client Interested</option>
+                  <option value="Sample Requested">Sample Requested</option>
+                  <option value="No Answer / Unreachable">No Answer / Unreachable</option>
+                  <option value="Pending">Pending</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">Description / Remarks (Optional)</label>
+                <textarea
+                  rows={3}
+                  placeholder="Add any extra details, client feedback or next steps..."
+                  value={activityDesc}
+                  onChange={(e) => setActivityDesc(e.target.value)}
+                  className="w-full p-3 bg-white border border-slate-300 rounded-xl text-xs text-slate-800 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition resize-y"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsAddActivityOpen(false)}
+                  className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="inline-flex items-center gap-1.5 px-5 py-2 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 active:bg-blue-800 disabled:opacity-50 shadow-xs transition cursor-pointer"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 size={13} className="animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    'Add Activity'
+                  )}
+                </button>
+              </div>
+            </form>
           </div>
-
         </div>
-
       )}
 
+      {extraRows.length > 0 && (
+        <div className="bg-white rounded-2xl border border-slate-200/90 p-6 shadow-xs">
+          <h3 className="font-bold text-sm text-slate-900 mb-5">Additional Details</h3>
+          <div className="space-y-3.5 text-xs">
+            {extraRows.map(([label, val]) => (
+              <div key={label} className="flex items-center justify-between gap-3">
+                <span className="text-slate-400 font-normal shrink-0">{label}</span>
+                <span className="text-slate-900 font-semibold text-right truncate min-w-0 lg:min-w-auto">{val}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
-
   );
-
 }
 
 
 
 // ── 3. Users | Requirements Tab ──────────────────────────────────
-
 // Used only until the UOM master has loaded (or when it is empty offline).
-
 const REQUIREMENT_UOM_OPTIONS = ['Meter', 'Kg', 'Taka', 'Roll'];
-
 const REQUIREMENT_STATUS_OPTIONS = ['Active', 'Draft'];
 
-
-
 const EMPTY_REQUIREMENT_DRAFT = {
-
   fabricQuality: '',
-
   fabricCode: '',
-
   fabricType: '',
-
   design: '',
-
   colour: '',
-
   width: '',
-
   gsm: '',
-
   qty: '1',
-
   uom: 'Meter',
-
   expectedRate: '',
-
   remarks: '',
-
   status: 'Active',
-
 };
 
-
-
 function tempRequirementId() {
-
   return `req-${Date.now()}-${Math.random().toString(16).slice(2, 6)}`;
-
 }
-
-
 
 function formatExpectedRate(value) {
-
   if (value === null || value === undefined || value === '') return '—';
-
   const num = Number(value);
-
   if (!Number.isFinite(num)) return '—';
-
   return `Rs. ${num.toLocaleString('en-IN')}`;
-
 }
-
-
 
 function formatFabricDim(value, suffix = '') {
-
   if (value === null || value === undefined || value === '') return '—';
-
   return `${value}${suffix}`;
-
 }
-
-
 
 /**
-
  * Fabric requirement form fields, shared by the add and edit requirement
-
  * dialogs. Same input styling as the rest of the drawer; the draft object
-
  * uses UI keys (`fabricQuality`, `colour`, `expectedRate`, ...) and the
-
  * mapping layer translates them to the API payload.
-
  */
-
 function RequirementFormFields({ draft, onChange, autoFocus = false }) {
-
   const { activeUnits } = useUnits();
-
   const uomOptions = activeUnits.length ? activeUnits.map((u) => u.code) : REQUIREMENT_UOM_OPTIONS;
-
   if (draft.uom && !uomOptions.includes(draft.uom)) uomOptions.unshift(draft.uom);
-
   const set = (key) => (event) => onChange({ ...draft, [key]: event.target.value });
-
   const inputCls = 'mt-2 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs font-normal text-slate-700 focus:outline-none focus:border-blue-500';
-
   return (
-
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-
       <label className="text-xs font-semibold text-slate-700 sm:col-span-2">
-
         Fabric Quality / Item Name *
-
         <input
-
           type="text"
-
           value={draft.fabricQuality}
-
           onChange={set('fabricQuality')}
-
           placeholder="e.g. Cotton Voile"
-
           className={inputCls}
-
           autoFocus={autoFocus}
-
         />
-
       </label>
-
       <label className="text-xs font-semibold text-slate-700">
-
         Fabric Code / SKU
-
         <input
-
           type="text"
-
           value={draft.fabricCode}
-
           onChange={set('fabricCode')}
-
           placeholder="e.g. CTV-60-120"
-
           className={inputCls}
-
         />
-
       </label>
-
       <label className="text-xs font-semibold text-slate-700">
-
         Fabric Type
-
         <input
-
           type="text"
-
           value={draft.fabricType}
-
           onChange={set('fabricType')}
-
           placeholder="e.g. Cotton"
-
           className={inputCls}
-
         />
-
       </label>
-
       <label className="text-xs font-semibold text-slate-700">
-
         Design
-
         <input
-
           type="text"
-
           value={draft.design}
-
           onChange={set('design')}
-
           placeholder="e.g. Floral"
-
           className={inputCls}
-
         />
-
       </label>
-
       <label className="text-xs font-semibold text-slate-700">
-
         Colour / Shade
-
         <input
-
           type="text"
-
           value={draft.colour}
-
           onChange={set('colour')}
-
           placeholder="e.g. Red"
-
           className={inputCls}
-
         />
-
       </label>
-
       <label className="text-xs font-semibold text-slate-700">
-
         Width (inches)
-
         <input
-
           type="number"
-
           min="0"
-
           step="0.01"
-
           value={draft.width}
-
           onChange={set('width')}
-
           placeholder="e.g. 58"
-
           className={inputCls}
-
         />
-
       </label>
-
       <label className="text-xs font-semibold text-slate-700">
-
         GSM
-
         <input
-
           type="number"
-
           min="0"
-
           step="0.01"
-
           value={draft.gsm}
-
           onChange={set('gsm')}
-
           placeholder="e.g. 120"
-
           className={inputCls}
-
         />
-
       </label>
-
       <label className="text-xs font-semibold text-slate-700">
-
         Required Quantity *
-
         <input
-
           type="number"
-
           min="0"
-
           step="0.01"
-
           value={draft.qty}
-
           onChange={set('qty')}
-
           placeholder="e.g. 150"
-
           className={inputCls}
-
         />
-
       </label>
-
       <label className="text-xs font-semibold text-slate-700">
-
         <span className="flex items-center justify-between">
-
           UOM
-
           <MasterSourceLink source="uom" />
-
         </span>
-
         <select value={draft.uom} onChange={set('uom')} className={`${inputCls} bg-white`}>
-
           {uomOptions.map((opt) => (
-
             <option key={opt} value={opt}>{opt}</option>
-
           ))}
-
         </select>
-
       </label>
-
       <label className="text-xs font-semibold text-slate-700">
-
         Expected Rate
-
         <input
-
           type="number"
-
           min="0"
-
           step="0.01"
-
           value={draft.expectedRate}
-
           onChange={set('expectedRate')}
-
           placeholder="Indicative rate (not final price)"
-
           className={inputCls}
-
         />
-
       </label>
-
       <label className="text-xs font-semibold text-slate-700">
-
         Status
-
         <select value={draft.status} onChange={set('status')} className={`${inputCls} bg-white`}>
-
           {REQUIREMENT_STATUS_OPTIONS.map((opt) => (
-
             <option key={opt} value={opt}>{opt}</option>
-
           ))}
-
         </select>
-
       </label>
-
       <label className="text-xs font-semibold text-slate-700 sm:col-span-2">
-
         Remarks
-
         <input
-
           type="text"
-
           value={draft.remarks}
-
           onChange={set('remarks')}
-
           placeholder="Any additional notes"
-
           className={inputCls}
-
         />
-
       </label>
-
     </div>
-
   );
-
 }
-
-
 
 function UsersProductsTab({ lead, onCountsChange, onActivity }) {
 
@@ -8404,18 +8318,17 @@ export default function LeadDetailView({ lead, onBackToLeads }) {
 
 
 
-  const logActivity = React.useCallback((title, color) => {
-
+  const logActivity = React.useCallback((title, color, extra = {}) => {
     if (!title) return;
-
-    const entry = { id: `act-${Date.now()}`, title, time: 'Just now', color: color || '#3b82f6' };
-
-    // The server records the activity from the change itself; this shows it
-
-    // immediately, and the next read of the timeline confirms it.
-
+    const entry = {
+      id: `act-`,
+      title,
+      time: 'Just now',
+      color: color || '#3b82f6',
+      dotColor: color || '#3b82f6',
+      ...extra,
+    };
     setActivities((current) => [entry, ...current.filter((item) => item.id !== entry.id)]);
-
   }, [viewLead?.id, lead?.id]);
 
 
@@ -9285,7 +9198,7 @@ export default function LeadDetailView({ lead, onBackToLeads }) {
 
       {activeTab === 'Sources & Emails' && <SourcesAndEmailsTab lead={activeLeadData} onCountsChange={updateDetailCounts} onActivity={logActivity} />}
 
-      {activeTab === 'General' && <GeneralTab lead={activeLeadData} />}
+      {activeTab === 'General' && <GeneralTab lead={activeLeadData} activities={activities} onActivity={logActivity} />}
 
       {activeTab === 'Users & Requirements' && <UsersProductsTab lead={activeLeadData} onCountsChange={updateDetailCounts} onActivity={logActivity} />}
 

@@ -200,7 +200,8 @@ export const NAV = [
         ],
       },
       { label: 'Deals', icon: TrendingUp, to: '/crm/deals' },
-      { label: 'Contracts', icon: FileText, to: '/crm/contracts' },
+      // Hidden for now; the /crm/contracts route still works.
+      // { label: 'Contracts', icon: FileText, to: '/crm/contracts' },
       {
         label: 'CRM Setup',
         icon: Sliders,
@@ -281,7 +282,8 @@ export const NAV = [
     children: [
       { label: 'Purchase Orders', icon: ClipboardList, to: '/purchase/orders' },
       { label: 'Supplier Delivery', icon: Truck, to: '/purchase/deliveries' },
-      { label: 'Final Job Work POs', icon: FileSpreadsheet, to: '/purchase/final-job-work-pos' },
+      // [DISABLED] Final Job Work POs concept commented out
+      // { label: 'Final Job Work POs', icon: FileSpreadsheet, to: '/purchase/final-job-work-pos' },
       { label: 'Goods Receipt', icon: PackageCheck, to: '/purchase/receipts' },
       { label: 'Supplier Reconciliation', icon: GitCompare, to: '/purchase/reconciliation' },
       { label: 'Supplier Ledger', icon: BookOpen, to: '/purchase/supplier-ledger' },
@@ -317,9 +319,6 @@ export const NAV = [
         ],
       },
       { label: 'Batch Registry', icon: QrCode, to: '/inventory/batches' },
-      // Quality, design, shade, item / variant, fabric type, categories and UOM -- one page, one tab each.
-      { label: 'Fabric Masters', icon: Boxes, to: '/inventory/fabric-masters' },
-      { label: 'Textile Operations Masters', icon: Wrench, to: '/inventory/masters/textile' },
       {
         label: 'Stock Position',
         icon: BarChart3,
@@ -334,27 +333,63 @@ export const NAV = [
         ],
       },
       {
-        label: 'QC (Quality Control)', icon: CircleCheck, to: '/inventory/qc/entry',
+        label: 'QC (Quality Control)', icon: CircleCheck, to: '/inventory/qc/dashboard',
         navigateOnOpen: true,
         // As the requirement (PDF §18): QC Entry, Reprocess, QC History, QC Reports.
         // The Defect Master is in Textile Operations Masters.
         children: [
-          { label: 'QC Entry', to: '/inventory/qc/entry', dot: true },
+          { label: 'QC Dashboard', to: '/inventory/qc/dashboard', dot: true },
+          { label: 'QC Entry', to: '/inventory/qc/entry' },
           { label: 'Reprocess', to: '/inventory/qc/reprocess' },
           { label: 'QC History', to: '/inventory/qc/history' },
           { label: 'QC Reports', to: '/inventory/qc/reports' },
         ],
       },
-      { label: 'Production Runs (In-house)', icon: Factory, to: '/inventory/production-runs' },
-      { label: 'Lot / Taka Register', icon: FileText, to: '/inventory/lot-register' },
-      { label: 'Taka Tag Print', icon: Tag, to: '/inventory/taka-tags' },
-      { label: 'Sample Management', icon: FlaskConical, to: '/inventory/samples' },
-      { label: 'Logistics / Trips', icon: Truck, to: '/inventory/trips' },
-      { label: 'Warehouses', icon: Warehouse, to: '/inventory/warehouses' },
-      { label: 'Transfers', icon: ArrowLeftRight, to: '/inventory/transfers' },
-      { label: 'Valuation & Ageing', icon: TrendingUp, to: '/inventory/valuation' },
-      { label: 'Lot Costing & Profitability', icon: DollarSign, to: '/inventory/lot-costing' },
-      { label: 'Month-End Audit', icon: CalendarCheck, to: '/inventory/audit' },
+      {
+        label: 'Lot & Taka',
+        icon: Tag,
+        defaultOpen: false,
+        navigateOnOpen: true,
+        children: [
+          { label: 'Lot / Taka Register', to: '/inventory/lot-register', dot: true },
+          { label: 'Taka Tag Print', to: '/inventory/taka-tags' },
+          { label: 'Production Runs (In-house)', to: '/inventory/production-runs' },
+        ],
+      },
+      {
+        label: 'Warehouse & Movement',
+        icon: Warehouse,
+        defaultOpen: false,
+        navigateOnOpen: true,
+        children: [
+          { label: 'Warehouses', to: '/inventory/warehouses', dot: true },
+          { label: 'Transfers', to: '/inventory/transfers' },
+          { label: 'Logistics / Trips', to: '/inventory/trips' },
+          { label: 'Sample Management', to: '/inventory/samples' },
+        ],
+      },
+      {
+        label: 'Reports',
+        icon: TrendingUp,
+        defaultOpen: false,
+        navigateOnOpen: true,
+        children: [
+          { label: 'Valuation & Ageing', to: '/inventory/valuation', dot: true },
+          { label: 'Lot Costing & Profitability', to: '/inventory/lot-costing' },
+          { label: 'Month-End Audit', to: '/inventory/audit' },
+        ],
+      },
+      {
+        label: 'Masters',
+        icon: Boxes,
+        defaultOpen: false,
+        navigateOnOpen: true,
+        children: [
+          // Quality, design, shade, item / variant, fabric type, categories and UOM -- one page, one tab each.
+          { label: 'Fabric Masters', to: '/inventory/fabric-masters', dot: true },
+          { label: 'Textile Operations Masters', to: '/inventory/masters/textile' },
+        ],
+      },
     ],
   },
 

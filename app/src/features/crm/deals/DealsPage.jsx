@@ -148,6 +148,15 @@ function formatColumnSummary(totalAmount, dealCount, leadCount) {
   return leadCount > 0 ? `${base} • ${leadCount} lead${leadCount === 1 ? '' : 's'}` : base;
 }
 
+function getProductLabel(product) {
+  if (typeof product === 'string') return product.trim();
+  if (!product || typeof product !== 'object') return '';
+  return String(
+    product.productName || product.fabricQuality || product.name ||
+    product.product || product.itemName || product.fabric || '',
+  ).trim();
+}
+
 // Stages beyond the hardcoded five (Revised, Declined, or anything a tenant
 // configures) fall back to a neutral palette rather than to Draft's blue, so a
 // custom stage is not mistaken for one of the built-in ones.
@@ -326,14 +335,16 @@ export default function DealsPage() {
   };
 
   const getDealProduct = (deal) => {
-    if (deal?.product) return deal.product;
+    const savedProduct = getProductLabel(deal?.product) ||
+      getProductLabel(Array.isArray(deal?.products) ? deal.products[0] : '');
+    if (savedProduct) return savedProduct;
     const linkedLead = (allLeads || []).find(
       (l) => (deal?.leadId && String(l.id) === String(deal.leadId)) ||
              (deal?.name && String(l.name).trim().toLowerCase() === String(deal.name).trim().toLowerCase())
     );
     const prods = linkedLead?.products || linkedLead?.customValues?.products || linkedLead?.customValues?.fields?.products;
-    if (Array.isArray(prods) && prods.length > 0) return prods[0];
-    return (typeof prods === 'string' ? prods : '');
+    if (Array.isArray(prods) && prods.length > 0) return getProductLabel(prods[0]);
+    return getProductLabel(prods);
   };
 
   const getDealUser = (deal) => {
@@ -358,13 +369,22 @@ export default function DealsPage() {
     });
     (deals || []).forEach((d) => {
       const prod = getDealProduct(d);
-      if (prod) list.add(String(prod).trim());
-      if (Array.isArray(d.products)) d.products.forEach((p) => p && list.add(String(p).trim()));
+      if (prod) list.add(prod);
+      if (Array.isArray(d.products)) d.products.forEach((p) => {
+        const name = getProductLabel(p);
+        if (name) list.add(name);
+      });
     });
     (allLeads || []).forEach((l) => {
       const prods = l.products || l.customValues?.products || l.customValues?.fields?.products;
-      if (Array.isArray(prods)) prods.forEach((p) => p && list.add(String(p).trim()));
-      else if (typeof prods === 'string' && prods) list.add(prods.trim());
+      if (Array.isArray(prods)) prods.forEach((p) => {
+        const name = getProductLabel(p);
+        if (name) list.add(name);
+      });
+      else {
+        const name = getProductLabel(prods);
+        if (name) list.add(name);
+      }
     });
     if (list.size === 0) {
       (TEXTILE_FABRIC_OPTIONS || []).forEach((p) => list.add(p));
@@ -875,7 +895,7 @@ export default function DealsPage() {
       price: deal.price,
       client: deal.client,
       phone: deal.phone ? (deal.phone.startsWith('+91') ? deal.phone : `+91 ${deal.phone}`) : '+91 ',
-      product: deal.product || '',
+      product: getDealProduct(deal),
       stage: deal.stage || 'Draft',
       source: deal.source || 'Website',
       assignedUser: deal.assignedUser || currentUser?.name || '',
@@ -1078,7 +1098,7 @@ export default function DealsPage() {
         </div>
       )}
 
-      {linkedDealId ? <DealDetailView key={linkedDealId} deal={deals.find((item) => String(item.id) === linkedDealId)} onEdit={handleOpenEditModal} onNotify={showNotification} onDelete={setDealToDelete} onUpdate={(patch) => {
+      {linkedDealId ? <DealDetailView key={linkedDealId} deal={deals.find((item) => String(item.id) === linkedDealId)} onEdit={handleOpenEditModal} onNotify={showNotification} onDelete={setDealToDelete} onMoveStage={handleMoveStage} onUpdate={(patch) => {
         // Header fields reach `/crm/deals/` through an explicit update —
         // nested arrays have their own endpoints (wired in the view).
         const updated = loadDeals().map((item) => String(item.id) === linkedDealId ? { ...item, ...patch } : item);
@@ -1767,6 +1787,34 @@ export default function DealsPage() {
 
           <div className="my-1 border-t border-slate-100" />
 
+          {dealMenu.deal?.stage !== 'Lost' && (
+            <button
+              type="button"
+              onClick={() => {
+                handleMoveStage(dealMenu.deal.id, 'Lost');
+              }}
+              className="w-full px-3.5 py-1.5 text-left text-xs font-semibold text-rose-600 hover:bg-rose-50 flex items-center gap-2 cursor-pointer"
+            >
+              <XCircle size={13} className="text-rose-500" />
+              <span>Lost Deal</span>
+            </button>
+          )}
+
+          {dealMenu.deal?.stage !== 'Won' && (
+            <button
+              type="button"
+              onClick={() => {
+                handleMoveStage(dealMenu.deal.id, 'Won');
+              }}
+              className="w-full px-3.5 py-1.5 text-left text-xs font-semibold text-emerald-600 hover:bg-emerald-50 flex items-center gap-2 cursor-pointer"
+            >
+              <Trophy size={13} className="text-emerald-500" />
+              <span>Won Deal</span>
+            </button>
+          )}
+
+          <div className="my-1 border-t border-slate-100" />
+
           <button
             type="button"
             onClick={() => {
@@ -1882,7 +1930,8 @@ export default function DealsPage() {
                     onChange={(e) => setFormState({ ...formState, product: e.target.value })}
                     className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs font-medium"
                   >
-                    {productOptions.filter((p) => p !== 'All Products').map((p) => (
+                    <option value="">Select product</option>
+                    {[...new Set([...productOptions.filter((p) => p !== 'All Products'), formState.product].filter(Boolean))].map((p) => (
                       <option key={p} value={p}>
                         {p}
                       </option>

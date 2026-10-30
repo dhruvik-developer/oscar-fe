@@ -340,7 +340,7 @@ export default function LeadStageTasks({ leadForms = [] }) {
               order: Number(draft.order) || 0,
               required: draft.required ?? true,
               autoCreate: draft.autoCreate ?? true,
-              repeats: draft.repeats === "" ? 14 : Number(draft.repeats) || 0,
+              repeats: draft.repeats === "" ? 14 : Math.max(1, parseInt(draft.repeats, 10) || 1),
               dueIn: draft.dueIn === "" ? 0 : Number(draft.dueIn) || 0,
             },
           ],
@@ -1008,10 +1008,16 @@ export default function LeadStageTasks({ leadForms = [] }) {
                           </td>
                           <td className="px-3 py-2.5">
                             <input
-                              type="text"
+                              type="number"
+                              inputMode="numeric"
+                              min="1"
+                              max="99"
+                              step="1"
+                              aria-label="Max repeats"
                               placeholder="default"
                               value={draft.repeats}
-                              onChange={(e) => updateDraft(stage.id, "repeats", e.target.value)}
+                              onKeyDown={(e) => { if ([".", ",", "e", "E", "+", "-"].includes(e.key)) e.preventDefault(); }}
+                              onChange={(e) => updateDraft(stage.id, "repeats", e.target.value.replace(/D/g, "").slice(0, 2))}
                               className="w-24 bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-blue-500 shadow-2xs"
                             />
                           </td>
@@ -1169,9 +1175,13 @@ export default function LeadStageTasks({ leadForms = [] }) {
                   </label>
                   <input
                     type="number"
-                    min="0"
+                    inputMode="numeric"
+                    min="1"
+                    max="99"
+                    step="1"
                     value={masterTask.repeats}
-                    onChange={(e) => updateMasterTask("repeats", e.target.value)}
+                    onKeyDown={(e) => { if ([".", ",", "e", "E", "+", "-"].includes(e.key)) e.preventDefault(); }}
+                    onChange={(e) => updateMasterTask("repeats", e.target.value.replace(/D/g, "").slice(0, 2))}
                     className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-blue-500 shadow-2xs text-slate-800"
                   />
                 </div>

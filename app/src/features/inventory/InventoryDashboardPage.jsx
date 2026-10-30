@@ -28,8 +28,6 @@ import {
 } from 'lucide-react';
 import { inventoryService } from '../../services/domainServices';
 import PageInfoButton from '../../components/ui/PageInfoButton';
-import { useTableSort } from '../../hooks/useTableSort';
-import SortableTh from '../../components/ui/SortableTh';
 
 // Helper for Indian Currency Formatting
 function formatINR(val) {
@@ -298,10 +296,6 @@ export function InventoryDashboardPage() {
     };
   }, [data]);
 
-  const godownSort = useTableSort(data?.stockByGodown || []);
-  const recentMovements = useMemo(() => (data?.recentMovements || []).slice(0, 8), [data]);
-  const movementSort = useTableSort(recentMovements);
-
   return (
     <div className="space-y-5">
       {/* ── TOP HEADER & FILTER BAR ────────────────────────────────────────── */}
@@ -337,7 +331,7 @@ export function InventoryDashboardPage() {
                 </option>
               ))}
             </select>
-            <ChevronDown size={12} className="absolute right-2 text-slate-400 pointer-events-none" />
+            <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
           </div>
 
           {/* Fabric Category Selector */}
@@ -357,7 +351,7 @@ export function InventoryDashboardPage() {
                 </option>
               ))}
             </select>
-            <ChevronDown size={12} className="absolute right-2 text-slate-400 pointer-events-none" />
+            <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
           </div>
 
           {/* Fabric Selector */}
@@ -377,7 +371,7 @@ export function InventoryDashboardPage() {
                 </option>
               ))}
             </select>
-            <ChevronDown size={12} className="absolute right-2 text-slate-400 pointer-events-none" />
+            <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
           </div>
 
           {/* Colour Selector */}
@@ -397,7 +391,7 @@ export function InventoryDashboardPage() {
                 </option>
               ))}
             </select>
-            <ChevronDown size={12} className="absolute right-2 text-slate-400 pointer-events-none" />
+            <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
           </div>
 
           {/* Date Range Picker */}
@@ -549,7 +543,7 @@ export function InventoryDashboardPage() {
                 <option value="qty">Quantity (Mtr)</option>
                 <option value="val">Value (₹)</option>
               </select>
-              <ChevronDown size={10} className="absolute right-1.5 text-slate-400 pointer-events-none" />
+              <ChevronDown size={10} className="absolute right-1.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
             </div>
           </div>
 
@@ -641,7 +635,7 @@ export function InventoryDashboardPage() {
                   <option value="qty">Quantity (Mtr)</option>
                   <option value="val">Value (₹)</option>
                 </select>
-                <ChevronDown size={10} className="absolute right-1.5 text-slate-400 pointer-events-none" />
+                <ChevronDown size={10} className="absolute right-1.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
               </div>
 
               <div className="relative inline-flex items-center">
@@ -657,7 +651,7 @@ export function InventoryDashboardPage() {
                     </option>
                   ))}
                 </select>
-                <ChevronDown size={10} className="absolute right-1.5 text-slate-400 pointer-events-none" />
+                <ChevronDown size={10} className="absolute right-1.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
               </div>
             </div>
           </div>
@@ -804,7 +798,7 @@ export function InventoryDashboardPage() {
                 <option value="qty">Quantity (Mtr)</option>
                 <option value="val">Value (₹)</option>
               </select>
-              <ChevronDown size={10} className="absolute right-1.5 text-slate-400 pointer-events-none" />
+              <ChevronDown size={10} className="absolute right-1.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
             </div>
           </div>
 
@@ -871,7 +865,7 @@ export function InventoryDashboardPage() {
                 <option value="qty">Quantity (Mtr)</option>
                 <option value="val">Value (₹)</option>
               </select>
-              <ChevronDown size={10} className="absolute right-1.5 text-slate-400 pointer-events-none" />
+              <ChevronDown size={10} className="absolute right-1.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
             </div>
           </div>
 
@@ -880,18 +874,18 @@ export function InventoryDashboardPage() {
             <table className="w-full text-left text-xs border-collapse">
               <thead>
                 <tr className="border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                  <SortableTh sort={godownSort} sortKey="godown" className="py-2 pr-2">Godown</SortableTh>
-                  <SortableTh sort={godownSort} sortKey="totalStock" className="py-2 px-2 text-right" align="right">Total Stock</SortableTh>
-                  <SortableTh sort={godownSort} sortKey="good" className="py-2 px-2 text-right text-emerald-600" align="right">Good</SortableTh>
-                  <SortableTh sort={godownSort} sortKey="sample" className="py-2 px-2 text-right text-cyan-600" align="right">Sample</SortableTh>
-                  <SortableTh sort={godownSort} sortKey="wastage" className="py-2 px-2 text-right text-rose-600" align="right">Wastage</SortableTh>
-                  <SortableTh sort={godownSort} sortKey="reprocess" className="py-2 px-2 text-right text-blue-600" align="right">Reprocess</SortableTh>
-                  <SortableTh sort={godownSort} sortKey="customerReturn" className="py-2 px-2 text-right text-purple-600" align="right">Customer Return</SortableTh>
-                  <SortableTh sort={godownSort} sortKey="greyWip" className="py-2 pl-2 text-right text-slate-500" align="right">Grey / WIP</SortableTh>
+                  <th className="py-2 pr-2">Godown</th>
+                  <th className="py-2 px-2 text-right">Total Stock</th>
+                  <th className="py-2 px-2 text-right text-emerald-600">Good</th>
+                  <th className="py-2 px-2 text-right text-cyan-600">Sample</th>
+                  <th className="py-2 px-2 text-right text-rose-600">Wastage</th>
+                  <th className="py-2 px-2 text-right text-blue-600">Reprocess</th>
+                  <th className="py-2 px-2 text-right text-purple-600">Customer Return</th>
+                  <th className="py-2 pl-2 text-right text-slate-500">Grey / WIP</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 font-mono text-[11.5px]">
-                {godownSort.rows.map((row, idx) => (
+                {(data?.stockByGodown || []).map((row, idx) => (
                   <tr key={idx} className="hover:bg-slate-50/80 transition-colors">
                     <td className="py-2 pr-2 font-sans font-bold text-slate-800">
                       {row.godown}
@@ -1114,17 +1108,17 @@ export function InventoryDashboardPage() {
             <table className="w-full text-left text-xs border-collapse">
               <thead>
                 <tr className="border-b border-slate-200 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-                  <SortableTh sort={movementSort} sortKey="date" className="py-2 pr-1">Date</SortableTh>
-                  <SortableTh sort={movementSort} sortKey="type" className="py-2 px-1">Type</SortableTh>
-                  <SortableTh sort={movementSort} sortKey="refNo" className="py-2 px-1">Ref No.</SortableTh>
-                  <SortableTh sort={movementSort} sortKey="fabric" className="py-2 px-1">Fabric</SortableTh>
-                  <SortableTh sort={movementSort} sortKey="qty" className="py-2 px-1 text-right" align="right">Qty (Mtr)</SortableTh>
-                  <SortableTh sort={movementSort} sortKey="category" className="py-2 px-1">Category</SortableTh>
-                  <SortableTh sort={movementSort} sortKey="godown" className="py-2 pl-1">Godown</SortableTh>
+                  <th className="py-2 pr-1">Date</th>
+                  <th className="py-2 px-1">Type</th>
+                  <th className="py-2 px-1">Ref No.</th>
+                  <th className="py-2 px-1">Fabric</th>
+                  <th className="py-2 px-1 text-right">Qty (Mtr)</th>
+                  <th className="py-2 px-1">Category</th>
+                  <th className="py-2 pl-1">Godown</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-[11px]">
-                {movementSort.rows.map((m, idx) => {
+                {(data?.recentMovements || []).slice(0, 8).map((m, idx) => {
                   // Category Badge Colors
                   const catBadgeColors = {
                     Inward: 'bg-emerald-50 text-emerald-700 border-emerald-200',

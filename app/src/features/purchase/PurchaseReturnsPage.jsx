@@ -6,6 +6,7 @@ import { Button } from '../../components/ui/Button';
 import { Plus, RotateCcw, CheckCircle2, X, Ban, AlertCircle, Eye, Printer, MapPin } from 'lucide-react';
 import { PageHeader } from '../../components/common/PageHeader';
 import { PrintDebitNoteModal } from '../../components/common/PrintDebitNoteModal';
+import MasterSourceLink from '../../components/common/MasterSourceLink';
 const purchaseReturnGuide = {
     title: 'Purchase Returns & Debit Notes',
     subtitle: 'Supplier RMA, debit memo issuance, selective item returns, and payables write-down',
@@ -309,7 +310,10 @@ export const PurchaseReturnsPage = () => {
                 </div>
 
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Reason for Return / Rejection</label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block font-semibold text-slate-700">Reason for Return / Rejection</label>
+                    <MasterSourceLink source="returnReasons" />
+                  </div>
                   <input type="text" required value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. Shade mismatch, short width..." className="w-full border border-slate-300 rounded-lg p-2 bg-white text-slate-800"/>
                 </div>
 

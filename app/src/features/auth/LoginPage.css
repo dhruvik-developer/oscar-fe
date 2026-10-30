@@ -75,17 +75,107 @@
 .oscar-login__brandrow {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-bottom: 34px;
+  gap: 14px;
+  margin-bottom: 40px;
+}
+.oscar-login__brandtext {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 .oscar-login__brandname {
   font-family: 'Manrope', system-ui, sans-serif;
   font-weight: 700;
-  font-size: 13px;
-  letter-spacing: .24em;
+  font-size: 18px;
+  letter-spacing: .14em;
   text-transform: uppercase;
   color: #FFFFFF;
 }
+.oscar-login__brandsub {
+  font-size: 12px;
+  letter-spacing: .32em;
+  text-transform: uppercase;
+  color: #B8C6DD;
+}
+.oscar-login__rule {
+  display: block;
+  width: 56px;
+  height: 2px;
+  margin-bottom: 22px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, #2F8BF0, #7FD3FF);
+}
+.oscar-login__eyebrow {
+  margin: 0 0 22px;
+  font-size: 12px;
+  line-height: 1.9;
+  letter-spacing: .32em;
+  text-transform: uppercase;
+  color: #C9D4E6;
+}
+.oscar-login__pillars {
+  list-style: none;
+  margin: 44px 0 0;
+  padding: 0;
+  display: flex;
+  max-width: 480px;
+}
+.oscar-login__pillars li {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 8px;
+  padding: 4px 10px;
+  color: #FFFFFF;
+}
+.oscar-login__pillars li + li {
+  border-left: 1px solid rgba(255, 255, 255, .18);
+}
+.oscar-login__pillar-icon {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  margin-bottom: 4px;
+  border-radius: 999px;
+  border: 1px solid rgba(110, 170, 245, .45);
+  background: rgba(59, 142, 234, .12);
+  box-shadow: inset 0 0 0 4px rgba(10, 20, 40, .25);
+  transition: background .2s ease, border-color .2s ease, transform .2s ease;
+}
+.oscar-login__pillars li:hover .oscar-login__pillar-icon {
+  background: rgba(59, 142, 234, .28);
+  border-color: rgba(140, 190, 250, .8);
+  transform: translateY(-2px);
+}
+.oscar-login__pillar-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .22em;
+  text-transform: uppercase;
+  color: #FFFFFF;
+}
+.oscar-login__pillar-detail {
+  font-size: 11px;
+  line-height: 1.35;
+  color: #9FB0CC;
+}
+
+/* Hero content rises in, one line after another. */
+@keyframes oscar-login-rise {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: none; }
+}
+.oscar-login__hero > * {
+  animation: oscar-login-rise .7s cubic-bezier(.2, .7, .2, 1) both;
+}
+.oscar-login__hero > :nth-child(2) { animation-delay: .08s; }
+.oscar-login__hero > :nth-child(3) { animation-delay: .16s; }
+.oscar-login__hero > :nth-child(4) { animation-delay: .24s; }
+.oscar-login__hero > :nth-child(5) { animation-delay: .34s; }
+.oscar-login__hero > :nth-child(6) { animation-delay: .46s; }
 .oscar-login__headline {
   margin: 0 0 20px;
   font-family: 'Source Serif 4', Georgia, 'Times New Roman', serif;
@@ -97,7 +187,12 @@
   text-shadow: 0 2px 22px rgba(2, 8, 28, .75);
 }
 .oscar-login__headline span {
-  color: #6AA8F4;
+  color: #3B9BF0;
+  background: linear-gradient(90deg, #2F8BF0 0%, #5CB4FF 60%, #7FD3FF 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-shadow: none;
 }
 .oscar-login__tagline {
   margin: 0;
@@ -416,6 +511,16 @@ select.oscar-login__input option {
     justify-content: center;
     margin-bottom: 22px;
   }
+  .oscar-login__brandtext {
+    align-items: flex-start;
+  }
+  .oscar-login__rule {
+    margin-left: auto;
+    margin-right: auto;
+  }
+  .oscar-login__pillars {
+    margin: 28px auto 0;
+  }
   .oscar-login__side-col {
     justify-self: center;
   }
@@ -430,9 +535,156 @@ select.oscar-login__input option {
   .oscar-login__tagline {
     font-size: 16px;
   }
+  .oscar-login__pillars li {
+    padding: 4px 2px;
+  }
+  .oscar-login__pillar-label {
+    font-size: 9px;
+    letter-spacing: .14em;
+  }
+  .oscar-login__pillar-detail {
+    display: none;
+  }
+  .oscar-login__pillar-icon {
+    width: 40px;
+    height: 40px;
+  }
+}
+
+/* ── Input icons (dark look) ── */
+.oscar-login__icon {
+  position: absolute;
+  left: 14px;
+  top: 15px;
+  color: var(--ol-muted);
+  pointer-events: none;
+}
+.oscar-login__input--icon {
+  padding-left: 44px;
+}
+
+/* ── Light / Dark switch under the card ── */
+.oscar-login__look {
+  display: flex;
+  width: max-content;
+  margin: 16px auto 0;
+  padding: 3px;
+  gap: 2px;
+  border-radius: 999px;
+  background: rgba(10, 18, 34, .55);
+  border: 1px solid rgba(255, 255, 255, .16);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+.oscar-login__look button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  font-family: 'Manrope', system-ui, sans-serif;
+  font-weight: 600;
+  font-size: 12.5px;
+  color: #C9D4E6;
+  cursor: pointer;
+  transition: background .15s, color .15s;
+}
+.oscar-login__look button:hover {
+  color: #FFFFFF;
+}
+.oscar-login__look button.is-active {
+  background: #FFFFFF;
+  color: #0F1B33;
+}
+.oscar-login--dark .oscar-login__look button.is-active {
+  background: linear-gradient(90deg, #1E6BF0, #4FA8FF);
+  color: #FFFFFF;
+}
+.oscar-login__look button:focus-visible {
+  outline: 2px solid #7FD3FF;
+  outline-offset: 2px;
+}
+
+/* ── Dark look: a glass card over the photo ── */
+.oscar-login--dark {
+  --ol-text: #EEF3FF;
+  --ol-muted: #B3C2DC;
+  --ol-divider: rgba(255, 255, 255, .16);
+  --ol-accent: #5AB0FF;
+  --ol-gradient: linear-gradient(90deg, #1E6BF0 0%, #4FA8FF 60%, #86DBFF 100%);
+  --ol-focus: 0 0 0 4px rgba(90, 176, 255, .25);
+}
+.oscar-login--dark .oscar-login__card {
+  background: linear-gradient(160deg, rgba(36, 58, 96, .58) 0%, rgba(16, 28, 52, .62) 100%);
+  border: 1px solid rgba(150, 190, 245, .32);
+  box-shadow:
+    0 0 0 1px rgba(80, 150, 255, .08),
+    0 0 46px -12px rgba(59, 142, 234, .55),
+    0 34px 80px -24px rgba(0, 0, 0, .65);
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+}
+/* Same heading as the light card; only the colours change. */
+.oscar-login--dark .oscar-login__subtitle {
+  color: #D5DEEE;
+}
+.oscar-login--dark .oscar-login__input {
+  background: rgba(8, 16, 32, .42);
+  border-color: rgba(255, 255, 255, .2);
+  color: #FFFFFF;
+}
+.oscar-login--dark .oscar-login__input::placeholder {
+  color: #8FA2C2;
+}
+.oscar-login--dark .oscar-login__input:focus {
+  background: rgba(8, 16, 32, .6);
+  border-color: #5AB0FF;
+}
+.oscar-login--dark select.oscar-login__input option {
+  background: #13213C;
+  color: #FFFFFF;
+}
+.oscar-login--dark select.oscar-login__input:disabled {
+  color: #8FA2C2;
+}
+.oscar-login--dark .oscar-login__input:-webkit-autofill {
+  -webkit-text-fill-color: #FFFFFF;
+  -webkit-box-shadow: 0 0 0 40px #14223D inset;
+  caret-color: #FFFFFF;
+}
+.oscar-login--dark .oscar-login__toggle {
+  top: 7px;
+  display: inline-flex;
+  align-items: center;
+  color: #C9D4E6;
+}
+.oscar-login--dark .oscar-login__remember {
+  color: #E3EAF6;
+}
+.oscar-login--dark .oscar-login__remember input {
+  accent-color: #2F86F6;
+}
+.oscar-login--dark .oscar-login__submit {
+  box-shadow: 0 14px 30px -14px rgba(59, 142, 234, .95);
+}
+.oscar-login--dark .oscar-login__card-footer {
+  color: #D5DEEE;
+}
+.oscar-login--dark .oscar-login__card-footer .oscar-login__link {
+  color: #5AB0FF;
+  text-decoration-color: rgba(90, 176, 255, .5);
+}
+.oscar-login--dark .oscar-login__caps {
+  color: #FFC266;
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .oscar-login__hero > * {
+    animation: none !important;
+  }
   .oscar-login *,
   .oscar-login *::before,
   .oscar-login *::after {

@@ -68,7 +68,6 @@ export function SalesTab({ batch }) {
   const perms = batch.permissions || {};
   const uom = batch.quantities?.uom || 'm';
   const rows = batch.sales || [];
-  const own = batch.ownership === 'OSCAR';
   const sellable = rollsWhere(batch, (t) => inGodown(t) && t.status !== 'Reserved' && !t.bulk && ['Passed', 'Pass', 'Not Inspected'].includes(t.qcStatus));
   const sellableQty = sellable.reduce((s, t) => s + Number(t.availableQuantity), 0);
   const notInspected = sellable.filter((t) => t.qcStatus === 'Not Inspected').reduce((s, t) => s + Number(t.availableQuantity), 0);
@@ -76,23 +75,21 @@ export function SalesTab({ batch }) {
     <div className="space-y-4">
       <Card
         title="Sell fabric"
-        subtitle={own ? 'Sell from a delivery challan or invoice: pick or scan this batch in the line’s batch picker. QC is not required.' : 'Customer material is not sold; deliver it to its owner from the Overview tab.'}
-        actions={own && perms.sell ? (
+        subtitle="Sell from a delivery challan or invoice: pick or scan this batch in the line’s batch picker. QC is not required."
+        actions={perms.sell ? (
           <>
             <Link to="/sales/delivery" className={`${btnDark} inline-flex items-center`}>New delivery challan</Link>
             <Link to="/sales/invoices" className={`${btnGhost} inline-flex items-center`}>New invoice</Link>
           </>
         ) : null}
       >
-        {own && (
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-            <Stat label="Sellable now" value={sellableQty} uom={uom} tone="text-emerald-700" />
-            <Stat label="…of which not inspected" value={notInspected} uom={uom} />
-            <Stat label="Sold (net)" value={batch.quantities?.sold} uom={uom} />
-          </div>
-        )}
-        {own && <p className="mt-2 text-slate-600">Batch ID to pick / scan: <span className="font-mono font-bold text-slate-800">{batch.batchCode}</span></p>}
-        {own && Number(batch.quantities?.unregistered) > 0 && <div className="mt-2"><Notice kind="warn">{formatNumberIN(batch.quantities.unregistered)} {uom} is still bulk; register it as takas before selling.</Notice></div>}
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+          <Stat label="Sellable now" value={sellableQty} uom={uom} tone="text-emerald-700" />
+          <Stat label="…of which not inspected" value={notInspected} uom={uom} />
+          <Stat label="Sold (net)" value={batch.quantities?.sold} uom={uom} />
+        </div>
+        <p className="mt-2 text-slate-600">Batch ID to pick / scan: <span className="font-mono font-bold text-slate-800">{batch.batchCode}</span></p>
+        {Number(batch.quantities?.unregistered) > 0 && <div className="mt-2"><Notice kind="warn">{formatNumberIN(batch.quantities.unregistered)} {uom} is still bulk; register it as takas before selling.</Notice></div>}
       </Card>
       <Card title={`Sales & returns (${rows.length})`}>
         {rows.length === 0 ? <Empty>Nothing from this batch has been sold.</Empty> : (

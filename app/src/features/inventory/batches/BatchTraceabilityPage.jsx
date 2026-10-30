@@ -19,21 +19,16 @@ const STATUS_STYLE = {
   Blocked: 'bg-rose-50 text-rose-700 border-rose-200',
 };
 
-/**
- * Tabs of the Batch 360 screen; `count` shows how much each one holds.
- * `hidden` tabs are left out of the tab bar but still open from the
- * Overview actions (sell, send for dyeing ...); they show in the bar only
- * while open.
- */
+/** Tabs of the Batch 360 screen; `count` shows how much each one holds. */
 const TABS = [
   { key: 'overview', label: 'Overview' },
-  { key: 'stock', label: 'Quantity & Stock', hidden: true, count: (b) => (b.takas || []).filter((t) => Number(t.availableQuantity) > 0).length },
+  { key: 'stock', label: 'Quantity & Stock', count: (b) => (b.takas || []).filter((t) => Number(t.availableQuantity) > 0).length },
   { key: 'qc', label: 'QC', count: (b) => (b.qc?.results || []).length },
-  { key: 'production', label: 'Daily Production', hidden: true, count: (b) => (b.productionRuns || []).length },
-  { key: 'yarn', label: 'Yarn', hidden: true, count: (b) => (b.yarn?.issues || []).length + (b.yarn?.manual || []).length },
-  { key: 'dyeing', label: 'Dyeing & Job Work', hidden: true, count: (b) => (b.jobWork || []).length },
-  { key: 'sales', label: 'Sales', hidden: true, count: (b) => (b.sales || []).length },
-  { key: 'cost', label: 'Cost & Profit', hidden: true },
+  { key: 'production', label: 'Daily Production', count: (b) => (b.productionRuns || []).length },
+  { key: 'yarn', label: 'Yarn', count: (b) => (b.yarn?.issues || []).length + (b.yarn?.manual || []).length },
+  { key: 'dyeing', label: 'Dyeing & Job Work', count: (b) => (b.jobWork || []).length },
+  { key: 'sales', label: 'Sales', count: (b) => (b.sales || []).length },
+  { key: 'cost', label: 'Cost & Profit' },
   { key: 'documents', label: 'Documents', count: (b) => (b.documents || []).length },
   { key: 'history', label: 'History', count: (b) => (b.timeline || []).length },
 ];
@@ -86,9 +81,17 @@ export default function BatchTraceabilityPage() {
     }
   };
 
+  const handleBack = () => {
+    if (window.history.length > 1) {
+      navigate(-1);
+    } else {
+      navigate('/inventory/batches');
+    }
+  };
+
   const back = (
-    <button type="button" onClick={() => navigate('/inventory/batches')} className="h-9 px-3 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-600 hover:bg-slate-50 inline-flex items-center gap-1.5 cursor-pointer">
-      <ArrowLeft size={14} /> Batch Registry
+    <button type="button" onClick={handleBack} className="h-9 px-3 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-600 hover:bg-slate-50 inline-flex items-center gap-1.5 cursor-pointer">
+      <ArrowLeft size={14} /> Back to Batch Registry
     </button>
   );
 
@@ -108,6 +111,12 @@ export default function BatchTraceabilityPage() {
       <PageHeader
         title={batch.batchCode}
         subtitle={`${batch.item || 'Fabric'} · ${batch.fabricTypeLabel || 'Grey fabric'} · ${batch.origin} · created ${batch.createdOn}`}
+        breadcrumb={[
+          { label: 'Dashboard', path: '/dashboard' },
+          { label: 'Inventory', path: '/inventory/dashboard' },
+          { label: 'Batch Registry', path: '/inventory/batches' },
+          { label: batch.batchCode },
+        ]}
         titleExtra={(
           <>
             <span className={`ml-2 px-2 py-0.5 rounded-full border text-[11px] font-semibold ${STATUS_STYLE[batch.status] || 'bg-slate-50 text-slate-700 border-slate-200'}`}>{batch.status}</span>
@@ -136,7 +145,7 @@ export default function BatchTraceabilityPage() {
 
       <nav className="bg-white border border-slate-200 rounded-xl p-1 overflow-x-auto" aria-label="Batch sections">
         <div role="tablist" className="flex gap-1 min-w-max">
-          {TABS.filter((t) => !t.hidden || t.key === tab).map((t) => {
+          {TABS.map((t) => {
             const n = t.count ? t.count(batch) : null;
             const active = tab === t.key;
             return (

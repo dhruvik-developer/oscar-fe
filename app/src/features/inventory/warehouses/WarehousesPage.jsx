@@ -126,11 +126,8 @@ function StockTab({ warehouses, onChanged }) {
         <select value={f.groupBy} onChange={(e) => set('groupBy')(e.target.value)} className={input} aria-label="Group by">
           <option value="item">By item</option><option value="batch">By batch</option>
         </select>
-        <select value={f.ownership} onChange={(e) => set('ownership')(e.target.value)} className={input} aria-label="Ownership">
-          <option value="">All owners</option><option value="OSCAR">OSCAR stock</option><option value="CUSTOMER">Customer material</option>
-        </select>
         <label className="inline-flex items-center gap-1.5 font-semibold"><input type="checkbox" checked={!!f.lowStock} disabled={byBatch} onChange={(e) => set('lowStock')(e.target.checked ? '1' : '')} /> Low stock only</label>
-        <button type="button" onClick={() => setF({ warehouseId: '', itemId: '', search: '', groupBy: 'item', ownership: '', lowStock: '' })} className="h-9 px-3 rounded-lg border border-slate-200 font-semibold inline-flex items-center gap-1 cursor-pointer"><RotateCcw size={13} /> Reset</button>
+        <button type="button" onClick={() => setF({ warehouseId: '', itemId: '', search: '', groupBy: 'item', lowStock: '' })} className="h-9 px-3 rounded-lg border border-slate-200 font-semibold inline-flex items-center gap-1 cursor-pointer"><RotateCcw size={13} /> Reset</button>
         <button type="button" onClick={() => inventoryService.exportWarehouseStock(Object.fromEntries(Object.entries(f).filter(([, v]) => v))).catch((err) => setError(err.message))} className="ml-auto h-9 px-3 rounded-lg border border-slate-200 font-semibold inline-flex items-center gap-1 cursor-pointer"><Download size={13} /> Export CSV</button>
       </div>
       {error && <div role="alert" className="p-2.5 rounded-lg bg-rose-50 border border-rose-200 text-rose-700">{error}</div>}
@@ -140,13 +137,13 @@ function StockTab({ warehouses, onChanged }) {
             <tr>
               <th className="text-left p-2">Warehouse</th><th className="text-left p-2">Item</th>{byBatch && <th className="text-left p-2">Batch</th>}
               <th className="text-right p-2">Physical</th><th className="text-right p-2">Reserved</th><th className="text-right p-2">QC pending</th>
-              <th className="text-right p-2">Customer material</th><th className="text-right p-2">Available</th><th className="text-right p-2">Incoming (in transit)</th>
+              <th className="text-right p-2">Available</th><th className="text-right p-2">Incoming (in transit)</th>
               {!byBatch && <th className="text-right p-2">Minimum</th>}
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {loading && <tr><td colSpan={10} className="p-6 text-center text-slate-400">Loading…</td></tr>}
-            {!loading && shown.length === 0 && <tr><td colSpan={10} className="p-6 text-center text-slate-400">No stock matches these filters.</td></tr>}
+            {loading && <tr><td colSpan={9} className="p-6 text-center text-slate-400">Loading…</td></tr>}
+            {!loading && shown.length === 0 && <tr><td colSpan={9} className="p-6 text-center text-slate-400">No stock matches these filters.</td></tr>}
             {!loading && shown.map((r) => (
               <tr key={`${r.warehouseId}-${r.itemId}-${r.batchCode || ''}`} className={r.lowStock ? 'bg-amber-50/60' : ''}>
                 <td className="p-2 font-semibold">{r.warehouseName}<div className="text-[10px] text-slate-400 font-mono">{r.warehouseCode}</div></td>
@@ -155,7 +152,6 @@ function StockTab({ warehouses, onChanged }) {
                 <td className="p-2 text-right tabular-nums">{n(r.physical)} {r.uom}</td>
                 <td className="p-2 text-right tabular-nums">{n(r.reserved)}</td>
                 <td className="p-2 text-right tabular-nums">{n(r.qcPending)}</td>
-                <td className="p-2 text-right tabular-nums">{n(r.customerOwned)}</td>
                 <td className="p-2 text-right tabular-nums font-bold">{n(r.available)}</td>
                 <td className="p-2 text-right tabular-nums">{n(r.inTransit)}</td>
                 {!byBatch && (
@@ -312,7 +308,7 @@ function WarehouseForm({ initial, onClose, onDone }) {
   return (
     <Modal title={isNew ? 'Add warehouse' : `Edit ${initial.name}`} onClose={onClose}>
       <form onSubmit={submit} className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        {field('code', isNew ? 'Warehouse code (auto if blank)' : 'Warehouse code', { disabled: !isNew, placeholder: isNew ? 'Auto from name, e.g. WH-SURAT' : '' })}
+        {field('code', 'Warehouse code *', { required: true, disabled: !isNew, placeholder: 'e.g. WH-SURAT' })}
         {field('name', 'Warehouse name *', { required: true })}
         <div className="sm:col-span-2">{field('address', 'Address')}</div>
         {field('city', 'City')}

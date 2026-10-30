@@ -3183,6 +3183,12 @@ export const ERPProvider = ({ children, }) => {
             projectId: po.projectId || undefined,
             items: poLines,
             notes: po.notes || '',
+            ...(po.fabricFlow ? {
+                fabricFlow: po.fabricFlow,
+                dyeingMillId: po.dyeingMillId || undefined,
+                yarnLines: po.yarnLines || [],
+                expenses: po.expenses || [],
+            } : {}),
         }, setPurchaseOrders, { label: 'Purchase Order' });
         showToast(`Purchase Order ${saved.poNumber} saved.`);
         return saved;

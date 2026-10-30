@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
+import SearchableCombobox from '../../../components/common/SearchableCombobox';
 import { Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Copy, FileText, Menu, MoreHorizontal, Pencil, Plus, Trophy, Upload, X } from 'lucide-react';
+import { ArrowLeft, Copy, FileText, Menu, MoreHorizontal, Pencil, Plus, Trophy, Upload, X, XCircle } from 'lucide-react';
 import Modal from '../../../components/ui/Modal';
 import { useERP } from '../../../context/ERPContext';
 import { loadCrmTasks, saveCrmTasks, CRM_EVENT } from '../../../services/leadStageAutomation';
@@ -68,24 +69,54 @@ const serverDealActivityToRow = (r) => ({
   type: 'activity',
 });
 
-const serverDealTaskToRow = (t, dealId) => ({
+const serverDealTaskToRow = (t) => ({
   id: `srv-${t.id}`,
   serverTaskId: t.id,
   title: t.title || '',
-  dealId,
+  dealId: t.dealId || t.deal || undefined,
+  leadId: t.leadId || t.lead || undefined,
   owner: t.assigneeName || t.owner || 'Unassigned',
   dueDate: t.dueDate || '',
   priority: t.priority || 'Medium',
   status: t.status || 'Open',
-  source: 'Deal',
+  source: t.source || 'Deal',
   description: t.description || '',
   updatedAt: t.updatedAt || new Date().toISOString(),
 });
 
-export default function DealDetailView({ deal, onEdit, onNotify, onUpdate, onDuplicate, onDelete }) {
+const serverTaskId = (task) => task?.serverTaskId || (isServerId(task?.id) ? task.id : undefined);
+
+export default function DealDetailView({ deal, onEdit, onNotify, onUpdate, onDuplicate, onMoveStage }) {
   const navigate = useNavigate();
-  const { quotations, customers } = useERP();
+  const { quotations, customers, items = [] } = useERP();
+  // Products offered on a deal: the fabrics in the item master (any other
+  // stock item when there are no fabrics yet). A typed name still works.
+  const productItems = (() => {
+    const live = items.filter((i) => i && i.name && i.isActive !== false && i.itemKind !== 'Service');
+    const fabrics = live.filter((i) => /fabric/i.test(i.itemKind || '') || ['LOT', 'TAKA'].includes(String(i.trackingType || '').toUpperCase()));
+    return (fabrics.length ? fabrics : live).slice().sort((a, b) => a.name.localeCompare(b.name));
+  })();
+  const productOptions = productItems.map((i) => ({ id: i.id, label: i.name, meta: [i.sku, i.fabricQuality, i.uom].filter(Boolean).join(' · ') }));
+  const pickProductName = (title) => {
+    const match = productItems.find((i) => i.name.toLowerCase() === title.trim().toLowerCase());
+    if (!match) {
+      setEditor((current) => ({ ...current, title, itemId: undefined }));
+      return;
+    }
+    const details = [match.fabricQuality, match.fabricGsm ? `${match.fabricGsm} GSM` : '', match.hsnCode ? `HSN ${match.hsnCode}` : ''].filter(Boolean).join(' · ');
+    setEditor((current) => ({
+      ...current,
+      title: match.name,
+      itemId: match.id,
+      unit: match.uom || current.unit,
+      rate: Number(match.sellingPrice) > 0 ? match.sellingPrice : current.rate,
+      description: current.description || details,
+    }));
+  };
   const currentUser = useAppStore((state) => state.currentUser);
+  const sourceLead = useCrmStore((state) => (
+    (state.leads || []).find((lead) => deal?.leadId != null && String(lead.id) === String(deal.leadId))
+  ));
   const [tab, setTab] = useState('Overview');
   const [tasks, setTasks] = useState(loadCrmTasks);
   const [editor, setEditor] = useState(null);
@@ -94,6 +125,34 @@ export default function DealDetailView({ deal, onEdit, onNotify, onUpdate, onDup
   // Latest deal rows for server-id remaps after optimistic saves resolve.
   const dealRef = useRef(deal);
   dealRef.current = deal;
+
+  const handleMarkLost = () => {
+    if (deal.stage === 'Lost') {
+      onNotify?.('Deal is already marked as Lost.');
+      return;
+    }
+    if (onMoveStage) {
+      onMoveStage(deal.id, 'Lost');
+    } else {
+      onUpdate?.({ stage: 'Lost', tag: 'Lost' });
+      onNotify?.(`Deal "${deal.name}" marked as Lost and moved to Lost deals.`);
+    }
+    navigate('/crm/deals');
+  };
+
+  const handleMarkWon = () => {
+    if (deal.stage === 'Won') {
+      onNotify?.('Deal is already marked as Won.');
+      return;
+    }
+    if (onMoveStage) {
+      onMoveStage(deal.id, 'Won');
+    } else {
+      onUpdate?.({ stage: 'Won', tag: 'Won' });
+      onNotify?.(`Deal "${deal.name}" marked as Won!`);
+    }
+    navigate('/crm/deals');
+  };
   // The floating "Menu" button drives the app-wide mobile navigation drawer
   // (backdrop, Escape and route-change dismissal live in MainLayout).
   const navigationOpen = useAppStore((state) => state.mobileSidebarOpen);
@@ -101,8 +160,13 @@ export default function DealDetailView({ deal, onEdit, onNotify, onUpdate, onDup
   useEffect(() => {
     const sync = () => setTasks(loadCrmTasks());
     window.addEventListener(CRM_EVENT, sync);
+    window.addEventListener('crm:data-updated', sync);
     window.addEventListener('storage', sync);
-    return () => { window.removeEventListener(CRM_EVENT, sync); window.removeEventListener('storage', sync); };
+    return () => {
+      window.removeEventListener(CRM_EVENT, sync);
+      window.removeEventListener('crm:data-updated', sync);
+      window.removeEventListener('storage', sync);
+    };
   }, []);
   // Backend-first for the workspace tabs: rows already saved under this deal
   // load here (matched by their server ids), so a refresh keeps everything.
@@ -140,12 +204,11 @@ export default function DealDetailView({ deal, onEdit, onNotify, onUpdate, onDup
         }
         if (dealTasks.length) {
           setTasks((prev) => {
-            const known = new Set(prev.map((t) => t.serverTaskId).filter(Boolean));
+            const known = new Set(prev.map((t) => String(t.serverTaskId || String(t.id).replace(/^srv-/, ''))));
             const incoming = dealTasks
               .filter((r) => r?.id && !known.has(String(r.id)))
-              .map((r) => serverDealTaskToRow(r, deal.id));
+              .map(serverDealTaskToRow);
             if (!incoming.length) return prev;
-            saveCrmTasks([...incoming, ...prev]);
             return [...incoming, ...prev];
           });
         }
@@ -160,9 +223,25 @@ export default function DealDetailView({ deal, onEdit, onNotify, onUpdate, onDup
   const activities = deal.activities || [];
   const documents = deal.documents || [];
   const contracts = deal.contracts || [];
-  const linkedTasks = tasks.filter((task) => String(task.dealId) === String(deal.id));
+  const linkedTasks = tasks.filter((task) => {
+    const matchDeal = task.dealId && (
+      String(task.dealId) === String(deal.id) ||
+      String(task.dealId) === String(deal.dealNumber)
+    );
+    const matchLead = deal.leadId && task.leadId && (
+      String(task.leadId) === String(deal.leadId) ||
+      String(task.leadId) === String(deal.leadNumber)
+    );
+    return matchDeal || matchLead;
+  });
   const linkedQuotes = quotations.filter((quote) => String(quote.dealId) === String(deal.id) || quote.dealReference === (deal.dealNumber || deal.id));
   const customer = customers.find((item) => String(item.id) === String(deal.customerId || deal.partyId) || item.name === deal.client);
+  const displayClient = deal.client || customer?.name || sourceLead?.company || sourceLead?.name;
+  const displayContact = deal.contactPerson || sourceLead?.customValues?.contactPerson || sourceLead?.name;
+  const displayEmail = deal.email || customer?.email || sourceLead?.email;
+  const displayPhone = deal.phone || customer?.phone || sourceLead?.phone;
+  const displaySource = deal.source || sourceLead?.source;
+  const displayOwner = deal.assignedUser || deal.owner || sourceLead?.owner;
   const actor = currentUser?.name || currentUser?.fullName || 'CRM User';
   const openEditor = (type, values = {}) => { setError(''); setEditor({ type, ...values }); };
   const notifyFailure = (failure) => onNotify(failure.message || 'Unable to save changes.');
@@ -189,7 +268,19 @@ export default function DealDetailView({ deal, onEdit, onNotify, onUpdate, onDup
       if (!title) throw new Error('Enter a title.');
       if (editor.type === 'Task') {
         const existing = loadCrmTasks();
-        const task = { ...(editor.id ? existing.find((item) => item.id === editor.id) : {}), id: editor.id || `task-${crypto.randomUUID()}`, title, dealId: deal.id, owner: editor.owner || deal.assignedUser || 'Unassigned', dueDate: editor.dueDate, priority: editor.priority || 'Medium', status: editor.status || 'Open', source: 'Deal', updatedAt: new Date().toISOString() };
+        const task = {
+          ...(editor.id ? tasks.find((item) => item.id === editor.id) || existing.find((item) => item.id === editor.id) : {}),
+          id: editor.id || `task-${crypto.randomUUID()}`,
+          title,
+          dealId: deal.id,
+          leadId: deal.leadId || undefined,
+          owner: editor.owner || deal.assignedUser || 'Unassigned',
+          dueDate: editor.dueDate,
+          priority: editor.priority || 'Medium',
+          status: editor.status || 'Open',
+          source: 'Deal',
+          updatedAt: new Date().toISOString(),
+        };
         if (!task.createdAt) task.createdAt = task.updatedAt;
         if (task.status === 'Completed') {
           task.completedAt ||= task.updatedAt;
@@ -198,7 +289,9 @@ export default function DealDetailView({ deal, onEdit, onNotify, onUpdate, onDup
           delete task.completedAt;
           delete task.completedBy;
         }
-        if (!saveCrmTasks(editor.id ? existing.map((item) => item.id === editor.id ? task : item) : [task, ...existing])) throw new Error('Task could not be saved.');
+        setTasks((prev) => editor.id
+          ? prev.map((item) => item.id === editor.id ? task : item)
+          : [task, ...prev]);
         if (backendDealOn(deal)) {
           const store = useCrmStore.getState();
           const member = (store.teamMembers || []).find((m) => m.name === task.owner);
@@ -206,30 +299,44 @@ export default function DealDetailView({ deal, onEdit, onNotify, onUpdate, onDup
             title: task.title,
             description: task.description || undefined,
             dealId: deal.id,
+            leadId: isServerId(deal.leadId) ? deal.leadId : undefined,
             assigneeId: member && isServerId(member.id) ? member.id : undefined,
             dueDate: task.dueDate || undefined,
             priority: task.priority || 'Medium',
             status: task.status || 'Open',
           };
-          const req = task.serverTaskId
-            ? store.updateTask(task.serverTaskId, payload)
+          const taskId = serverTaskId(task);
+          const req = taskId
+            ? store.updateTask(taskId, payload)
             : store.createTask(payload);
           req.then((saved) => {
             if (saved?.id) {
-              saveCrmTasks(loadCrmTasks().map((t) => (t.id === task.id ? { ...t, serverTaskId: saved.id } : t)));
+              setTasks((prev) => prev.map((item) => (
+                item.id === task.id
+                  ? { ...item, serverTaskId: saved.id, dealId: saved.dealId || deal.id, leadId: saved.leadId || deal.leadId }
+                  : item
+              )));
+              window.dispatchEvent(new Event(CRM_EVENT));
+              window.dispatchEvent(new Event('crm:data-updated'));
             }
           }).catch((err) => console.warn('[CRM] deal task not saved:', err?.message || err));
+        } else if (!saveCrmTasks(editor.id
+          ? existing.map((item) => item.id === editor.id ? task : item)
+          : [task, ...existing])) {
+          throw new Error('Task could not be saved.');
         }
+        window.dispatchEvent(new Event(CRM_EVENT));
+        window.dispatchEvent(new Event('crm:data-updated'));
         setTab('Tasks');
         onNotify(editor.id ? 'Task updated.' : 'Task created and linked to this deal.');
       } else if (editor.type === 'Product') {
-        const item = { ...(products.find((product) => product.id === editor.id) || {}), id: editor.id || crypto.randomUUID(), name: title, description: editor.description || '', details: editor.description || '', qty: Number(editor.qty), rate: Number(editor.rate), unit: editor.unit || 'Qty' };
+        const item = { ...(products.find((product) => product.id === editor.id) || {}), id: editor.id || crypto.randomUUID(), name: title, itemId: editor.itemId || undefined, description: editor.description || '', details: editor.description || '', qty: Number(editor.qty), rate: Number(editor.rate), unit: editor.unit || 'Qty' };
         if (!Number.isFinite(item.qty) || item.qty <= 0 || !Number.isFinite(item.rate) || item.rate < 0) throw new Error('Enter a positive quantity and a valid rate.');
         const updated = editor.id ? products.map((product) => product.id === editor.id ? item : product) : [...products, item];
         const totals = dealTotals(updated, deal.discount, deal.taxRate);
         save({ products: updated, discount: totals.discount, price: totals.total }, 'Products and deal value updated');
         if (backendDealOn(deal)) {
-          const payload = { name: item.name, description: item.description || '', qty: item.qty, rate: item.rate, unit: item.unit || 'Qty' };
+          const payload = { name: item.name, itemId: item.itemId || null, description: item.description || '', qty: item.qty, rate: item.rate, unit: item.unit || 'Qty' };
           const req = item.serverLineId
             ? crmService.updateDealLine(deal.id, item.serverLineId, payload)
             : crmService.addDealLine(deal.id, payload);
@@ -310,11 +417,18 @@ export default function DealDetailView({ deal, onEdit, onNotify, onUpdate, onDup
             .catch((err) => console.warn('[CRM] deal document not deleted:', err?.message || err));
         }
       } else {
-        if (!saveCrmTasks(loadCrmTasks().filter((item) => item.id !== removal.item.id))) throw new Error('Task could not be removed.');
-        if (backendDealOn(deal) && removal.item.serverTaskId) {
-          useCrmStore.getState().deleteTask(removal.item.serverTaskId)
+        const taskId = serverTaskId(removal.item);
+        setTasks((prev) => prev.filter((item) => (
+          item.id !== removal.item.id && (!taskId || serverTaskId(item) !== taskId)
+        )));
+        if (backendDealOn(deal) && taskId) {
+          useCrmStore.getState().deleteTask(taskId)
             .catch((err) => console.warn('[CRM] deal task not deleted:', err?.message || err));
+        } else if (!saveCrmTasks(loadCrmTasks().filter((item) => item.id !== removal.item.id))) {
+          throw new Error('Task could not be removed.');
         }
+        window.dispatchEvent(new Event(CRM_EVENT));
+        window.dispatchEvent(new Event('crm:data-updated'));
         onNotify('Task removed');
       }
       setRemoval(null);
@@ -327,24 +441,28 @@ export default function DealDetailView({ deal, onEdit, onNotify, onUpdate, onDup
   return <div className="crm-deal-detail">
     <button type="button" className="deal-mobile-menu btn-outline btn-sm" aria-label={navigationOpen ? 'Close navigation' : 'Open navigation'} aria-expanded={navigationOpen} onClick={toggleNavigation}>{navigationOpen ? <X size={16} /> : <Menu size={16} />}Menu</button>
       <>
-        <header className="deal-detail-header"><nav aria-label="Breadcrumb"><Link to="/crm/deals">CRM</Link><span> / </span><Link to="/crm/deals">Deals</Link><span> / {deal.dealNumber || deal.id}</span></nav><div className="deal-detail-heading"><div><p className="deal-eyebrow">Deal Detail</p><h1>{deal.name}</h1><div className="deal-detail-subtitle"><span>{deal.dealNumber || deal.id}</span><span className="deal-stage" data-won={deal.stage === 'Won'}>{deal.stage}</span>{deal.stage === 'Won' && <Trophy size={18} className="text-amber-500" />}<span>{deal.client}</span></div></div><div className="deal-header-actions"><button className="btn-outline btn-sm" onClick={() => onEdit(deal)}><Pencil size={14} />Edit</button><button className="btn-outline btn-sm" onClick={() => { try { onDuplicate(deal); } catch (failure) { notifyFailure(failure); } }}><Copy size={14} />Duplicate</button><details className="deal-more"><summary className="btn-outline btn-sm"><MoreHorizontal size={15} />More</summary><div><Link to="/crm/deals"><ArrowLeft size={14} />Back to Deals</Link><button onClick={() => onDelete(deal)}>Delete Deal</button></div></details></div></div></header>
-        <div className="deal-detail-tabs" role="tablist" aria-label="Deal sections">{['Overview', 'Products', 'Activities', 'Documents', 'Quotations', 'Tasks', 'Related'].map((name) => {
+        <header className="deal-detail-header"><nav aria-label="Breadcrumb"><Link to="/crm/deals">CRM</Link><span> / </span><Link to="/crm/deals">Deals</Link><span> / {deal.dealNumber || deal.id}</span></nav><div className="deal-detail-heading"><div><p className="deal-eyebrow">Deal Detail</p><h1>{deal.name}</h1><div className="deal-detail-subtitle"><span>{deal.dealNumber || deal.id}</span><span className="deal-stage" data-won={deal.stage === 'Won'} data-lost={deal.stage === 'Lost'}>{deal.stage}</span>{deal.stage === 'Won' && <Trophy size={18} className="text-amber-500" />}<span>{displayClient}</span></div></div><div className="deal-header-actions"><button className="btn-outline btn-sm" onClick={() => onEdit(deal)}><Pencil size={14} />Edit</button><button className="btn-outline btn-sm" onClick={() => { try { onDuplicate(deal); } catch (failure) { notifyFailure(failure); } }}><Copy size={14} />Duplicate</button><details className="deal-more"><summary className="btn-outline btn-sm"><MoreHorizontal size={15} />More</summary><div><Link to="/crm/deals"><ArrowLeft size={14} />Back to Deals</Link>{deal.stage !== 'Lost' && <button type="button" onClick={handleMarkLost} className="text-rose-600 hover:text-rose-700 hover:bg-rose-50 flex items-center gap-2 cursor-pointer"><XCircle size={14} className="text-rose-500" /><span>Lost Deal</span></button>}{deal.stage !== 'Won' && <button type="button" onClick={handleMarkWon} className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 flex items-center gap-2 cursor-pointer"><Trophy size={14} className="text-emerald-500" /><span>Won Deal</span></button>}</div></details></div></div></header>
+        <div className="deal-detail-tabs" role="tablist" aria-label="Deal sections">{['Overview', 'Products', 'Activities', 'Documents', /* 'Quotations', -- tab hidden for now */ 'Tasks', 'Related'].map((name) => {
           const count = { Products: products.length, Activities: activities.length, Documents: documents.length, Quotations: linkedQuotes.length, Tasks: linkedTasks.length, Related: contracts.length + Number(deal.leadId != null) + Number(Boolean(customer || deal.client)) }[name];
           return <button key={name} id={`deal-tab-${name}`} role="tab" aria-selected={tab === name} aria-controls="deal-tab-panel" tabIndex={tab === name ? 0 : -1} onKeyDown={(event) => { if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return; event.preventDefault(); const buttons = [...event.currentTarget.parentElement.children]; const next = event.key === 'Home' ? 0 : event.key === 'End' ? buttons.length - 1 : (buttons.indexOf(event.currentTarget) + (event.key === 'ArrowRight' ? 1 : -1) + buttons.length) % buttons.length; buttons[next].focus(); buttons[next].click(); }} onClick={() => setTab(name)}>{name}{count != null && <span>{count}</span>}</button>;
         })}</div>
         <div role="tabpanel" id="deal-tab-panel" aria-labelledby={`deal-tab-${tab}`}>
-          {tab === 'Overview' && <div className="deal-overview-grid"><Panel title="Deal Information"><dl className="deal-info-list">{[['Customer', deal.client], ['Contact Person', deal.contactPerson], ['Email', deal.email ? <a href={`mailto:${deal.email}`}>{deal.email}</a> : null], ['Phone', deal.phone ? <a href={`tel:${deal.phone}`}>{deal.phone}</a> : null], ['Deal Value', money(deal.price)], ['Expected Close Date', date(deal.expectedCloseDate || deal.date)], ['Source', deal.source], ['Owner', deal.assignedUser || deal.owner], ['Team', deal.team], ['Stage', deal.stage]].map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value || 'Not specified'}</dd></div>)}</dl></Panel><div className="deal-detail-stack"><Panel title="Summary" action={<button aria-label="Edit summary" onClick={() => openEditor('Summary', { title: deal.description || deal.notes || '' })}><Pencil size={14} /></button>}><p className="deal-summary-text">{deal.description || deal.notes || 'Add a summary of the customer requirements and next steps.'}</p></Panel><Panel title={`Products (${products.length})`} action={<button className="deal-text-action" onClick={() => openEditor('Product', { qty: 1, rate: 0 })}><Plus size={14} />Add</button>}>{productTable}</Panel></div><div className="deal-detail-stack"><Panel title="Quick Actions"><div className="deal-quick-actions"><button className="btn-outline btn-sm" onClick={createQuote}><FileText size={16} />Create Quotation</button><button className="btn-outline btn-sm" onClick={() => openEditor('Contract', { title: `${deal.name} — contract` })}><FileText size={16} />Create Contract</button><button className="btn-outline btn-sm" onClick={() => openEditor('Task', { owner: deal.assignedUser })}><Plus size={16} />Add Task</button></div></Panel><Panel title="Related Information">{related}</Panel></div></div>}
+          {tab === 'Overview' && <div className="deal-overview-grid"><Panel title="Deal Information"><dl className="deal-info-list">{[['Customer', displayClient], ['Contact Person', displayContact], ['Email', displayEmail ? <a href={`mailto:${displayEmail}`}>{displayEmail}</a> : null], ['Phone', displayPhone ? <a href={`tel:${displayPhone}`}>{displayPhone}</a> : null], ['Deal Value', money(deal.price)], ['Expected Close Date', date(deal.expectedCloseDate || deal.date)], ['Source', displaySource], ['Owner', displayOwner], ['Team', deal.team], ['Stage', deal.stage]].map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value || 'Not specified'}</dd></div>)}</dl></Panel><div className="deal-detail-stack"><Panel title="Summary" action={<button aria-label="Edit summary" onClick={() => openEditor('Summary', { title: deal.description || deal.notes || '' })}><Pencil size={14} /></button>}><p className="deal-summary-text">{deal.description || deal.notes || 'Add a summary of the customer requirements and next steps.'}</p></Panel><Panel title={`Products (${products.length})`} action={<button className="deal-text-action" onClick={() => openEditor('Product', { qty: 1, rate: 0 })}><Plus size={14} />Add</button>}>{productTable}</Panel></div><div className="deal-detail-stack">{/* Quick Actions hidden for now:
+            <Panel title="Quick Actions"><div className="deal-quick-actions"><button className="btn-outline btn-sm" onClick={createQuote}><FileText size={16} />Create Quotation</button><button className="btn-outline btn-sm" onClick={() => openEditor('Contract', { title: `${deal.name} — contract` })}><FileText size={16} />Create Contract</button><button className="btn-outline btn-sm" onClick={() => openEditor('Task', { owner: deal.assignedUser })}><Plus size={16} />Add Task</button></div></Panel>
+          */}<Panel title="Related Information">{related}</Panel></div></div>}
           {tab === 'Products' && <Panel title={`Products (${products.length})`} action={<button className="btn-primary btn-sm" onClick={() => openEditor('Product', { qty: 1, rate: 0 })}><Plus size={14} />Add Product</button>}>{productTable}</Panel>}
           {tab === 'Activities' && <Panel title="Activities" action={<button className="btn-primary btn-sm" onClick={() => openEditor('Activity')}><Plus size={14} />Add Activity</button>}><ActivitiesTimeline activities={activities} /></Panel>}
           {tab === 'Documents' && <Panel title={`Documents (${documents.length})`} action={<label className="btn-primary btn-sm cursor-pointer"><Upload size={14} />Upload Document<input aria-label="Upload document" type="file" className="sr-only" onChange={upload} /></label>}><DocumentsTable documents={documents} onRemove={(item) => setRemoval({ type: 'Document', item })} /><p className="deal-action-hint">Maximum file size: 2 MB.</p></Panel>}
+          {/* Quotations tab hidden for now:
           {tab === 'Quotations' && <Panel title={`Quotations (${linkedQuotes.length})`} action={<button className="btn-primary btn-sm" onClick={createQuote}><Plus size={14} />Create Quotation</button>}><QuotationsTable quotations={linkedQuotes} /></Panel>}
+          */}
           {tab === 'Tasks' && <Panel title={`Tasks (${linkedTasks.length})`} action={<button className="btn-primary btn-sm" onClick={() => openEditor('Task', { owner: deal.assignedUser })}><Plus size={14} />Add Task</button>}><TasksTable tasks={linkedTasks} onEdit={(task) => openEditor('Task', task)} onRemove={(item) => setRemoval({ type: 'Task', item })} /></Panel>}
           {tab === 'Related' && <div className="deal-detail-stack"><Panel title="Related Records"><RelatedCards deal={deal} customer={customer} /></Panel><Panel title="Contract Drafts" action={<button className="btn-primary btn-sm" onClick={() => openEditor('Contract', { title: `${deal.name} — contract` })}><Plus size={14} />Create Contract</button>}>{contracts.length ? <ul className="deal-record-list">{contracts.map((contract) => <li key={contract.id}><FileText size={18} /><div><strong>{contract.title}</strong><p>{contract.status} · {date(contract.createdAt)}</p><p className="whitespace-pre-wrap">{contract.terms}</p><a download={`${contract.title}.txt`} href={`data:text/plain;charset=utf-8,${encodeURIComponent(`${contract.title}\nDeal: ${deal.dealNumber || deal.id}\nCustomer: ${deal.client}\nStatus: Draft\n\n${contract.terms}`)}`}>Download draft</a></div></li>)}</ul> : <Empty>No contract drafts created yet.</Empty>}</Panel></div>}
         </div>
       </>
     <Modal isOpen={Boolean(removal)} onClose={() => setRemoval(null)} title={`Remove ${removal?.type || 'record'}`} footer={<><button className="btn-outline btn-sm" onClick={() => setRemoval(null)}>Cancel</button><button className="btn-primary btn-sm" onClick={removeRecord}>Remove</button></>}><p className="text-sm">Remove {removal?.item.name || removal?.item.title} from this deal?</p></Modal>
     <Modal isOpen={Boolean(editor)} onClose={() => setEditor(null)} title={editor ? `${editor.type === 'Summary' || editor.id ? 'Edit' : 'Add'} ${editor.type}` : ''}>
-      {editor && <form onSubmit={submit} className="deal-detail-form">{editor.type !== 'Pricing' && <label>{editor.type === 'Product' ? 'Product name' : editor.type === 'Summary' ? 'Summary' : 'Title'} *{['Activity', 'Summary'].includes(editor.type) ? <textarea autoFocus required rows={4} value={editor.title || ''} onChange={(event) => setEditor({ ...editor, title: event.target.value })} /> : <input autoFocus required value={editor.title || ''} onChange={(event) => setEditor({ ...editor, title: event.target.value })} />}</label>}
+      {editor && <form onSubmit={submit} className="deal-detail-form">{editor.type !== 'Pricing' && <label>{editor.type === 'Product' ? 'Product name' : editor.type === 'Summary' ? 'Summary' : 'Title'} *{['Activity', 'Summary'].includes(editor.type) ? <textarea autoFocus required rows={4} value={editor.title || ''} onChange={(event) => setEditor({ ...editor, title: event.target.value })} /> : editor.type === 'Product' ? <><SearchableCombobox autoFocus required ariaLabel="Product name" placeholder="Search a fabric or type a product name" value={editor.title || ''} selectedId={editor.itemId} onChange={pickProductName} onSelect={(o) => pickProductName(o.label)} options={productOptions} emptyText="No fabric matches — the name you typed will be used." />{editor.itemId ? <small className="deal-form-hint">From the item master — unit and rate filled in; you can change them.</small> : productItems.length > 0 && <small className="deal-form-hint">{productItems.length} fabrics available — start typing to pick one.</small>}</> : <input autoFocus required value={editor.title || ''} onChange={(event) => setEditor({ ...editor, title: event.target.value })} />}</label>}
         {editor.type === 'Product' && <><label>Description<textarea rows={2} value={editor.description || ''} onChange={(event) => setEditor({ ...editor, description: event.target.value })} /></label><div className="deal-form-grid">{[['qty', 'Quantity', 'number'], ['rate', 'Rate (₹)', 'number'], ['unit', 'Unit', 'text']].map(([key, label, type]) => <label key={key}>{label}<input required={key !== 'unit'} type={type} min={key === 'qty' ? '0.001' : '0'} step="any" value={editor[key] ?? ''} onChange={(event) => setEditor({ ...editor, [key]: event.target.value })} /></label>)}</div></>}
         {editor.type === 'Task' && <><label>Assigned to<input value={editor.owner || ''} onChange={(event) => setEditor({ ...editor, owner: event.target.value })} /></label><div className="deal-form-grid"><label>Due date *<input required type="date" value={editor.dueDate || ''} onChange={(event) => setEditor({ ...editor, dueDate: event.target.value })} /></label><label>Priority<select value={editor.priority || 'Medium'} onChange={(event) => setEditor({ ...editor, priority: event.target.value })}>{['Low', 'Medium', 'High', 'Urgent'].map((priority) => <option key={priority}>{priority}</option>)}</select></label></div><label>Status<select value={editor.status || 'Open'} onChange={(event) => setEditor({ ...editor, status: event.target.value })}>{['Open', 'In Progress', 'Waiting', 'Completed'].map((status) => <option key={status}>{status}</option>)}</select></label></>}
         {editor.type === 'Pricing' && <div className="deal-form-grid"><label>Discount (₹)<input aria-label="Discount" type="number" min="0" step="0.01" value={editor.discount} onChange={(event) => setEditor({ ...editor, discount: event.target.value })} /></label><label>Tax (%)<input aria-label="Tax rate" type="number" min="0" max="100" step="0.01" value={editor.taxRate} onChange={(event) => setEditor({ ...editor, taxRate: event.target.value })} /></label></div>}

@@ -41,7 +41,7 @@ export function CustomerReceiptModal({ onClose, onDone }) {
     <div className="fixed inset-0 z-[1000] bg-slate-900/50 flex items-center justify-center p-3" onMouseDown={(e) => { if (e.target === e.currentTarget && !saving) onClose(); }}>
       <form onSubmit={submit} role="dialog" aria-modal="true" aria-labelledby="cust-receipt-title" className="bg-white rounded-2xl shadow-2xl w-full max-w-lg text-xs">
         <div className="flex items-center justify-between px-5 py-3 border-b border-slate-200">
-          <h3 id="cust-receipt-title" className="text-sm font-bold">Receive customer material</h3>
+          <h3 id="cust-receipt-title" className="text-sm font-bold">Receive fabric batch</h3>
           <button type="button" onClick={onClose} disabled={saving} aria-label="Close" className="p-1.5 rounded-lg hover:bg-slate-100 cursor-pointer"><X size={16} /></button>
         </div>
         <div className="px-5 py-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -74,7 +74,7 @@ export function CustomerReceiptModal({ onClose, onDone }) {
               <input required value={form.rolls} onChange={(e) => setForm({ ...form, rolls: e.target.value })} placeholder="Metres per taka, e.g. 102, 98.5, 110" className={inputCls} aria-label="Metres per taka" />
             )}
           </fieldset>
-          <p className="sm:col-span-2 text-[11px] text-slate-500">Customer material is held, not owned: it gets its own batch and QR tag, but adds nothing to OSCAR&apos;s stock value or books, and cannot be sold.</p>
+          <p className="sm:col-span-2 text-[11px] text-slate-500">Fabric batch receives its own batch and QR tag for tracking.</p>
           {error && <div role="alert" className="sm:col-span-2 p-2.5 rounded-lg bg-rose-50 border border-rose-200 text-rose-700">{error}</div>}
         </div>
         <div className="flex justify-end gap-2 px-5 py-3 border-t border-slate-200">
@@ -124,7 +124,7 @@ export function PhysicalStockSummary() {
           {rows.length === 0 && <tr><td colSpan={STATES.length + 4} className="px-3 py-6 text-center text-slate-400">Nothing in stock.</td></tr>}
           {rows.map((r) => (
             <tr key={`${r.ownership}-${r.ownerPartyId || ''}`}>
-              <td className="px-3 py-2 font-semibold">{r.ownership === 'OSCAR' ? 'OSCAR (own stock)' : `${r.ownerPartyName} (customer material)`}</td>
+              <td className="px-3 py-2 font-semibold">{r.ownership === 'OSCAR' ? 'OSCAR Stock' : (r.ownerPartyName || 'Stock')}</td>
               <td className="px-3 py-2 text-right tabular-nums">{r.batches}</td>
               {STATES.map(([key]) => <td key={key} className="px-3 py-2 text-right tabular-nums">{formatNumberIN(r[key])}</td>)}
               <td className="px-3 py-2 text-right tabular-nums font-bold">{formatNumberIN(r.inHand)}</td>

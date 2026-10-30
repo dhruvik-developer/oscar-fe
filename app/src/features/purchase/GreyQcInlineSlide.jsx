@@ -37,6 +37,9 @@ export function GreyQcInlineSlide({ po, onClose, onQcSaved, onNextStep, onPrevSt
   const [remarks, setRemarks] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+  const [activeInspectTaka, setActiveInspectTaka] = useState(null);
+  const [inspectValues, setInspectValues] = useState({ good: 0, reprocess: 0, reject: 0, sample: 0 });
+  const [inspectValidationError, setInspectValidationError] = useState('');
 
   const poId = po?.id;
   const poNumber = po?.poNumber || po?.code || po?.orderNumber || 'PO';
@@ -123,16 +126,143 @@ export function GreyQcInlineSlide({ po, onClose, onQcSaved, onNextStep, onPrevSt
     });
 
     setTakas(
-      grnTakas.map((t) => ({
-        ...t,
-        disposition: t.qcStatus === 'Passed' ? 'Passed' : t.qcStatus === 'Rejected' ? 'Rejected' : (t.disposition || 'Passed'),
-      }))
+      grnTakas.map((t) => {
+        const len = Number(t.receivedQty || t.received_quantity || t.availableQty || 0);
+        const isPassed = t.qcStatus === 'Passed';
+        const isRejected = t.qcStatus === 'Rejected';
+        return {
+          ...t,
+          disposition: isPassed ? 'Passed' : isRejected ? 'Rejected' : (t.disposition || 'Passed'),
+          inspection: t.inspection || {
+            good: isRejected ? 0 : len,
+            reprocess: 0,
+            reject: isRejected ? len : 0,
+            sample: 0,
+            isInspected: isPassed || isRejected,
+          },
+        };
+      })
     );
   }, [currentGrn, allLots]);
 
   const takaTotalMeters = useMemo(() => {
     return takas.reduce((s, t) => s + Number(t.receivedQty || t.received_quantity || t.availableQty || 0), 0);
   }, [takas]);
+
+  const inspectEligibleQty = useMemo(() => {
+    if (!activeInspectTaka) return 0;
+    return Number(activeInspectTaka.receivedQty || activeInspectTaka.received_quantity || activeInspectTaka.availableQty || 0);
+  }, [activeInspectTaka]);
+
+  const inspectTotalAllocated = useMemo(() => {
+    const g = parseFloat(inspectValues.good) || 0;
+    const rp = parseFloat(inspectValues.reprocess) || 0;
+    const rj = parseFloat(inspectValues.reject) || 0;
+    const sm = parseFloat(inspectValues.sample) || 0;
+    return Math.round((g + rp + rj + sm) * 10000) / 10000;
+  }, [inspectValues]);
+
+  const inspectUnallocated = useMemo(() => {
+    return Math.max(0, Math.round((inspectEligibleQty - inspectTotalAllocated) * 10000) / 10000);
+  }, [inspectEligibleQty, inspectTotalAllocated]);
+
+  const handleInspectInputChange = (category, rawVal) => {
+    setInspectValidationError('');
+
+    if (category === 'good') {
+      setInspectValues((prev) => ({
+        ...prev,
+        good: rawVal,
+      }));
+      return;
+    }
+
+    setInspectValues((prev) => {
+      const rp = category === 'reprocess' ? (parseFloat(rawVal) || 0) : (parseFloat(prev.reprocess) || 0);
+      const rj = category === 'reject' ? (parseFloat(rawVal) || 0) : (parseFloat(prev.reject) || 0);
+      const sm = category === 'sample' ? (parseFloat(rawVal) || 0) : (parseFloat(prev.sample) || 0);
+
+      const otherSum = rp + rj + sm;
+      const autoGood = Math.max(0, Math.round((inspectEligibleQty - otherSum) * 100) / 100);
+
+      return {
+        ...prev,
+        [category]: rawVal,
+        good: autoGood,
+      };
+    });
+  };
+
+  const handleOpenInspectModal = (taka) => {
+    const len = Number(taka.receivedQty || taka.received_quantity || taka.availableQty || 0);
+    setActiveInspectTaka(taka);
+    if (taka.inspection?.isInspected) {
+      setInspectValues({
+        good: taka.inspection.good ?? 0,
+        reprocess: taka.inspection.reprocess ?? 0,
+        reject: taka.inspection.reject ?? 0,
+        sample: taka.inspection.sample ?? 0,
+      });
+    } else {
+      const isRej = taka.disposition === 'Rejected';
+      setInspectValues({
+        good: isRej ? 0 : len,
+        reprocess: 0,
+        reject: isRej ? len : 0,
+        sample: 0,
+      });
+    }
+    setInspectValidationError('');
+  };
+
+  const handleSaveInspectAllocation = () => {
+    if (!activeInspectTaka) return;
+    const g = parseFloat(inspectValues.good) || 0;
+    const rp = parseFloat(inspectValues.reprocess) || 0;
+    const rj = parseFloat(inspectValues.reject) || 0;
+    const sm = parseFloat(inspectValues.sample) || 0;
+
+    if (g < 0 || rp < 0 || rj < 0 || sm < 0) {
+      setInspectValidationError('Quantities cannot be negative.');
+      return;
+    }
+
+    const total = Math.round((g + rp + rj + sm) * 10000) / 10000;
+    if (total > inspectEligibleQty + 0.001) {
+      setInspectValidationError(
+        `Total allocated (${numIN(total)} m) exceeds eligible length (${numIN(inspectEligibleQty)} m).`
+      );
+      return;
+    }
+
+    setTakas((prev) =>
+      prev.map((t) => {
+        if (t.id === activeInspectTaka.id) {
+          const len = Number(t.receivedQty || t.received_quantity || t.availableQty || 0);
+          let disp = 'Passed';
+          if (rj === len) disp = 'Rejected';
+          else if (g === len) disp = 'Passed';
+          else if (rp === len) disp = 'Reprocess';
+          else disp = 'Inspected';
+
+          return {
+            ...t,
+            disposition: disp,
+            inspection: {
+              good: g,
+              reprocess: rp,
+              reject: rj,
+              sample: sm,
+              isInspected: true,
+            },
+          };
+        }
+        return t;
+      })
+    );
+
+    setActiveInspectTaka(null);
+  };
 
   const duplicateRollNumbers = useMemo(() => {
     const counts = {};
@@ -158,35 +288,93 @@ export function GreyQcInlineSlide({ po, onClose, onQcSaved, onNextStep, onPrevSt
 
   const stats = useMemo(() => {
     const totalTakas = takas.length;
-    const passedTakas = takas.filter((t) => t.disposition === 'Passed');
-    const rejectedTakas = takas.filter((t) => t.disposition === 'Rejected');
-    const passedMeters = passedTakas.reduce((s, t) => s + Number(t.receivedQty || t.received_quantity || 0), 0);
-    const rejectedMeters = rejectedTakas.reduce((s, t) => s + Number(t.receivedQty || t.received_quantity || 0), 0);
-    const isAllQcDone = totalTakas > 0 && takas.every((t) => t.qcStatus === 'Passed' || t.qcStatus === 'Rejected');
+    let passedMeters = 0;
+    let rejectedMeters = 0;
+    let reprocessMeters = 0;
+    let sampleMeters = 0;
+    let passedCount = 0;
+    let rejectedCount = 0;
+
+    takas.forEach((t) => {
+      const len = Number(t.receivedQty || t.received_quantity || t.availableQty || 0);
+      if (t.inspection?.isInspected) {
+        const g = Number(t.inspection.good || 0);
+        const rp = Number(t.inspection.reprocess || 0);
+        const rj = Number(t.inspection.reject || 0);
+        const sm = Number(t.inspection.sample || 0);
+        passedMeters += g;
+        reprocessMeters += rp;
+        rejectedMeters += rj;
+        sampleMeters += sm;
+        if (g > 0 || sm > 0) passedCount += 1;
+        if (rj > 0) rejectedCount += 1;
+      } else if (t.disposition === 'Rejected') {
+        rejectedMeters += len;
+        rejectedCount += 1;
+      } else {
+        passedMeters += len;
+        passedCount += 1;
+      }
+    });
+
+    const isAllQcDone =
+      totalTakas > 0 &&
+      takas.every((t) => t.qcStatus === 'Passed' || t.qcStatus === 'Rejected' || t.inspection?.isInspected);
 
     return {
       totalTakas,
       totalMeters: takaTotalMeters,
-      passedCount: passedTakas.length,
-      passedMeters,
-      rejectedCount: rejectedTakas.length,
-      rejectedMeters,
+      passedCount,
+      passedMeters: Math.round(passedMeters * 10000) / 10000,
+      rejectedCount,
+      rejectedMeters: Math.round(rejectedMeters * 10000) / 10000,
+      reprocessMeters: Math.round(reprocessMeters * 10000) / 10000,
+      sampleMeters: Math.round(sampleMeters * 10000) / 10000,
+      goodMeters: Math.round(passedMeters * 10000) / 10000,
       isAllQcDone,
     };
   }, [takas, takaTotalMeters]);
 
   const handleSetAllDisposition = (verdict) => {
     setTakas((prev) =>
-      prev.map((t) => ({
-        ...t,
-        disposition: verdict,
-      }))
+      prev.map((t) => {
+        const len = Number(t.receivedQty || t.received_quantity || t.availableQty || 0);
+        const isRej = verdict === 'Rejected';
+        return {
+          ...t,
+          disposition: verdict,
+          inspection: {
+            good: isRej ? 0 : len,
+            reprocess: 0,
+            reject: isRej ? len : 0,
+            sample: 0,
+            isInspected: true,
+          },
+        };
+      })
     );
   };
 
   const handleUpdateDisposition = (takaId, verdict) => {
     setTakas((prev) =>
-      prev.map((t) => (t.id === takaId ? { ...t, disposition: verdict } : t))
+      prev.map((t) => {
+        if (t.id === takaId) {
+          const len = Number(t.receivedQty || t.received_quantity || t.availableQty || 0);
+          const isRej = verdict === 'Rejected';
+          return {
+            ...t,
+            disposition: verdict,
+            inspection: {
+              good: isRej ? 0 : len,
+              reprocess: 0,
+              reject: isRej ? len : 0,
+              sample: 0,
+              isInspected: true,
+            },
+          };
+        }
+        return t;
+      })
     );
   };
 
@@ -227,26 +415,39 @@ export function GreyQcInlineSlide({ po, onClose, onQcSaved, onNextStep, onPrevSt
 
       const payload = {
         receiptId: currentGrn.id,
-        goodQty: stats.passedMeters,
-        secondQty: 0,
-        reprocessQty: 0,
+        goodQty: stats.goodMeters,
+        secondQty: stats.sampleMeters,
+        sampleQty: stats.sampleMeters,
+        reprocessQty: stats.reprocessMeters,
         rejectQty: stats.rejectedMeters,
         holdQty: 0,
-        remarks: remarks || `QC inspection completed by ${inspectorName} for ${currentGrn.grn_number}. Passed: ${stats.passedCount} rolls (${numIN(stats.passedMeters)} m), Rejected: ${stats.rejectedCount} rolls (${numIN(stats.rejectedMeters)} m).`,
-        takas: takas.map((t) => ({
-          id: t.id,
-          takaId: t.takaId || t.id,
-          barcode: t.barcode,
-          takaRoll: t.takaRoll || t.taka_number,
-          receivedQty: Number(t.receivedQty || t.received_quantity || 0),
-          disposition: t.disposition,
-        })),
+        remarks:
+          remarks ||
+          `QC inspection completed by ${inspectorName} for ${currentGrn.grn_number}. Good: ${numIN(stats.goodMeters)} m, Reprocess: ${numIN(stats.reprocessMeters)} m, Reject: ${numIN(stats.rejectedMeters)} m, Sample: ${numIN(stats.sampleMeters)} m.`,
+        takas: takas.map((t) => {
+          const len = Number(t.receivedQty || t.received_quantity || 0);
+          const insp = t.inspection?.isInspected ? t.inspection : null;
+          return {
+            id: t.id,
+            takaId: t.takaId || t.id,
+            barcode: t.barcode,
+            takaRoll: t.takaRoll || t.taka_number,
+            receivedQty: len,
+            disposition: t.disposition,
+            goodQty: insp ? Number(insp.good || 0) : (t.disposition === 'Rejected' ? 0 : len),
+            reprocessQty: insp ? Number(insp.reprocess || 0) : 0,
+            rejectQty: insp ? Number(insp.reject || 0) : (t.disposition === 'Rejected' ? len : 0),
+            secondQty: insp ? Number(insp.sample || 0) : 0,
+            sampleQty: insp ? Number(insp.sample || 0) : 0,
+            inspection: insp,
+          };
+        }),
       };
 
       const res = await api.post('/inventory/qc/complete/', payload);
 
       setSuccessMsg(
-        `QC inspection completed successfully! ${stats.passedCount} rolls (${numIN(stats.passedMeters)} m) posted to warehouse stock. ${stats.rejectedCount} rolls (${numIN(stats.rejectedMeters)} m) quarantined.`
+        `QC inspection completed successfully! Good: ${numIN(stats.goodMeters)} m posted to warehouse stock. Reprocess: ${numIN(stats.reprocessMeters)} m, Quarantined/Reject: ${numIN(stats.rejectedMeters)} m, Sample: ${numIN(stats.sampleMeters)} m.`
       );
       if (showToast) {
         showToast(`QC completed for ${currentGrn.grn_number}: ${stats.passedCount} accepted, ${stats.rejectedCount} rejected.`, 'success');
@@ -497,15 +698,19 @@ export function GreyQcInlineSlide({ po, onClose, onQcSaved, onNextStep, onPrevSt
                 <th className="py-2 px-3">Barcode / Taka ID</th>
                 <th className="py-2 px-3">Lot #</th>
                 <th className="py-2 px-3">Roll #</th>
-                <th className="py-2 px-3">Length (m)</th>
+                <th className="py-2 px-3 text-right">Length (m)</th>
                 <th className="py-2 px-3">Current Location</th>
                 <th className="py-2 px-3 text-center">QC Disposition</th>
+                <th className="py-2 px-3 text-right">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-slate-700">
               {takas.map((t, idx) => {
-                const isPassed = t.disposition === 'Passed';
-                const isRejected = t.disposition === 'Rejected';
+                const len = Number(t.receivedQty || t.received_quantity || t.availableQty || 0);
+                const isInspected = Boolean(t.inspection?.isInspected);
+                const isPassed = t.disposition === 'Passed' && (!isInspected || t.inspection?.good === len);
+                const isRejected = t.disposition === 'Rejected' && (!isInspected || t.inspection?.reject === len);
+
                 return (
                   <tr key={t.id || idx} className="hover:bg-slate-50/70 font-mono text-[11px]">
                     <td className="py-1.5 px-3 font-bold text-indigo-700 flex items-center gap-1">
@@ -514,44 +719,79 @@ export function GreyQcInlineSlide({ po, onClose, onQcSaved, onNextStep, onPrevSt
                     </td>
                     <td className="py-1.5 px-3 font-semibold text-slate-800">{t.lotNo || t.lot_number || '-'}</td>
                     <td className="py-1.5 px-3 font-bold">#{t.takaRoll || t.taka_number || idx + 1}</td>
-                    <td className="py-1.5 px-3 font-extrabold text-blue-700">{numIN(t.receivedQty || t.received_quantity || t.availableQty)} m</td>
+                    <td className="py-1.5 px-3 text-right font-extrabold text-blue-700">{numIN(len)} m</td>
                     <td className="py-1.5 px-3 text-slate-500 font-sans text-[10.5px]">
                       {t.qcStatus === 'Passed' ? 'WH-MAIN (Godown)' : t.qcStatus === 'Rejected' ? 'SYS-REJECT' : (t.location || 'SYS-QC-HOLD')}
                     </td>
                     <td className="py-1.5 px-3 text-center">
-                      <div className="inline-flex rounded-lg border border-slate-200 p-0.5 bg-white">
-                        <button
-                          type="button"
-                          disabled={isGrnAlreadyCompleted}
-                          onClick={() => handleUpdateDisposition(t.id, 'Passed')}
-                          className={`px-2.5 py-0.5 text-[10.5px] font-bold rounded-md transition-colors cursor-pointer ${
-                            isPassed
-                              ? 'bg-emerald-600 text-white shadow-2xs'
-                              : 'text-slate-600 hover:text-emerald-700'
-                          }`}
-                        >
-                          Pass (Grade A)
-                        </button>
-                        <button
-                          type="button"
-                          disabled={isGrnAlreadyCompleted}
-                          onClick={() => handleUpdateDisposition(t.id, 'Rejected')}
-                          className={`px-2.5 py-0.5 text-[10.5px] font-bold rounded-md transition-colors cursor-pointer ${
-                            isRejected
-                              ? 'bg-rose-600 text-white shadow-2xs'
-                              : 'text-slate-600 hover:text-rose-700'
-                          }`}
-                        >
-                          Reject
-                        </button>
-                      </div>
+                      {isInspected && !isPassed && !isRejected ? (
+                        <div className="inline-flex flex-wrap items-center justify-center gap-1 font-sans text-[10px]">
+                          {Number(t.inspection.good) > 0 && (
+                            <span className="px-1.5 py-0.5 rounded font-bold bg-emerald-100 text-emerald-800">
+                              Good: {numIN(t.inspection.good)}m
+                            </span>
+                          )}
+                          {Number(t.inspection.reprocess) > 0 && (
+                            <span className="px-1.5 py-0.5 rounded font-bold bg-amber-100 text-amber-800">
+                              Reprocess: {numIN(t.inspection.reprocess)}m
+                            </span>
+                          )}
+                          {Number(t.inspection.reject) > 0 && (
+                            <span className="px-1.5 py-0.5 rounded font-bold bg-rose-100 text-rose-800">
+                              Reject: {numIN(t.inspection.reject)}m
+                            </span>
+                          )}
+                          {Number(t.inspection.sample) > 0 && (
+                            <span className="px-1.5 py-0.5 rounded font-bold bg-blue-100 text-blue-800">
+                              Sample: {numIN(t.inspection.sample)}m
+                            </span>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="inline-flex rounded-lg border border-slate-200 p-0.5 bg-white">
+                          <button
+                            type="button"
+                            disabled={isGrnAlreadyCompleted}
+                            onClick={() => handleUpdateDisposition(t.id, 'Passed')}
+                            className={`px-2.5 py-0.5 text-[10.5px] font-bold rounded-md transition-colors cursor-pointer ${
+                              isPassed
+                                ? 'bg-emerald-600 text-white shadow-2xs'
+                                : 'text-slate-600 hover:text-emerald-700'
+                            }`}
+                          >
+                            Pass (Grade A)
+                          </button>
+                          <button
+                            type="button"
+                            disabled={isGrnAlreadyCompleted}
+                            onClick={() => handleUpdateDisposition(t.id, 'Rejected')}
+                            className={`px-2.5 py-0.5 text-[10.5px] font-bold rounded-md transition-colors cursor-pointer ${
+                              isRejected
+                                ? 'bg-rose-600 text-white shadow-2xs'
+                                : 'text-slate-600 hover:text-rose-700'
+                            }`}
+                          >
+                            Reject
+                          </button>
+                        </div>
+                      )}
+                    </td>
+                    <td className="py-1.5 px-3 text-right">
+                      <button
+                        type="button"
+                        disabled={isGrnAlreadyCompleted}
+                        onClick={() => handleOpenInspectModal(t)}
+                        className="px-2.5 py-1 text-[11px] font-bold rounded-lg bg-blue-600 hover:bg-blue-700 text-white shadow-2xs transition-colors cursor-pointer disabled:opacity-50"
+                      >
+                        {isInspected ? 'Edit Inspection' : 'Inspect'}
+                      </button>
                     </td>
                   </tr>
                 );
               })}
               {takas.length === 0 && !loading && (
                 <tr>
-                  <td colSpan={6} className="py-6 text-center text-slate-400 font-sans">
+                  <td colSpan={7} className="py-6 text-center text-slate-400 font-sans">
                     No lot/taka rolls created for this GRN yet. Please create takas in Stage 4 first.
                   </td>
                 </tr>
@@ -628,6 +868,158 @@ export function GreyQcInlineSlide({ po, onClose, onQcSaved, onNextStep, onPrevSt
           </div>
         </div>
       </form>
+
+      {/* ── Compact Inspect Modal (Good, Reprocess, Bad/Reject, Sample ONLY) ── */}
+      {activeInspectTaka && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-[2px] p-4"
+          onClick={() => setActiveInspectTaka(null)}
+        >
+          <div
+            className="w-full max-w-lg rounded-2xl bg-white p-5 shadow-2xl border border-slate-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+              <div>
+                <h3 className="text-sm font-bold text-slate-800">
+                  Inspect Taka Roll #{activeInspectTaka.takaRoll || activeInspectTaka.taka_number || 1}
+                </h3>
+                <p className="text-[11px] text-slate-500 mt-0.5">
+                  Eligible Inspection Quantity:{' '}
+                  <span className="font-bold font-mono text-blue-700">{numIN(inspectEligibleQty)} m</span>
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setActiveInspectTaka(null)}
+                className="text-slate-400 hover:text-slate-600 rounded-lg p-1 transition-colors cursor-pointer"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* 4 Category Boxes: Good (Pass), Reprocess, Bad / Reject, Sample */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {/* Good (Pass) - Subtle Green */}
+              <div className="p-3 rounded-xl border border-emerald-200 bg-emerald-50/40 flex flex-col justify-between">
+                <label className="block text-[11px] font-bold text-emerald-800 mb-1.5">
+                  Good (Pass)
+                </label>
+                <div className="relative flex items-center">
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    max={inspectEligibleQty}
+                    value={inspectValues.good}
+                    onChange={(e) => handleInspectInputChange('good', e.target.value)}
+                    className="w-full pl-2 pr-6 py-1.5 bg-white border border-emerald-300 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 rounded-lg text-xs font-mono font-bold text-emerald-950"
+                    placeholder="0.00"
+                  />
+                  <span className="absolute right-2 text-[11px] font-bold text-emerald-700 pointer-events-none">m</span>
+                </div>
+              </div>
+
+              {/* Reprocess - Subtle Orange */}
+              <div className="p-3 rounded-xl border border-amber-200 bg-amber-50/40 flex flex-col justify-between">
+                <label className="block text-[11px] font-bold text-amber-800 mb-1.5">
+                  Reprocess
+                </label>
+                <div className="relative flex items-center">
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    max={inspectEligibleQty}
+                    value={inspectValues.reprocess}
+                    onChange={(e) => handleInspectInputChange('reprocess', e.target.value)}
+                    className="w-full pl-2 pr-6 py-1.5 bg-white border border-amber-300 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 rounded-lg text-xs font-mono font-bold text-amber-950"
+                    placeholder="0.00"
+                  />
+                  <span className="absolute right-2 text-[11px] font-bold text-amber-700 pointer-events-none">m</span>
+                </div>
+              </div>
+
+              {/* Bad / Reject - Subtle Red */}
+              <div className="p-3 rounded-xl border border-rose-200 bg-rose-50/40 flex flex-col justify-between">
+                <label className="block text-[11px] font-bold text-rose-800 mb-1.5">
+                  Bad / Reject
+                </label>
+                <div className="relative flex items-center">
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    max={inspectEligibleQty}
+                    value={inspectValues.reject}
+                    onChange={(e) => handleInspectInputChange('reject', e.target.value)}
+                    className="w-full pl-2 pr-6 py-1.5 bg-white border border-rose-300 focus:border-rose-500 focus:ring-1 focus:ring-rose-500 rounded-lg text-xs font-mono font-bold text-rose-950"
+                    placeholder="0.00"
+                  />
+                  <span className="absolute right-2 text-[11px] font-bold text-rose-700 pointer-events-none">m</span>
+                </div>
+              </div>
+
+              {/* Sample - Subtle Blue */}
+              <div className="p-3 rounded-xl border border-blue-200 bg-blue-50/40 flex flex-col justify-between">
+                <label className="block text-[11px] font-bold text-blue-800 mb-1.5">
+                  Sample
+                </label>
+                <div className="relative flex items-center">
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    max={inspectEligibleQty}
+                    value={inspectValues.sample}
+                    onChange={(e) => handleInspectInputChange('sample', e.target.value)}
+                    className="w-full pl-2 pr-6 py-1.5 bg-white border border-blue-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded-lg text-xs font-mono font-bold text-blue-950"
+                    placeholder="0.00"
+                  />
+                  <span className="absolute right-2 text-[11px] font-bold text-blue-700 pointer-events-none">m</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Validation Feedback & Metres Tracking */}
+            <div className="mt-3 text-[11px] flex items-center justify-between">
+              <span
+                className={
+                  inspectTotalAllocated > inspectEligibleQty + 0.001
+                    ? 'text-rose-600 font-bold'
+                    : 'text-slate-500'
+                }
+              >
+                Allocated: <strong className="font-mono">{numIN(inspectTotalAllocated)} m</strong> /{' '}
+                {numIN(inspectEligibleQty)} m
+                {inspectUnallocated > 0.001 && ` (${numIN(inspectUnallocated)} m unallocated)`}
+              </span>
+              {inspectValidationError && (
+                <span className="text-rose-600 font-bold">{inspectValidationError}</span>
+              )}
+            </div>
+
+            {/* Bottom Buttons: Cancel and Save ONLY */}
+            <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setActiveInspectTaka(null)}
+                className="px-3.5 py-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveInspectAllocation}
+                className="px-4 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-colors shadow-xs cursor-pointer"
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

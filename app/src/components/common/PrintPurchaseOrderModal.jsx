@@ -201,11 +201,11 @@ export const PrintPurchaseOrderModal = ({ isOpen, onClose, po }) => {
                                                     )}
                                                 </td>
                                                 <td className="py-2.5 px-3 text-center font-mono font-semibold text-slate-800">{qty}</td>
-                                                <td className="py-2.5 px-3 text-right font-mono">${rate.toFixed(2)}</td>
+                                                <td className="py-2.5 px-3 text-right font-mono">₹{rate.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                                                 <td className="py-2.5 px-3 text-center text-slate-500 font-mono">{disc}%</td>
                                                 <td className="py-2.5 px-3 text-center text-slate-500 font-mono">{tax}%</td>
                                                 <td className="py-2.5 px-3 text-right font-mono font-bold text-slate-900">
-                                                    ${lineTotal.toFixed(2)}
+                                                    ₹{lineTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                                 </td>
                                             </tr>
                                         );
@@ -231,15 +231,15 @@ export const PrintPurchaseOrderModal = ({ isOpen, onClose, po }) => {
                         <div className="w-72 space-y-1.5 font-mono text-xs text-right">
                             <div className="flex justify-between text-slate-600">
                                 <span>PO Net Subtotal:</span>
-                                <span>${subtotal.toFixed(2)}</span>
+                                <span>₹{subtotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                             </div>
                             <div className="flex justify-between text-slate-600">
                                 <span>Estimated Input GST / Tax:</span>
-                                <span>${taxAmount.toFixed(2)}</span>
+                                <span>₹{taxAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                             </div>
                             <div className="flex justify-between text-sm font-black text-slate-900 pt-2 border-t-2 border-slate-900 bg-slate-50 p-1.5 rounded">
                                 <span>Grand PO Commitment:</span>
-                                <span className="text-blue-900">${grandTotal.toFixed(2)}</span>
+                                <span className="text-blue-900">₹{grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                             </div>
                         </div>
                     </div>

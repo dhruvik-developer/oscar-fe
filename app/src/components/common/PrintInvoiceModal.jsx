@@ -22,7 +22,7 @@ export const PrintInvoiceModal = ({ isOpen, onClose, invoice, balanceDue = 0, })
     const posStateCode = posMatch ? posMatch[1] : posRaw.slice(0, 2).toUpperCase();
     const hasStates = Boolean(companyStateCode && posStateCode);
     const isIntraState = hasStates && companyStateCode === posStateCode;
-    const moneySymbol = (currency || '').includes('INR') ? '₹' : '$';
+    const moneySymbol = (currency || '').includes('USD') ? '$' : '₹';
     const money = (v) => `${moneySymbol}${(Number(v) || 0).toFixed(2)}`;
     // Split every line's GST into CGST+SGST (intra-state) or IGST (inter-state)
     const lineTaxBreakdown = (it) => {

@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { X, Printer, CheckCircle2 } from 'lucide-react';
 import { SignatureSlot, useDocumentSignatures } from './SignatureSlot';
+
 export const PaymentReceiptModal = ({ receipt, onClose }) => {
   const docSigs = useDocumentSignatures('PaymentReceipt', receipt?.id || receipt?.receiptNumber, `Payment Receipt ${receipt?.receiptNumber || ''}`);
     // UX only: Esc dismisses. No logic changes.
@@ -59,7 +60,7 @@ export const PaymentReceiptModal = ({ receipt, onClose }) => {
             <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3 flex items-center justify-between mt-2">
               <span className="font-bold text-emerald-900">Total Amount Settled:</span>
               <span className="font-mono font-bold text-lg text-emerald-800">
-                ${receipt.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                ₹{Number(receipt.amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
             </div>
           </div>

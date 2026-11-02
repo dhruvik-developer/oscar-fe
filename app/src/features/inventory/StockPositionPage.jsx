@@ -1312,13 +1312,6 @@ export function StockPositionPage() {
               <strong>Combined Grey Stock Alert:</strong> Available grey fabric ({formatQty(data.combinedGreyStock.availableGrey, data.combinedGreyStock.uom)}) has fallen below safety threshold ({formatQty(data.combinedGreyStock.threshold, data.combinedGreyStock.uom)}) by {formatQty(data.combinedGreyStock.shortage, data.combinedGreyStock.uom)}.
             </span>
           </div>
-          <button
-            type="button"
-            onClick={() => navigate('/administration/alerts')}
-            className="text-[11px] font-semibold text-rose-700 hover:text-rose-900 underline shrink-0 cursor-pointer text-left"
-          >
-            View Alert Center &rarr;
-          </button>
         </div>
       )}
 
@@ -2653,7 +2646,7 @@ export function StockPositionPage() {
                 <div>
                   <span className="font-semibold text-slate-800 block">Enable Low-Stock Alert</span>
                   <span className="text-[11px] text-slate-500">
-                    Triggers Alert Center incident and topbar notification when breached.
+                    Triggers a system alert and topbar notification when breached.
                   </span>
                 </div>
                 <input
@@ -2695,4 +2688,3 @@ export function StockPositionPage() {
 }
 
 export default StockPositionPage;
-

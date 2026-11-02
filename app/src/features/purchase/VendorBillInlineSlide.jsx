@@ -410,9 +410,6 @@ export function VendorBillInlineSlide({ po, instruction, onClose, onBillSaved, o
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="px-2 py-0.5 rounded text-[10px] font-black bg-indigo-100 text-indigo-800 uppercase tracking-wider">
-                Stage 8 Reconciliation
-              </span>
               <h3 className="text-sm font-extrabold text-slate-900">
                 Vendor Bill Matching & 3-Way Reconciliation
               </h3>
@@ -940,9 +937,6 @@ export function VendorBillInlineSlide({ po, instruction, onClose, onBillSaved, o
               <span>Previous: Grey Stock Updated</span>
             </button>
           )}
-          <span className="text-[11px] text-slate-500 font-medium hidden md:inline">
-            Stage 8 • Vendor Bill Matching & 3-Way Reconciliation
-          </span>
         </div>
 
         <div className="flex items-center gap-2">

@@ -243,9 +243,6 @@ export function SupplierBillMatchingInlineSlide({ po, instruction, onClose, onBi
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="px-2 py-0.5 rounded text-[10px] font-black bg-blue-100 text-blue-700 uppercase tracking-wider">
-                Stage 8 Slide
-              </span>
               <h3 className="text-sm font-extrabold text-slate-900">
                 Supplier Bill Matching (3-Way Verification)
               </h3>
@@ -378,7 +375,7 @@ export function SupplierBillMatchingInlineSlide({ po, instruction, onClose, onBi
         <div className="p-3 rounded-xl border border-slate-200 bg-slate-50 flex items-center justify-between gap-2 text-xs">
           <div className="flex items-center gap-2 text-slate-600">
             <AlertTriangle size={15} className="text-amber-500 shrink-0" />
-            <span>No vendor bill recorded yet for {effectivePoNumber}. Please record a bill in Stage 7 before matching.</span>
+            <span>No vendor bill recorded yet for {effectivePoNumber}. Please record a bill before matching.</span>
           </div>
           <span className="px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-200 text-slate-700">
             Pending Bill Intake
@@ -505,9 +502,6 @@ export function SupplierBillMatchingInlineSlide({ po, instruction, onClose, onBi
               <span>Previous: Vendor Bill</span>
             </button>
           )}
-          <span className="text-[11px] text-slate-500 font-medium hidden md:inline">
-            Stage 8 of 9 • Supplier 3-Way Bill Matching
-          </span>
         </div>
 
         <div className="flex items-center gap-2 ml-auto">

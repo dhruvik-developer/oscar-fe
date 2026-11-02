@@ -37,7 +37,7 @@ const salesOrderGuide = {
 };
 export const SalesOrdersPage = () => {
     const navigate = useNavigate();
-    const { showToast, salesOrders, customers, addSalesOrder, updateSalesOrderStage, cancelSalesOrder, convertSalesOrderToInvoice, convertSalesOrderToChallan, addProformaInvoice, proformaInvoices = [], deliveryChallans, invoices, paymentIns, formatCurrency, formatDateDDMMYYYY, getCurrentISODate, addDaysISO } = useERP();
+    const { showToast, salesOrders, customers, addSalesOrder, updateSalesOrderStage, cancelSalesOrder, createSalesOrderChallanAndInvoice, addProformaInvoice, proformaInvoices = [], deliveryChallans, invoices, paymentIns, formatCurrency, formatDateDDMMYYYY, getCurrentISODate, addDaysISO } = useERP();
     const pmsProjects = usePmsStore((s) => s.projects || []);
     const [pmsModalOrder, setPmsModalOrder] = useState(null);
     const [stageFilter, setStageFilter] = useState('All');
@@ -76,6 +76,10 @@ export const SalesOrdersPage = () => {
     const [pickingListOrder, setPickingListOrder] = useState(null);
     const [printSalesOrderTarget, setPrintSalesOrderTarget] = useState(null);
     const [cancelModalTarget, setCancelModalTarget] = useState(null);
+    const [cancelError, setCancelError] = useState('');
+    const [cancellingOrder, setCancellingOrder] = useState(false);
+    const [convertingOrderIds, setConvertingOrderIds] = useState(() => new Set());
+    const convertingOrderIdsRef = useRef(new Set());
     const [selectedCustomerId, setSelectedCustomerId] = useState(customers[0]?.id || '');
     const [deliveryDate, setDeliveryDate] = useState(() => addDaysISO(getCurrentISODate(), 10));
     const [lineItems, setLineItems] = useState([]);
@@ -135,36 +139,118 @@ export const SalesOrdersPage = () => {
         });
         handleCloseCreateModal();
     };
+    const handleCreateChallanAndInvoice = async (order) => {
+        const key = String(order.id);
+        if (convertingOrderIdsRef.current.has(key)) return;
+        convertingOrderIdsRef.current.add(key);
+        setConvertingOrderIds(new Set(convertingOrderIdsRef.current));
+        try {
+            const { challan, invoice } = await createSalesOrderChallanAndInvoice(order);
+            if (challan) {
+                showToast(
+                    `Draft challan ${challan?.challanNumber || ''} and invoice ${invoice?.invoiceNumber || ''} are linked. Dispatch the challan before finalizing the invoice.`
+                );
+            } else {
+                showToast(
+                    `Invoice ${invoice?.invoiceNumber || ''} already exists. Refresh the Sales Order Register to load its linked challan.`
+                );
+            }
+        } catch (error) {
+            showToast(error?.message || 'Unable to create the linked challan and invoice.');
+        } finally {
+            convertingOrderIdsRef.current.delete(key);
+            setConvertingOrderIds(new Set(convertingOrderIdsRef.current));
+        }
+    };
     const advanceStage = (orderId, currentStage) => {
         if (currentStage === 'Draft') {
             updateSalesOrderStage(orderId, 'Confirmed');
         }
-        else if (currentStage === 'Confirmed' || currentStage === 'Partially Dispatched') {
-            convertSalesOrderToChallan(orderId);
-            navigate('/sales/delivery');
-        }
-        else if (currentStage === 'Fully Dispatched') {
-            convertSalesOrderToInvoice(orderId);
-            navigate('/sales/invoices');
-        }
     };
     const orderHasInvoice = (order) => {
         if (!order) return false;
-        if (order.stage === 'Invoiced') return true;
+        if (order.stage === 'Invoiced' || order.hasInvoice || order.invoiceStatus === 'Invoiced' || order.linkedInvoiceId) return true;
         return (invoices || []).some(inv => 
             inv.status !== 'Cancelled' && (
-                (order.id && inv.salesOrderId === order.id) ||
+                (order.id && String(inv.salesOrderId || inv.salesOrder || '') === String(order.id)) ||
                 (order.orderNumber && (inv.salesOrderNumber === order.orderNumber || inv.linkedSo === order.orderNumber || inv.salesOrderRef === order.orderNumber))
             )
         );
     };
+    const linkedInvoiceRows = (order) => (invoices || []).filter((invoice) =>
+        invoice.status !== 'Cancelled' && (
+            (order.id && String(invoice.salesOrderId || invoice.salesOrder || '') === String(order.id)) ||
+            (order.orderNumber && (invoice.salesOrderNumber === order.orderNumber || invoice.linkedSo === order.orderNumber || invoice.salesOrderRef === order.orderNumber))
+        )
+    );
+    const getLinkedInvoiceId = (order) =>
+        linkedInvoiceRows(order)
+            .filter((invoice) => invoice.status === 'Draft')
+            .sort((left, right) => (
+                new Date(left.createdAt || left.created_at || 0).getTime() -
+                new Date(right.createdAt || right.created_at || 0).getTime()
+            ))[0]?.id ||
+        order?.linkedInvoiceId ||
+        linkedInvoiceRows(order)[0]?.id;
 
+    const linkedChallanRows = (order) => (deliveryChallans || []).filter((challan) =>
+        challan.status !== 'Cancelled' && (
+            (order.id && String(challan.salesOrderId || challan.salesOrder || '') === String(order.id)) ||
+            (order.orderNumber && (
+                challan.salesOrderNumber === order.orderNumber ||
+                challan.linkedSo === order.orderNumber
+            ))
+        )
+    );
+    const invoiceForChallan = (challan) => linkedInvoiceRows(
+        { id: challan.salesOrderId, orderNumber: challan.salesOrderNumber || challan.linkedSo }
+    ).find((invoice) => (
+        String(invoice.deliveryChallanId || '') === String(challan.id) ||
+        (challan.challanNumber && invoice.deliveryChallanNumber === challan.challanNumber)
+    ));
+    const getCombinedDocuments = (order) => {
+        const challans = linkedChallanRows(order);
+        const orderInvoices = linkedInvoiceRows(order);
+        const challan = challans.find((row) => (
+            orderInvoices.some((invoice) => (
+                String(invoice.deliveryChallanId || '') === String(row.id) ||
+                (row.challanNumber && invoice.deliveryChallanNumber === row.challanNumber)
+            ))
+        )) || challans.find((row) => row.status === 'Draft') ||
+            challans.find((row) => (
+                ['Dispatched', 'In Transit', 'Delivered'].includes(row.status) &&
+                !invoiceForChallan(row)
+            )) || challans[0];
+        const invoice = challan
+            ? invoiceForChallan(challan)
+            : orderInvoices.find((row) => row.status === 'Draft') || orderInvoices[0];
+        return { challan, invoice };
+    };
+    const orderNeedsCombinedAction = (order) => {
+        if (!order || ['Draft', 'Pending Approval', 'Invoiced', 'Closed', 'Cancelled'].includes(order.stage)) {
+            return false;
+        }
+        const activeDraftInvoice = linkedInvoiceRows(order).find(
+            (invoice) => invoice.status === 'Draft'
+        ) || order?.linkedInvoice;
+        if (activeDraftInvoice?.status === 'Draft' && activeDraftInvoice.deliveryChallanId) {
+            return false;
+        }
+        const challans = linkedChallanRows(order);
+        if (challans.some((challan) => (
+            ['Draft', 'Dispatched', 'In Transit', 'Delivered'].includes(challan.status) &&
+            !invoiceForChallan(challan)
+        ))) {
+            return true;
+        }
+        return ['Confirmed', 'Partially Dispatched'].includes(order.stage);
+    };
     const orderHasChallan = (order) => {
         if (!order) return false;
         if (['Fully Dispatched', 'Invoiced'].includes(order.stage)) return true;
         return (deliveryChallans || []).some(dc =>
             dc.status !== 'Cancelled' && (
-                (order.id && dc.salesOrderId === order.id) ||
+                (order.id && String(dc.salesOrderId || dc.salesOrder || '') === String(order.id)) ||
                 (order.orderNumber && (dc.salesOrderNumber === order.orderNumber || dc.linkedSo === order.orderNumber))
             )
         );
@@ -175,6 +261,9 @@ export const SalesOrdersPage = () => {
             return true;
         return o.stage === stageFilter;
     });
+    const selectedCombinedDocs = selectedOrder
+        ? getCombinedDocuments(selectedOrder)
+        : {};
     // [Quotation & Proforma Invoice modules are commented out] — kept for when the module returns; no button calls it now.
     const handleGenerateProforma = (order) => {
         const lines = order.items || order.lineItems || [];
@@ -400,6 +489,9 @@ export const SalesOrdersPage = () => {
             width: '18%',
             render: (o) => {
                 const isCancelled = o.stage === 'Cancelled' || o.status === 'Cancelled';
+                const combinedDocs = getCombinedDocuments(o);
+                const isDraftPair = combinedDocs.challan && combinedDocs.invoice &&
+                    combinedDocs.invoice.status === 'Draft';
                 return (<div className="flex items-center justify-end gap-1.5 whitespace-nowrap">
             <button onClick={() => setPrintSalesOrderTarget(o)} className="p-1 text-muted hover:text-primary hover:bg-soft rounded-lg cursor-pointer transition-colors" title="Print Official Sales Order Confirmation">
               <Printer size={13}/>
@@ -426,33 +518,62 @@ export const SalesOrdersPage = () => {
                 Awaiting approval
               </span>
             )}
-            {o.stage === 'Confirmed' && !orderHasChallan(o) && (<>
-                {!pmsProjects.some((p) => p.crmOrderId === o.orderNumber) && (
-                  <button
-                    onClick={() => setPmsModalOrder(o.orderNumber)}
-                    className="px-2 py-1 bg-violet-600 text-white rounded-md text-xs font-semibold hover:bg-violet-700 cursor-pointer inline-flex items-center gap-1 shadow-xs transition-colors whitespace-nowrap"
-                    title="Convert this Confirmed Sales Order into a PMS Production Project"
-                  >
-                    <Layers size={12}/> PMS Project
-                  </button>
-                )}
-                <button onClick={() => advanceStage(o.id, 'Confirmed')} className="px-2.5 py-1 bg-indigo-600 text-white rounded-md text-xs font-semibold hover:bg-indigo-700 cursor-pointer inline-flex items-center gap-1 shadow-xs transition-colors whitespace-nowrap">
-                  <Truck size={12}/> Issue Challan
+            {o.stage === 'Confirmed' && !orderHasChallan(o) &&
+              !pmsProjects.some((p) => p.crmOrderId === o.orderNumber) && (
+                <button
+                  onClick={() => setPmsModalOrder(o.orderNumber)}
+                  className="px-2 py-1 bg-violet-600 text-white rounded-md text-xs font-semibold hover:bg-violet-700 cursor-pointer inline-flex items-center gap-1 shadow-xs transition-colors whitespace-nowrap"
+                  title="Convert this Confirmed Sales Order into a PMS Production Project"
+                >
+                  <Layers size={12}/> PMS Project
                 </button>
-              </>)}
-            {o.stage === 'Partially Dispatched' && (<button onClick={() => advanceStage(o.id, 'Partially Dispatched')} className="px-2.5 py-1 bg-indigo-600 text-white rounded-md text-xs font-semibold hover:bg-indigo-700 cursor-pointer inline-flex items-center gap-1 shadow-xs transition-colors whitespace-nowrap">
-                <Truck size={12}/> Dispatch Remaining
-              </button>)}
-            {!isCancelled && o.stage !== 'Invoiced' && o.stage !== 'Closed' && !orderHasInvoice(o) && (
+              )}
+            {!isCancelled && orderNeedsCombinedAction(o) && (
               <button
-                onClick={async () => {
-                  await convertSalesOrderToInvoice(o.id);
-                  navigate('/sales/invoices');
-                }}
-                className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-xs font-semibold cursor-pointer inline-flex items-center gap-1 shadow-xs transition-colors whitespace-nowrap"
-                title="Convert this Sales Order into a Sales Invoice"
+                onClick={() => void handleCreateChallanAndInvoice(o)}
+                disabled={convertingOrderIds.has(String(o.id))}
+                className="px-2 py-1 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 disabled:cursor-wait text-white rounded-md text-[10px] font-semibold cursor-pointer inline-flex items-center gap-1 shadow-xs transition-colors whitespace-nowrap"
+                title={combinedDocs.challan && !combinedDocs.invoice
+                  ? 'Create the missing invoice for the existing challan'
+                  : 'Create linked Draft Challan and Sales Invoice'}
               >
-                <Receipt size={12}/> Sales Invoice
+                <Truck size={11}/> {convertingOrderIds.has(String(o.id))
+                  ? 'Creating…'
+                  : combinedDocs.challan && !combinedDocs.invoice
+                    ? 'Create Invoice'
+                    : 'Create Challan + Invoice'}
+              </button>
+            )}
+            {combinedDocs.challan && !combinedDocs.invoice && (
+              <span className="text-[9px] font-semibold text-amber-700" title="The challan is saved; only the invoice remains to be created.">
+                Invoice pending
+              </span>
+            )}
+            {isDraftPair && (
+              <span className="text-[9px] font-semibold text-blue-700" title="Both linked drafts are saved. Dispatch the challan before finalizing the invoice.">
+                Drafts linked
+              </span>
+            )}
+            {combinedDocs.challan && (
+              <button
+                onClick={() => navigate('/sales/delivery', { state: { challanId: combinedDocs.challan.id } })}
+                className="p-1 text-muted hover:text-indigo-600 hover:bg-indigo-50 rounded cursor-pointer"
+                title="View Challan"
+                aria-label="View Challan"
+              >
+                <Truck size={12}/>
+              </button>
+            )}
+            {(combinedDocs.invoice?.id || getLinkedInvoiceId(o)) && (
+              <button
+                onClick={() => navigate('/sales/invoices', {
+                  state: { invoiceId: combinedDocs.invoice?.id || getLinkedInvoiceId(o) },
+                })}
+                className="p-1 text-muted hover:text-emerald-700 hover:bg-emerald-50 rounded cursor-pointer"
+                title="View Invoice"
+                aria-label="View Invoice"
+              >
+                <Receipt size={12}/>
               </button>
             )}
             {o.stage === 'Invoiced' && (<span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 inline-flex items-center gap-1 whitespace-nowrap">
@@ -461,9 +582,12 @@ export const SalesOrdersPage = () => {
             {isCancelled && (<span className="text-[11px] font-semibold text-rose-600 dark:text-rose-400 inline-flex items-center gap-1 whitespace-nowrap">
                 <Ban size={12}/> Cancelled
               </span>)}
-            {!isCancelled && o.stage !== 'Invoiced' && o.stage !== 'Closed' && (
+            {!isCancelled && o.stage !== 'Invoiced' && o.stage !== 'Closed' && !orderHasInvoice(o) && (
               <button
-                onClick={() => setCancelModalTarget(o)}
+                onClick={() => {
+                  setCancelError('');
+                  setCancelModalTarget(o);
+                }}
                 className="p-1 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded cursor-pointer transition-colors"
                 title="Cancel Sales Order"
               >
@@ -628,21 +752,6 @@ export const SalesOrdersPage = () => {
                 <StatusBadge status={selectedOrder.stage || 'Draft'}/>
               </div>
               <div className="flex flex-wrap lg:flex-nowrap items-center gap-2">
-                {selectedOrder.stage !== 'Cancelled' && !orderHasInvoice(selectedOrder) && (
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      await convertSalesOrderToInvoice(selectedOrder.id);
-                      setSelectedOrder(null);
-                      navigate('/sales/invoices');
-                    }}
-                    className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-lg font-semibold flex items-center gap-1.5 cursor-pointer shadow-xs"
-                    title="Convert to Sales Invoice"
-                  >
-                    <Receipt size={13}/>
-                    Convert to Sales Invoice
-                  </button>
-                )}
                 <button
                   type="button"
                   onClick={() => setPrintSalesOrderTarget(selectedOrder)}
@@ -766,31 +875,57 @@ export const SalesOrdersPage = () => {
                     {selectedOrder.stage === 'Draft' && (<Button onClick={() => { advanceStage(selectedOrder.id, 'Draft'); setSelectedOrder(null); }}>
                         Confirm Order
                       </Button>)}
-                    {(selectedOrder.stage === 'Confirmed' || selectedOrder.stage === 'Partially Dispatched') && !orderHasChallan(selectedOrder) && (<Button onClick={() => { advanceStage(selectedOrder.id, selectedOrder.stage); setSelectedOrder(null); }}>
-                        {selectedOrder.stage === 'Partially Dispatched' ? 'Dispatch Remaining' : 'Issue Delivery Challan'}
-                      </Button>)}
-                    {selectedOrder.stage !== 'Cancelled' && !orderHasInvoice(selectedOrder) && (
-                      <Button
-                        className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold flex items-center gap-1 cursor-pointer"
-                        onClick={async () => {
-                          await convertSalesOrderToInvoice(selectedOrder.id);
-                          setSelectedOrder(null);
-                          navigate('/sales/invoices');
-                        }}
+                    {orderNeedsCombinedAction(selectedOrder) && (
+                      <button
+                        type="button"
+                        onClick={() => void handleCreateChallanAndInvoice(selectedOrder)}
+                        disabled={convertingOrderIds.has(String(selectedOrder.id))}
+                        className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 disabled:cursor-wait text-white rounded-lg font-semibold flex items-center gap-1.5 cursor-pointer shadow-xs"
                       >
-                        <Receipt size={13}/> Convert to Sales Invoice
-                      </Button>
+                        <Truck size={13}/>
+                        {convertingOrderIds.has(String(selectedOrder.id))
+                          ? 'Creating…'
+                          : selectedCombinedDocs.challan && !selectedCombinedDocs.invoice
+                            ? 'Create Invoice'
+                            : 'Create Challan + Invoice'}
+                      </button>
                     )}
-                    <button
-                      onClick={() => {
-                        const target = selectedOrder;
-                        setSelectedOrder(null);
-                        setCancelModalTarget(target);
-                      }}
-                      className="px-3 py-1.5 border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-lg font-semibold text-xs flex items-center gap-1 cursor-pointer"
-                    >
-                      <Ban size={12}/> Cancel Order
-                    </button>
+                    {selectedCombinedDocs.challan && !selectedCombinedDocs.invoice && (
+                      <span className="text-[11px] font-semibold text-amber-700">Invoice pending</span>
+                    )}
+                    {selectedCombinedDocs.challan && (
+                      <button
+                        onClick={() => navigate('/sales/delivery', {
+                          state: { challanId: selectedCombinedDocs.challan.id },
+                        })}
+                        className="px-3 py-1.5 border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg font-semibold text-xs cursor-pointer"
+                      >
+                        View Challan
+                      </button>
+                    )}
+                    {(selectedCombinedDocs.invoice?.id || getLinkedInvoiceId(selectedOrder)) && (
+                      <button
+                        onClick={() => navigate('/sales/invoices', {
+                          state: { invoiceId: selectedCombinedDocs.invoice?.id || getLinkedInvoiceId(selectedOrder) },
+                        })}
+                        className="px-3 py-1.5 border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg font-semibold text-xs cursor-pointer"
+                      >
+                        View Invoice
+                      </button>
+                    )}
+                    {!orderHasInvoice(selectedOrder) && (
+                      <button
+                        onClick={() => {
+                          const target = selectedOrder;
+                          setSelectedOrder(null);
+                          setCancelError('');
+                          setCancelModalTarget(target);
+                        }}
+                        className="px-3 py-1.5 border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-lg font-semibold text-xs flex items-center gap-1 cursor-pointer"
+                      >
+                        <Ban size={12}/> Cancel Order
+                      </button>
+                    )}
                   </>
                 )}
                 <Button variant="outline" onClick={() => setSelectedOrder(null)}>
@@ -826,29 +961,68 @@ export const SalesOrdersPage = () => {
             </div>
 
             <div className="py-4 space-y-2 text-slate-600">
-              <p className="font-semibold text-slate-800">This action will:</p>
-              <ul className="list-disc list-inside space-y-1 text-slate-600">
-                <li>Release inventory reservation for this order</li>
-                <li>Prevent any new Delivery Challans or Invoices from being generated</li>
-                <li>Mark order as <strong className="text-rose-600">Cancelled</strong></li>
-                <li>Preserve previous document history</li>
-              </ul>
+              {orderHasInvoice(cancelModalTarget) ? (
+                <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-amber-800">
+                  This order has an active linked invoice. Resolve or remove that invoice before cancelling the order.
+                </p>
+              ) : (
+                <>
+                  <p className="font-semibold text-slate-800">This action will:</p>
+                  <ul className="list-disc list-inside space-y-1 text-slate-600">
+                    <li>Release inventory reservation for this order</li>
+                    <li>Prevent any new Delivery Challans or Invoices from being generated</li>
+                    <li>Mark order as <strong className="text-rose-600">Cancelled</strong></li>
+                    <li>Preserve previous document history</li>
+                  </ul>
+                </>
+              )}
             </div>
 
+            {cancelError && (
+              <p role="alert" className="mb-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-rose-700">
+                {cancelError}
+              </p>
+            )}
+
             <div className="flex justify-end gap-2 pt-3 border-t border-slate-200">
-              <Button variant="outline" onClick={() => setCancelModalTarget(null)}>
-                Keep Order
-              </Button>
-              <button
-                type="button"
-                onClick={() => {
-                  cancelSalesOrder(cancelModalTarget.id);
-                  setCancelModalTarget(null);
-                }}
-                className="px-4 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg font-bold shadow-sm cursor-pointer"
+              <Button
+                variant="outline"
+                disabled={cancellingOrder}
+                onClick={() => setCancelModalTarget(null)}
               >
-                Cancel Order
-              </button>
+                {cancellingOrder ? 'Cancelling…' : 'Keep Order'}
+              </Button>
+              {orderHasInvoice(cancelModalTarget) ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCancelModalTarget(null);
+                    navigate('/sales/invoices');
+                  }}
+                  className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold shadow-sm cursor-pointer"
+                >
+                  Open Invoices
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  disabled={cancellingOrder}
+                  onClick={async () => {
+                    setCancellingOrder(true);
+                    setCancelError('');
+                    const result = await cancelSalesOrder(cancelModalTarget.id);
+                    if (result?.success) {
+                      setCancelModalTarget(null);
+                    } else {
+                      setCancelError(result?.message || 'The Sales Order could not be cancelled.');
+                    }
+                    setCancellingOrder(false);
+                  }}
+                  className="px-4 py-1.5 bg-rose-600 hover:bg-rose-700 disabled:opacity-60 disabled:cursor-wait text-white rounded-lg font-bold shadow-sm cursor-pointer"
+                >
+                  {cancellingOrder ? 'Cancelling…' : 'Cancel Order'}
+                </button>
+              )}
             </div>
           </div>
         </div>

@@ -4,9 +4,9 @@ import { useERP } from '../../context/ERPContext';
 import { Button } from '../ui/Button';
 import UomSelect from './UomSelect';
 import MasterSourceLink from './MasterSourceLink';
-import BatchPickerModal from './BatchPickerModal';
 import useUnits from '../../hooks/useUnits';
 import { factorToStock, formatQty, resolveUnit, unitDecimals } from '../../utils/uom';
+import BatchAllocationModal from './BatchAllocationModal';
 
 const createEmptyLine = () => ({
   id: `li-${Date.now()}-${Math.floor(Math.random() * 10000)}`,
@@ -23,9 +23,18 @@ const createEmptyLine = () => ({
   isUserModified: false,
 });
 
-export const LineItemEditor = ({ items = [], onChange, type = 'sales', readOnly = false, onRequestPO, orderId }) => {
-    // Sales lines of lot/taka items can be drawn from chosen batches.
-    const [batchPickerIndex, setBatchPickerIndex] = useState(null);
+export const LineItemEditor = ({
+  items = [],
+  onChange,
+  type = 'sales',
+  readOnly = false,
+  onRequestPO,
+  showCharges = false,
+  freightCharges = 0,
+  otherCharges = 0,
+  onFreightChange,
+  onOtherChargesChange,
+}) => {
     const {
       items: masterItems = [],
       categories = [],
@@ -36,6 +45,47 @@ export const LineItemEditor = ({ items = [], onChange, type = 'sales', readOnly 
     const { units } = useUnits();
 
     const [isStockPickerOpen, setIsStockPickerOpen] = useState(false);
+    const [batchModalState, setBatchModalState] = useState({
+      isOpen: false,
+      lineIndex: null,
+      item: null,
+    });
+
+    const openBatchAllocation = (index) => {
+      const line = items[index];
+      if (!line) return;
+      const masterObj = line.itemId
+        ? masterItems.find((mi) => mi.id === line.itemId || mi.sku === line.sku)
+        : null;
+      setBatchModalState({
+        isOpen: true,
+        lineIndex: index,
+        item: {
+          ...line,
+          itemId: line.itemId || masterObj?.id,
+          sku: line.sku || line.itemSku || masterObj?.sku,
+          name: line.name || line.description || masterObj?.name,
+          qty: line.qty || 1,
+          uom: line.uom || line.unit || masterObj?.uom || 'Mtr',
+        },
+      });
+    };
+
+    const handleSaveBatchAllocation = (takaAllocations, summary) => {
+      if (batchModalState.lineIndex === null) return;
+      const updated = [...items];
+      const idx = batchModalState.lineIndex;
+      const currentLine = updated[idx];
+      if (!currentLine) return;
+
+      updated[idx] = {
+        ...currentLine,
+        takaAllocations,
+        batchAllocations: summary.batches,
+        isUserModified: true,
+      };
+      onChange(updated);
+    };
     const [stockPickerTargetMachineId, setStockPickerTargetMachineId] = useState(null);
     const [pickerSearch, setPickerSearch] = useState('');
     const [pickerCategory, setPickerCategory] = useState('All');
@@ -235,8 +285,6 @@ export const LineItemEditor = ({ items = [], onChange, type = 'sales', readOnly 
 
         const updatedMain = {
             ...current,
-            // Batches picked for the previous item do not apply to this one.
-            takaAllocations: [],
             id: lineId,
             itemId: selected.id,
             sku: selected.sku,
@@ -333,10 +381,6 @@ export const LineItemEditor = ({ items = [], onChange, type = 'sales', readOnly 
         
         const prevQty = current.qty || 1;
         current[field] = value;
-        // A new quantity no longer matches the batches picked for the old one.
-        if (field === 'qty' && Array.isArray(current.takaAllocations) && current.takaAllocations.length) {
-            current.takaAllocations = [];
-        }
 
         // If user changed rate/discount/tax/qty directly on a BOM part, mark as user modified
         if (current.isBomGenerated && (field === 'qty' || field === 'rate' || field === 'discount' || field === 'tax')) {
@@ -423,26 +467,11 @@ export const LineItemEditor = ({ items = [], onChange, type = 'sales', readOnly 
         const grossAfterDisc = ((Number(it.qty) || 0) * (Number(it.rate) || 0)) * (1 - ((Number(it.discount) || 0) / 100));
         return acc + (grossAfterDisc * (((it.tax !== undefined && it.tax !== null ? Number(it.tax) : 5)) / 100));
     }, 0);
-    const grandTotal = Math.round((subtotal - totalDiscount + totalTax) * 100) / 100;
+    const extraChargesTotal = showCharges ? ((Number(freightCharges) || 0) + (Number(otherCharges) || 0)) : 0;
+    const grandTotal = Math.round((subtotal - totalDiscount + totalTax + extraChargesTotal) * 100) / 100;
 
     return (
     <div className="space-y-4 font-sans text-xs">
-      {batchPickerIndex !== null && items[batchPickerIndex] && (
-        <BatchPickerModal
-          itemId={items[batchPickerIndex].itemId}
-          itemName={items[batchPickerIndex].name}
-          qty={items[batchPickerIndex].qty}
-          value={items[batchPickerIndex].takaAllocations || []}
-          orderId={orderId}
-          onClose={() => setBatchPickerIndex(null)}
-          onSave={(allocations) => {
-            const updated = [...items];
-            updated[batchPickerIndex] = { ...updated[batchPickerIndex], takaAllocations: allocations };
-            onChange(updated);
-            setBatchPickerIndex(null);
-          }}
-        />
-      )}
       {/* Scrolls sideways on narrow screens instead of clipping columns. */}
       <div className="border border-border rounded-xl bg-card shadow-xs overflow-x-auto custom-scrollbar">
         <table className="w-full min-w-[720px] lg:min-w-0 border-collapse text-xs">
@@ -603,21 +632,6 @@ export const LineItemEditor = ({ items = [], onChange, type = 'sales', readOnly 
                                   </button>
                                 </div>
                               )}
-                              {type === 'sales' && item.itemId && ['LOT', 'TAKA'].includes(String(masterItems.find((mi) => String(mi.id) === String(item.itemId))?.trackingType || '').toUpperCase()) && (() => {
-                                const picked = Array.isArray(item.takaAllocations) ? item.takaAllocations : [];
-                                const batchCodes = [...new Set(picked.map((a) => a.batchCode).filter(Boolean))];
-                                return (
-                                  <button
-                                    type="button"
-                                    onClick={() => setBatchPickerIndex(index)}
-                                    className="mt-1.5 inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold rounded-md text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 transition cursor-pointer"
-                                    title="Choose the batches this line is sold from, or scan a batch tag"
-                                  >
-                                    <Layers size={10} />
-                                    <span>{batchCodes.length ? `Batch: ${batchCodes.join(', ')}` : 'Batch: auto (oldest first) — choose'}</span>
-                                  </button>
-                                );
-                              })()}
                               <input
                                 type="text"
                                 placeholder="Custom line description / serial notes..."
@@ -625,6 +639,35 @@ export const LineItemEditor = ({ items = [], onChange, type = 'sales', readOnly 
                                 onChange={(e) => handleFieldChange(index, 'description', e.target.value)}
                                 className="w-full text-[11px] px-2.5 py-1 mt-1.5 rounded-md border border-border/70 bg-card text-text placeholder:text-muted focus:outline-none focus:border-primary transition"
                               />
+                                {/* Multi-Batch & Taka Allocation Status & Trigger */}
+                                {item.itemId && (
+                                  <div className="mt-1.5 flex items-center gap-1.5 flex-wrap">
+                                    {Array.isArray(item.takaAllocations) && item.takaAllocations.length > 0 ? (
+                                      <button
+                                        type="button"
+                                        onClick={() => openBatchAllocation(index)}
+                                        className="inline-flex items-center gap-1.5 px-2 py-0.5 text-[11px] font-bold rounded-md bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 transition cursor-pointer shadow-2xs"
+                                        title="Click to view or adjust multi-batch & taka allocations"
+                                      >
+                                        <Layers size={11} className="text-emerald-600" />
+                                        <span>
+                                          Allocated: {item.takaAllocations.reduce((sum, a) => sum + Number(a.qty || 0), 0)} {item.uom || stockUnit || 'Mtr'} (
+                                          {[...new Set(item.takaAllocations.map((a) => a.lotNo).filter(Boolean))].length || 1} {([...new Set(item.takaAllocations.map((a) => a.lotNo).filter(Boolean))].length || 1) === 1 ? 'Batch' : 'Batches'})
+                                        </span>
+                                      </button>
+                                    ) : (
+                                      <button
+                                        type="button"
+                                        onClick={() => openBatchAllocation(index)}
+                                        className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-bold rounded-md bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 border border-indigo-200 dark:border-indigo-800 transition cursor-pointer shadow-2xs"
+                                        title="Allocate across available inventory batches & takas"
+                                      >
+                                        <Layers size={11} className="text-indigo-600" />
+                                        <span>+ Pick Batches</span>
+                                      </button>
+                                    )}
+                                  </div>
+                                )}
                             </div>
                           )
                         ) : (
@@ -651,6 +694,18 @@ export const LineItemEditor = ({ items = [], onChange, type = 'sales', readOnly 
                                   <span className="text-[10px] text-muted font-mono block mt-0.5">
                                     SKU: {item.itemSku}
                                   </span>
+                                )}
+                                {Array.isArray(item.takaAllocations) && item.takaAllocations.length > 0 && (
+                                  <div className="mt-1 flex items-center gap-1.5 flex-wrap">
+                                    <span
+                                      className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold rounded bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700"
+                                    >
+                                      <Layers size={10} className="text-emerald-600" />
+                                      <span>
+                                        Batches: {[...new Set(item.takaAllocations.map((a) => a.lotNo).filter(Boolean))].join(', ')} ({item.takaAllocations.reduce((sum, a) => sum + Number(a.qty || 0), 0)} {item.uom || stockUnit || 'Mtr'})
+                                      </span>
+                                    </span>
+                                  </div>
                                 )}
                               </div>
                             )}
@@ -875,6 +930,48 @@ export const LineItemEditor = ({ items = [], onChange, type = 'sales', readOnly 
             <strong className="font-mono text-text">₹{totalTax.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
           </div>
           <div className="pt-2 border-t border-border flex items-center justify-between font-bold text-sm text-text">
+{showCharges && (
+            <>
+              <div className="flex items-center justify-between text-text-secondary">
+                <span>Freight Charges:</span>
+                {onFreightChange && !readOnly ? (
+                  <div className="flex items-center gap-1 font-mono">
+                    <span className="text-muted">₹</span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="any"
+                      value={freightCharges || ''}
+                      placeholder="0"
+                      onChange={(e) => onFreightChange(parseFloat(e.target.value) || 0)}
+                      className="w-20 text-right px-2 py-0.5 rounded-lg border border-border bg-card text-text font-semibold text-xs focus:outline-none focus:border-primary"
+                    />
+                  </div>
+                ) : (
+                  <strong className="font-mono text-text">₹{Number(freightCharges || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
+                )}
+              </div>
+              <div className="flex items-center justify-between text-text-secondary">
+                <span>Other Charges:</span>
+                {onOtherChargesChange && !readOnly ? (
+                  <div className="flex items-center gap-1 font-mono">
+                    <span className="text-muted">₹</span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="any"
+                      value={otherCharges || ''}
+                      placeholder="0"
+                      onChange={(e) => onOtherChargesChange(parseFloat(e.target.value) || 0)}
+                      className="w-20 text-right px-2 py-0.5 rounded-lg border border-border bg-card text-text font-semibold text-xs focus:outline-none focus:border-primary"
+                    />
+                  </div>
+                ) : (
+                  <strong className="font-mono text-text">₹{Number(otherCharges || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
+                )}
+              </div>
+            </>
+          )}
             <span>Grand Total:</span>
             <strong className="font-mono text-primary">₹{grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
           </div>
@@ -1021,6 +1118,19 @@ export const LineItemEditor = ({ items = [], onChange, type = 'sales', readOnly 
           </div>
         </div>
       )}
+
+      {/* Multi-Batch & Taka Allocation Modal */}
+      <BatchAllocationModal
+        isOpen={batchModalState.isOpen}
+        onClose={() => setBatchModalState({ isOpen: false, lineIndex: null, item: null })}
+        item={batchModalState.item || {}}
+        currentAllocations={
+          batchModalState.lineIndex !== null
+            ? items[batchModalState.lineIndex]?.takaAllocations || []
+            : []
+        }
+        onSave={handleSaveBatchAllocation}
+      />
     </div>
   );
 };

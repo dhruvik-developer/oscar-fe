@@ -213,7 +213,6 @@ const UsersPage = lazy(() => import('../features/administration/UsersPage'));
 const RolesPage = lazy(() => import('../features/administration/RolesPage'));
 const ClientsPage = lazy(() => import('../features/administration/ClientsPage'));
 const ApprovalsInboxPage = lazy(() => import('../features/administration/ApprovalsInboxPage'));
-const AlertCenterPage = lazy(() => import('../features/administration/AlertCenterPage'));
 const AccountingLogPage = lazy(() => import('../features/accounts/AccountingLogPage'));
 const ChartOfAccountsPage = lazy(() => import('../features/accounts/ChartOfAccountsPage'));
 const ExpenseCategoriesPage = lazy(() => import('../features/accounts/ExpenseCategoriesPage'));
@@ -448,21 +447,26 @@ const router = createBrowserRouter([
       { path: 'job-work/itc-04', element: <Page component={ITC04ReportPage} title="ITC-04 Job Work Report" /> },
 
       // ── Sales ─────────────────────────────────────────────
-      // [Quotation & Proforma Invoice modules are commented out] — Sales opens on Sales Orders.
-      { path: 'sales', element: <Navigate to="/sales/orders" replace /> },
-      // { path: 'sales/quotations/create', element: <Page component={QuotationComposerPage} /> },
-      // { path: 'sales/quotations/:id', element: <Page component={QuotationDetailPage} /> },
-      // { path: 'sales/quotations', element: <Page component={QuotationsPage} /> },
-      { path: 'sales/orders', element: <Page component={SalesOrdersPage} /> },
-      // { path: 'sales/proforma', element: <Page component={ProformaInvoicesPage} /> },
-      { path: 'sales/invoices', element: <Page component={SalesInvoicesPage} /> },
-      { path: 'sales/returns', element: <Page component={SalesReturnsPage} /> },
-      { path: 'sales/payments', element: <Page component={PaymentInPage} /> },
-      { path: 'sales/receivables', element: <Page component={CustomerPaymentsPage} /> },
-      { path: 'sales/delivery', element: <Page component={DeliveryChallansPage} /> },
-      { path: 'sales/broker-commissions', element: <Page component={BrokerCommissionPage} title="Broker Commissions" /> },
-      // [REMOVED] Customer Warranty concept removed product-wide
-      { path: 'sales/warranty', element: <Navigate to="/sales/delivery" replace /> },
+      // Sales Orders is the module root, not a fallback for other Sales routes.
+      {
+        path: 'sales',
+        children: [
+          { index: true, element: <Navigate to="/sales/orders" replace /> },
+          // { path: 'quotations/create', element: <Page component={QuotationComposerPage} /> },
+          // { path: 'quotations/:id', element: <Page component={QuotationDetailPage} /> },
+          // { path: 'quotations', element: <Page component={QuotationsPage} /> },
+          { path: 'orders', element: <Page component={SalesOrdersPage} /> },
+          // { path: 'proforma', element: <Page component={ProformaInvoicesPage} /> },
+          { path: 'invoices', element: <Page component={SalesInvoicesPage} /> },
+          { path: 'returns', element: <Page component={SalesReturnsPage} /> },
+          { path: 'payments', element: <Page component={PaymentInPage} /> },
+          { path: 'receivables', element: <Page component={CustomerPaymentsPage} /> },
+          { path: 'delivery', element: <Page component={DeliveryChallansPage} /> },
+          { path: 'broker-commissions', element: <Page component={BrokerCommissionPage} title="Broker Commissions" /> },
+          // [REMOVED] Customer Warranty concept removed product-wide
+          { path: 'warranty', element: <Navigate to="/sales/delivery" replace /> },
+        ],
+      },
       { path: 'warranty', element: <Navigate to="/sales/delivery" replace /> },
 
       // ── Purchase ──────────────────────────────────────────
@@ -663,7 +667,7 @@ const router = createBrowserRouter([
       // ── Administration ────────────────────────────────────
       { path: 'administration', element: <Navigate to="/administration/settings" replace /> },
       { path: 'administration/approvals', element: <Page component={ApprovalsInboxPage} title="Approvals Inbox" /> },
-      { path: 'administration/alerts', element: <Page component={AlertCenterPage} title="Alert Center & Exceptions" /> },
+      { path: 'administration/alerts', element: <Navigate to="/administration/settings" replace /> },
       { path: 'administration/accounting-log', element: <Navigate to="/accounts/accounting-log" replace /> },
       { path: 'administration/users', element: <Page component={UsersPage} /> },
       { path: 'administration/roles', element: <Page component={RolesPage} /> },
@@ -671,9 +675,9 @@ const router = createBrowserRouter([
       { path: 'administration/client', element: <Navigate to="/administration/clients" replace /> },
       { path: 'administration/settings', element: <Page component={SettingsPage} /> },
       { path: 'admin/approvals', element: <Navigate to="/administration/approvals" replace /> },
-      { path: 'admin/alerts', element: <Navigate to="/administration/alerts" replace /> },
+      { path: 'admin/alerts', element: <Navigate to="/administration/settings" replace /> },
       { path: 'approvals', element: <Navigate to="/administration/approvals" replace /> },
-      { path: 'alerts', element: <Navigate to="/administration/alerts" replace /> },
+      { path: 'alerts', element: <Navigate to="/administration/settings" replace /> },
 
       // ── Catch-all ─────────────────────────────────────────
       { path: '*', element: <Navigate to="/dashboard" replace /> },

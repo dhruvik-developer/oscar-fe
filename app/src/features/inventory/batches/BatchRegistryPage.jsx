@@ -8,7 +8,6 @@ import {
 } from 'lucide-react';
 import PageHeader from '../../../components/ui/PageHeader';
 import AppPagination from '../../../components/ui/AppPagination';
-import KpiCard from '../../../components/ui/KpiCard';
 import { inventoryService } from '../../../services/domainServices';
 import { formatINR, formatNumberIN, describeApiError } from '../../accounts/accountingShared';
 import { printBatchTags } from './printBatchTag';
@@ -36,25 +35,22 @@ const FABRIC_TYPES = [
   ['GREY', 'Grey'],
   ['DYED', 'Dyed'],
 ];
-/** Stock tiles: [summary key, label, holding filter it opens, figure colour, icon, icon tint]. */
-const STOCK_TILES = [
-  ['totalPhysical', 'Total physical', '', 'text-slate-900', Boxes, 'bg-slate-100 text-slate-600'],
-  ['available', 'Available', 'available', 'text-emerald-700', CheckCircle2, 'bg-emerald-50 text-emerald-600'],
-  ['reserved', 'Reserved', 'reserved', 'text-blue-700', Bookmark, 'bg-blue-50 text-blue-600'],
-  ['qcHold', 'QC hold', 'qcHold', 'text-amber-700', ClipboardCheck, 'bg-amber-50 text-amber-600'],
-  ['rework', 'Rework', 'rework', 'text-violet-700', RefreshCcw, 'bg-violet-50 text-violet-600'],
-  ['rejected', 'Rejected', 'rejected', 'text-rose-700', XCircle, 'bg-rose-50 text-rose-600'],
-  ['withJobWorker', 'At job worker', 'withJobWorker', 'text-indigo-700', Truck, 'bg-indigo-50 text-indigo-600'],
-];
 /** Where a batch came from, with its icon. */
 const ORIGIN_ICON = { PURCHASE: ShoppingCart, PRODUCTION: Factory, JOB_WORK: Truck, MERGE: GitMerge, MANUAL: PenLine };
 /** Status tabs above the table ('' = all). */
-const STATUS_TABS = ['', 'In Stock', 'QC Hold', 'At Job Worker', 'Blocked', 'Sold Out'];
+const STATUS_TABS = ['', 'In Stock', 'At Job Worker', 'Blocked', 'Sold Out'];
 const STATUS_DOT = {
   'In Stock': 'bg-emerald-500', 'QC Hold': 'bg-amber-500', 'At Job Worker': 'bg-violet-500',
   Blocked: 'bg-rose-500', 'Sold Out': 'bg-slate-400', Closed: 'bg-slate-300',
 };
-const HOLDING_LABEL = Object.fromEntries(STOCK_TILES.filter(([, , h]) => h).map(([, label, h]) => [h, label]));
+const HOLDING_LABEL = {
+  available: 'Available',
+  reserved: 'Reserved',
+  qcHold: 'QC hold',
+  rework: 'Rework',
+  rejected: 'Rejected',
+  withJobWorker: 'At job worker',
+};
 /** The stock bar of a row: [quantity key, label, bar colour]. */
 const STOCK_PARTS = [
   ['available', 'Available', 'bg-emerald-500'],
@@ -82,7 +78,7 @@ const BLANK = {
 };
 const inputCls = 'h-9 px-3 bg-white border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:border-blue-500';
 const ghostBtn = 'h-9 px-3 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50 inline-flex items-center gap-1.5 cursor-pointer';
-const QC_STATUSES = ['Passed', 'Pending', 'On Hold', 'Reprocess', 'Rejected', 'Not Inspected'];
+const QC_STATUSES = ['Passed'];
 const PO_STATUS_OPTIONS = ['Draft', 'Pending Approval', 'Approved', 'Issued', 'Partially Received', 'Fully Received', 'Closed'];
 const RECEIPT_STATUS_OPTIONS = [
   ['', 'All receipt statuses'],
@@ -130,11 +126,7 @@ function BatchGroupCard({
   expanded,
   onToggle,
   onOpenPo,
-  onViewBatches,
   onOpenBatch,
-  onReceiveGoods,
-  onMatchBill,
-  onPerformQc,
 }) {
   const isPo = group.type === 'po';
   const isUnlinked = group.type === 'unlinked';
@@ -149,13 +141,9 @@ function BatchGroupCard({
     : 0;
 
   const batches = group.batches || [];
-  const qcPendingQty = group.qcPendingQty !== undefined
-    ? Number(group.qcPendingQty)
-    : batches.reduce((sum, b) => sum + (['Pending', 'QC Hold', 'Mixed', 'Not Inspected'].includes(b.qcStatus) ? Number(b.batchQty || 0) : 0), 0);
-
   const qcAcceptedQty = (group.qcPassedQty !== undefined || group.qcAcceptedQty !== undefined)
     ? Number(group.qcPassedQty || group.qcAcceptedQty)
-    : batches.reduce((sum, b) => sum + (b.qcStatus === 'Passed' ? Number(b.availableQty || b.batchQty || 0) : 0), 0);
+    : batches.reduce((sum, b) => sum + Number(b.acceptedQty || 0), 0);
 
   const availableQty = group.availableQty !== undefined
     ? Number(group.availableQty)
@@ -191,7 +179,7 @@ function BatchGroupCard({
   }[group.status] || 'bg-slate-100 text-slate-700 border-slate-200';
 
   return (
-    <section className="border border-slate-200 rounded-xl bg-white overflow-hidden shadow-2xs transition-shadow hover:shadow-xs">
+    <section className="border border-blue-100 rounded-xl bg-slate-50/70 overflow-hidden shadow-2xs transition-shadow hover:shadow-xs">
       <div className="p-4 space-y-3">
         {/* Main PO Header Bar */}
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -201,7 +189,7 @@ function BatchGroupCard({
               onClick={onToggle}
               aria-expanded={expanded}
               aria-label={`${expanded ? 'Collapse' : 'Expand'} ${title}`}
-              className="grid place-items-center w-8 h-8 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 cursor-pointer font-bold text-base transition-colors"
+              className="grid place-items-center w-8 h-8 rounded-lg border border-blue-200 bg-white text-blue-700 hover:bg-blue-50 cursor-pointer font-bold text-base transition-colors"
             >
               {expanded ? '−' : '+'}
             </button>
@@ -249,79 +237,17 @@ function BatchGroupCard({
             </div>
           </div>
 
-          {/* Action Buttons */}
-          <div className="flex flex-wrap items-center gap-2 ml-auto">
-            {isPo && (
-              <>
-                {onReceiveGoods && (
-                  <button
-                    type="button"
-                    onClick={onReceiveGoods}
-                    className="h-8 px-3.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-xs font-bold text-white inline-flex items-center gap-1.5 cursor-pointer shadow-2xs transition-colors"
-                  >
-                    <PackageCheck size={14} /> + Receive Goods
-                  </button>
-                )}
-                {onPerformQc && qcPendingQty > 0 && (
-                  <button
-                    type="button"
-                    onClick={onPerformQc}
-                    className="h-8 px-3 rounded-lg border border-amber-300 bg-amber-50 hover:bg-amber-100 text-xs font-semibold text-amber-800 inline-flex items-center gap-1.5 cursor-pointer transition-colors"
-                  >
-                    <ShieldCheck size={13} /> QC Pending ({formatNumberIN(qcPendingQty)})
-                  </button>
-                )}
-                {onMatchBill && (
-                  <button
-                    type="button"
-                    onClick={onMatchBill}
-                    className="h-8 px-3 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700 inline-flex items-center gap-1.5 cursor-pointer shadow-2xs"
-                  >
-                    <Receipt size={13} className="text-slate-500" /> Match Bill
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={onViewBatches}
-                  className={ghostBtn}
-                >
-                  View Batches
-                </button>
-                {/* [DISABLED] Open PO button commented out as requested
-                <button
-                  type="button"
-                  onClick={onOpenPo}
-                  className={ghostBtn}
-                >
-                  Open PO
-                </button>
-                */}
-              </>
-            )}
-          </div>
         </div>
 
         {/* Quantity Metrics Ribbon */}
         {isPo && (
-          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 pt-2 border-t border-slate-100 text-xs">
-            <div className="rounded-lg bg-slate-50 p-2 border border-slate-100">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-blue-100 text-xs">
+            <div className="rounded-lg bg-white/80 p-2 border border-slate-200/80">
               <span className="text-[10px] font-semibold uppercase text-slate-500 block">Ordered</span>
               <span className="font-bold text-slate-900 tabular-nums">{formatNumberIN(orderedQty)} {uom}</span>
             </div>
-            <div className="rounded-lg bg-slate-50 p-2 border border-slate-100">
-              <span className="text-[10px] font-semibold uppercase text-slate-500 block">Received</span>
-              <span className="font-bold text-slate-900 tabular-nums">{formatNumberIN(receivedQty)} {uom}</span>
-            </div>
-            <div className={`rounded-lg p-2 border ${remainingQty > 0 ? 'bg-amber-50/70 border-amber-200 text-amber-900' : 'bg-slate-50 border-slate-100 text-slate-900'}`}>
-              <span className="text-[10px] font-semibold uppercase text-slate-500 block">Remaining</span>
-              <span className="font-bold tabular-nums">{formatNumberIN(remainingQty)} {uom}</span>
-            </div>
-            <div className={`rounded-lg p-2 border ${qcPendingQty > 0 ? 'bg-amber-50/70 border-amber-200 text-amber-900' : 'bg-slate-50 border-slate-100 text-slate-900'}`}>
-              <span className="text-[10px] font-semibold uppercase text-slate-500 block">QC Pending</span>
-              <span className="font-bold tabular-nums">{formatNumberIN(qcPendingQty)} {uom}</span>
-            </div>
             <div className="rounded-lg bg-emerald-50/60 p-2 border border-emerald-100">
-              <span className="text-[10px] font-semibold uppercase text-emerald-700 block">QC Accepted</span>
+              <span className="text-[10px] font-semibold uppercase text-emerald-700 block">QC-Passed Quantity</span>
               <span className="font-bold text-emerald-800 tabular-nums">{formatNumberIN(qcAcceptedQty)} {uom}</span>
             </div>
             <div className="rounded-lg bg-emerald-50/80 p-2 border border-emerald-200">
@@ -329,8 +255,8 @@ function BatchGroupCard({
               <span className="font-bold text-emerald-900 tabular-nums">{formatNumberIN(availableQty)} {uom}</span>
             </div>
             <div className="rounded-lg bg-blue-50/60 p-2 border border-blue-100">
-              <span className="text-[10px] font-semibold uppercase text-blue-700 block">Batches</span>
-              <span className="font-bold text-blue-900 tabular-nums">{batches.length}</span>
+              <span className="text-[10px] font-semibold uppercase text-blue-700 block">Eligible Batch Count</span>
+              <span className="font-bold text-blue-900 tabular-nums">{group.batchCount ?? batches.length}</span>
             </div>
           </div>
         )}
@@ -339,30 +265,23 @@ function BatchGroupCard({
       {/* Expanded Child Batch Rows Table */}
       {expanded && (
         <div className="overflow-x-auto border-t border-slate-200 bg-slate-50/40">
-          <table className="w-full min-w-[920px] text-xs">
+          <table className="w-full min-w-[760px] text-xs">
             <thead className="bg-slate-100/80 text-[10px] uppercase tracking-wide text-slate-600 border-b border-slate-200">
               <tr>
-                <th className="px-4 py-2.5 text-left">Batch No.</th>
-                <th className="px-4 py-2.5 text-left">Receipt / GRN</th>
-                <th className="px-4 py-2.5 text-left">Receipt Date</th>
-                <th className="px-4 py-2.5 text-right">Received Qty</th>
-                <th className="px-4 py-2.5 text-left">QC Status</th>
-                <th className="px-4 py-2.5 text-right">Accepted</th>
-                <th className="px-4 py-2.5 text-right">Rejected</th>
-                <th className="px-4 py-2.5 text-left">Stock Status</th>
+                <th className="px-4 py-2.5 text-left">Batch Number</th>
+                <th className="px-4 py-2.5 text-left">GRN Number</th>
+                <th className="px-4 py-2.5 text-left">Fabric</th>
+                <th className="px-4 py-2.5 text-right">QC-Passed Quantity</th>
+                <th className="px-4 py-2.5 text-right">Available Quantity</th>
                 <th className="px-4 py-2.5 text-left">Location</th>
-                <th className="px-4 py-2.5 text-left">Dispatch</th>
-                <th className="px-4 py-2.5 text-right">Actions</th>
+                <th className="px-4 py-2.5 text-left">Dispatch Status</th>
+                <th className="px-4 py-2.5 text-right">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 bg-white">
               {batches.map((batch) => {
-                const bReceiptDate = batch.receiptDate || batch.createdAt
-                  ? new Date(batch.receiptDate || batch.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
-                  : '—';
-                const bRejectedQty = Number(batch.rejectedQty || batch.quantities?.rejected || 0);
-                const bAcceptedQty = Number(batch.availableQty || (batch.qcStatus === 'Passed' ? batch.batchQty : 0));
-                const bLocation = batch.locationName || batch.godown || 'Main Godown';
+                const bAcceptedQty = Number(batch.acceptedQty || 0);
+                const bLocation = (batch.locationNames || []).join(', ') || '—';
                 const bDispatchStatus = batch.dispatchStatus || (
                   batch.status === 'Sold Out' ? 'Dispatched' :
                   (Number(batch.quantities?.reserved || 0) > 0 ? 'Reserved' : 'In Godown')
@@ -372,36 +291,19 @@ function BatchGroupCard({
                   <tr key={batch.id || batch.batchCode} onClick={() => onOpenBatch(batch.batchCode)} className="hover:bg-slate-50 cursor-pointer transition-colors">
                     <td className="px-4 py-3">
                       <span className="font-mono font-bold text-blue-700 hover:underline">{batch.batchCode}</span>
-                      <div className="text-[10px] text-slate-500 mt-0.5">{batch.item || '—'} · {batch.fabricType === 'DYED' ? 'Dyed' : 'Grey'}</div>
                     </td>
                     <td className="px-4 py-3 text-slate-600 font-mono text-[11px]">
                       {(batch.receiptNumbers || []).join(', ') || batch.sourceDocumentNumber || '—'}
                     </td>
-                    <td className="px-4 py-3 text-slate-600">{bReceiptDate}</td>
-                    <td className="px-4 py-3 text-right tabular-nums font-semibold text-slate-800">
-                      {formatNumberIN(batch.batchQty)} {batch.uom || uom}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
-                        batch.qcStatus === 'Passed' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
-                        batch.qcStatus === 'Pending' || batch.qcStatus === 'QC Hold' ? 'bg-amber-50 text-amber-700 border-amber-200' :
-                        batch.qcStatus === 'Rejected' ? 'bg-rose-50 text-rose-700 border-rose-200' :
-                        'bg-slate-100 text-slate-700 border-slate-200'
-                      }`}>
-                        {batch.qcStatus || 'Pending'}
-                      </span>
+                    <td className="px-4 py-3 text-slate-700">
+                      <span className="font-semibold">{batch.item || '—'}</span>
+                      <span className="ml-1.5 text-[10px] text-slate-500">{batch.fabricType === 'DYED' ? 'Dyed' : 'Grey'}</span>
                     </td>
                     <td className="px-4 py-3 text-right tabular-nums font-bold text-emerald-700">
                       {formatNumberIN(bAcceptedQty)} {batch.uom || uom}
                     </td>
-                    <td className="px-4 py-3 text-right tabular-nums text-rose-600">
-                      {bRejectedQty > 0 ? `${formatNumberIN(bRejectedQty)} ${batch.uom || uom}` : '—'}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-[10px] font-semibold whitespace-nowrap ${STATUS_STYLE[batch.status] || STATUS_STYLE.Closed}`}>
-                        <span className={`w-1.5 h-1.5 rounded-full ${STATUS_DOT[batch.status] || STATUS_DOT.Closed}`} />
-                        {batch.status || 'In Stock'}
-                      </span>
+                    <td className="px-4 py-3 text-right tabular-nums font-semibold text-slate-800">
+                      {formatNumberIN(batch.availableQty)} {batch.uom || uom}
                     </td>
                     <td className="px-4 py-3 text-slate-600">{bLocation}</td>
                     <td className="px-4 py-3">
@@ -427,8 +329,8 @@ function BatchGroupCard({
               })}
               {batches.length === 0 && (
                 <tr>
-                  <td colSpan={11} className="px-4 py-8 text-center text-slate-500">
-                    {isPo ? 'No batches have been created for this PO yet. Click "+ Receive Goods" to inward fabric.' : 'No batches in this group.'}
+                  <td colSpan={8} className="px-4 py-8 text-center text-slate-500">
+                    {isPo ? 'No QC-passed batches posted to inventory are linked to this PO.' : 'No batches in this group.'}
                   </td>
                 </tr>
               )}
@@ -884,7 +786,7 @@ function PoMovementHistoryPanel({ flowData, selectedPoGroup }) {
   );
 }
 
-/** Batch Registry: every permanent batch ID with its live quantities. */
+/** Batch Registry: permanent batch IDs with passed QC and posted stock. */
 export default function BatchRegistryPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -904,8 +806,6 @@ export default function BatchRegistryPage() {
   const [expandedGroups, setExpandedGroups] = useState({});
   // Batch profitability report: cost / revenue / profit columns (ledger access only).
   const [withCost, setWithCost] = useState(false);
-  // PO receipts still at QC Hold are kept out of the registry unless asked for.
-  const [showAwaitingQc, setShowAwaitingQc] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [scan, setScan] = useState('');
@@ -934,7 +834,7 @@ export default function BatchRegistryPage() {
     setLoading(true);
     setError('');
     try {
-      const params = { page, page_size: pageSize, ...(withCost ? { withCost: 1 } : {}), ...(showAwaitingQc ? { awaitingQc: 'include' } : {}) };
+      const params = { page, page_size: pageSize, ...(withCost ? { withCost: 1 } : {}) };
       Object.entries(query).forEach(([k, v]) => { if (v) params[k] = v; });
       if (view === 'all') {
         const [res, poOptions] = await Promise.all([
@@ -956,7 +856,7 @@ export default function BatchRegistryPage() {
     } finally {
       setLoading(false);
     }
-  }, [query, page, pageSize, withCost, showAwaitingQc, view]);
+  }, [query, page, pageSize, withCost, view]);
   useEffect(() => { load(); }, [load]);
 
   // Filters apply as they change; typing in search waits a moment.
@@ -1003,12 +903,6 @@ export default function BatchRegistryPage() {
 
   const toggleGroup = (key) => setExpandedGroups((current) => ({ ...current, [key]: !current[key] }));
 
-  const viewBatchesForPo = (poId) => {
-    setView('po');
-    setF('poId', poId);
-    setPage(1);
-  };
-
   // A barcode/QR scanner types the code and presses Enter
   const openScanned = (e) => {
     e.preventDefault();
@@ -1050,30 +944,6 @@ export default function BatchRegistryPage() {
   const advancedCount = chips.filter(([k]) => k !== 'holding').length;
   const s = data.summary;
   const cols = withCost ? 13 : 8;
-
-  // Real KPI summary metrics
-  const pendingReceiptVal = useMemo(() => {
-    if (s?.pendingReceipt !== undefined && s?.pendingReceipt !== null) return Number(s.pendingReceipt);
-    return (data.groups || [])
-      .filter((g) => g.type === 'po')
-      .reduce((acc, g) => acc + Math.max(0, Number(g.remainingQty || 0)), 0);
-  }, [s?.pendingReceipt, data.groups]);
-
-  const qcPendingVal = useMemo(() => {
-    if (s?.qcHold !== undefined && s?.qcHold !== null) return Number(s.qcHold);
-    return (data.groups || []).reduce((acc, g) => {
-      return acc + (g.batches || []).reduce((bAcc, b) => {
-        return bAcc + (['Pending', 'QC Hold', 'Mixed', 'Not Inspected'].includes(b.qcStatus) ? Number(b.batchQty || 0) : 0);
-      }, 0);
-    }, 0);
-  }, [s?.qcHold, data.groups]);
-
-  const availableStockVal = useMemo(() => {
-    if (s?.available !== undefined && s?.available !== null) return Number(s.available);
-    return (data.groups || []).reduce((acc, g) => {
-      return acc + (g.batches || []).reduce((bAcc, b) => bAcc + Number(b.availableQty || 0), 0);
-    }, 0);
-  }, [s?.available, data.groups]);
 
   // Client-filtered groups for real-time responsiveness across toolbar filters
   const displayedGroups = useMemo(() => {
@@ -1385,22 +1255,14 @@ export default function BatchRegistryPage() {
 
           {/* Backend KPI Metric Tiles */}
           {(() => {
-            const reprocessVal = Number(selectedPoGroup.qcReprocessQty || flowData?.quantities?.reprocessAtQc || 0);
-            const rejectedVal = Number(selectedPoGroup.qcRejectedQty || flowData?.quantities?.rejectedAtQc || 0);
             const tiles = [
               ['Ordered Quantity', selectedPoGroup.orderedQty, 'text-slate-900', 'bg-slate-50'],
               ['Received at OSCAR', selectedPoGroup.receivedQty, 'text-slate-900', 'bg-slate-50'],
               ['Remaining to Receive', selectedPoGroup.remainingQty, Number(selectedPoGroup.remainingQty || 0) > 0 ? 'text-amber-800' : 'text-slate-900', Number(selectedPoGroup.remainingQty || 0) > 0 ? 'bg-amber-50/50 border border-amber-200/60' : 'bg-slate-50'],
-              ['Linked Batches', selectedPoGroup.batches?.length || selectedPoGroup.batchCount || 0, 'text-blue-700', 'bg-blue-50/50 border border-blue-200/60'],
-              ['QC Pending Quantity', selectedPoGroup.qcPendingQty, qcPendingMetres > 0 ? 'text-amber-700' : 'text-slate-700', qcPendingMetres > 0 ? 'bg-amber-50 border border-amber-200' : 'bg-slate-50'],
-              ['QC Passed Quantity', selectedPoGroup.qcPassedQty, 'text-emerald-700', 'bg-emerald-50 border border-emerald-200'],
+              ['Eligible Batches', selectedPoGroup.batches?.length || selectedPoGroup.batchCount || 0, 'text-blue-700', 'bg-blue-50/50 border border-blue-200/60'],
+              ['QC-Passed Quantity', selectedPoGroup.qcPassedQty, 'text-emerald-700', 'bg-emerald-50 border border-emerald-200'],
+              ['Available Stock Quantity', selectedPoGroup.availableQty, 'text-emerald-800', 'bg-emerald-50/80 border border-emerald-200'],
             ];
-            if (reprocessVal > 0) {
-              tiles.push(['QC Reprocess Quantity', reprocessVal, 'text-purple-700', 'bg-purple-50 border border-purple-200']);
-            }
-            if (rejectedVal > 0) {
-              tiles.push(['QC Rejected Quantity', rejectedVal, 'text-rose-700', 'bg-rose-50 border border-rose-200']);
-            }
             const gridColsCls = tiles.length >= 7 ? 'grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-7' : 'grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6';
             return (
               <dl className={gridColsCls}>
@@ -1408,7 +1270,7 @@ export default function BatchRegistryPage() {
                   <div key={label} className={`rounded-xl p-3 ${bgCls}`}>
                     <dt className="text-[10px] font-bold uppercase tracking-wider text-slate-500">{label}</dt>
                     <dd className={`mt-1 text-base font-extrabold tabular-nums ${txtCls}`}>
-                      {label === 'Linked Batches' ? value : `${formatNumberIN(value)} ${selectedPoGroup.uom || 'm'}`}
+                      {label === 'Eligible Batches' ? value : `${formatNumberIN(value)} ${selectedPoGroup.uom || 'm'}`}
                     </dd>
                   </div>
                 ))}
@@ -1448,11 +1310,6 @@ export default function BatchRegistryPage() {
               title={!hasPendingQc ? 'No receipts or fabric currently awaiting QC inspection' : 'Inspect rolls, accept/reject, and transition accepted fabric to available stock'}
             >
               <ShieldCheck size={14} /> Perform QC
-              {qcPendingMetres > 0 && (
-                <span className="ml-1 px-1.5 py-0.2 rounded-full bg-amber-400 text-slate-900 text-[10px] font-bold">
-                  {formatNumberIN(qcPendingMetres)} {selectedPoGroup.uom || 'm'}
-                </span>
-              )}
             </button>
 
             {/* 3. Supplier Dispatch */}
@@ -1615,62 +1472,30 @@ export default function BatchRegistryPage() {
         />
       )}
 
-      {/* Top 4 Summary Cards — Real Backend Data */}
-      {!selectedPoGroup && (
-        <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3" aria-label="Purchase workflow summary">
-          <KpiCard
-            label="Active Purchase Orders"
-            value={String(view === 'po' ? (data.count || (data.groups || []).filter((g) => g.type === 'po').length) : (purchaseOrders.length || 0))}
-            subtitle="Open POs with batch tracking"
-            icon={FileText}
-            tone="blue"
-          />
-          <KpiCard
-            label="Pending Receipt"
-            value={`${formatNumberIN(pendingReceiptVal)} m`}
-            subtitle="Metres remaining to receive"
-            icon={PackageOpen}
-            tone="amber"
-          />
-          <KpiCard
-            label="QC Pending"
-            value={`${formatNumberIN(qcPendingVal)} m`}
-            subtitle="Metres awaiting inspection"
-            icon={ClipboardCheck}
-            tone="amber"
-          />
-          <KpiCard
-            label="Available Stock"
-            value={`${formatNumberIN(availableStockVal)} m`}
-            subtitle="Accepted and ready for dispatch"
-            icon={CheckCircle2}
-            tone="emerald"
-          />
-        </section>
-      )}
-
-      {/* Stock summary tiles when viewing all or broad search */}
+      {/* Eligible-batch stock summary from the registry API */}
       {!selectedPoGroup && s && (
-        <section className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-8 gap-3" aria-label="Stock of the batches shown">
-          {STOCK_TILES.map(([key, label, holding, tone, Icon, tint]) => {
-            const value = Number(s[key] || 0);
-            const active = holding && filters.holding === holding;
+        <section className="grid grid-cols-2 xl:grid-cols-4 gap-3" aria-label="Batch registry summary">
+          {[
+            ['QC-Passed Batches', data.batchCount, 'QC passed and posted', Boxes, 'text-blue-700', 'bg-blue-50'],
+            ['Available Stock', s.available, 'Ready to use', CheckCircle2, 'text-emerald-700', 'bg-emerald-50'],
+            ['Reserved Stock', s.reserved, 'Held for orders', Bookmark, 'text-indigo-700', 'bg-indigo-50'],
+            ['At Job Worker', s.withJobWorker, 'Currently with job worker', Truck, 'text-slate-700', 'bg-slate-100'],
+          ].map(([label, value, subtitle, Icon, tone, tint]) => {
+            const isBatchCount = label === 'QC-Passed Batches';
+            const numericValue = Number(value || 0);
             return (
-              <button
-                key={key}
-                type="button"
-                disabled={!holding}
-                onClick={() => setF('holding', active ? '' : holding)}
-                title={holding ? (active ? 'Show all batches' : `Only batches with ${label.toLowerCase()} stock`) : undefined}
-                className={`group text-left rounded-xl border bg-white px-3.5 py-3 transition-all ${active ? 'border-blue-500 ring-2 ring-blue-500/20' : 'border-slate-200'} ${holding ? 'hover:border-blue-300 hover:shadow-sm cursor-pointer' : 'cursor-default'}`}
-              >
-                <div className="flex items-center gap-2">
-                  <span className={`grid place-items-center w-7 h-7 rounded-lg ${value || !holding ? tint : 'bg-slate-50 text-slate-300'}`}><Icon size={15} /></span>
-                  <span className="text-[10.5px] font-semibold uppercase tracking-wide text-slate-500 leading-tight">{label}</span>
+              <article key={label} className="rounded-xl border border-slate-200 bg-slate-50/80 px-3.5 py-3 shadow-2xs">
+                <div className="flex items-center gap-2.5">
+                  <span className={`grid place-items-center w-8 h-8 rounded-lg ${tint}`}><Icon size={16} /></span>
+                  <div className="min-w-0">
+                    <h2 className="text-[11px] font-semibold uppercase tracking-wide text-slate-600">{label}</h2>
+                    <div className={`mt-0.5 text-lg leading-5 font-bold tabular-nums ${tone}`}>
+                      {formatNumberIN(numericValue)}{!isBatchCount && <span className="ml-1 text-[11px] font-medium text-slate-500">m</span>}
+                    </div>
+                    <p className="mt-0.5 text-[10px] text-slate-500">{subtitle}</p>
+                  </div>
                 </div>
-                <div className={`mt-2 text-xl font-bold tabular-nums ${value ? tone : 'text-slate-300'}`}>{formatNumberIN(value)}</div>
-                {key === 'totalPhysical' && <div className="text-[10px] text-slate-400">{data.batchCount} batch{data.batchCount === 1 ? '' : 'es'} · metres</div>}
-              </button>
+              </article>
             );
           })}
         </section>
@@ -2147,9 +1972,7 @@ export default function BatchRegistryPage() {
                               </>
                             )}
                             <td className="px-3 py-3">
-                              {b.awaitingQc
-                                ? <span className="px-2 py-0.5 rounded-full border text-[10px] font-semibold whitespace-nowrap bg-amber-50 text-amber-800 border-amber-200">Waiting for QC</span>
-                                : <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-[10px] font-semibold whitespace-nowrap ${STATUS_STYLE[b.status] || STATUS_STYLE.Closed}`}><span className={`w-1.5 h-1.5 rounded-full ${STATUS_DOT[b.status] || STATUS_DOT.Closed}`} />{b.status}</span>}
+                              <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-[10px] font-semibold whitespace-nowrap ${STATUS_STYLE[b.status] || STATUS_STYLE.Closed}`}><span className={`w-1.5 h-1.5 rounded-full ${STATUS_DOT[b.status] || STATUS_DOT.Closed}`} />{b.status}</span>
                             </td>
                             <td className="px-3 py-3 text-right whitespace-nowrap space-x-1" onClick={(e) => e.stopPropagation()}>
                               <button type="button" onClick={() => open(b.batchCode)} title="Open Batch 360°" aria-label={`Open ${b.batchCode}`} className="p-1.5 rounded-md border border-slate-200 text-blue-700 hover:bg-blue-50 cursor-pointer">
@@ -2192,21 +2015,7 @@ export default function BatchRegistryPage() {
                       group={group}
                       expanded={Boolean(expandedGroups[group.key])}
                       onToggle={() => toggleGroup(group.key)}
-                      // onOpenPo={() => navigate(`/purchase/orders?po=${encodeURIComponent(group.poId)}`)}
-                      onViewBatches={() => viewBatchesForPo(group.poId)}
                       onOpenBatch={open}
-                      onReceiveGoods={group.type === 'po' ? () => {
-                        viewBatchesForPo(group.poId);
-                        setPendingAction({ poId: group.poId, action: 'receive_goods' });
-                      } : undefined}
-                      onMatchBill={group.type === 'po' ? () => {
-                        viewBatchesForPo(group.poId);
-                        setPendingAction({ poId: group.poId, action: 'match_bill' });
-                      } : undefined}
-                      onPerformQc={group.type === 'po' ? () => {
-                        viewBatchesForPo(group.poId);
-                        setPendingAction({ poId: group.poId, action: 'perform_qc' });
-                      } : undefined}
                     />
                   ))}
                 </div>

@@ -11,6 +11,8 @@ import { formatDateDDMMYYYY } from '../../utils/dateUtils';
 import { SendChallanModal } from '../../components/common/SendChallanModal';
 import { PrintDeliveryChallanModal } from '../../components/common/PrintDeliveryChallanModal';
 import { SignatureSlot, useDocumentSignatures } from '../../components/common/SignatureSlot';
+import MasterSourceLink from '../../components/common/MasterSourceLink';
+import BatchAllocationModal from '../../components/common/BatchAllocationModal';
 const challanGuide = {
     title: 'Delivery Challans & Waybills',
     subtitle: 'Warehouse logistics dispatch, non-commercial shipping waybills, and proof of delivery (POD).',
@@ -74,6 +76,7 @@ export const DeliveryChallansPage = () => {
     const [dispatchNote, setDispatchNote] = useState('');
     const [lineItems, setLineItems] = useState([]);
     const [validationError, setValidationError] = useState('');
+    const [batchModalTarget, setBatchModalTarget] = useState(null);
 
     const prepareOrderLines = (order) => {
         if (!order || !order.items) return [];
@@ -94,6 +97,8 @@ export const DeliveryChallansPage = () => {
                 isSerial,
                 availableSerials,
                 selectedSerials: availableSerials.slice(0, defaultDispatchQty),
+                takaAllocations: it.takaAllocations || it.taka_allocations || [],
+                batchAllocations: it.batchAllocations || [],
             };
         });
     };
@@ -469,18 +474,27 @@ export const DeliveryChallansPage = () => {
                   </select>
                 </div>
                 <div>
-                  <label className="font-semibold text-slate-700 block mb-1">Carrier / Transporter</label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="font-semibold text-slate-700 block">Carrier / Transporter</label>
+                    <MasterSourceLink source="transporters" />
+                  </div>
                   <input type="text" value={transporter} onChange={(e) => setTransporter(e.target.value)} className="w-full p-2 border border-slate-300 rounded bg-white text-slate-800" placeholder="e.g. Transporter / Carrier name"/>
                 </div>
                 <div>
-                  <label className="font-semibold text-slate-700 block mb-1">Vehicle / Truck Plate #</label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="font-semibold text-slate-700 block">Vehicle / Truck Plate #</label>
+                    <MasterSourceLink source="vehicles" />
+                  </div>
                   <input type="text" value={vehicleNo} onChange={(e) => setVehicleNo(e.target.value)} className="w-full p-2 border border-slate-300 rounded bg-white text-slate-800" placeholder="e.g. MH-12-AB-9041"/>
                 </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="font-semibold text-slate-700 block mb-1">Driver Contact / Phone</label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="font-semibold text-slate-700 block">Driver Contact / Phone</label>
+                    <MasterSourceLink source="drivers" />
+                  </div>
                   <input type="text" value={driverContact} onChange={(e) => setDriverContact(e.target.value)} className="w-full p-2 border border-slate-300 rounded bg-white text-slate-800"/>
                 </div>
                 <div>
@@ -577,6 +591,32 @@ export const DeliveryChallansPage = () => {
                               </div>
                             </td>
                             <td className="p-2.5">
+                              {/* Multi-Batch & Taka Allocation Trigger */}
+                              <div className="mb-1.5 flex items-center gap-1">
+                                {Array.isArray(item.takaAllocations) && item.takaAllocations.length > 0 ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => setBatchModalTarget({ lineIndex: idx, item })}
+                                    className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold rounded bg-emerald-50 text-emerald-700 border border-emerald-300 hover:bg-emerald-100 transition cursor-pointer"
+                                    title="Click to view or adjust allocated batches"
+                                  >
+                                    <Package size={10} className="text-emerald-600" />
+                                    <span>
+                                      Allocated: {item.takaAllocations.reduce((sum, a) => sum + Number(a.qty || 0), 0)} ({[...new Set(item.takaAllocations.map(a => a.lotNo).filter(Boolean))].length} Batches)
+                                    </span>
+                                  </button>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => setBatchModalTarget({ lineIndex: idx, item })}
+                                    className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold rounded bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100 transition cursor-pointer"
+                                    title="Pick specific inventory batches and rolls"
+                                  >
+                                    <Package size={10} className="text-indigo-600" />
+                                    <span>+ Pick Batches</span>
+                                  </button>
+                                )}
+                              </div>
                               {item.isSerial ? (
                                 <div className="space-y-1">
                                   <span className="text-[10px] font-bold text-slate-500 block">Select Serials ({item.selectedSerials?.length || 0}/{item.qty}):</span>
@@ -880,7 +920,18 @@ export const DeliveryChallansPage = () => {
                       {(selectedChallan.items || []).map((it, idx) => (
                         <tr key={it.id || idx} className="hover:bg-slate-50/60">
                           <td className="p-2.5 text-center font-mono text-slate-400">{idx + 1}</td>
-                          <td className="p-2.5 font-semibold text-slate-800">{it.description || it.name}</td>
+                          <td className="p-2.5 font-semibold text-slate-800">
+                            <div>{it.description || it.name}</div>
+                            {Array.isArray(it.takaAllocations || it.taka_allocations) && (it.takaAllocations || it.taka_allocations).length > 0 && (
+                              <div className="mt-1 flex flex-wrap gap-1 font-normal">
+                                {(it.takaAllocations || it.taka_allocations).map((a, aidx) => (
+                                  <span key={aidx} className="inline-flex items-center gap-1 text-[9px] font-mono px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200">
+                                    Batch {a.lotNo || a.lot_number || '-'}: {a.qty} {it.uom || 'Mtr'}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </td>
                           <td className="p-2.5 font-mono text-slate-500 text-[11px]">{it.itemSku || it.sku || 'SKU-LOG-01'}</td>
                           <td className="p-2.5 text-center font-bold text-slate-900">{it.qty}</td>
                           <td className="p-2.5">
@@ -1029,5 +1080,29 @@ export const DeliveryChallansPage = () => {
         onClose={() => setPrintChallanTarget(null)}
         challan={printChallanTarget}
       />
-    </div>);
+    
+      {/* Multi-Batch & Taka Allocation Modal for Delivery Challans */}
+      {batchModalTarget && (
+        <BatchAllocationModal
+          isOpen={Boolean(batchModalTarget)}
+          onClose={() => setBatchModalTarget(null)}
+          item={batchModalTarget?.item || {}}
+          currentAllocations={lineItems[batchModalTarget.lineIndex]?.takaAllocations || []}
+          onSave={(allocations, summary) => {
+            const updated = [...lineItems];
+            const line = updated[batchModalTarget.lineIndex];
+            if (line) {
+              updated[batchModalTarget.lineIndex] = {
+                ...line,
+                qty: summary.totalQty > 0 ? summary.totalQty : line.qty,
+                takaAllocations: allocations,
+                batchAllocations: summary.batches,
+              };
+              setLineItems(updated);
+            }
+            setBatchModalTarget(null);
+          }}
+        />
+      )}
+</div>);
 };

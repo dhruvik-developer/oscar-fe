@@ -555,9 +555,6 @@ export function GoodsReceiptInlineSlide({ po, delivery, onClose, onReceiptSaved,
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="px-2 py-0.5 rounded text-[10px] font-black bg-emerald-100 text-emerald-800 uppercase tracking-wider">
-                Stage 3 Slide
-              </span>
               <h3 className="text-sm font-extrabold text-slate-900">
                 Standalone Goods Receipt Note (GRN)
               </h3>
@@ -1038,9 +1035,6 @@ export function GoodsReceiptInlineSlide({ po, delivery, onClose, onReceiptSaved,
                 <span>Previous: Supplier Delivery</span>
               </button>
             )}
-            <span className="text-[11px] text-slate-500 font-medium hidden md:inline">
-              Stage 3 of 8 • Standalone GRN
-            </span>
           </div>
 
           <div className="flex items-center gap-2 ml-auto">

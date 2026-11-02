@@ -394,7 +394,7 @@ export function GreyQcInlineSlide({ po, onClose, onQcSaved, onNextStep, onPrevSt
     }
 
     if (takas.length === 0) {
-      setErrorMsg('No takas found for the selected GRN. Please create takas in Stage 4 first.');
+      setErrorMsg('No takas found for the selected GRN. Please create takas first.');
       return;
     }
 
@@ -483,9 +483,6 @@ export function GreyQcInlineSlide({ po, onClose, onQcSaved, onNextStep, onPrevSt
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="px-2 py-0.5 rounded text-[10px] font-black bg-indigo-100 text-indigo-700 uppercase tracking-wider">
-                Stage 5 Slide
-              </span>
               <h3 className="text-sm font-extrabold text-slate-900">
                 Grey Fabric Quality Control (QC Inspection)
               </h3>
@@ -792,7 +789,7 @@ export function GreyQcInlineSlide({ po, onClose, onQcSaved, onNextStep, onPrevSt
               {takas.length === 0 && !loading && (
                 <tr>
                   <td colSpan={7} className="py-6 text-center text-slate-400 font-sans">
-                    No lot/taka rolls created for this GRN yet. Please create takas in Stage 4 first.
+                    No lot/taka rolls created for this GRN yet. Please create takas first.
                   </td>
                 </tr>
               )}
@@ -825,9 +822,6 @@ export function GreyQcInlineSlide({ po, onClose, onQcSaved, onNextStep, onPrevSt
                 <span>Previous: Lot / Taka Creation</span>
               </button>
             )}
-            <span className="text-[11px] text-slate-500 font-medium hidden md:inline">
-              Stage 5 of 8 • Grey Fabric QC Inspection
-            </span>
           </div>
 
           <div className="flex items-center gap-2 ml-auto">

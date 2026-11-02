@@ -4,7 +4,7 @@ import { useERP } from '../../context/ERPContext';
 import { StatusBadge } from '../../components/ui/StatusBadge';
 import { Button } from '../../components/ui/Button';
 import {
-  Plus, ClipboardList, ClipboardCheck, Send, ArrowRight, X, Copy, Printer, DollarSign,
+  Plus, ClipboardList, ClipboardCheck, Send, ArrowRight, ChevronRight, X, Copy, Printer, DollarSign,
   Clock, CheckCircle2, Package, Maximize2, Minimize2, Trash2, Ban, MapPin,
   ShoppingCart, FileText, Search, Filter, MoreVertical, ChevronDown, FileSpreadsheet,
   Truck, Factory, Info, PackageCheck, Layers, ShieldCheck, Warehouse, FileCheck2, CreditCard, Receipt,
@@ -33,6 +33,7 @@ import { PrintPurchaseOrderModal } from '../../components/common/PrintPurchaseOr
 import PageHeader from '../../components/ui/PageHeader';
 import KpiCard from '../../components/ui/KpiCard';
 import { api } from '../../services/api';
+import { inventoryService } from '../../services/domainServices';
 import { fabricMasterSync } from '../../services/fabricMasterSync';
 import UomSelect from '../../components/common/UomSelect';
 import MasterSourceLink from '../../components/common/MasterSourceLink';
@@ -43,6 +44,11 @@ import {
   FABRIC_FLOW_B,
 } from './FabricFlowForm';
 import { PoFabricFlowPanel } from './PoFabricFlowPanel';
+import { PoActionMenu } from './PoActionMenu';
+import { PoDetailsModal } from './PoDetailsModal';
+import { PoLandedCostsModal } from './PoLandedCostsModal';
+import { PoMovementHistoryModal } from './PoMovementHistoryModal';
+import { PoDeleteConfirmModal } from './PoDeleteConfirmModal';
 
 const purchaseOrderGuide = {
     title: 'Purchase Orders',
@@ -261,6 +267,21 @@ export const PurchaseOrdersPage = () => {
     }, [selectedPo?.id]);
 
     const [printPoTarget, setPrintPoTarget] = useState(null);
+    const [editingPo, setEditingPo] = useState(null);
+    const [actionMenuTarget, setActionMenuTarget] = useState(null);
+    const [expandedPoId, setExpandedPoId] = useState(null);
+    const [expandedBatches, setExpandedBatches] = useState([]);
+    const [expandedBatchesLoading, setExpandedBatchesLoading] = useState(false);
+    const [expandedBatchesError, setExpandedBatchesError] = useState('');
+    const [expandedBatchesReload, setExpandedBatchesReload] = useState(0);
+    const [detailsModalPo, setDetailsModalPo] = useState(null);
+    const [grnModalPo, setGrnModalPo] = useState(null);
+    const [qcModalPo, setQcModalPo] = useState(null);
+    const [dispatchModalPo, setDispatchModalPo] = useState(null);
+    const [billMatchModalPo, setBillMatchModalPo] = useState(null);
+    const [landedCostPo, setLandedCostPo] = useState(null);
+    const [movementHistoryPo, setMovementHistoryPo] = useState(null);
+    const [deleteConfirmPo, setDeleteConfirmPo] = useState(null);
     const [selectedVendorId, setSelectedVendorId] = useState(vendors[0]?.id || '');
     const [poDate, setPoDate] = useState(() => getCurrentISODate());
     const [expectedDate, setExpectedDate] = useState(() => addDaysISO(getCurrentISODate(), 10));
@@ -291,6 +312,37 @@ export const PurchaseOrdersPage = () => {
     const [fabricFilter, setFabricFilter] = useState('All');
     const [dateFrom, setDateFrom] = useState('');
     const [dateTo, setDateTo] = useState('');
+
+    useEffect(() => {
+      if (!expandedPoId) {
+        setExpandedBatches([]);
+        setExpandedBatchesError('');
+        setExpandedBatchesLoading(false);
+        return undefined;
+      }
+
+      let cancelled = false;
+      setExpandedBatches([]);
+      setExpandedBatchesError('');
+      setExpandedBatchesLoading(true);
+      inventoryService.getBatchGroups({
+        poId: expandedPoId,
+        groupBy: 'po',
+        page: 1,
+        page_size: 1,
+      }).then((response) => {
+        if (cancelled) return;
+        const group = (response?.groups || []).find((item) => String(item.poId) === String(expandedPoId));
+        setExpandedBatches(group?.batches || []);
+      }).catch((error) => {
+        if (cancelled) return;
+        setExpandedBatchesError(error?.response?.data?.detail || error?.message || 'Linked batches could not be loaded.');
+      }).finally(() => {
+        if (!cancelled) setExpandedBatchesLoading(false);
+      });
+
+      return () => { cancelled = true; };
+    }, [expandedPoId, expandedBatchesReload]);
 
     const location = useLocation();
     const [searchParams, setSearchParams] = useSearchParams();
@@ -351,6 +403,7 @@ export const PurchaseOrdersPage = () => {
     }, [deepLinkPoId, deepLinkStage]);
 
     const handleOpenCreateModal = () => {
+        setEditingPo(null);
         setSelectedVendorId(vendors[0]?.id || '');
         setPoDate(getCurrentISODate());
         setExpectedDate(addDaysISO(getCurrentISODate(), 10));
@@ -360,6 +413,38 @@ export const PurchaseOrdersPage = () => {
         resetFabricFlow();
         setProjectMode('general');
         setProjectId('');
+        setIsFullscreen(false);
+        setShowAddModal(true);
+    };
+
+    const handleOpenEditModal = (po) => {
+        setEditingPo(po);
+        const vend = vendors.find((v) => v.id === po.vendorId || v.name === po.vendor);
+        setSelectedVendorId(vend?.id || vendors[0]?.id || '');
+        setPoDate(toISODate(po.date) || getCurrentISODate());
+        setExpectedDate(toISODate(po.expectedDate) || addDaysISO(getCurrentISODate(), 10));
+        setLineItems((po.items || po.lineItems || []).map((it) => ({
+            ...it,
+            id: it.id || `li-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+            itemId: it.itemId || it.item_id || '',
+            name: it.name || it.description || '',
+            qty: it.qty ?? '',
+            rate: it.rate ?? '',
+            amount: (Number(it.qty) || 0) * (Number(it.rate) || 0),
+            uom: it.uom || 'Mtr',
+        })));
+        setRemarks(po.notes || po.remarks || '');
+        const clonedType = purchaseTypeOf(po);
+        setPurchaseType(clonedType === PURCHASE_TYPE_FINAL_JW ? '' : clonedType);
+        resetFabricFlow();
+        if (po.fabricFlow) {
+            setFabricFlow(po.fabricFlow);
+            setDyeingMillId(po.dyeingMillId || '');
+            setYarnRows(po.yarnLines || po.yarnRows || []);
+            setCostRows(po.expenses || po.costRows || []);
+        }
+        setProjectMode(po.projectId ? 'project' : 'general');
+        setProjectId(po.projectId || '');
         setIsFullscreen(false);
         setShowAddModal(true);
     };
@@ -381,6 +466,7 @@ export const PurchaseOrdersPage = () => {
 
     const handleCloseCreateModal = () => {
         setShowAddModal(false);
+        setEditingPo(null);
         setSelectedVendorId(vendors[0]?.id || '');
         setPoDate(getCurrentISODate());
         setExpectedDate(addDaysISO(getCurrentISODate(), 10));
@@ -470,6 +556,30 @@ export const PurchaseOrdersPage = () => {
             discount: 0,
         }));
         setSaving(true);
+        if (editingPo) {
+            try {
+                await api.patch(`/purchase/orders/${editingPo.id}/`, {
+                    vendorId: vend.id,
+                    date: poDate,
+                    expectedDate,
+                    purchaseType: fabricFlow ? PURCHASE_TYPE_GREY : purchaseType,
+                    projectId: projectMode === 'project' ? projectId : null,
+                    items: normalizedLines,
+                    notes: remarks || '',
+                    ...flowExtras,
+                });
+                showToast(`Purchase Order ${editingPo.poNumber} updated successfully.`);
+                if (typeof refreshCollections === 'function') {
+                    refreshCollections(['purchaseOrders']);
+                }
+                handleCloseCreateModal();
+            } catch (err) {
+                alert(err?.message || 'Could not update purchase order.');
+            } finally {
+                setSaving(false);
+            }
+            return;
+        }
         try {
             await addPurchaseOrder({
                 vendorId: vend.id,
@@ -1018,32 +1128,11 @@ export const PurchaseOrdersPage = () => {
       { k: 'Fully Received', color: '#34d399' },
     ];
 
-    const renderRowActions = (p) => {
+    const renderStatusAction = (p) => {
       const poStatusInfo = getPoBilledStatus(p.id);
       const hasRemaining = poStatusInfo.totalRemainingQty > 0;
       return (
         <div className="flex items-center justify-end gap-1.5 whitespace-nowrap">
-          {getOscarStatus(p) !== 'Cancelled' && (
-            <button
-              type="button"
-              onClick={() => navigate(`/inventory/batches?po=${encodeURIComponent(p.id)}&poNumber=${encodeURIComponent(p.poNumber || '')}&view=po`)}
-              className="px-2.5 py-1 bg-blue-50 border border-blue-200 text-blue-700 rounded-md text-xs font-semibold hover:bg-blue-100 shadow-2xs whitespace-nowrap inline-flex items-center gap-1 cursor-pointer"
-              title={`Manage receipt, batches, QC & dispatch for ${p.poNumber || 'this PO'} in Batch Registry`}
-            >
-              <Package size={12} /> Batch Registry
-            </button>
-          )}
-          <button onClick={() => setPrintPoTarget(p)} className="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Print Official Purchase Order">
-            <Printer size={13}/>
-          </button>
-          <button onClick={() => handleClonePo(p)} className="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Clone / Reorder this Purchase Order">
-            <Copy size={13}/>
-          </button>
-          {p.status === 'Draft' && (
-            <button type="button" onClick={() => deletePurchaseOrder(p.id)} className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors" title="Delete Draft PO">
-              <Trash2 size={13} />
-            </button>
-          )}
           {getOscarStatus(p) === 'Draft' ? (
             <button onClick={() => issuePo(p.id)} className="px-2.5 py-1 bg-blue-600 text-white rounded-md text-xs font-semibold hover:bg-blue-700 shadow-xs transition-colors whitespace-nowrap inline-flex items-center gap-1">
               <Send size={11}/> Submit for Approval
@@ -1056,10 +1145,8 @@ export const PurchaseOrdersPage = () => {
             <button onClick={() => startProductionPo(p.id)} className="px-2.5 py-1 bg-violet-600 text-white rounded-md text-xs font-semibold hover:bg-violet-700 shadow-xs transition-colors whitespace-nowrap inline-flex items-center gap-1">
               <ArrowRight size={11}/> Start Production
             </button>
-          ) : getOscarStatus(p) === 'Cancelled' ? (
-            <span className="text-xs text-rose-600 font-semibold inline-flex items-center gap-1"><Ban size={11}/> Cancelled</span>
-          ) : getOscarStatus(p) === 'Fully Received' ? (
-            <span className="text-xs text-emerald-600 font-semibold inline-flex items-center gap-1"><CheckCircle2 size={11}/> Fully Received</span>
+          ) : ['Cancelled', 'Fully Received'].includes(getOscarStatus(p)) ? (
+            null
           ) : (
             <div className="flex items-center gap-1">
               {poStatusInfo.totalBilledQty <= 0 && (
@@ -1078,6 +1165,31 @@ export const PurchaseOrdersPage = () => {
       );
     };
 
+    const renderMoreActionsButton = (p) => (
+      <button
+        type="button"
+        aria-label={`Actions for ${p.poNumber || 'PO'}`}
+        aria-expanded={actionMenuTarget?.po?.id === p.id}
+        onClick={(e) => {
+          e.stopPropagation();
+          const rect = e.currentTarget.getBoundingClientRect();
+          setActionMenuTarget((prev) => (prev?.po?.id === p.id ? null : { po: p, anchorRect: rect }));
+        }}
+        className={`p-1.5 rounded-lg border transition-colors cursor-pointer ${
+          actionMenuTarget?.po?.id === p.id
+            ? 'bg-blue-50 border-blue-300 text-blue-600 shadow-2xs'
+            : 'border-slate-200 text-slate-400 hover:text-slate-700 hover:bg-slate-100 hover:border-slate-300'
+        }`}
+        title="More actions"
+      >
+        <MoreVertical size={14} />
+      </button>
+    );
+
+    const toggleExpandedPo = (poId) => {
+      setExpandedPoId((current) => current === poId ? null : poId);
+    };
+
     return (
     <div className="-m-3 md:-m-5 bg-[#edf3fc] p-3 md:p-5 space-y-4 min-h-[calc(100vh-62px)]">
       <PageHeader
@@ -1086,13 +1198,6 @@ export const PurchaseOrdersPage = () => {
         guide={purchaseOrderGuide}
         actions={
           <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => navigate('/purchase/final-job-work-pos')}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-[12px] font-bold text-blue-700 hover:bg-blue-100 transition-colors shadow-xs"
-            >
-              <FileSpreadsheet size={14} /> Final Job Work POs
-            </button>
             <Button icon={Plus} onClick={handleOpenCreateModal} className="!rounded-lg !bg-[#2563eb] hover:!bg-[#1d4ed8]">
               Create Purchase Order
             </Button>
@@ -1138,54 +1243,221 @@ export const PurchaseOrdersPage = () => {
             <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="rounded-lg border border-slate-200 bg-white py-2 px-2 text-[12px] text-slate-600 outline-none" title="PO Date to" />
           </div>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[900px] border-collapse text-left text-[12px]">
-            <thead>
-              <tr className="border-b border-slate-100 text-[10.5px] font-bold uppercase tracking-wide text-slate-400">
-                {['PO Number', 'PO Date', 'Vendor', 'Fabric', 'Order Qty', 'Rate (₹/Unit)', 'Total Amount (₹)', 'Expected Delivery', 'Received', 'Status', 'Actions'].map((h, i) => (
-                  <th key={h} className={`px-4 py-2.5 ${i >= 4 && i <= 8 ? 'text-right' : ''} ${i === 9 ? 'text-center' : ''}`}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {paginatedOrders.map((p) => {
-                return (
-                  <tr key={p.id} className="border-b border-slate-50 hover:bg-slate-50/60">
-                    <td className="px-4 py-2.5">
-                      <div className="flex items-center gap-1.5 font-mono font-bold text-slate-800 whitespace-nowrap">
-                        <ClipboardList size={13} className="text-slate-400" /> {p.poNumber}
+        <div className="space-y-2.5 bg-[#f8faff] p-3">
+          {paginatedOrders.map((p) => {
+            const status = getOscarStatus(p);
+            const orderedQty = getPoQty(p);
+            const receivedQty = getPoReceivedQty(p);
+            const remainingQty = Math.max(0, orderedQty - receivedQty);
+            const progress = orderedQty > 0 ? Math.min(100, Math.round((receivedQty / orderedQty) * 100)) : 0;
+            const progressColor = status === 'Cancelled'
+              ? 'bg-rose-500'
+              : progress >= 100
+                ? 'bg-emerald-500'
+                : progress > 0
+                  ? 'bg-amber-500'
+                  : 'bg-blue-600';
+            const uom = lineUom(getPoLines(p)[0]) || 'Mtr';
+            const isExpanded = expandedPoId === p.id;
+            const isMenuOpen = actionMenuTarget?.po?.id === p.id;
+
+            return (
+              <div key={p.id} className="overflow-hidden rounded-xl">
+                <article className="grid gap-3 rounded-xl border border-[#cbdcf3] bg-[#f1f6ff] p-3 shadow-[0_2px_5px_rgba(28,66,120,0.07)] transition-colors hover:bg-[#edf4ff] md:grid-cols-2 xl:grid-cols-[minmax(195px,0.95fr)_minmax(410px,1.8fr)_minmax(250px,1.1fr)]">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                      <h4 className="break-all font-mono text-[13px] font-extrabold text-[#17294e]">{p.poNumber || '—'}</h4>
+                      <span className="text-[10px] font-medium text-slate-500">PO date {formatDateDDMMYYYY(p.date)}</span>
+                    </div>
+                    <p className="mt-1 truncate text-[11.5px] font-bold text-slate-700" title={p.vendor || ''}>{p.vendor || '—'}</p>
+                    <p className="mt-0.5 truncate text-[11px] font-medium text-slate-600" title={getPoFabric(p)}>{getPoFabric(p)}</p>
+                    <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                      {(p.fabricFlow || purchaseTypeOf(p) === PURCHASE_TYPE_GREY) && (
+                        <span className="inline-flex items-center rounded-md border border-teal-200 bg-teal-50 px-1.5 py-0.5 text-[9px] font-bold text-teal-700">
+                          {p.fabricFlow === FABRIC_FLOW_B ? 'Factory → Mill → OSCAR' : 'Factory → OSCAR'}
+                        </span>
+                      )}
+                      <span className={`inline-flex items-center rounded-md border px-1.5 py-0.5 text-[9px] font-bold ${TYPE_BADGE[purchaseTypeOf(p)]?.cls || TYPE_BADGE[PURCHASE_TYPE_GREY].cls}`}>
+                        {TYPE_BADGE[purchaseTypeOf(p)]?.label || purchaseTypeOf(p)}
+                      </span>
+                      <span className="text-[9.5px] font-semibold text-slate-500">{p.projectCode || 'General Stock'}</span>
+                    </div>
+                  </div>
+
+                  <div className="min-w-0 md:col-span-1">
+                    <div className="grid grid-cols-2 gap-x-3 gap-y-2 sm:grid-cols-3 xl:grid-cols-5">
+                      <div className="min-w-0">
+                        <p className="text-[9px] font-semibold uppercase tracking-wide text-slate-500">Ordered Qty</p>
+                        <p className="mt-0.5 break-words font-mono text-[11.5px] font-bold tabular-nums text-[#17294e]">{poQtyText(p)}</p>
                       </div>
-                      <div className="mt-1 flex flex-wrap items-center gap-1">
-                        {p.fabricFlow
-                          ? <span className="inline-block rounded border px-1.5 py-px text-[9.5px] font-bold bg-teal-50 text-teal-700 border-teal-200">{p.fabricFlow === FABRIC_FLOW_B ? 'Factory → Mill → OSCAR' : 'Factory → OSCAR'}</span>
-                          : <span className={`inline-block rounded border px-1.5 py-px text-[9.5px] font-bold ${TYPE_BADGE[purchaseTypeOf(p)]?.cls || TYPE_BADGE[PURCHASE_TYPE_GREY].cls}`}>{TYPE_BADGE[purchaseTypeOf(p)]?.label || purchaseTypeOf(p)}</span>}
-                        <span className="text-[9.5px] font-semibold text-slate-400">{p.projectCode || 'General Stock'}</span>
+                      <div className="min-w-0">
+                        <p className="text-[9px] font-semibold uppercase tracking-wide text-slate-500">Rate</p>
+                        <p className="mt-0.5 break-words font-mono text-[11px] font-semibold tabular-nums text-slate-700">{poRateText(p)}</p>
                       </div>
-                    </td>
-                    <td className="px-4 py-2.5 font-mono text-[11px] text-slate-500 whitespace-nowrap">{formatDateDDMMYYYY(p.date)}</td>
-                    <td className="px-4 py-2.5 font-bold text-slate-700">{p.vendor}</td>
-                    <td className="px-4 py-2.5 text-slate-600 font-medium whitespace-nowrap">{getPoFabric(p)}</td>
-                    <td className="px-4 py-2.5 text-right font-mono font-semibold text-slate-800 whitespace-nowrap">{poQtyText(p)}</td>
-                    <td className="px-4 py-2.5 text-right font-mono text-slate-700 whitespace-nowrap">{poRateText(p)}</td>
-                    <td className="px-4 py-2.5 text-right font-mono font-bold text-slate-800 whitespace-nowrap">{formatCurrency(p.amount ?? p.total ?? 0)}</td>
-                    <td className="px-4 py-2.5 font-mono text-[11px] text-slate-500 whitespace-nowrap">{formatDateDDMMYYYY(p.expectedDate)}</td>
-                    <td className="px-4 py-2.5 text-right font-mono text-slate-700 whitespace-nowrap">{poReceivedText(p)}</td>
-                    <td className="px-4 py-2.5 text-center"><StatusBadge status={getOscarStatus(p)} /></td>
-                    <td className="px-4 py-2.5">{renderRowActions(p)}</td>
-                  </tr>
-                );
-              })}
-              {filtered.length === 0 && (
-                <tr>
-                  <td colSpan={11} className="px-4 py-12 text-center">
-                    <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-xl bg-blue-50 text-blue-500"><FileText size={20} /></div>
-                    <p className="mt-3 text-[13px] font-extrabold text-[#17294e]">No records found</p>
-                    <p className="mt-1 text-[11.5px] text-slate-400">There are no records matching your current filter criteria.</p>
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+                      <div className="min-w-0">
+                        <p className="text-[9px] font-semibold uppercase tracking-wide text-slate-500">Total Amount</p>
+                        <p className="mt-0.5 break-words font-mono text-[11px] font-extrabold tabular-nums text-[#17294e]">{formatCurrency(p.amount ?? p.total ?? 0)}</p>
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-[9px] font-semibold uppercase tracking-wide text-slate-500">Expected Delivery</p>
+                        <p className="mt-0.5 break-words font-mono text-[10.5px] font-medium text-slate-700">{formatDateDDMMYYYY(p.expectedDate)}</p>
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-[9px] font-semibold uppercase tracking-wide text-slate-500">Received</p>
+                        <p className="mt-0.5 break-words font-mono text-[11px] font-bold tabular-nums text-[#17294e]">{poReceivedText(p)}</p>
+                      </div>
+                    </div>
+                    <div className="mt-2 flex items-center gap-2">
+                      <div
+                        className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/80"
+                        role="progressbar"
+                        aria-label={`Receiving progress for ${p.poNumber || 'purchase order'}`}
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                        aria-valuenow={progress}
+                      >
+                        <div className={`h-full rounded-full transition-all duration-300 ${progressColor}`} style={{ width: `${progress}%` }} />
+                      </div>
+                      <span className="w-8 text-right text-[10px] font-bold tabular-nums text-slate-600">{progress}%</span>
+                      {remainingQty > 0 && receivedQty > 0 && (
+                        <span className="whitespace-nowrap text-[9px] font-medium text-amber-700">{formatQty(remainingQty, uom, { units })} left</span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex min-w-0 flex-col justify-between gap-2 md:col-span-2 xl:col-span-1">
+                    <div className="flex items-center justify-between gap-2 xl:justify-end">
+                      <StatusBadge status={status} />
+                      <button
+                        type="button"
+                        onClick={() => toggleExpandedPo(p.id)}
+                        aria-expanded={isExpanded}
+                        className="rounded-md p-1 text-slate-500 transition-colors hover:bg-white hover:text-blue-700 xl:hidden"
+                        title={`${isExpanded ? 'Collapse' : 'Expand'} linked batches for ${p.poNumber || 'purchase order'}`}
+                        aria-label={`${isExpanded ? 'Collapse' : 'Expand'} linked batches for ${p.poNumber || 'purchase order'}`}
+                      >
+                        <ChevronRight size={15} className={`transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`} />
+                      </button>
+                    </div>
+                    <div className="flex flex-wrap items-center justify-end gap-1.5">
+                      {renderStatusAction(p)}
+                      <button
+                        type="button"
+                        onClick={() => toggleExpandedPo(p.id)}
+                        aria-expanded={isExpanded}
+                        className="hidden rounded-md p-1 text-slate-500 transition-colors hover:bg-white hover:text-blue-700 xl:inline-flex"
+                        title={`${isExpanded ? 'Collapse' : 'Expand'} linked batches for ${p.poNumber || 'purchase order'}`}
+                        aria-label={`${isExpanded ? 'Collapse' : 'Expand'} linked batches for ${p.poNumber || 'purchase order'}`}
+                      >
+                        <ChevronRight size={15} className={`transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`} />
+                      </button>
+                      {status !== 'Cancelled' && (
+                        <button
+                          type="button"
+                          onClick={() => navigate(`/inventory/batches?po=${encodeURIComponent(p.id)}&poNumber=${encodeURIComponent(p.poNumber || '')}&view=po`)}
+                          className="inline-flex items-center gap-1 whitespace-nowrap rounded-md border border-blue-200 bg-blue-50 px-2 py-1 text-[10px] font-semibold text-blue-700 transition-colors hover:bg-blue-100"
+                          title={`Manage receipt, batches, QC & dispatch for ${p.poNumber || 'this PO'} in Batch Registry`}
+                        >
+                          <Package size={11} /> Batch Registry
+                        </button>
+                      )}
+                      {renderMoreActionsButton(p)}
+                    </div>
+                  </div>
+                </article>
+                <div className={`grid transition-[grid-template-rows] duration-200 ${isExpanded ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}>
+                  <div className="overflow-hidden">
+                    <section
+                      className={`border border-t-0 border-[#cbdcf3] bg-[#f8faff] px-3 pb-3 pt-2 transition-opacity duration-200 ${isExpanded ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
+                      aria-label={`Linked batches for ${p.poNumber || 'purchase order'}`}
+                      aria-hidden={!isExpanded}
+                    >
+                      <div className="mb-2 flex items-center justify-between gap-2">
+                        <h5 className="text-[11.5px] font-extrabold text-[#17294e]">
+                          Linked Batches — {p.poNumber || 'Purchase Order'} ({expandedBatchesLoading ? '…' : expandedBatches.length})
+                        </h5>
+                        {expandedBatchesLoading && <span className="text-[10px] font-medium text-slate-500">Loading linked batches…</span>}
+                      </div>
+                      {expandedBatchesError ? (
+                        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-[11px] text-rose-700" role="alert">
+                          <span>{expandedBatchesError}</span>
+                          <button
+                            type="button"
+                            onClick={() => setExpandedBatchesReload((attempt) => attempt + 1)}
+                            className="rounded border border-rose-300 bg-white px-2 py-1 font-semibold hover:bg-rose-100"
+                          >
+                            Retry
+                          </button>
+                        </div>
+                      ) : !expandedBatchesLoading && expandedBatches.length === 0 ? (
+                        <p className="rounded-lg border border-slate-200 bg-white px-3 py-3 text-center text-[11px] text-slate-500">
+                          No batches are linked to this purchase order yet.
+                        </p>
+                      ) : (
+                        <div className="overflow-x-auto rounded-lg border border-[#d8e4f4] bg-white">
+                          <table className="w-full min-w-[1050px] border-collapse text-left text-[10.5px]">
+                            <thead className="bg-[#edf4ff] text-[9px] font-bold uppercase tracking-wide text-slate-500">
+                              <tr>
+                                {['Batch Number', 'Receipt / GRN Number', 'Receipt Date', 'Received Quantity', 'QC Status', 'Accepted Quantity', 'Rejected Quantity', 'Stock Status', 'Location', 'Action'].map((heading) => (
+                                  <th key={heading} className="whitespace-nowrap px-2.5 py-2">{heading}</th>
+                                ))}
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                              {expandedBatches.map((batch) => {
+                                const qcStatus = batch.qcStatus || 'Not Inspected';
+                                const qcClass = ['Passed', 'Pass', 'Approved'].includes(qcStatus)
+                                  ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                                  : ['Rejected', 'Reject'].includes(qcStatus)
+                                    ? 'border-rose-200 bg-rose-50 text-rose-700'
+                                    : ['Pending', 'QC Hold', 'On Hold', 'Mixed', 'Partially Approved', 'Not Inspected'].includes(qcStatus)
+                                      ? 'border-amber-200 bg-amber-50 text-amber-700'
+                                      : 'border-slate-200 bg-slate-100 text-slate-700';
+                                const receiptDates = batch.receiptDates || [];
+                                const receiptDateLabel = receiptDates.length
+                                  ? receiptDates.map((date) => formatDateDDMMYYYY(date)).join(', ')
+                                  : '—';
+                                const openBatch = () => navigate(`/inventory/batches/${encodeURIComponent(batch.batchCode)}`);
+
+                                return (
+                                  <tr key={batch.id || batch.batchCode} className="text-slate-700 hover:bg-blue-50/40">
+                                    <td className="whitespace-nowrap px-2.5 py-2 font-mono font-bold text-blue-700">{batch.batchCode || '—'}</td>
+                                    <td className="px-2.5 py-2 font-mono text-[10px]">{(batch.receiptNumbers || []).join(', ') || batch.sourceDocumentNumber || '—'}</td>
+                                    <td className="whitespace-nowrap px-2.5 py-2 text-[10px]" title={receiptDateLabel}>{receiptDateLabel}</td>
+                                    <td className="whitespace-nowrap px-2.5 py-2 font-mono font-semibold tabular-nums">{formatQty(Number(batch.batchQty) || 0, batch.uom || uom, { units })}</td>
+                                    <td className="px-2.5 py-2">
+                                      <span className={`whitespace-nowrap rounded-full border px-1.5 py-0.5 text-[9px] font-bold ${qcClass}`}>{qcStatus}</span>
+                                    </td>
+                                    <td className="whitespace-nowrap px-2.5 py-2 font-mono font-semibold tabular-nums text-emerald-700">{formatQty(Number(batch.acceptedQty) || 0, batch.uom || uom, { units })}</td>
+                                    <td className="whitespace-nowrap px-2.5 py-2 font-mono font-semibold tabular-nums text-rose-600">{formatQty(Number(batch.qcRejectedQty) || 0, batch.uom || uom, { units })}</td>
+                                    <td className="whitespace-nowrap px-2.5 py-2">{batch.status || '—'}</td>
+                                    <td className="px-2.5 py-2">{(batch.locationNames || []).join(', ') || '—'}</td>
+                                    <td className="whitespace-nowrap px-2.5 py-2">
+                                      <div className="flex items-center gap-1">
+                                        <button type="button" onClick={openBatch} className="rounded border border-blue-200 bg-blue-50 px-1.5 py-1 text-[9px] font-semibold text-blue-700 hover:bg-blue-100">Batch 360°</button>
+                                        <button type="button" onClick={openBatch} className="rounded border border-slate-200 bg-white px-1.5 py-1 text-[9px] font-semibold text-slate-600 hover:bg-slate-50">View Batch</button>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </section>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+          {filtered.length === 0 && (
+            <div className="px-4 py-12 text-center">
+              <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-xl bg-blue-50 text-blue-500"><FileText size={20} /></div>
+              <p className="mt-3 text-[13px] font-extrabold text-[#17294e]">No records found</p>
+              <p className="mt-1 text-[11.5px] text-slate-400">There are no records matching your current filter criteria.</p>
+            </div>
+          )}
         </div>
         <TablePagination
           total={filtered.length}
@@ -1309,8 +1581,8 @@ export const PurchaseOrdersPage = () => {
           } text-xs`}>
             <div className="flex items-center justify-between pb-3 border-b border-slate-200">
               <div>
-                <h3 className="font-bold text-base text-[#1F2E4A]">Create Purchase Order</h3>
-                <p className="text-[11px] text-slate-400 mt-0.5">Create a new grey fabric purchase order from a Vendor with quantity and rate.</p>
+                <h3 className="font-bold text-base text-[#1F2E4A]">{editingPo ? `Edit Purchase Order (${editingPo.poNumber})` : 'Create Purchase Order'}</h3>
+                <p className="text-[11px] text-slate-400 mt-0.5">{editingPo ? 'Update order details, line items, and terms.' : 'Create a new grey fabric purchase order from a Vendor with quantity and rate.'}</p>
               </div>
               <div className="flex items-center gap-2">
                 <button type="button" onClick={() => setIsFullscreen(!isFullscreen)} className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-100 transition" title={isFullscreen ? "Exit Fullscreen" : "Maximize Fullscreen"}>
@@ -1364,30 +1636,7 @@ export const PurchaseOrdersPage = () => {
                 </p>
               </div>
               */}
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1.5">Project Association</label>
-                <div className="flex flex-wrap items-center gap-2">
-                  {[['general', 'Without Project / General Stock'], ['project', 'With Project']].map(([mode, text]) => (
-                    <label key={mode} className={`inline-flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-1.5 text-[12px] font-semibold ${projectMode === mode ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-slate-200 bg-white text-slate-600'}`}>
-                      <input type="radio" name="projectMode" value={mode} checked={projectMode === mode} onChange={() => { setProjectMode(mode); if (mode === 'general') setProjectId(''); }} className="accent-blue-600" />
-                      {text}
-                    </label>
-                  ))}
-                  {projectMode === 'project' && (
-                    <select value={projectId} onChange={(e) => setProjectId(e.target.value)} className="min-w-[240px] flex-1 border border-slate-300 rounded-lg p-2 bg-white text-slate-800 font-medium">
-                      <option value="">Select project...</option>
-                      {projects.map((pr) => (
-                        <option key={pr.id} value={pr.id}>{pr.code}{pr.customerName ? ` — ${pr.customerName}` : ''}</option>
-                      ))}
-                    </select>
-                  )}
-                </div>
-                <p className="mt-1 text-[10.5px] text-slate-400">
-                  {projectMode === 'general'
-                    ? 'Accepted fabric goes to general warehouse stock and can be allocated to a project later.'
-                    : (projectsError || 'The PO and its downstream documents are linked to this project.')}
-                </p>
-              </div>
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <div className="flex items-center justify-between mb-1">
@@ -1562,13 +1811,161 @@ export const PurchaseOrdersPage = () => {
               </div>
               <div className="flex flex-wrap lg:flex-nowrap justify-end gap-2 pt-3 border-t border-slate-200">
                 <button type="button" onClick={handleCloseCreateModal} className="px-3 py-1.5 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-100 font-medium">Cancel</button>
-                <button type="submit" disabled={saving} className="px-4 py-1.5 bg-[#1F2E4A] hover:bg-[#152033] text-white rounded-lg font-bold shadow-sm disabled:opacity-60">{saving ? 'Saving…' : 'Save & Issue Purchase Order'}</button>
+                <button type="submit" disabled={saving} className="px-4 py-1.5 bg-[#1F2E4A] hover:bg-[#152033] text-white rounded-lg font-bold shadow-sm disabled:opacity-60">{saving ? 'Saving…' : (editingPo ? 'Update Purchase Order' : 'Save & Issue Purchase Order')}</button>
               </div>
             </form>
           </div>
         </div>)}
 
-      {/* [DISABLED] PO Detail & Lifecycle Progression Modal removed as requested */}
+      {/* ── Three-Dot Action Menu ── */}
+      {actionMenuTarget && (
+        <PoActionMenu
+          po={actionMenuTarget.po}
+          anchorRect={actionMenuTarget.anchorRect}
+          status={getOscarStatus(actionMenuTarget.po)}
+          hasRemaining={getPoBilledStatus(actionMenuTarget.po.id).totalRemainingQty > 0}
+          receivedQty={getPoReceivedQty(actionMenuTarget.po)}
+          orderedQty={getPoQty(actionMenuTarget.po)}
+          onClose={() => setActionMenuTarget(null)}
+          onViewDetails={(po) => setDetailsModalPo(po)}
+          onEdit={(po) => handleOpenEditModal(po)}
+          onDuplicate={(po) => handleClonePo(po)}
+          onBatchRegistry={(po) => navigate(`/inventory/batches?po=${encodeURIComponent(po.id)}&poNumber=${encodeURIComponent(po.poNumber || '')}&view=po`)}
+          onReceiveGoods={(po) => setGrnModalPo(po)}
+          onPerformQc={(po) => setQcModalPo(po)}
+          onSupplierDispatch={(po) => setDispatchModalPo(po)}
+          onMatchVendorBill={(po) => setBillMatchModalPo(po)}
+          onViewLandedCosts={(po) => setLandedCostPo(po)}
+          onMovementHistory={(po) => setMovementHistoryPo(po)}
+          onPrint={(po) => setPrintPoTarget(po)}
+          onCancelPo={(po) => {
+            if (window.confirm(`Are you sure you want to cancel Purchase Order ${po.poNumber}?`)) {
+              cancelPurchaseOrder(po.id);
+            }
+          }}
+          onDelete={(po) => setDeleteConfirmPo(po)}
+        />
+      )}
+
+      {/* ── View PO Details Modal ── */}
+      {detailsModalPo && (
+        <PoDetailsModal
+          po={detailsModalPo}
+          status={getOscarStatus(detailsModalPo)}
+          formatCurrency={formatCurrency}
+          formatDateDDMMYYYY={formatDateDDMMYYYY}
+          onClose={() => setDetailsModalPo(null)}
+          onPrint={(po) => setPrintPoTarget(po)}
+          onOpenBatchRegistry={(po) => navigate(`/inventory/batches?po=${encodeURIComponent(po.id)}&poNumber=${encodeURIComponent(po.poNumber || '')}&view=po`)}
+        />
+      )}
+
+      {/* ── Receive Goods (GRN) Compact Modal ── */}
+      {grnModalPo && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-2 sm:p-4 animate-in fade-in">
+          <div className="bg-white border border-slate-200 shadow-2xl rounded-2xl w-full max-w-5xl max-h-[95vh] sm:max-h-[92vh] overflow-y-auto flex flex-col p-4 sm:p-6 text-xs">
+            <GoodsReceiptInlineSlide
+              po={grnModalPo}
+              onClose={() => setGrnModalPo(null)}
+              onReceiptSaved={() => {
+                setGrnModalPo(null);
+                if (typeof refreshCollections === 'function') {
+                  refreshCollections(['purchaseOrders', 'purchaseBills']);
+                }
+              }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* ── Perform QC Compact Modal ── */}
+      {qcModalPo && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-2 sm:p-4 animate-in fade-in">
+          <div className="bg-white border border-slate-200 shadow-2xl rounded-2xl w-full max-w-5xl max-h-[95vh] sm:max-h-[92vh] overflow-y-auto flex flex-col p-4 sm:p-6 text-xs">
+            <GreyQcInlineSlide
+              po={qcModalPo}
+              onClose={() => setQcModalPo(null)}
+              onQcSaved={() => {
+                setQcModalPo(null);
+                if (typeof refreshCollections === 'function') {
+                  refreshCollections(['purchaseOrders', 'purchaseBills']);
+                }
+              }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* ── Supplier Dispatch Compact Modal ── */}
+      {dispatchModalPo && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-2 sm:p-4 animate-in fade-in">
+          <div className="bg-white border border-slate-200 shadow-2xl rounded-2xl w-full max-w-5xl max-h-[95vh] sm:max-h-[92vh] overflow-y-auto flex flex-col p-4 sm:p-6 text-xs">
+            <SupplierDeliveryInlineSlide
+              po={dispatchModalPo}
+              onClose={() => setDispatchModalPo(null)}
+              onDeliverySaved={() => {
+                setDispatchModalPo(null);
+                if (typeof refreshCollections === 'function') {
+                  refreshCollections(['purchaseOrders']);
+                }
+              }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* ── Match Vendor Bill Compact Modal ── */}
+      {billMatchModalPo && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-2 sm:p-4 animate-in fade-in">
+          <div className="bg-white border border-slate-200 shadow-2xl rounded-2xl w-full max-w-5xl max-h-[95vh] sm:max-h-[92vh] overflow-y-auto flex flex-col p-4 sm:p-6 text-xs">
+            <SupplierBillMatchingInlineSlide
+              po={billMatchModalPo}
+              onClose={() => setBillMatchModalPo(null)}
+              onBillMatched={() => {
+                setBillMatchModalPo(null);
+                if (typeof refreshCollections === 'function') {
+                  refreshCollections(['purchaseOrders', 'purchaseBills']);
+                }
+              }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* ── View Landed Costs Modal ── */}
+      {landedCostPo && (
+        <PoLandedCostsModal
+          po={landedCostPo}
+          formatCurrency={formatCurrency}
+          onClose={() => setLandedCostPo(null)}
+        />
+      )}
+
+      {/* ── Movement History Modal ── */}
+      {movementHistoryPo && (
+        <PoMovementHistoryModal
+          po={movementHistoryPo}
+          formatDateDDMMYYYY={formatDateDDMMYYYY}
+          onClose={() => setMovementHistoryPo(null)}
+        />
+      )}
+
+      {/* ── Delete Confirmation Dialog ── */}
+      {deleteConfirmPo && (
+        <PoDeleteConfirmModal
+          po={deleteConfirmPo}
+          formatCurrency={formatCurrency}
+          formatDateDDMMYYYY={formatDateDDMMYYYY}
+          onClose={() => setDeleteConfirmPo(null)}
+          onConfirm={(po) => {
+            deletePurchaseOrder(po.id);
+            showToast(`Purchase Order ${po.poNumber} deleted.`);
+            if (typeof refreshCollections === 'function') {
+              refreshCollections(['purchaseOrders']);
+            }
+          }}
+        />
+      )}
 
  <PrintPurchaseOrderModal isOpen={Boolean(printPoTarget)} onClose={() => setPrintPoTarget(null)} po={printPoTarget} />
     </div>);

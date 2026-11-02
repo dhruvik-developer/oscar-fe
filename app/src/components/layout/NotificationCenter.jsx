@@ -18,7 +18,6 @@ import {
   Package,
   RefreshCw,
   Search,
-  Settings2,
   ShieldCheck,
   ShoppingCart,
   MoreHorizontal,
@@ -749,9 +748,6 @@ export default function NotificationCenter() {
                 <IconButton label="Mark all as read" onClick={markAllNotificationsRead} disabled={!serverUnread}>
                   <CheckCheck size={15} />
                 </IconButton>
-                <IconButton label="Alert settings" onClick={() => go('/administration/alerts?tab=settings')}>
-                  <Settings2 size={15} />
-                </IconButton>
                 <div className="relative" ref={menuRef}>
                   <IconButton
                     label="More options"
@@ -769,8 +765,6 @@ export default function NotificationCenter() {
                         { label: 'All notifications', icon: ListChecks, run: () => go('/notifications') },
                         ...(hasRead ? [{ label: 'Clear read notifications', icon: Eraser, run: clearRead }] : []),
                         { label: desktop ? 'Turn off desktop alerts' : 'Turn on desktop alerts', icon: BellRing, run: toggleDesktop },
-                        { divider: true },
-                        { label: 'Open Alert Center', icon: AlertTriangle, run: () => go('/administration/alerts') },
                         { label: 'Open CRM tasks', icon: Users, run: () => go('/crm/tasks') },
                         { label: 'Open my project tasks', icon: FolderKanban, run: () => go('/pms/my-tasks') },
                       ].map((item, i) => (item.divider ? <div key={`d${i}`} className="my-1 h-px bg-border" /> : (
@@ -923,12 +917,9 @@ export default function NotificationCenter() {
           {/* Footer */}
           <div className="flex items-center justify-between gap-3 px-4 py-2.5 border-t border-border bg-soft/50 text-[11.5px] text-muted">
             <span className="truncate">Live alerts clear once the issue is resolved.</span>
-            <span className="shrink-0 flex items-center gap-1.5">
+            <span className="shrink-0">
               <button type="button" onClick={() => go('/notifications')} className="h-7 px-2.5 rounded-lg border border-border bg-card font-semibold text-text hover:bg-soft cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40">
                 View all
-              </button>
-              <button type="button" onClick={() => go('/administration/alerts')} className="h-7 px-2.5 rounded-lg bg-primary font-semibold text-white hover:opacity-90 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40">
-                Alert Center
               </button>
             </span>
           </div>

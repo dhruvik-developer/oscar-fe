@@ -1085,16 +1085,6 @@ export const ERPProvider = ({ children, }) => {
 
         setInvoices((prev) => [invoice, ...prev]);
 
-        // If finalized, post financial records and inventory
-        if (isFinalized) {
-            // Stock (SALE movements), COGS and the customer balance are posted
-            // by the server on finalize; the refresh after persistCreate brings
-            // them in. Nothing is mirrored locally.
-            showToast(`Invoice ${invoice.invoiceNumber} created and finalized.`);
-        } else {
-            showToast(`Draft Invoice ${invoice.invoiceNumber} saved.`);
-        }
-
         // The local posting above keeps the screen responsive; the server does
         // the same work authoritatively — allocates INV-…, recomputes the
         // totals, posts the SALE movements and the Dr Debtors / Cr Sales entry —
@@ -1111,7 +1101,26 @@ export const ERPProvider = ({ children, }) => {
                             : m
                     )));
                 }
+                if (saved?.reused) {
+                    setInvoices((prev) => [
+                        saved,
+                        ...prev.filter((row) =>
+                            row.id !== invoice.id && String(row.id) !== String(saved.id)
+                        ),
+                    ]);
+                }
                 refreshCollections(['invoices', 'journalEntries', 'inventoryMovements', 'parties', 'items']);
+                if (saved?.finalizationError) {
+                    showToast(
+                        `Draft Invoice ${saved.invoiceNumber || invoice.invoiceNumber} was saved, but finalization failed: ${saved.finalizationError.message}`
+                    );
+                } else if (saved?.reused) {
+                    showToast(`Opened existing Draft Invoice ${saved.invoiceNumber || saved.id}.`);
+                } else if (saved?.finalized) {
+                    showToast(`Invoice ${saved.invoiceNumber || invoice.invoiceNumber} created and finalized.`);
+                } else {
+                    showToast(`Draft Invoice ${saved?.invoiceNumber || invoice.invoiceNumber} saved.`);
+                }
             },
         });
 
@@ -1214,16 +1223,28 @@ export const ERPProvider = ({ children, }) => {
         return updatedInv;
     };
 
-    const finalizeInvoice = (invoiceId) => {
+    const finalizeInvoice = async (invoiceId) => {
         const target = invoices.find((i) => i.id === invoiceId);
         if (!target) return undefined;
         if (target.status === 'Cancelled') {
-            showToast('Cannot finalize a cancelled invoice.');
-            return undefined;
+            throw new Error('Cannot finalize a cancelled invoice.');
         }
         if (target.finalized) {
-            showToast(`Invoice ${target.invoiceNumber} is already finalized.`);
             return target;
+        }
+
+        if (isBackendEnabled()) {
+            if (!isServerId(invoiceId)) {
+                throw new Error('This invoice has not synced to the server yet. Please refresh and try again.');
+            }
+            const saved = await runDocAction('invoices', invoiceId, 'finalize', {}, setInvoices, {
+                refresh: ['invoices', 'journalEntries', 'inventoryMovements', 'parties', 'items', 'salesOrders'],
+            });
+            if (!saved) {
+                throw new Error('The server did not confirm invoice finalization. Refresh and try again.');
+            }
+            showToast(`Invoice ${saved.invoiceNumber || target.invoiceNumber} finalized and posted to General Ledger.`);
+            return saved;
         }
 
         let finalized = null;
@@ -1242,20 +1263,7 @@ export const ERPProvider = ({ children, }) => {
 
         if (!finalized) return undefined;
 
-        // Stock (SALE movements), COGS and the customer balance are posted by
-        // the server's finalize action; the refresh below brings them in.
-
-        // Auto-create Journal Entry for Revenue & AR — server-side: the
-        // finalize action posts Dr Debtors / Cr Sales itself, and the
-        // re-read below brings that entry in. A local mirror here would
-        // double-count in the ledger views.
-        runDocAction('invoices', finalized.id, 'finalize', {}, setInvoices, {
-            refresh: ['invoices', 'journalEntries', 'inventoryMovements', 'parties', 'items', 'salesOrders'],
-        })
-            .then(() => {
-                showToast(`Invoice ${finalized.invoiceNumber} finalized and posted to General Ledger.`);
-            })
-            .catch(() => refreshCollections(['invoices'])); // failed: restore the server's row
+        showToast(`Invoice ${finalized.invoiceNumber} finalized and posted to General Ledger.`);
         return finalized;
     };
 
@@ -2487,23 +2495,30 @@ export const ERPProvider = ({ children, }) => {
             persistUpdate('salesOrders', id, { stage, status: stage }, setSalesOrders);
         }
     };
-    const cancelSalesOrder = (orderId) => {
+    const cancelSalesOrder = async (orderId) => {
         const order = salesOrders.find((o) => o.id === orderId);
         if (!order) return { success: false, message: 'Order not found.' };
         if (order.stage === 'Cancelled' || order.status === 'Cancelled') {
             return { success: true, message: 'Already cancelled.' };
         }
-        setSalesOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, stage: 'Cancelled', status: 'Cancelled' } : o)));
-        // Server-side cancel releases reservations; re-read afterwards.
-        runDocAction('salesOrders', orderId, 'cancel', {}, setSalesOrders, {
-            refresh: ['salesOrders', 'deliveryChallans'],
-        })
-            .then(() => {
+        if (isBackendEnabled()) {
+            try {
+                const saved = await runDocAction('salesOrders', orderId, 'cancel', {}, setSalesOrders, {
+                    refresh: ['salesOrders', 'deliveryChallans'],
+                });
+                if (!saved) {
+                    throw new Error('The server did not confirm the cancellation. Refresh and try again.');
+                }
                 showToast(`Sales Order ${order.orderNumber} cancelled.`);
-            })
-            .catch(() => {
-                refreshCollections(['salesOrders']);
-            });
+                return { success: true, message: `Sales Order ${order.orderNumber} cancelled.` };
+            } catch (error) {
+                refreshCollections(['salesOrders', 'deliveryChallans']);
+                return { success: false, message: error?.message || 'The Sales Order could not be cancelled.' };
+            }
+        }
+        setSalesOrders((prev) => prev.map((o) => (
+            o.id === orderId ? { ...o, stage: 'Cancelled', status: 'Cancelled' } : o
+        )));
         return { success: true, message: `Sales Order ${order.orderNumber} cancelled.` };
     };
     // Order conversions run on the server (partial quantities, QC gates,
@@ -2522,6 +2537,90 @@ export const ERPProvider = ({ children, }) => {
                 showToast(`Could not create challan — ${describeError(err)}`);
                 return undefined;
             });
+    };
+    const createSalesOrderChallanAndInvoice = async (order) => {
+        if (!order?.id || !isBackendEnabled() || !isServerId(order.id)) {
+            throw new Error('Create Challan + Invoice requires a connected Sales server.');
+        }
+
+        const orderId = String(order.id);
+        const matchesOrder = (document) => (
+            String(document.salesOrderId || document.salesOrder || '') === orderId ||
+            (order.orderNumber && (
+                document.salesOrderNumber === order.orderNumber ||
+                document.linkedSo === order.orderNumber
+            ))
+        );
+        const orderChallans = (deliveryChallans || []).filter(
+            (challan) => challan.status !== 'Cancelled' && matchesOrder(challan)
+        );
+        const orderInvoices = (invoices || []).filter(
+            (invoice) => invoice.status !== 'Cancelled' && matchesOrder(invoice)
+        );
+        const draftInvoice = orderInvoices.find((invoice) => invoice.status === 'Draft');
+
+        const invoiceForChallan = (challan) => orderInvoices.find((invoice) => (
+            String(invoice.deliveryChallanId || '') === String(challan.id) ||
+            (challan.challanNumber && invoice.deliveryChallanNumber === challan.challanNumber)
+        ));
+        const linkedDraftChallan = draftInvoice && orderChallans.find(
+            (challan) => String(challan.id) === String(draftInvoice.deliveryChallanId || '')
+        );
+        if (draftInvoice?.deliveryChallanId && !linkedDraftChallan) {
+            await refreshCollections(['invoices', 'salesOrders']);
+            return { challan: null, invoice: draftInvoice, reused: true };
+        }
+
+        let challan = linkedDraftChallan ||
+            orderChallans.find((row) => row.status === 'Draft' && !invoiceForChallan(row)) ||
+            orderChallans.find((row) => (
+                ['Dispatched', 'In Transit', 'Delivered'].includes(row.status) &&
+                (row.postedAt || row.posted_at) &&
+                !invoiceForChallan(row)
+            ));
+
+        try {
+            if (!challan) {
+                if (!['Confirmed', 'Partially Dispatched'].includes(order.stage)) {
+                    throw new Error(
+                        'No unbilled delivery challan is available for this Sales Order.'
+                    );
+                }
+                const created = await api.post(
+                    `/sales/orders/${orderId}/convert-to-challan/`,
+                    {}
+                );
+                challan = RESOURCES.deliveryChallans.fromApi(created);
+                setDeliveryChallans((previous) => [
+                    challan,
+                    ...(previous || []).filter((row) => String(row.id) !== String(challan.id)),
+                ]);
+            }
+
+            const existingInvoice = invoiceForChallan(challan);
+            if (existingInvoice) {
+                await refreshCollections(['deliveryChallans', 'invoices', 'salesOrders']);
+                return { challan, invoice: existingInvoice };
+            }
+
+            const action = challan.status === 'Draft'
+                ? 'create-draft-invoice'
+                : 'convert-to-invoice';
+            const createdInvoice = await api.post(
+                `/sales/challans/${challan.id}/${action}/`,
+                {}
+            );
+            const invoice = RESOURCES.invoices.fromApi(createdInvoice);
+            setInvoices((previous) => [
+                invoice,
+                ...(previous || []).filter((row) => String(row.id) !== String(invoice.id)),
+            ]);
+            await refreshCollections(['deliveryChallans', 'invoices', 'salesOrders']);
+            return { challan, invoice };
+        } catch (error) {
+            await refreshCollections(['deliveryChallans', 'invoices', 'salesOrders']);
+            throw error;
+        }
     };
     const convertInvoiceToChallan = async (invoiceId, payload = {}) => {
         const inv = invoices.find(i => String(i.id) === String(invoiceId));
@@ -2623,16 +2722,20 @@ export const ERPProvider = ({ children, }) => {
     const convertSalesOrderToInvoice = async (orderId, payload = {}) => {
         const order = salesOrders.find((o) => String(o.id) === String(orderId));
         if (!order) return undefined;
-        if (isBackendEnabled() && isServerId(orderId)) {
-            try {
-                const res = await api.post(`/sales/orders/${orderId}/convert-to-invoice/`, payload);
-                const invoice = res?.data || res;
-                showToast(`Draft invoice created for ${order.orderNumber}.`);
-                refreshCollections(['invoices', 'salesOrders']);
-                return invoice;
-            } catch (err) {
-                console.warn('[ERP] Backend convert-to-invoice returned error, falling back to direct creation:', err);
+        if (isBackendEnabled()) {
+            if (!isServerId(orderId)) {
+                throw new Error('This Sales Order has not synced to the server yet. Please refresh and try again.');
             }
+            const res = await api.post(`/sales/orders/${orderId}/convert-to-invoice/`, payload);
+            const body = res?.data || res;
+            const invoice = RESOURCES.invoices.fromApi(body);
+            showToast(
+                body.reused
+                    ? `Opened the existing Draft invoice for ${order.orderNumber}.`
+                    : `Draft invoice created for ${order.orderNumber}.`
+            );
+            refreshCollections(['invoices', 'salesOrders']);
+            return invoice;
         }
         const defaultAddresses = resolvePartyAddresses(order.customerId, order.customer);
         const orderLines = (order.items || order.lineItems || []).map((it, idx) => ({
@@ -2663,7 +2766,6 @@ export const ERPProvider = ({ children, }) => {
             items: orderLines,
             total: orderLines.reduce((acc, it) => acc + (it.amount || 0), 0),
         });
-        setSalesOrders(prev => prev.map(o => String(o.id) === String(order.id) ? { ...o, stage: 'Invoiced', status: 'Invoiced' } : o));
         showToast(`Draft Invoice created for Sales Order ${order.orderNumber}!`);
         return newInvoice;
     };
@@ -4528,6 +4630,7 @@ export const ERPProvider = ({ children, }) => {
             cancelSalesOrder,
             convertSalesOrderToInvoice,
             convertSalesOrderToChallan,
+            createSalesOrderChallanAndInvoice,
             convertInvoiceToChallan,
             convertChallanToInvoice,
             addDeliveryChallan,

@@ -1,10 +1,10 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useERP } from '../../context/ERPContext';
 import { DataTable } from '../../components/ui/DataTable';
 import { StatusBadge } from '../../components/ui/StatusBadge';
 import { StatCard } from '../../components/ui/StatCard';
 import { Button } from '../../components/ui/Button';
-import { Boxes, Plus, ShoppingCart, CheckCircle, Truck, Receipt, X, ShieldAlert, Copy, Printer, DollarSign, Clock, CheckCircle2, Maximize2, Minimize2, FileSpreadsheet, Ban, Layers, ExternalLink, Loader2, PackageCheck } from 'lucide-react';
+import { Boxes, Plus, ShoppingCart, CheckCircle, Truck, Receipt, X, ShieldAlert, Copy, Printer, IndianRupee, Clock, CheckCircle2, Maximize2, Minimize2, Ban, Layers, ExternalLink, Loader2, PackageCheck } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { LineItemEditor } from '../../components/common/LineItemEditor';
 import { DocumentTimeline } from '../../components/common/DocumentTimeline';
@@ -12,11 +12,10 @@ import { RelatedDocumentsCard } from '../../components/common/RelatedDocumentsCa
 import { AutoPOModal } from '../../components/common/AutoPOModal';
 import { PageHeader } from '../../components/common/PageHeader';
 import { PrintSalesOrderModal } from '../../components/common/PrintSalesOrderModal';
-import PickingListModal from './orders/PickingListModal';
 import SalespersonSelect from '../../components/common/SalespersonSelect';
-import MasterSourceLink from '../../components/common/MasterSourceLink';
+import MasterSourceLink, { useMasterDataRefresh } from '../../components/common/MasterSourceLink';
+import { salesService } from '../../services/domainServices';
 import { usePmsStore } from '../../stores/pmsStore';
-import { CreateProjectModal } from '../pms/projects/components/CreateProjectModal';
 const salesOrderGuide = {
     title: 'Sales Orders',
     subtitle: 'Customer purchase agreements driving warehouse reservation, proforma billing, and dispatch.',
@@ -30,16 +29,14 @@ const salesOrderGuide = {
     ],
     tips: [
         'Use the 📋 Clone button on any past order to duplicate customer and line items in 1 click.',
-        'Click "Generate Proforma" to create a non-accounting preliminary invoice with custom payment milestones for advance deposit collection.',
         'If stock is 0 or low, click [+PO] directly on the line item to requisition missing units immediately.',
     ],
     workflow: ['Quotation Approved', 'Sales Order Confirmed', 'Proforma Issued (Optional)', 'Delivery Challan Dispatched', 'Sales Invoice Issued', 'Payment Receipt Settled'],
 };
 export const SalesOrdersPage = () => {
     const navigate = useNavigate();
-    const { showToast, salesOrders, customers, addSalesOrder, updateSalesOrderStage, cancelSalesOrder, convertSalesOrderToInvoice, convertSalesOrderToChallan, convertSalesOrderToChallanAndInvoice, addProformaInvoice, proformaInvoices = [], deliveryChallans, invoices, paymentIns, formatCurrency, formatDateDDMMYYYY, getCurrentISODate, addDaysISO } = useERP();
+    const { showToast, salesOrders, customers, addSalesOrder, updateSalesOrderBroker, updateSalesOrderStage, cancelSalesOrder, convertSalesOrderToInvoice, convertSalesOrderToChallan, convertSalesOrderToChallanAndInvoice, proformaInvoices = [], deliveryChallans, invoices, paymentIns, formatCurrency, formatDateDDMMYYYY, getCurrentISODate, addDaysISO } = useERP();
     const pmsProjects = usePmsStore((s) => s.projects || []);
-    const [pmsModalOrder, setPmsModalOrder] = useState(null);
     const [stageFilter, setStageFilter] = useState('All');
     const [showAddModal, setShowAddModal] = useState(false);
     const [isFullscreen, setIsFullscreen] = useState(false);
@@ -49,7 +46,14 @@ export const SalesOrdersPage = () => {
     const [detailMaximized, setDetailMaximized] = useState(false);
     const [selectedOrder, setSelectedOrder] = useState(null);
     useEffect(() => {
-        if (!selectedOrder) { setDetailSize(null); setDetailMaximized(false); }
+        if (!selectedOrder) {
+            setDetailSize(null);
+            setDetailMaximized(false);
+            setBrokerError('');
+            return;
+        }
+        setDetailBrokerId(selectedOrder.brokerId || '');
+        setBrokerError('');
     }, [selectedOrder]);
     const handleDetailResizeStart = (e) => {
         if (e.button !== 0 || !detailCardRef.current) return;
@@ -73,19 +77,40 @@ export const SalesOrdersPage = () => {
         window.addEventListener('mousemove', onMove);
         window.addEventListener('mouseup', onUp);
     };
-    const [pickingListOrder, setPickingListOrder] = useState(null);
     const [printSalesOrderTarget, setPrintSalesOrderTarget] = useState(null);
     const [cancelModalTarget, setCancelModalTarget] = useState(null);
     // Track which orders have an in-progress invoice creation so the button is
     // disabled during the async call and duplicate clicks are prevented.
     const [invoicingIds, setInvoicingIds] = useState(new Set());
     const [selectedCustomerId, setSelectedCustomerId] = useState(customers[0]?.id || '');
+    const [selectedBrokerId, setSelectedBrokerId] = useState('');
+    const [brokers, setBrokers] = useState([]);
+    const [detailBrokerId, setDetailBrokerId] = useState('');
+    const [savingBroker, setSavingBroker] = useState(false);
+    const [brokerError, setBrokerError] = useState('');
     const [deliveryDate, setDeliveryDate] = useState(() => addDaysISO(getCurrentISODate(), 10));
     const [lineItems, setLineItems] = useState([]);
+    const [createError, setCreateError] = useState('');
     const [salesperson, setSalesperson] = useState({ id: '', name: '' });
+    const showToastRef = useRef(showToast);
+    showToastRef.current = showToast;
+    const loadBrokers = useCallback(() => {
+        salesService.getBrokersList()
+            .then((res) => {
+                const rows = res?.data?.results || res?.results || res?.data || res || [];
+                if (Array.isArray(rows)) setBrokers(rows);
+            })
+            .catch((err) => {
+                console.error('Failed to load Broker Master:', err);
+                showToastRef.current('Could not load brokers. Please try again before assigning one.');
+            });
+    }, []);
+    useEffect(() => { loadBrokers(); }, [loadBrokers]);
+    useMasterDataRefresh(loadBrokers, ['brokers']);
     // Auto-PO Requisition Modal State
     const [autoPOState, setAutoPOState] = useState({ isOpen: false });
     const selectedCustomer = customers.find((c) => c.id === selectedCustomerId);
+    const selectedBroker = brokers.find((broker) => String(broker.id) === String(selectedBrokerId));
     const totalAmt = lineItems.reduce((acc, it) => acc + (it.amount || it.qty * it.rate), 0);
     // No limit configured on the customer -> no credit check (the server enforces it on confirm).
     const creditLimit = Number(selectedCustomer?.creditLimit) || 0;
@@ -95,7 +120,9 @@ export const SalesOrdersPage = () => {
         setSelectedCustomerId(customers[0]?.id || '');
         setDeliveryDate(addDaysISO(getCurrentISODate(), 10));
         setLineItems([]);
+        setCreateError('');
         setSalesperson({ id: '', name: '' });
+        setSelectedBrokerId('');
         setIsFullscreen(false);
         setShowAddModal(true);
     };
@@ -105,7 +132,9 @@ export const SalesOrdersPage = () => {
         setSelectedCustomerId(customers[0]?.id || '');
         setDeliveryDate(addDaysISO(getCurrentISODate(), 10));
         setLineItems([]);
+        setCreateError('');
         setSalesperson({ id: '', name: '' });
+        setSelectedBrokerId('');
         setIsFullscreen(false);
     };
 
@@ -113,6 +142,7 @@ export const SalesOrdersPage = () => {
         setSelectedCustomerId(order.customerId || customers[0]?.id || '');
         setDeliveryDate(order.deliveryDate || addDaysISO(getCurrentISODate(), 10));
         setSalesperson({ id: order.salespersonId || '', name: order.salesperson || order.salesPerson || '' });
+        setSelectedBrokerId(order.brokerId || '');
         setLineItems((order.items || []).map((it) => ({
             ...it,
             id: `li-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
@@ -122,8 +152,21 @@ export const SalesOrdersPage = () => {
     };
     const handleCreate = (e) => {
         e.preventDefault();
+        setCreateError('');
         const cust = selectedCustomer;
-        if (!cust) return;
+        if (!cust) {
+            setCreateError('Choose a customer before creating the Sales Order.');
+            return;
+        }
+        const orderLines = lineItems.filter((line) => line.itemId || line.name || line.description);
+        if (orderLines.length === 0) {
+            setCreateError('Add at least one item to the Sales Order.');
+            return;
+        }
+        if (orderLines.some((line) => !Number.isFinite(Number(line.rate)) || Number(line.rate) <= 0)) {
+            setCreateError('Every Sales Order item must have a unit rate greater than 0.');
+            return;
+        }
         addSalesOrder({
             customerId: cust.id,
             customer: cust.name,
@@ -135,8 +178,28 @@ export const SalesOrdersPage = () => {
             items: lineItems,
             salespersonId: salesperson.id,
             salesperson: salesperson.name,
+            brokerId: selectedBrokerId,
+            broker: selectedBroker?.name || '',
+            brokerName: selectedBroker?.name || '',
+            brokerCode: selectedBroker?.code || '',
         });
         handleCloseCreateModal();
+    };
+    const handleSaveBrokerAssignment = async () => {
+        const broker = brokers.find((entry) => String(entry.id) === String(detailBrokerId));
+        setSavingBroker(true);
+        setBrokerError('');
+        try {
+            const saved = await updateSalesOrderBroker(selectedOrder.id, broker || null);
+            setSelectedOrder(saved);
+            showToast('Sales Order broker assignment saved.');
+        } catch (err) {
+            const message = err?.message || 'Could not save the broker assignment.';
+            setBrokerError(message);
+            showToast(message);
+        } finally {
+            setSavingBroker(false);
+        }
     };
     const advanceStage = (orderId, currentStage) => {
         if (currentStage === 'Draft') {
@@ -205,71 +268,19 @@ export const SalesOrdersPage = () => {
             return true;
         return o.stage === stageFilter;
     });
-    const handleGenerateProforma = (order) => {
-        const lines = order.items || order.lineItems || [];
-        if (lines.length === 0) {
-            showToast('This order has no lines to bill on a proforma.');
-            return;
-        }
-        // Lines are copied from the order as saved on the server; the server
-        // allocates the PI number and recomputes every total.
-        const rawItems = lines.map((it, idx) => ({
-            id: `pi-it-${Date.now()}-${idx}`,
-            salesOrderLineId: it.id,
-            itemId: it.itemId,
-            sku: it.sku || it.itemSku,
-            productName: it.itemName || it.name || it.description,
-            description: it.description || it.itemName || it.name,
-            qty: Number(it.qty),
-            uom: it.uom,
-            rate: Number(it.rate),
-            unitPrice: Number(it.rate),
-            discount: Number(it.discount ?? 0),
-            tax: Number(it.tax ?? 0),
-        }));
-        addProformaInvoice({
-            id: `pi-${Date.now()}`,
-            piDate: getCurrentISODate(),
-            customerId: order.customerId,
-            customer: order.customer,
-            billingAddress: order.billingAddress,
-            shippingAddress: order.shippingAddress,
-            referenceSo: order.orderNumber,
-            salesOrderId: order.id,
-            paymentTerms: order.paymentTerms,
-            notes: `Proforma for Sales Order ${order.orderNumber}.`,
-            status: 'Draft',
-            items: rawItems,
-            lineItems: rawItems,
-        });
-        navigate('/sales/proforma');
-    };
-
     const getOrderTimelineSteps = (order) => {
-        const isQuoteLinked = !!order.quotationNumber;
         const isConfirmed = order.stage !== 'Draft';
-        const linkedPi = proformaInvoices.find((p) => p.referenceSo === order.orderNumber || p.salesOrderId === order.id);
         const isDispatched = ['Partially Dispatched', 'Fully Dispatched', 'Invoiced', 'Closed'].includes(order.stage);
         const isInvoiced = order.stage === 'Invoiced' || order.stage === 'Closed';
         const linkedInvoice = invoices.find((i) => i.salesOrderId === order.id || i.linkedSo === order.orderNumber);
         const isPaid = linkedInvoice?.status === 'Paid' || order.paymentStatus === 'Paid';
         return [
             {
-                label: 'Quotation',
-                docNumber: order.quotationNumber || 'Direct Order',
-                status: isQuoteLinked ? 'completed' : 'completed',
-            },
-            {
                 label: 'Sales Order',
                 docNumber: order.orderNumber,
                 date: order.date,
                 amount: order.amount,
                 status: isConfirmed ? 'completed' : 'current',
-            },
-            {
-                label: 'Proforma (Optional)',
-                docNumber: linkedPi?.piNumber || 'Advance Milestone',
-                status: linkedPi ? 'completed' : isConfirmed ? 'current' : 'pending',
             },
             {
                 label: 'Delivery Challan',
@@ -372,6 +383,26 @@ export const SalesOrdersPage = () => {
             render: (o) => <span className="font-bold text-text">{o.customer}</span>,
         },
         {
+            key: 'brokerName',
+            header: 'Broker',
+            width: '12%',
+            render: (o) => {
+                const brokerName = o.brokerName || o.broker || '';
+                const brokerCode = o.brokerCode || '';
+                return brokerName || brokerCode ? (
+                    <div className="flex flex-col">
+                        {brokerName && <span className="font-semibold text-text">{brokerName}</span>}
+                        {brokerCode && <span className="font-mono text-[10px] text-muted">{brokerCode}</span>}
+                    </div>
+                ) : (
+                    <div className="flex flex-col">
+                        <span className="text-muted">Unassigned</span>
+                        <span className="font-mono text-[10px] text-muted">BRK-N/A</span>
+                    </div>
+                );
+            },
+        },
+        {
             key: 'date',
             header: 'SO Date',
             width: '11%',
@@ -433,18 +464,9 @@ export const SalesOrdersPage = () => {
             <button onClick={() => setPrintSalesOrderTarget(o)} className="p-1 text-muted hover:text-primary hover:bg-soft rounded-lg cursor-pointer transition-colors" title="Print Official Sales Order Confirmation">
               <Printer size={13}/>
             </button>
-            <button onClick={() => setPickingListOrder({ id: o.id, orderNumber: o.orderNumber })} className="p-1 text-muted hover:text-indigo-600 hover:bg-indigo-50 rounded-lg cursor-pointer transition-colors" title="Warehouse Picking List">
-              <Boxes size={13}/>
-            </button>
             <button onClick={() => handleCloneOrder(o)} className="p-1 text-muted hover:text-primary hover:bg-soft rounded-lg cursor-pointer transition-colors" title="Clone / Duplicate this Sales Order">
               <Copy size={13}/>
             </button>
-            {!isCancelled && (
-              <button onClick={() => handleGenerateProforma(o)} className="p-1 text-muted hover:text-blue-600 hover:bg-blue-50 rounded-lg cursor-pointer transition-colors" title="Generate Proforma Invoice for advance payment milestone collection">
-                <FileSpreadsheet size={13}/>
-              </button>
-            )}
-
             {o.stage === 'Draft' && (<button onClick={() => advanceStage(o.id, 'Draft')} className="px-2.5 py-1 bg-primary text-white rounded-md text-xs font-semibold hover:bg-primary-hover cursor-pointer shadow-xs transition-colors whitespace-nowrap inline-flex items-center gap-1">
                 Confirm Order
               </button>)}
@@ -452,15 +474,6 @@ export const SalesOrdersPage = () => {
               <span className="px-2 py-1 text-[11px] font-semibold text-orange-700 whitespace-nowrap" title="Dispatch and invoicing unlock once the discount is approved">
                 Awaiting approval
               </span>
-            )}
-            {o.stage === 'Confirmed' && !pmsProjects.some((p) => p.crmOrderId === o.orderNumber) && (
-              <button
-                onClick={() => setPmsModalOrder(o.orderNumber)}
-                className="px-2 py-1 bg-violet-600 text-white rounded-md text-xs font-semibold hover:bg-violet-700 cursor-pointer inline-flex items-center gap-1 shadow-xs transition-colors whitespace-nowrap"
-                title="Convert this Confirmed Sales Order into a PMS Production Project"
-              >
-                <Layers size={12}/> PMS Project
-              </button>
             )}
             {!isCancelled && o.stage !== 'Draft' && o.stage !== 'Pending Approval' && o.stage !== 'Closed' && (!orderHasInvoice(o) || !orderHasChallan(o)) && (
               <button
@@ -542,7 +555,7 @@ export const SalesOrdersPage = () => {
 
       {/* Sales Orders KPI Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard label="Total Booked Pipeline" value={formatCurrency(totalSoValue)} icon={DollarSign} />
+        <StatCard label="Total Booked Pipeline" value={formatCurrency(totalSoValue)} icon={IndianRupee} />
         <StatCard label="Active In-Fulfillment" value={formatCurrency(confirmedValue)} icon={Truck} trend={{ positive: true, text: `${openOrdersCount} orders active` }} highlight={openOrdersCount > 0} />
         <StatCard label="Open Backlog Orders" value={`${openOrdersCount} Orders`} icon={Clock} subtext="Pending warehouse dispatch" />
         <StatCard label="Invoiced & Fulfilled" value={`${fulfilledOrdersCount} Completed`} icon={CheckCircle2} trend={{ positive: true, text: 'Invoices created' }} />
@@ -624,6 +637,16 @@ export const SalesOrdersPage = () => {
                     <MasterSourceLink source="employees" />
                   </div>
                   <SalespersonSelect value={salesperson.id} name={salesperson.name} onChange={setSalesperson} className="w-full p-2 border border-slate-300 rounded bg-white text-slate-800"/>
+                  <div className="flex items-center justify-between mb-1 mt-3">
+                    <label className="font-semibold text-slate-700 block">Broker</label>
+                    <MasterSourceLink source="brokers" />
+                  </div>
+                  <select value={selectedBrokerId} onChange={(e) => setSelectedBrokerId(e.target.value)} className="w-full p-2 border border-slate-300 rounded bg-white text-slate-800">
+                    <option value="">Unassigned</option>
+                    {brokers.map((broker) => (
+                      <option key={broker.id} value={broker.id}>{broker.name} ({broker.code})</option>
+                    ))}
+                  </select>
                 </div>
               </div>
 
@@ -640,7 +663,7 @@ export const SalesOrdersPage = () => {
 
               <div>
                 <label className="font-semibold text-slate-700 block mb-2">Order Line Items & Inventory Allocation</label>
-                <LineItemEditor items={lineItems} onChange={setLineItems} type="sales" onRequestPO={(item, deficitQty) => {
+                <LineItemEditor items={lineItems} onChange={(next) => { setLineItems(next); setCreateError(''); }} type="sales" onRequestPO={(item, deficitQty) => {
                 setAutoPOState({
                     isOpen: true,
                     item,
@@ -648,6 +671,12 @@ export const SalesOrdersPage = () => {
                 });
             }}/>
               </div>
+
+              {createError && (
+                <p role="alert" className="text-xs font-medium text-rose-700 bg-rose-50 border border-rose-200 rounded-lg px-3 py-2">
+                  {createError}
+                </p>
+              )}
 
               <div className="flex items-center justify-end gap-2 pt-4 border-t border-slate-200">
                 <Button variant="outline" type="button" onClick={handleCloseCreateModal}>
@@ -737,6 +766,36 @@ export const SalesOrdersPage = () => {
               {/* Lifecycle Stepper */}
               <DocumentTimeline steps={getOrderTimelineSteps(selectedOrder)}/>
 
+              {selectedOrder.stage === 'Draft' && (
+                <section className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                  <div className="flex flex-wrap items-end gap-3">
+                    <label className="min-w-[220px] flex-1">
+                      <span className="mb-1 block font-semibold text-slate-700">Broker assignment</span>
+                      <select
+                        value={detailBrokerId}
+                        onChange={(e) => { setDetailBrokerId(e.target.value); setBrokerError(''); }}
+                        className="w-full rounded border border-slate-300 bg-white p-2 text-slate-800"
+                      >
+                        <option value="">Unassigned</option>
+                        {selectedOrder.brokerId && !brokers.some((broker) => String(broker.id) === String(selectedOrder.brokerId)) && (
+                          <option value={selectedOrder.brokerId}>
+                            {selectedOrder.brokerName || selectedOrder.broker || 'Current broker'}
+                            {selectedOrder.brokerCode ? ` (${selectedOrder.brokerCode})` : ''}
+                          </option>
+                        )}
+                        {brokers.map((broker) => (
+                          <option key={broker.id} value={broker.id}>{broker.name} ({broker.code})</option>
+                        ))}
+                      </select>
+                    </label>
+                    <Button type="button" onClick={handleSaveBrokerAssignment} disabled={savingBroker}>
+                      {savingBroker ? 'Saving...' : 'Save Broker'}
+                    </Button>
+                  </div>
+                  {brokerError && <p className="mt-2 text-xs text-rose-700">{brokerError}</p>}
+                </section>
+              )}
+
               {/* Connected Docs Card */}
               <RelatedDocumentsCard documents={getOrderRelatedDocs(selectedOrder)}/>
 
@@ -823,12 +882,6 @@ export const SalesOrdersPage = () => {
               <div className="flex flex-wrap lg:flex-nowrap items-center gap-2">
                 {selectedOrder.stage !== 'Cancelled' && (
                   <>
-                    <Button variant="outline" onClick={() => setPickingListOrder({ id: selectedOrder.id, orderNumber: selectedOrder.orderNumber })}>
-                      <Boxes size={13} className="mr-1 text-indigo-600"/> Picking List
-                    </Button>
-                    <Button variant="outline" onClick={() => { handleGenerateProforma(selectedOrder); setSelectedOrder(null); }}>
-                      <FileSpreadsheet size={13} className="mr-1 text-blue-600"/> Generate Proforma
-                    </Button>
                     {selectedOrder.stage === 'Draft' && (<Button onClick={() => { advanceStage(selectedOrder.id, 'Draft'); setSelectedOrder(null); }}>
                         Confirm Order
                       </Button>)}
@@ -926,29 +979,11 @@ export const SalesOrdersPage = () => {
         </div>
       )}
 
-      {/* Official Commercial Sales Order Confirmation PDF Voucher */}
-      {pickingListOrder && (
-        <PickingListModal
-          orderId={pickingListOrder.id}
-          orderNumber={pickingListOrder.orderNumber}
-          onClose={() => setPickingListOrder(null)}
-        />
-      )}
       <PrintSalesOrderModal
         isOpen={Boolean(printSalesOrderTarget)}
         onClose={() => setPrintSalesOrderTarget(null)}
         order={printSalesOrderTarget}
       />
 
-      {/* Connect with PMS: Create Production Project */}
-      <CreateProjectModal
-        isOpen={Boolean(pmsModalOrder)}
-        initialOrderNumber={pmsModalOrder || ''}
-        onClose={() => setPmsModalOrder(null)}
-        onCreated={(id) => {
-          setPmsModalOrder(null);
-          navigate(`/pms/projects/${id}`);
-        }}
-      />
     </div>);
 };

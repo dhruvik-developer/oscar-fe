@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Search, CheckCircle2, Receipt, Eye, DollarSign, X, Zap, Printer, Clock, AlertCircle, FileText, Plus, Ban, Check, Edit, Lock, ShieldAlert, MapPin, Truck } from 'lucide-react';
+import { Search, CheckCircle2, Receipt, Eye, IndianRupee, X, Zap, Printer, Clock, AlertCircle, FileText, Plus, Ban, Check, Edit, Lock, ShieldAlert, MapPin, Truck } from 'lucide-react';
 import { useERP } from '../../context/ERPContext';
 import { salesService } from '../../services/domainServices';
 import { StatCard } from '../../components/ui/StatCard';
@@ -537,11 +537,10 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
         setShowCreateModal(false);
     };
 
-    const handleQuickSettleAndReceipt = (inv) => {
+    const handleQuickSettleAndReceipt = async (inv) => {
         const outstanding = getInvoiceOutstanding(inv.id);
         const amountToPay = outstanding.balanceDue > 0 ? outstanding.balanceDue : inv.total;
-        const receiptNum = `RCPT-2026-${Date.now().toString().slice(-4)}`;
-        addPaymentIn({
+        const payment = await addPaymentIn({
             customerId: inv.customerId,
             customer: inv.customer,
             invoiceId: inv.id,
@@ -550,18 +549,20 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
             mode: 'Bank Wire Direct',
             reference: `AUTO-SETTLE-${inv.invoiceNumber}`,
         });
+        if (!payment) return;
         setActiveReceipt({
-            receiptNumber: receiptNum,
+            id: payment.id,
+            receiptNumber: payment.receiptNumber || payment.payment_number,
             invoiceNumber: inv.invoiceNumber,
             customer: inv.customer,
-            amount: amountToPay,
-            date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-            paymentMode: 'Bank Wire Direct',
-            reference: `WIRE-${Date.now().toString().slice(-6)}`,
+            amount: payment.amount,
+            date: payment.date,
+            paymentMode: payment.mode,
+            reference: payment.reference || payment.referenceNumber,
         });
     };
 
-    const handleRecordPaymentSubmit = (e) => {
+    const handleRecordPaymentSubmit = async (e) => {
         e.preventDefault();
         if (!showPaymentModal || isSubmittingPayment) return;
         const outstanding = getInvoiceOutstanding(showPaymentModal.id);
@@ -573,7 +574,7 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
         }
         setIsSubmittingPayment(true);
         try {
-            addPaymentIn({
+            const payment = await addPaymentIn({
                 customerId: showPaymentModal.customerId,
                 customer: showPaymentModal.customer,
                 invoiceId: showPaymentModal.id,
@@ -582,15 +583,16 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
                 mode: payMode,
                 reference: payRef || `WIRE-${Date.now()}`,
             });
-            const receiptNum = `RCPT-2026-${Date.now().toString().slice(-4)}`;
+            if (!payment) return;
             setActiveReceipt({
-                receiptNumber: receiptNum,
+                id: payment.id,
+                receiptNumber: payment.receiptNumber || payment.payment_number,
                 invoiceNumber: showPaymentModal.invoiceNumber,
                 customer: showPaymentModal.customer,
-                amount: payAmount,
-                date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-                paymentMode: payMode,
-                reference: payRef || `WIRE-${Date.now()}`,
+                amount: payment.amount,
+                date: payment.date,
+                paymentMode: payment.mode,
+                reference: payment.reference || payment.referenceNumber,
             });
             setShowPaymentModal(null);
             setPayAmount(0);
@@ -823,7 +825,7 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
 
             {/* Sales Invoices KPI Stat Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <StatCard label="Total Invoiced Value" value={formatCurrency(totalInvoiced)} icon={DollarSign} />
+                <StatCard label="Total Invoiced Value" value={formatCurrency(totalInvoiced)} icon={IndianRupee} />
                 <StatCard label="AR Outstanding Due" value={formatCurrency(totalBalanceDue)} icon={Clock} trend={{ positive: totalBalanceDue === 0, text: totalBalanceDue > 0 ? `${unpaidCount} unpaid/partial` : 'All settled' }} highlight={totalBalanceDue > 0} />
                 <StatCard label="Total Collected" value={formatCurrency(totalCollected)} icon={CheckCircle2} trend={{ positive: true, text: 'Receipts synchronized' }} />
                 <StatCard label="Total Invoices" value={`${invoices.length} Invoices`} icon={FileText} subtext={`${unpaidCount} requiring payment`} />
@@ -1518,7 +1520,7 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
                                         setShowPaymentModal(selectedInvoice);
                                         setPayAmount(getInvoiceOutstanding(selectedInvoice.id).balanceDue);
                                     }} className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-semibold text-xs shadow-sm flex items-center gap-1.5 cursor-pointer">
-                                        <DollarSign className="w-3.5 h-3.5"/> Settle Payment
+                                        <IndianRupee className="w-3.5 h-3.5"/> Settle Payment
                                     </button>
                                 )}
 

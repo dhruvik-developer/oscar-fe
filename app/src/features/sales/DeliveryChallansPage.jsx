@@ -26,6 +26,7 @@ const challanGuide = {
     tips: [
         'Delivery Challans never show commercial unit prices or taxes, matching standard international shipping practices.',
         'Click "Confirm POD" once the customer signs the physical or digital receiving slip to mark delivery complete.',
+        'Only one active Delivery Challan is allowed per Sales Order. Create another after the current challan is delivered or cancelled.',
     ],
     workflow: ['Sales Order Confirmed', 'Delivery Challan Generated', 'Carrier In-Transit', 'Consignee Receives Goods', 'POD Verified & Invoice Issued'],
 };
@@ -68,6 +69,7 @@ export const DeliveryChallansPage = () => {
     const [printChallanTarget, setPrintChallanTarget] = useState(null);
     const [cancelModalTarget, setCancelModalTarget] = useState(null);
     const [sendModalChallan, setSendModalChallan] = useState(null);
+    const [podSavingIds, setPodSavingIds] = useState(new Set());
     const [selectedSoId, setSelectedSoId] = useState(salesOrders[0]?.id || '');
     const [transporter, setTransporter] = useState('');
     const [vehicleNo, setVehicleNo] = useState('');
@@ -77,6 +79,40 @@ export const DeliveryChallansPage = () => {
     const [lineItems, setLineItems] = useState([]);
     const [validationError, setValidationError] = useState('');
     const [batchModalTarget, setBatchModalTarget] = useState(null);
+
+    const hasActiveChallanForOrder = (order, exceptChallanId) => (deliveryChallans || []).some((challan) => {
+        if (challan.id === exceptChallanId || ['Delivered', 'Cancelled'].includes(challan.status)) return false;
+        const matchesId = order.id && [challan.salesOrderId, challan.sourceSalesOrderId].some(
+            (id) => id && String(id) === String(order.id)
+        );
+        const matchesNumber = order.orderNumber && [
+            challan.salesOrderNumber,
+            challan.sourceSalesOrderNumber,
+            challan.linkedSo,
+        ].some((number) => number && number === order.orderNumber);
+        return matchesId || matchesNumber;
+    });
+
+    const seenActiveOrderKeys = new Set();
+    const visibleDeliveryChallans = (deliveryChallans || []).filter((challan) => {
+        if (['Delivered', 'Cancelled'].includes(challan.status)) return true;
+        const linkedOrder = salesOrders.find((order) =>
+            (challan.salesOrderId && String(challan.salesOrderId) === String(order.id)) ||
+            (challan.sourceSalesOrderId && String(challan.sourceSalesOrderId) === String(order.id)) ||
+            (challan.salesOrderNumber && challan.salesOrderNumber === order.orderNumber) ||
+            (challan.sourceSalesOrderNumber && challan.sourceSalesOrderNumber === order.orderNumber) ||
+            (challan.linkedSo && challan.linkedSo === order.orderNumber)
+        );
+        const orderKey = linkedOrder
+            ? `order:${linkedOrder.id}`
+            : challan.salesOrderId || challan.sourceSalesOrderId
+                ? `id:${challan.salesOrderId || challan.sourceSalesOrderId}`
+                : challan.salesOrderNumber || challan.sourceSalesOrderNumber || challan.linkedSo;
+        if (!orderKey) return true;
+        if (seenActiveOrderKeys.has(orderKey)) return false;
+        seenActiveOrderKeys.add(orderKey);
+        return true;
+    });
 
     const prepareOrderLines = (order) => {
         if (!order || !order.items) return [];
@@ -113,12 +149,13 @@ export const DeliveryChallansPage = () => {
     const openAddModal = () => {
         setDraftChallan(null);
         // Only orders with quantity still to dispatch can be picked.
-        const defaultSo = salesOrders.find((o) => o.stage === 'Confirmed' || o.stage === 'Partially Dispatched');
-        if (defaultSo) {
-            setSelectedSoId(defaultSo.id);
-            setLineItems(prepareOrderLines(defaultSo));
-        }
-        setValidationError('');
+        const defaultSo = salesOrders.find((o) =>
+            (o.stage === 'Confirmed' || o.stage === 'Partially Dispatched') &&
+            !hasActiveChallanForOrder(o)
+        );
+        setSelectedSoId(defaultSo?.id || '');
+        setLineItems(defaultSo ? prepareOrderLines(defaultSo) : []);
+        setValidationError(defaultSo ? '' : 'No eligible Sales Order is available. An active Delivery Challan may already exist for each order.');
         setShowAddModal(true);
     };
 
@@ -178,6 +215,10 @@ export const DeliveryChallansPage = () => {
             setValidationError('Select the sales order to dispatch against.');
             return;
         }
+        if (hasActiveChallanForOrder(order, draftChallan?.id)) {
+            setValidationError(`Sales Order ${order.orderNumber || ''} already has an active Delivery Challan. Complete or cancel it before creating another.`);
+            return;
+        }
         
         // Over-delivery validation
         for (const item of lineItems) {
@@ -220,10 +261,22 @@ export const DeliveryChallansPage = () => {
         });
         if (created) { setShowAddModal(false); setSelectedChallan(created); setDraftChallan(null); }
     };
-    const markDelivered = (id) => {
-        updateDeliveryChallanStatus(id, 'Delivered');
-        if (selectedChallan && selectedChallan.id === id) {
-            setSelectedChallan({ ...selectedChallan, status: 'Delivered' });
+    const markDelivered = async (id) => {
+        if (podSavingIds.has(id)) return;
+        setPodSavingIds((prev) => new Set(prev).add(id));
+        try {
+            const updated = await updateDeliveryChallanStatus(id, 'Delivered');
+            if (updated && selectedChallan?.id === id) {
+                setSelectedChallan({ ...selectedChallan, ...updated, status: 'Delivered' });
+            }
+        } catch {
+            // The context reports the server error; leave the challan unchanged.
+        } finally {
+            setPodSavingIds((prev) => {
+                const next = new Set(prev);
+                next.delete(id);
+                return next;
+            });
         }
     };
     const getChallanRelatedDocs = (challan) => {
@@ -402,9 +455,10 @@ export const DeliveryChallansPage = () => {
                 {c.status !== 'Draft' && c.status !== 'Delivered' && c.status !== 'Cancelled' && (
                   <button
                     onClick={() => markDelivered(c.id)}
-                    className="px-2 py-0.5 bg-primary hover:bg-primary-hover text-white rounded text-[11px] font-semibold cursor-pointer flex items-center gap-1 shadow-2xs transition-colors"
+                    disabled={podSavingIds.has(c.id)}
+                    className="px-2 py-0.5 bg-primary hover:bg-primary-hover text-white rounded text-[11px] font-semibold cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-1 shadow-2xs transition-colors"
                   >
-                    <CheckCircle2 size={11}/> POD
+                    <CheckCircle2 size={11}/> {podSavingIds.has(c.id) ? 'Saving...' : 'POD'}
                   </button>
                 )}
                 {c.status === 'Delivered' && (
@@ -437,7 +491,7 @@ export const DeliveryChallansPage = () => {
             Issue Delivery Challan
           </Button>}/>
 
-      <DataTable title="Active Dispatch Consignments" columns={columns} data={deliveryChallans} keyExtractor={(c) => c.id} searchPlaceholder="Search challan #, sales order, or carrier..." searchFilter={(c, term) => String(c.challanNumber ?? '').toLowerCase().includes(term) ||
+      <DataTable title="Active Dispatch Consignments" columns={columns} data={visibleDeliveryChallans} keyExtractor={(c) => c.id} searchPlaceholder="Search challan #, sales order, or carrier..." searchFilter={(c, term) => String(c.challanNumber ?? '').toLowerCase().includes(term) ||
             (c.salesOrderNumber && String(c.salesOrderNumber ?? '').toLowerCase().includes(term)) ||
             String(c.customer ?? '').toLowerCase().includes(term) ||
             (c.transporter && String(c.transporter ?? '').toLowerCase().includes(term))}/>
@@ -468,7 +522,7 @@ export const DeliveryChallansPage = () => {
                     ) : (
                       <option value="">-- Select Source Sales Order --</option>
                     )}
-                    {salesOrders.map((so) => (<option key={so.id} value={so.id}>
+                    {salesOrders.filter((so) => !hasActiveChallanForOrder(so, draftChallan?.id)).map((so) => (<option key={so.id} value={so.id}>
                         {so.orderNumber} - {so.customer} ({so.items?.length || 0} items)
                       </option>))}
                   </select>
@@ -782,9 +836,13 @@ export const DeliveryChallansPage = () => {
                 if (currentStatus === 'Delivered') progressPct = 100;
                 if (isCancelled) progressPct = 0;
 
-                const advanceStage = (nextStatus) => {
-                  updateDeliveryChallanStatus(selectedChallan.id, nextStatus);
-                  setSelectedChallan({ ...selectedChallan, status: nextStatus });
+                const advanceStage = async (nextStatus) => {
+                  try {
+                    const updated = await updateDeliveryChallanStatus(selectedChallan.id, nextStatus);
+                    if (updated) setSelectedChallan({ ...selectedChallan, ...updated, status: nextStatus });
+                  } catch {
+                    // The context reports the server error; leave the status unchanged.
+                  }
                 };
 
                 return (
@@ -986,8 +1044,8 @@ export const DeliveryChallansPage = () => {
               <div className="flex flex-wrap lg:flex-nowrap items-center gap-2">
                 {selectedChallan.status === 'Draft' && <Button onClick={() => prepareDraftDispatch(selectedChallan)}>Prepare Dispatch</Button>}
                 {selectedChallan.status !== 'Draft' && selectedChallan.status !== 'Delivered' && selectedChallan.status !== 'Cancelled' && (
-                  <Button onClick={() => markDelivered(selectedChallan.id)}>
-                    Confirm Proof of Delivery (POD)
+                  <Button disabled={podSavingIds.has(selectedChallan.id)} onClick={() => markDelivered(selectedChallan.id)}>
+                    {podSavingIds.has(selectedChallan.id) ? 'Saving POD...' : 'Confirm Proof of Delivery (POD)'}
                   </Button>
                 )}
                 {selectedChallan.status !== 'Cancelled' && (

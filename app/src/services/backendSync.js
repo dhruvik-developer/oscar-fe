@@ -143,7 +143,10 @@ function documentToApi(doc, { partyField = 'partyId', partyKeys = [] } = {}, { p
     // the HRMS employee id or the name to `salesperson_fk` (incentive basis).
     salesperson: doc.salesperson || doc.salesPerson || undefined,
     salespersonId: link(doc.salespersonId),
-    broker: doc.broker || undefined,
+    broker: doc.broker !== undefined ? (doc.broker || '') : undefined,
+    brokerId: doc.brokerId !== undefined
+      ? (doc.brokerId ? link(doc.brokerId) : null)
+      : undefined,
     paymentTerms: doc.paymentTerms || undefined,
     creditDays: doc.creditDays !== undefined ? num(doc.creditDays) : undefined,
     vehicleNo: doc.vehicleNo || doc.vehicleNumber || undefined,
@@ -177,6 +180,9 @@ function documentFromApi(row, { numberField, partyLabel = 'customer' } = {}) {
     salesPerson: row.salesperson || '',
     salespersonId: row.salespersonId || '',
     broker: row.broker || '',
+    brokerId: row.brokerId || '',
+    brokerName: row.brokerName || row.broker || '',
+    brokerCode: row.brokerCode || '',
     paymentTerms: row.paymentTerms || '',
     creditDays: row.creditDays !== undefined ? num(row.creditDays) : 0,
     vehicleNo: row.vehicleNo || row.vehicleNumber || '',
@@ -655,6 +661,7 @@ export const RESOURCES = {
     }),
     fromApi: (row) => ({
       ...row,
+      receiptNumber: row.payment_number || row.receiptNumber,
       date: displayIn(row.date),
       customer: row.customerName,
       reference: row.referenceNumber,

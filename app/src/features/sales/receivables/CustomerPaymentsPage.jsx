@@ -194,7 +194,7 @@ export default function CustomerPaymentsPage() {
                             <button type="button" className={linkBtn} onClick={() => setPayFor({ customerId: r.customerId, invoiceId: r.id })}>Record payment</button>
                           )}
                           <button type="button" className={linkBtn} onClick={() => setTermsFor(r)}>Terms</button>
-                          {can('request_payment_discount') && num(r.paidAmount) > 0 && (
+                          {can('request_payment_discount') && num(r.paidAmount) > 0 && r.hasEarlyPayment && (
                             <button type="button" className={linkBtn} onClick={() => setDiscountFor(r)}>
                               Request discount{r.openDiscountRequests ? ` (${r.openDiscountRequests} open)` : ''}
                             </button>

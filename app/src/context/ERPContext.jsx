@@ -2405,6 +2405,10 @@ export const ERPProvider = ({ children, }) => {
             freight: quote.freight,
             customerId: quote.customerId,
             customer: quote.customer,
+            brokerId: quote.brokerId || '',
+            broker: quote.brokerName || quote.broker || '',
+            brokerName: quote.brokerName || quote.broker || '',
+            brokerCode: quote.brokerCode || '',
             billingAddress: createAddressSnapshot(quote.billingAddress),
             shippingAddress: createAddressSnapshot(quote.shippingAddress),
             date: getCurrentDateFormatted(),
@@ -2459,11 +2463,50 @@ export const ERPProvider = ({ children, }) => {
             // HRMS employee who owns the sale (incentive basis, PDF §12).
             salespersonId: order.salespersonId || '',
             salesperson: order.salesperson || order.salesPerson || '',
+            brokerId: order.brokerId || '',
+            broker: order.brokerName || order.broker || '',
+            brokerName: order.brokerName || order.broker || '',
+            brokerCode: order.brokerCode || '',
         };
         setSalesOrders((prev) => [newOrder, ...prev]);
         showToast(`Sales Order ${newOrder.orderNumber} created.`);
         persistCreate('salesOrders', newOrder, setSalesOrders);
         return newOrder;
+    };
+    const updateSalesOrderBroker = async (id, broker) => {
+        const current = salesOrders.find((order) => String(order.id) === String(id));
+        if (!current) throw new Error('That Sales Order no longer exists.');
+        if (current.stage !== 'Draft') {
+            throw new Error('Only draft Sales Orders can be edited.');
+        }
+
+        const brokerId = broker?.id || '';
+        const brokerName = broker?.name || '';
+        const updates = {
+            brokerId,
+            broker: brokerName,
+            brokerName,
+            brokerCode: broker?.code || '',
+        };
+        const updated = { ...current, ...updates };
+        setSalesOrders((prev) => prev.map((order) => (
+            String(order.id) === String(id) ? updated : order
+        )));
+        if (!isBackendEnabled() || !isServerId(id)) return updated;
+
+        try {
+            const saved = await pushUpdate('salesOrders', id, {
+                brokerId: brokerId || null,
+                broker: brokerName,
+            });
+            if (saved) reconcile(setSalesOrders, id, saved);
+            return saved || updated;
+        } catch (err) {
+            setSalesOrders((prev) => prev.map((order) => (
+                String(order.id) === String(id) ? current : order
+            )));
+            throw err;
+        }
     };
     const updateSalesOrderStage = (id, stage) => {
         const current = salesOrders.find((o) => o.id === id);
@@ -2521,7 +2564,9 @@ export const ERPProvider = ({ children, }) => {
                 refreshCollections(['deliveryChallans', 'invoices']);
                 return challan;
             } catch (err) {
-                console.warn('[ERP] Backend convert-to-challan failed, falling back to client creation:', err);
+                console.warn('[ERP] Backend convert-to-challan failed:', err);
+                showToast(`Could not create challan — ${describeError(err)}`);
+                return undefined;
             }
         }
         const defaultAddresses = resolvePartyAddresses(inv.customerId, inv.customer);
@@ -2569,7 +2614,11 @@ export const ERPProvider = ({ children, }) => {
                 refreshCollections(['invoices', 'deliveryChallans']);
                 return inv;
             } catch (err) {
-                console.warn('[ERP] Backend convert-to-invoice failed, falling back to client creation:', err);
+                // No client-side fallback: the server is what keeps an order to
+                // one invoice, so its refusal must stand.
+                console.warn('[ERP] Backend convert-to-invoice failed:', err);
+                showToast(`Could not create invoice — ${describeError(err)}`);
+                return undefined;
             }
         }
         const defaultAddresses = resolvePartyAddresses(challan.customerId, challan.customer);
@@ -2730,6 +2779,20 @@ export const ERPProvider = ({ children, }) => {
     const addDeliveryChallan = (challan) => {
         const previous = challan.id ? deliveryChallans.find(dc => dc.id === challan.id) : null;
         if (previous && previous.status !== 'Draft') return previous;
+        const salesOrderId = challan.salesOrderId || challan.sourceSalesOrderId;
+        const salesOrderNumber = challan.salesOrderNumber || challan.sourceSalesOrderNumber || challan.linkedSo;
+        const activeDuplicate = deliveryChallans.find((dc) => (
+            dc.id !== challan.id &&
+            !['Delivered', 'Cancelled'].includes(dc.status) &&
+            (
+                (salesOrderId && [dc.salesOrderId, dc.sourceSalesOrderId].some((id) => id && String(id) === String(salesOrderId))) ||
+                (salesOrderNumber && [dc.salesOrderNumber, dc.sourceSalesOrderNumber, dc.linkedSo].some((number) => number && number === salesOrderNumber))
+            )
+        ));
+        if (activeDuplicate) {
+            showToast(`Sales Order ${salesOrderNumber || ''} already has an active Delivery Challan. Complete or cancel it before creating another.`);
+            return null;
+        }
 
         const challanItems = challan.items || challan.lineItems || [];
         const defaultAddresses = resolvePartyAddresses(challan.customerId, challan.customer);
@@ -2892,9 +2955,18 @@ export const ERPProvider = ({ children, }) => {
         return newChallan;
     };
     const updateDeliveryChallanStatus = (id, status) => {
-        if (deliveryChallans.find(c => c.id === id)?.status === 'Draft') {
+        const challan = deliveryChallans.find((c) => c.id === id);
+        if (challan?.status === 'Draft') {
             showToast('This challan is a draft. Dispatch must be prepared before delivery can be recorded.');
-            return;
+            return Promise.resolve(null);
+        }
+        if (status === 'Delivered' && isBackendEnabled() && isServerId(id)) {
+            return runDocAction('deliveryChallans', id, 'confirm-pod', {}, setDeliveryChallans, {
+                refresh: ['deliveryChallans', 'salesOrders'],
+            }).then((saved) => {
+                showToast(`Proof of delivery saved for Challan ${saved?.challanNumber || challan?.challanNumber || ''}.`);
+                return saved;
+            });
         }
         setDeliveryChallans((prev) => prev.map((c) => {
             if (c.id !== id)
@@ -2906,6 +2978,7 @@ export const ERPProvider = ({ children, }) => {
         }));
         persistUpdate('deliveryChallans', id, { status }, setDeliveryChallans);
         showToast(`Challan updated to ${status}.`);
+        return Promise.resolve({ ...challan, status });
     };
     const cancelDeliveryChallan = (challanId) => {
         const challan = deliveryChallans.find((c) => c.id === challanId);
@@ -3027,7 +3100,7 @@ export const ERPProvider = ({ children, }) => {
             .forEach((w) => persistUpdate('warranties', w.id, { documentStatus: 'Cancelled' }, setWarranties));
         return { success: true, message: `Challan ${challan.challanNumber} cancelled.` };
     };
-    const addPaymentIn = (pay) => {
+    const addPaymentIn = async (pay) => {
         const payAmt = Number(pay.amount) || 0;
         if (payAmt <= 0) {
             showToast('Payment amount must be greater than zero.');
@@ -3076,44 +3149,66 @@ export const ERPProvider = ({ children, }) => {
             referenceNumber: pay.reference || `WIRE-${Date.now().toString().slice(-6)}`,
             status: 'Paid',
         };
-        setPaymentIns((prev) => [newPay, ...prev]);
-        // Update invoice payment tracking and dynamic status
-        if (newPay.invoiceNumber || newPay.invoiceId) {
-            setInvoices((prev) => prev.map((inv) => {
-                if (inv.invoiceNumber === newPay.invoiceNumber || (newPay.invoiceId && inv.id === newPay.invoiceId)) {
-                    const currentPaid = Number(inv.amountPaid ?? inv.paidAmount ?? 0);
-                    const updatedPaid = currentPaid + payAmt;
-                    const totalInvoice = Number(inv.total ?? inv.amount ?? 0);
-                    const isFull = updatedPaid >= (totalInvoice - 0.01);
-                    const derivedStatus = updatedPaid <= 0 ? (inv.status === 'Draft' ? 'Draft' : 'Unpaid') : isFull ? 'Paid' : 'Partially Paid';
-                    return {
-                        ...inv,
-                        paidAmount: updatedPaid,
-                        amountPaid: updatedPaid,
-                        balanceDue: Math.max(0, totalInvoice - updatedPaid),
-                        status: derivedStatus,
-                    };
+        if (isBackendEnabled() && newPay.invoiceId && !isServerId(newPay.invoiceId)) {
+            showToast('Wait for the invoice to finish saving before recording its payment.');
+            return null;
+        }
+        let savedPay = newPay;
+        if (isBackendEnabled()) {
+            try {
+                const serverPay = await pushCreate('paymentIns', newPay);
+                if (!serverPay) {
+                    showToast('Payment was not saved. Please try again.');
+                    return null;
                 }
-                return inv;
-            }));
+                savedPay = {
+                    ...newPay,
+                    ...serverPay,
+                    receiptNumber: serverPay.receiptNumber || serverPay.payment_number || newPay.receiptNumber,
+                    status: 'Paid',
+                };
+            } catch (err) {
+                showToast(`Payment could not be recorded — ${describeError(err)}`);
+                return null;
+            }
         }
-        // Adjust customer balance
-        if (newPay.customer) {
-            setCustomers((prev) => prev.map((c) => String(c.name ?? '').toLowerCase() === newPay.customer?.toLowerCase() || (newPay.customerId && c.id === newPay.customerId)
-                ? { ...c, balance: Math.max(0, c.balance - payAmt) }
-                : c));
+
+        setPaymentIns((prev) => [savedPay, ...prev]);
+        if (!isBackendEnabled()) {
+            // Local-only mode has no server ledger to refresh.
+            if (newPay.invoiceNumber || newPay.invoiceId) {
+                setInvoices((prev) => prev.map((inv) => {
+                    if (inv.invoiceNumber === newPay.invoiceNumber || (newPay.invoiceId && inv.id === newPay.invoiceId)) {
+                        const currentPaid = Number(inv.amountPaid ?? inv.paidAmount ?? 0);
+                        const updatedPaid = currentPaid + payAmt;
+                        const totalInvoice = Number(inv.total ?? inv.amount ?? 0);
+                        const isFull = updatedPaid >= (totalInvoice - 0.01);
+                        const derivedStatus = updatedPaid <= 0 ? (inv.status === 'Draft' ? 'Draft' : 'Unpaid') : isFull ? 'Paid' : 'Partially Paid';
+                        return {
+                            ...inv,
+                            paidAmount: updatedPaid,
+                            amountPaid: updatedPaid,
+                            balanceDue: Math.max(0, totalInvoice - updatedPaid),
+                            status: derivedStatus,
+                        };
+                    }
+                    return inv;
+                }));
+            }
+            if (newPay.customer) {
+                setCustomers((prev) => prev.map((c) => String(c.name ?? '').toLowerCase() === newPay.customer?.toLowerCase() || (newPay.customerId && c.id === newPay.customerId)
+                    ? { ...c, balance: Math.max(0, c.balance - payAmt) }
+                    : c));
+            }
+            setBankAccounts((prev) => prev.map((acc, idx) => idx === 0 ? { ...acc, balance: acc.balance + payAmt } : acc));
+        } else {
+            refreshCollections(['paymentIns', 'invoices', 'journalEntries', 'parties', 'bankAccounts']);
         }
-        // Add to Operating Bank Account
-        setBankAccounts((prev) => prev.map((acc, idx) => idx === 0 ? { ...acc, balance: acc.balance + payAmt } : acc));
-        // The receipt's own journal entry is posted server-side with the
-        // payment — re-read instead of mirroring it locally (no doubles).
-        persistCreate('paymentIns', newPay, setPaymentIns, {
-            onServer: () => refreshCollections(['paymentIns', 'invoices', 'journalEntries', 'parties', 'bankAccounts']),
-        });
         showToast(`Recorded receipt of ${formatCurrency(payAmt)} from ${newPay.customer}`);
 
         // Check if customer payment triggers any broker commission payout
         try {
+            if (isBackendEnabled()) return savedPay;
             const savedComms = localStorage.getItem('evenmore_broker_commissions');
             let commList = savedComms ? JSON.parse(savedComms) : [];
             let triggeredBroker = null;
@@ -3138,7 +3233,7 @@ export const ERPProvider = ({ children, }) => {
                 showToast(`🔔 Customer payment complete! Broker commission of ${formatCurrency(triggeredAmount)} is now DUE for payout to ${triggeredBroker}.`);
             }
         } catch {}
-        return newPay;
+        return savedPay;
     };
     // Credit notes are created on the server: it enforces the returnable
     // quantity per invoice line, routes stock by condition (Good / Hold /
@@ -4615,6 +4710,7 @@ export const ERPProvider = ({ children, }) => {
             convertQuotationToDeliveryChallan,
             convertQuotationToSalesOrder,
             addSalesOrder,
+            updateSalesOrderBroker,
             updateSalesOrderStage,
             cancelSalesOrder,
             convertSalesOrderToInvoice,

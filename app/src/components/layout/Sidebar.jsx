@@ -68,7 +68,7 @@ import {
   Lock,
   Truck,
   FlaskConical,
-  DollarSign,
+  IndianRupee,
 } from 'lucide-react';
 import { useAppStore } from '../../stores/appStore';
 import BrandLogo, { useBrandName } from '../common/BrandLogo';
@@ -269,7 +269,7 @@ export const NAV = [
       { label: 'Delivery Challans', icon: Send, to: '/sales/delivery' },
       // [DISABLED] Warranty Cards concept commented out
       // { label: 'Warranty Cards', icon: ShieldCheck, to: '/sales/warranty' },
-      { label: 'Broker Commissions', icon: DollarSign, to: '/sales/broker-commissions' },
+      { label: 'Broker Commissions', icon: IndianRupee, to: '/sales/broker-commissions' },
       { label: 'Sales Returns', icon: RotateCcw, to: '/sales/returns' },
       { label: 'Payment In', icon: ArrowDownLeft, to: '/sales/payments' },
       { label: 'Payments & Discounts', icon: BadgePercent, to: '/sales/receivables', permission: 'view_sales' },
@@ -286,7 +286,8 @@ export const NAV = [
       // [DISABLED] Final Job Work POs concept commented out
       // { label: 'Final Job Work POs', icon: FileSpreadsheet, to: '/purchase/final-job-work-pos' },
       { label: 'Goods Receipt', icon: PackageCheck, to: '/purchase/receipts' },
-      { label: 'Supplier Reconciliation', icon: GitCompare, to: '/purchase/reconciliation' },
+      // [DISABLED] Supplier Reconciliation commented out
+      // { label: 'Supplier Reconciliation', icon: GitCompare, to: '/purchase/reconciliation' },
       { label: 'Supplier Ledger', icon: BookOpen, to: '/purchase/supplier-ledger' },
       { label: 'Vendor Bills', icon: Receipt, to: '/purchase/vendor-bills' },
       { label: 'Bill Matching', icon: GitCompare, to: '/purchase/bill-matching' },

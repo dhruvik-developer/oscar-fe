@@ -96,7 +96,7 @@ export function PoActionMenu({
   const isFullyReceived = status === 'Fully Received';
 
   const canEdit = isDraft;
-  const canReceiveGoods = !isDraft && !isPendingApproval && !isCancelled;
+  const canReceiveGoods = !isDraft && !isPendingApproval && !isCancelled && !isFullyReceived;
   const canPerformQc = !isDraft && !isPendingApproval && !isCancelled;
   const canDispatch = !isDraft && !isPendingApproval && !isCancelled;
   const canMatchBill = !isDraft && !isCancelled;
@@ -197,7 +197,7 @@ export function PoActionMenu({
             : isCancelled
             ? 'Order cancelled'
             : isFullyReceived
-            ? 'View receipt history or record excess intake'
+            ? 'All ordered quantity has already been received'
             : 'Record inward goods receipt (GRN)'
         }
         className={`w-full px-3 py-1.5 text-left flex items-center justify-between gap-2 transition-colors ${

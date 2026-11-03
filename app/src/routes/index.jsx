@@ -485,7 +485,9 @@ const router = createBrowserRouter([
       // [DISABLED] Supplier Reconciliation concept commented out
       // { path: 'purchase/reconciliation', element: <Page component={SupplierReconciliationPage} /> },
       { path: 'purchase/reconciliation', element: <Navigate to="/purchase/orders" replace /> },
-      { path: 'purchase/supplier-ledger', element: <Page component={SupplierLedgerPage} /> },
+      // [MOVED to Accounts] Supplier Ledger moved to Accounts module
+      // { path: 'purchase/supplier-ledger', element: <Page component={SupplierLedgerPage} /> },
+      { path: 'purchase/supplier-ledger', element: <Navigate to="/accounts/supplier-ledger" replace /> },
       { path: 'purchase/bills', element: <Page component={PurchaseBillsPage} /> },
       { path: 'purchase/vendor-bills', element: <Page component={VendorBillsPage} /> },
       { path: 'purchase/bill-matching', element: <Page component={BillMatchingPage} /> },
@@ -582,6 +584,8 @@ const router = createBrowserRouter([
       { path: 'accounts/day-book', element: <Page component={DayBookPage} title="Day Book & Position" /> },
       { path: 'accounts/cash-bank', element: <Page component={CashBankPage} /> },
       { path: 'accounts/general-ledger', element: <Page component={GeneralLedgerPage} /> },
+      { path: 'accounts/supplier-ledger', element: <Page component={SupplierLedgerPage} title="Supplier Ledger" /> },
+      { path: 'accounts/customer-ledger', element: <Navigate to="/accounts/supplier-ledger?type=customer" replace /> },
       { path: 'accounts/notes', element: <Page component={StandaloneNotesPage} title="Debit / Credit Notes" /> },
       { path: 'accounts/reports', element: <Page component={FinancialReportsPage} /> },
       { path: 'accounts/accounting-log', element: <Page component={AccountingLogPage} title="Accounting Log" /> },

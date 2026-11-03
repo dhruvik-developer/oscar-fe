@@ -328,6 +328,7 @@ export const PurchaseOrdersPage = () => {
       inventoryService.getBatchGroups({
         poId: expandedPoId,
         groupBy: 'po',
+        includePendingQc: 1,
         page: 1,
         page_size: 1,
       }).then((response) => {
@@ -346,6 +347,13 @@ export const PurchaseOrdersPage = () => {
 
     const location = useLocation();
     const [searchParams, setSearchParams] = useSearchParams();
+
+    React.useEffect(() => {
+        const qcPoId = searchParams.get('qcPoId') || location.state?.qcPoId;
+        if (!qcPoId) return;
+        setExpandedPoId(qcPoId);
+        setExpandedBatchesReload((attempt) => attempt + 1);
+    }, [location.key, location.state, searchParams]);
 
     React.useEffect(() => {
         if (location.state?.createPo || searchParams.get('action') === 'create') {
@@ -1406,6 +1414,9 @@ export const PurchaseOrdersPage = () => {
                             <tbody className="divide-y divide-slate-100">
                               {expandedBatches.map((batch) => {
                                 const qcStatus = batch.qcStatus || 'Not Inspected';
+                                const isQcPassed = qcStatus === 'Passed';
+                                const isQcInProgress = qcStatus === 'In Progress';
+                                const isQcPending = Boolean(batch.pendingQcReceiptId) && !isQcPassed && !isQcInProgress;
                                 const qcClass = ['Passed', 'Pass', 'Approved'].includes(qcStatus)
                                   ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
                                   : ['Rejected', 'Reject'].includes(qcStatus)
@@ -1436,6 +1447,34 @@ export const PurchaseOrdersPage = () => {
                                       <div className="flex items-center gap-1">
                                         <button type="button" onClick={openBatch} className="rounded border border-blue-200 bg-blue-50 px-1.5 py-1 text-[9px] font-semibold text-blue-700 hover:bg-blue-100">Batch 360°</button>
                                         <button type="button" onClick={openBatch} className="rounded border border-slate-200 bg-white px-1.5 py-1 text-[9px] font-semibold text-slate-600 hover:bg-slate-50">View Batch</button>
+                                        {isQcPassed ? (
+                                          <span className="rounded border border-emerald-200 bg-emerald-50 px-1.5 py-1 text-[9px] font-bold text-emerald-700">QC Passed</span>
+                                        ) : isQcInProgress ? (
+                                          <button type="button" disabled className="cursor-not-allowed rounded border border-amber-200 bg-amber-50 px-1.5 py-1 text-[9px] font-semibold text-amber-700">QC In Progress</button>
+                                        ) : isQcPending ? (
+                                          <button
+                                            type="button"
+                                            onClick={() => navigate(
+                                              `/inventory/qc/advanced?step=decide&receiptId=${encodeURIComponent(batch.pendingQcReceiptId)}`,
+                                              { state: { qcReturnTo: `${location.pathname}?qcPoId=${encodeURIComponent(expandedPoId)}` } },
+                                            )}
+                                            className="rounded border border-blue-200 bg-blue-50 px-1.5 py-1 text-[9px] font-semibold text-blue-700 hover:bg-blue-100"
+                                            title={`Open QC for ${batch.receiptNumbers?.[0] || batch.batchCode}`}
+                                          >
+                                            QC
+                                          </button>
+                                        ) : qcStatus === 'Rework' ? (
+                                          // Reprocessed fabric is inspected again through the existing
+                                          // Re-check Rework step, not a fresh QC on the receipt.
+                                          <button
+                                            type="button"
+                                            onClick={() => navigate('/inventory/qc/advanced?step=recheck')}
+                                            className="rounded border border-amber-200 bg-amber-50 px-1.5 py-1 text-[9px] font-semibold text-amber-700 hover:bg-amber-100"
+                                            title={`Re-check reworked fabric of ${batch.batchCode}`}
+                                          >
+                                            Re-check
+                                          </button>
+                                        ) : null}
                                       </div>
                                     </td>
                                   </tr>
@@ -1831,7 +1870,13 @@ export const PurchaseOrdersPage = () => {
           onEdit={(po) => handleOpenEditModal(po)}
           onDuplicate={(po) => handleClonePo(po)}
           onBatchRegistry={(po) => navigate(`/inventory/batches?po=${encodeURIComponent(po.id)}&poNumber=${encodeURIComponent(po.poNumber || '')}&view=po`)}
-          onReceiveGoods={(po) => setGrnModalPo(po)}
+          onReceiveGoods={(po) => {
+            if (getOscarStatus(po) === 'Fully Received') {
+              showToast('All ordered quantity has already been received for this purchase order.');
+              return;
+            }
+            setGrnModalPo(po);
+          }}
           onPerformQc={(po) => setQcModalPo(po)}
           onSupplierDispatch={(po) => setDispatchModalPo(po)}
           onMatchVendorBill={(po) => setBillMatchModalPo(po)}

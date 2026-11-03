@@ -127,7 +127,7 @@ export const CommandPalette = ({ isOpen, onClose }) => {
         .slice(0, 3)
         .map((inv) => ({
         label: `${inv.invoiceNumber} - ${inv.customer}`,
-        sub: `Total: $${inv.total.toFixed(2)} • Status: ${inv.status}`,
+        sub: `Total: ₹${inv.total.toLocaleString('en-IN', { minimumFractionDigits: 2 })} • Status: ${inv.status}`,
         path: '/sales/invoices',
         icon: Receipt,
         category: 'Invoices',

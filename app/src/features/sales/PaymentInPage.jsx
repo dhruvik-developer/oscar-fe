@@ -3,7 +3,7 @@ import { useERP } from '../../context/ERPContext';
 import { DataTable } from '../../components/ui/DataTable';
 import { StatCard } from '../../components/ui/StatCard';
 import { Button } from '../../components/ui/Button';
-import { Plus, ArrowDownLeft, CreditCard, X, Receipt, DollarSign, CheckCircle2, TrendingUp } from 'lucide-react';
+import { Plus, ArrowDownLeft, CreditCard, X, Receipt, IndianRupee, CheckCircle2, TrendingUp } from 'lucide-react';
 import { PageHeader } from '../../components/common/PageHeader';
 const paymentInGuide = {
     title: 'Payment In & Customer Receipts',
@@ -51,12 +51,12 @@ export const PaymentInPage = () => {
             setAmount(outstanding.balanceDue > 0 ? outstanding.balanceDue : inv.total);
         }
     };
-    const handleRecord = (e) => {
+    const handleRecord = async (e) => {
         e.preventDefault();
         const inv = invoices.find((i) => i.id === selectedInvoiceId);
         if (!inv) return; // the invoice must be chosen explicitly
         const cust = customers.find((c) => c.id === inv.customerId || c.name === inv.customer);
-        addPaymentIn({
+        const payment = await addPaymentIn({
             customerId: cust?.id || inv.customerId,
             customer: inv.customer || cust?.name,
             invoiceId: inv.id,
@@ -67,6 +67,7 @@ export const PaymentInPage = () => {
             // The receipt number is allocated by the server.
             reference: reference || undefined,
         });
+        if (!payment) return;
         setShowAddModal(false);
     };
     const totalCollected = paymentIns.reduce((sum, p) => sum + (p.amount || 0), 0);
@@ -146,7 +147,7 @@ export const PaymentInPage = () => {
 
       {/* Payment In KPI Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard label="Total Received Collections" value={formatCurrency(totalCollected)} icon={DollarSign} highlight />
+        <StatCard label="Total Received Collections" value={formatCurrency(totalCollected)} icon={IndianRupee} highlight />
         <StatCard label="Total Vouchers Issued" value={`${paymentIns.length} Receipts`} icon={Receipt} trend={{ positive: true, text: 'Cleared to Ledger' }} />
         <StatCard label="Avg Receipt Amount" value={formatCurrency(avgReceipt)} icon={TrendingUp} />
         <StatCard label="Bank & Wire Transfers" value={`${wireCount} Settlements`} icon={CheckCircle2} subtext="Direct Treasury intake" />

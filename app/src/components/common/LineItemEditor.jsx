@@ -804,14 +804,22 @@ export const LineItemEditor = ({
 
                       <td className="px-3 py-2.5 text-right align-top">
                         {!readOnly ? (
-                          <input
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            value={item.rate ?? 0}
-                            onChange={(e) => handleFieldChange(index, 'rate', Math.max(0, Number(e.target.value)))}
-                            className="w-24 text-right font-mono text-xs font-semibold px-2 py-1.5 rounded-lg border border-border bg-card text-text focus:outline-none focus:border-primary transition ml-auto"
-                          />
+                          <div>
+                            <input
+                              type="number"
+                              min="0.01"
+                              step="0.01"
+                              value={item.rate ?? 0}
+                              aria-invalid={Number(item.rate) <= 0 && Boolean(item.itemId || item.description)}
+                              onChange={(e) => handleFieldChange(index, 'rate', Math.max(0, Number(e.target.value)))}
+                              className={`w-24 text-right font-mono text-xs font-semibold px-2 py-1.5 rounded-lg border bg-card text-text focus:outline-none focus:border-primary transition ml-auto ${
+                                Number(item.rate) <= 0 ? 'border-rose-500' : 'border-border'
+                              }`}
+                            />
+                            {Number(item.rate) <= 0 && (item.itemId || item.description) && (
+                              <p className="mt-1 text-[10px] text-rose-600">Unit rate must be greater than 0.</p>
+                            )}
+                          </div>
                         ) : (
                           <span className="font-mono font-semibold text-text">₹{Number(item.rate || 0).toFixed(2)}</span>
                         )}

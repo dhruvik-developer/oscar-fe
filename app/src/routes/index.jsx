@@ -149,7 +149,8 @@ const PurchaseReturnsPage = lazy(() => import('../features/purchase/PurchaseRetu
 const PaymentOutPage = lazy(() => import('../features/purchase/PaymentOutPage').then(m => ({ default: m.PaymentOutPage })));
 const ExpensesPage = lazy(() => import('../features/purchase/ExpensesPage').then(m => ({ default: m.ExpensesPage })));
 const GoodsReceiptPage = lazy(() => import('../features/purchase/GoodsReceiptPage').then(m => ({ default: m.GoodsReceiptPage })));
-const SupplierReconciliationPage = lazy(() => import('../features/purchase/SupplierReconciliationPage'));
+// [DISABLED] Supplier Reconciliation concept commented out
+// const SupplierReconciliationPage = lazy(() => import('../features/purchase/SupplierReconciliationPage'));
 const SupplierLedgerPage = lazy(() => import('../features/purchase/SupplierLedgerPage'));
 const TextileMastersPage = lazy(() => import('../features/masters/TextileMastersPage'));
 
@@ -481,7 +482,9 @@ const router = createBrowserRouter([
       // { path: 'purchase/final-job-work-pos', element: <Page component={FinalJobWorkPOsPage} /> },
       { path: 'purchase/final-job-work-pos', element: <Navigate to="/purchase/orders" replace /> },
       { path: 'purchase/receipts', element: <Page component={GoodsReceiptPage} /> },
-      { path: 'purchase/reconciliation', element: <Page component={SupplierReconciliationPage} /> },
+      // [DISABLED] Supplier Reconciliation concept commented out
+      // { path: 'purchase/reconciliation', element: <Page component={SupplierReconciliationPage} /> },
+      { path: 'purchase/reconciliation', element: <Navigate to="/purchase/orders" replace /> },
       { path: 'purchase/supplier-ledger', element: <Page component={SupplierLedgerPage} /> },
       { path: 'purchase/bills', element: <Page component={PurchaseBillsPage} /> },
       { path: 'purchase/vendor-bills', element: <Page component={VendorBillsPage} /> },

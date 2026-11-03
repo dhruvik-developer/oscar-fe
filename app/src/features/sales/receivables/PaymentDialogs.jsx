@@ -350,14 +350,14 @@ export function DiscountRequestModal({ isOpen, onClose, invoice, onSaved }) {
     receivablesService.getPayments({ customerId: invoice.customerId, page_size: 200, status: 'Active' }).then((b) => {
       const list = rows(b)
         .map((p) => ({ ...p, onInvoice: (p.allocations || []).filter((a) => a.documentId === invoice.id).reduce((s, a) => s + num(a.amount), 0) }))
-        .filter((p) => p.onInvoice > 0);
+        .filter((p) => p.onInvoice > 0 && invoice.dueDate && daysBetween(p.date, invoice.dueDate) > 0);
       setPayments(list);
       setPaymentId(list[0]?.id || '');
     }).catch((err) => setError(errorText(err, 'Could not load receipts.')));
   }, [isOpen, invoice]);
 
   const payment = useMemo(() => payments.find((p) => p.id === paymentId), [payments, paymentId]);
-  const early = payment && invoice?.dueDate ? daysBetween(payment.date, invoice.dueDate) : null;
+  const early = payment && invoice?.dueDate ? daysBetween(payment.date, invoice.dueDate) : 0;
 
   const submit = async (e) => {
     e.preventDefault();
@@ -407,7 +407,9 @@ export function DiscountRequestModal({ isOpen, onClose, invoice, onSaved }) {
           <div><dt className="text-muted">Invoice amount</dt><dd className="font-medium text-text font-mono">{money(invoice.invoiceAmount)}</dd></div>
         </dl>
         {payments.length === 0 ? (
-          <p className="text-[12.5px] text-muted">No receipt is allocated to this invoice yet. Record and allocate the payment first.</p>
+          <p className="text-[12.5px] text-muted">
+            No receipt paid before the due date is available. The customer must pay earlier than {date(invoice.dueDate)} to qualify.
+          </p>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="sm:col-span-2">
@@ -416,8 +418,8 @@ export function DiscountRequestModal({ isOpen, onClose, invoice, onSaved }) {
                 {payments.map((p) => <option key={p.id} value={p.id}>{p.paymentNumber} · {date(p.date)} · {money(p.onInvoice)} on this invoice</option>)}
               </select>
               {payment && (
-                <p className={`mt-1 text-[12px] ${early > 0 ? 'text-emerald-700' : 'text-amber-700'}`}>
-                  {early > 0 ? `Paid ${early} day${early === 1 ? '' : 's'} before the due date.` : 'This receipt was not paid before the due date. The approver will see that.'}
+                <p className="mt-1 text-[12px] text-emerald-700">
+                  Paid {early} day{early === 1 ? '' : 's'} before the due date.
                   {' '}Eligible amount {money(payment.onInvoice)}.
                 </p>
               )}

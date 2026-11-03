@@ -8,7 +8,7 @@ import {
   Clock, CheckCircle2, Package, Maximize2, Minimize2, Trash2, Ban, MapPin,
   ShoppingCart, FileText, Search, Filter, MoreVertical, ChevronDown, FileSpreadsheet,
   Truck, Factory, Info, PackageCheck, Layers, ShieldCheck, Warehouse, FileCheck2, CreditCard, Receipt,
-  Building2, Calendar, Sparkles, QrCode,
+  Building2, Calendar, Sparkles, QrCode, Eye, RefreshCw, AlertCircle,
 } from 'lucide-react';
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { toISODate } from '../../utils/dateUtils';
@@ -1444,37 +1444,60 @@ export const PurchaseOrdersPage = () => {
                                     <td className="whitespace-nowrap px-2.5 py-2">{batch.status || '—'}</td>
                                     <td className="px-2.5 py-2">{(batch.locationNames || []).join(', ') || '—'}</td>
                                     <td className="whitespace-nowrap px-2.5 py-2">
-                                      <div className="flex items-center gap-1">
-                                        <button type="button" onClick={openBatch} className="rounded border border-blue-200 bg-blue-50 px-1.5 py-1 text-[9px] font-semibold text-blue-700 hover:bg-blue-100">Batch 360°</button>
-                                        <button type="button" onClick={openBatch} className="rounded border border-slate-200 bg-white px-1.5 py-1 text-[9px] font-semibold text-slate-600 hover:bg-slate-50">View Batch</button>
+                                      <div className="flex items-center gap-1.5">
+                                        <button
+                                          type="button"
+                                          onClick={openBatch}
+                                          className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1 text-[9.5px] font-semibold text-slate-700 shadow-2xs transition-all hover:border-blue-300 hover:bg-blue-50/70 hover:text-blue-700 active:scale-95 cursor-pointer"
+                                          title={`Open 360° traceability view for ${batch.batchCode}`}
+                                        >
+                                          <Eye size={10.5} className="text-slate-400" />
+                                          <span>Batch 360°</span>
+                                        </button>
                                         {isQcPassed ? (
-                                          <span className="rounded border border-emerald-200 bg-emerald-50 px-1.5 py-1 text-[9px] font-bold text-emerald-700">QC Passed</span>
+                                          <span className="inline-flex items-center gap-1 rounded-md border border-emerald-300/80 bg-emerald-50 px-2 py-0.5 text-[9.5px] font-bold text-emerald-800 shadow-2xs">
+                                            <CheckCircle2 size={11} className="stroke-[2.5] text-emerald-600" />
+                                            <span>QC Passed</span>
+                                          </span>
                                         ) : isQcInProgress ? (
-                                          <button type="button" disabled className="cursor-not-allowed rounded border border-amber-200 bg-amber-50 px-1.5 py-1 text-[9px] font-semibold text-amber-700">QC In Progress</button>
-                                        ) : isQcPending ? (
-                                          <button
-                                            type="button"
-                                            onClick={() => navigate(
-                                              `/inventory/qc/advanced?step=decide&receiptId=${encodeURIComponent(batch.pendingQcReceiptId)}`,
-                                              { state: { qcReturnTo: `${location.pathname}?qcPoId=${encodeURIComponent(expandedPoId)}` } },
-                                            )}
-                                            className="rounded border border-blue-200 bg-blue-50 px-1.5 py-1 text-[9px] font-semibold text-blue-700 hover:bg-blue-100"
-                                            title={`Open QC for ${batch.receiptNumbers?.[0] || batch.batchCode}`}
-                                          >
-                                            QC
-                                          </button>
+                                          <span className="inline-flex items-center gap-1 rounded-md border border-amber-300 bg-amber-50 px-2 py-0.5 text-[9.5px] font-bold text-amber-800 shadow-2xs">
+                                            <Clock size={11} className="animate-spin text-amber-600" style={{ animationDuration: '3s' }} />
+                                            <span>QC In Progress</span>
+                                          </span>
+                                        ) : ['Rejected', 'Reject'].includes(qcStatus) ? (
+                                          <span className="inline-flex items-center gap-1 rounded-md border border-rose-300 bg-rose-50 px-2 py-0.5 text-[9.5px] font-bold text-rose-800 shadow-2xs">
+                                            <AlertCircle size={11} className="stroke-[2.5] text-rose-600" />
+                                            <span>QC Rejected</span>
+                                          </span>
                                         ) : qcStatus === 'Rework' ? (
-                                          // Reprocessed fabric is inspected again through the existing
-                                          // Re-check Rework step, not a fresh QC on the receipt.
                                           <button
                                             type="button"
-                                            onClick={() => navigate('/inventory/qc/advanced?step=recheck')}
-                                            className="rounded border border-amber-200 bg-amber-50 px-1.5 py-1 text-[9px] font-semibold text-amber-700 hover:bg-amber-100"
+                                            onClick={() => setQcModalPo({
+                                              ...p,
+                                              initialReceiptId: batch.pendingQcReceiptId || batch.receiptNumbers?.[0] || batch.sourceDocumentNumber,
+                                              batchCode: batch.batchCode,
+                                            })}
+                                            className="inline-flex items-center gap-1.5 rounded-md bg-gradient-to-r from-amber-500 to-amber-600 px-2.5 py-1 text-[10px] font-bold text-white shadow-xs transition-all duration-150 hover:from-amber-600 hover:to-amber-700 hover:shadow-md active:scale-95 cursor-pointer"
                                             title={`Re-check reworked fabric of ${batch.batchCode}`}
                                           >
-                                            Re-check
+                                            <RefreshCw size={11} className="stroke-[2.5] text-amber-100" />
+                                            <span>Re-check</span>
                                           </button>
-                                        ) : null}
+                                        ) : (
+                                          <button
+                                            type="button"
+                                            onClick={() => setQcModalPo({
+                                              ...p,
+                                              initialReceiptId: batch.pendingQcReceiptId || batch.receiptNumbers?.[0] || batch.sourceDocumentNumber,
+                                              batchCode: batch.batchCode,
+                                            })}
+                                            className="inline-flex items-center gap-1.5 rounded-md bg-gradient-to-r from-blue-600 via-indigo-600 to-indigo-700 px-2.5 py-1 text-[10px] font-bold text-white shadow-xs transition-all duration-150 hover:from-blue-700 hover:via-indigo-700 hover:to-indigo-800 hover:shadow-md active:scale-95 group cursor-pointer"
+                                            title={`Perform Quality Inspection for ${batch.receiptNumbers?.[0] || batch.batchCode}`}
+                                          >
+                                            <ShieldCheck size={12} className="stroke-[2.5] text-indigo-100 group-hover:scale-110 transition-transform" />
+                                            <span>Perform QC</span>
+                                          </button>
+                                        )}
                                       </div>
                                     </td>
                                   </tr>
@@ -1929,9 +1952,11 @@ export const PurchaseOrdersPage = () => {
           <div className="bg-white border border-slate-200 shadow-2xl rounded-2xl w-full max-w-5xl max-h-[95vh] sm:max-h-[92vh] overflow-y-auto flex flex-col p-4 sm:p-6 text-xs">
             <GreyQcInlineSlide
               po={qcModalPo}
+              initialReceiptId={qcModalPo.initialReceiptId}
               onClose={() => setQcModalPo(null)}
               onQcSaved={() => {
                 setQcModalPo(null);
+                setExpandedBatchesReload((attempt) => attempt + 1);
                 if (typeof refreshCollections === 'function') {
                   refreshCollections(['purchaseOrders', 'purchaseBills']);
                 }

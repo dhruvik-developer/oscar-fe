@@ -217,28 +217,6 @@ export function PoActionMenu({
       <button
         type="button"
         role="menuitem"
-        disabled={!canPerformQc}
-        onClick={() => handleAction(onPerformQc)}
-        title={
-          isDraft || isPendingApproval
-            ? 'Order must be approved before quality inspection'
-            : isCancelled
-            ? 'Order cancelled'
-            : 'Inspect rolls, log defects & taka grades'
-        }
-        className={`w-full px-3 py-1.5 text-left flex items-center gap-2 transition-colors ${
-          canPerformQc
-            ? 'hover:bg-indigo-50 hover:text-indigo-700 cursor-pointer text-slate-700'
-            : 'opacity-40 cursor-not-allowed text-slate-400'
-        }`}
-      >
-        <ShieldCheck size={13} className="text-indigo-600 shrink-0" />
-        <span>Perform QC</span>
-      </button>
-
-      <button
-        type="button"
-        role="menuitem"
         disabled={!canDispatch}
         onClick={() => handleAction(onSupplierDispatch)}
         title={!canDispatch ? 'PO must be approved before logging dispatch' : 'Log vendor shipment / challan'}

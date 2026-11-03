@@ -1833,7 +1833,19 @@ export const ERPProvider = ({ children, }) => {
         return newParty;
     };
     const updateParty = (id, updates) => {
-        setParties((prev) => prev.map((p) => (p.id === id || p.code === id ? { ...p, ...updates } : p)));
+        setParties((prev) => prev.map((p) => {
+            if (p.id === id || p.code === id) {
+                let nextBalance = p.balance;
+                if (updates.openingBalance !== undefined) {
+                    const oldOpening = Number(p.openingBalance ?? p.opening_balance ?? 0) || 0;
+                    const newOpening = Number(updates.openingBalance) || 0;
+                    const diff = newOpening - oldOpening;
+                    nextBalance = (Number(p.balance) || 0) + diff;
+                }
+                return { ...p, ...updates, balance: nextBalance };
+            }
+            return p;
+        }));
         persistUpdate('parties', id, updates, setParties);
         showToast(`Party updated.`);
     };
@@ -3796,15 +3808,15 @@ export const ERPProvider = ({ children, }) => {
     // Server-first: the vendor's own invoice number is typed by the user; the
     // server computes subtotal / GST / total. Throws on failure.
     const addVendorBill = async (bill) => {
-        const rawLines = (bill.lineItems || bill.items || []).filter((l) => l && l.itemId);
-        if (!bill.vendorId) throw rejectCreate('Select a vendor.');
+        const rawLines = (bill.lineItems || bill.items || []).filter((l) => l && (l.itemId || l.batchId));
+        if (!bill.purchaseOrderId && !bill.vendorId) throw rejectCreate('Select a Purchase Order.');
         if (!String(bill.vendorBillNumber || '').trim()) throw rejectCreate('Enter the vendor bill / invoice number.');
         if (!(bill.billDate || bill.date)) throw rejectCreate('Pick the bill date.');
         if (rawLines.length === 0 || rawLines.some((l) => !(Number(l.qty ?? l.quantity) > 0))) {
             throw rejectCreate('Add at least one item with billed quantity greater than 0.');
         }
         const saved = await createOnServer('vendorBills', {
-            vendorId: bill.vendorId,
+            vendorId: bill.vendorId || undefined,
             vendorBillNumber: String(bill.vendorBillNumber).trim(),
             billDate: bill.billDate || bill.date,
             purchaseOrderId: bill.purchaseOrderId || undefined,
@@ -3814,6 +3826,9 @@ export const ERPProvider = ({ children, }) => {
             remarks: bill.remarks || bill.notes || '',
             lineItems: rawLines.map((line) => ({
                 itemId: line.itemId,
+                batchId: line.batchId || undefined,
+                batchNumber: line.batchNumber || line.batchCode || undefined,
+                grnId: line.grnId || undefined,
                 sku: line.sku || line.itemSku || undefined,
                 itemName: line.itemName || line.name || line.description || undefined,
                 qty: Number(line.qty ?? line.quantity),

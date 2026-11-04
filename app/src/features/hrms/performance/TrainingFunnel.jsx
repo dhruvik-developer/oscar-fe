@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Avatar } from "../../../components/hrms/Avatar";
 import { useNavigate } from "react-router-dom";
 import {
@@ -87,14 +87,6 @@ export default function TrainingFunnel({ embedded = false, onBack }) {
   });
 
   // Filtered list
-  const [listPage, setListPage] = useState(1);
-  const [listPageSize, setListPageSize] = useState(10);
-
-  const paginatedTrainings = useMemo(() => {
-    const start = (listPage - 1) * listPageSize;
-    return filteredTrainings.slice(start, start + listPageSize);
-  }, [filteredTrainings, listPage, listPageSize]);
-
   const filteredTrainings = useMemo(() => {
     return trainings.filter((t) => {
       if (deptFilter !== "All" && t.department !== deptFilter) return false;
@@ -108,6 +100,18 @@ export default function TrainingFunnel({ embedded = false, onBack }) {
       return true;
     });
   }, [trainings, deptFilter, search]);
+
+  const [listPage, setListPage] = useState(1);
+  const [listPageSize, setListPageSize] = useState(10);
+
+  useEffect(() => {
+    setListPage(1);
+  }, [deptFilter, search, listPageSize]);
+
+  const paginatedTrainings = useMemo(() => {
+    const start = (listPage - 1) * listPageSize;
+    return filteredTrainings.slice(start, start + listPageSize);
+  }, [filteredTrainings, listPage, listPageSize]);
 
   // Overall totals
   const totalCount = filteredTrainings.length;

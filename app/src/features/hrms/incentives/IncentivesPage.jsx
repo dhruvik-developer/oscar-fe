@@ -234,6 +234,17 @@ export default function IncentivesPage() {
     },
   });
 
+  const schemeSort = useTableSort(schemes || [], {
+    accessors: {
+      basis: (s) => BASIS_LABELS[s.basis] || s.basis,
+      rate: (s) => {
+        const slabs = Array.isArray(s.slabs) ? s.slabs : [];
+        return slabs.length ? Number(slabs[0].rate_pct ?? slabs[0].rate ?? 0) : Number(s.ratePct || 0);
+      },
+      payoutAfterDays: (s) => s.payoutAfterDays ?? 90,
+    },
+  });
+
   const [schemePage, setSchemePage] = useState(1);
   const [schemePageSize, setSchemePageSize] = useState(5);
 
@@ -253,17 +264,6 @@ export default function IncentivesPage() {
     const start = (accrualPage - 1) * accrualPageSize;
     return accrualSort.rows.slice(start, start + accrualPageSize);
   }, [accrualSort.rows, accrualPage, accrualPageSize]);
-
-  const schemeSort = useTableSort(schemes || [], {
-    accessors: {
-      basis: (s) => BASIS_LABELS[s.basis] || s.basis,
-      rate: (s) => {
-        const slabs = Array.isArray(s.slabs) ? s.slabs : [];
-        return slabs.length ? Number(slabs[0].rate_pct ?? slabs[0].rate ?? 0) : Number(s.ratePct || 0);
-      },
-      payoutAfterDays: (s) => s.payoutAfterDays ?? 90,
-    },
-  });
 
   const stats = useMemo(() => {
     let gross = 0;

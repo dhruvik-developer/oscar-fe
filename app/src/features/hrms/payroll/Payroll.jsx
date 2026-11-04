@@ -547,28 +547,6 @@ export default function Payroll() {
   }, [computedEmployeePayrolls]);
 
   // Filtered Employee-wise list
-  // Employee-wise table pagination
-  const [empPage, setEmpPage] = useState(1);
-  const [empPageSize, setEmpPageSize] = useState(10);
-
-  useEffect(() => {
-    setEmpPage(1);
-  }, [searchTerm, departmentFilter, statusFilter, selectedPeriod, empPageSize]);
-
-  const paginatedEmployees = useMemo(() => {
-    const start = (empPage - 1) * empPageSize;
-    return filteredEmployees.slice(start, start + empPageSize);
-  }, [filteredEmployees, empPage, empPageSize]);
-
-  // My Salary / History table pagination
-  const [historyPage, setHistoryPage] = useState(1);
-  const [historyPageSize, setHistoryPageSize] = useState(10);
-
-  const paginatedHistory = useMemo(() => {
-    const start = (historyPage - 1) * historyPageSize;
-    return ownHistory.slice(start, start + historyPageSize);
-  }, [ownHistory, historyPage, historyPageSize]);
-
   const filteredEmployees = useMemo(() => {
     return computedEmployeePayrolls.filter((p) => {
       const q = empSearch.toLowerCase();
@@ -582,6 +560,19 @@ export default function Payroll() {
     });
   }, [computedEmployeePayrolls, empSearch, deptFilter, statusFilter]);
 
+  // Employee-wise table pagination
+  const [empPage, setEmpPage] = useState(1);
+  const [empPageSize, setEmpPageSize] = useState(10);
+
+  useEffect(() => {
+    setEmpPage(1);
+  }, [empSearch, deptFilter, statusFilter, period, empPageSize]);
+
+  const paginatedEmployees = useMemo(() => {
+    const start = (empPage - 1) * empPageSize;
+    return filteredEmployees.slice(start, start + empPageSize);
+  }, [filteredEmployees, empPage, empPageSize]);
+
   // Own salary: the signed-in employee's payslips, newest first.
   const ownHistory = useMemo(
     () =>
@@ -590,6 +581,19 @@ export default function Payroll() {
         .sort((a, b) => String(b.period || b.month || "").localeCompare(String(a.period || a.month || ""))),
     [ownHistoryRaw]
   );
+
+  // My Salary / History table pagination
+  const [historyPage, setHistoryPage] = useState(1);
+  const [historyPageSize, setHistoryPageSize] = useState(10);
+
+  useEffect(() => {
+    setHistoryPage(1);
+  }, [period, historyPageSize]);
+
+  const paginatedHistory = useMemo(() => {
+    const start = (historyPage - 1) * historyPageSize;
+    return ownHistory.slice(start, start + historyPageSize);
+  }, [ownHistory, historyPage, historyPageSize]);
   const ownRecord = useMemo(
     () => ownHistory.find((h) => h.period === period) || ownHistory[0] || null,
     [ownHistory, period]

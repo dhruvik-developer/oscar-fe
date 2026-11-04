@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useAppStore } from '../../../stores/appStore';
 import { Badge } from '../../../components/hrms/Badge';
 import Modal from '../../../components/ui/Modal';
@@ -53,17 +53,6 @@ export function DepartmentsPage() {
     String(d.name ?? '').toLowerCase().includes(q.toLowerCase()) ||
     String(d.head ?? '').toLowerCase().includes(q.toLowerCase())
   );
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
-
-  useEffect(() => {
-    setPage(1);
-  }, [q, statusFilter, pageSize]);
-
-  const paginatedRows = useMemo(() => {
-    const start = (page - 1) * pageSize;
-    return sort.rows.slice(start, start + pageSize);
-  }, [sort.rows, page, pageSize]);
 
   const sort = useTableSort(filtered, {
     accessors: {
@@ -73,6 +62,18 @@ export function DepartmentsPage() {
       status: (d) => d.status || 'Active',
     },
   });
+
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  useEffect(() => {
+    setPage(1);
+  }, [q, pageSize]);
+
+  const paginatedRows = useMemo(() => {
+    const start = (page - 1) * pageSize;
+    return sort.rows.slice(start, start + pageSize);
+  }, [sort.rows, page, pageSize]);
 
   async function handleCreate(e) {
     e.preventDefault();

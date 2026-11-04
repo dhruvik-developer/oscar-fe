@@ -421,13 +421,17 @@ export default function Leave() {
     accessors: { dates: (r) => String(r.dates || "").split(" – ")[0] },
   });
   const compOffSort = useTableSort(compOffCredits);
+  const encashmentSort = useTableSort(encashments, {
+    accessors: { amount: (e) => e.amount || e.days * 2083 },
+  });
+
   // Leave queue pagination
   const [leavePage, setLeavePage] = useState(1);
   const [leavePageSize, setLeavePageSize] = useState(5);
 
   useEffect(() => {
     setLeavePage(1);
-  }, [queueFilter, typeFilter, search, leavePageSize]);
+  }, [approvalSearch, statusFilter, typeFilter, leavePageSize]);
 
   const paginatedLeaves = useMemo(() => {
     const start = (leavePage - 1) * leavePageSize;
@@ -452,10 +456,6 @@ export default function Leave() {
     const start = (govPage - 1) * govPageSize;
     return currentGovRows.slice(start, start + govPageSize);
   }, [currentGovRows, govPage, govPageSize]);
-
-  const encashmentSort = useTableSort(encashments, {
-    accessors: { amount: (e) => e.amount || e.days * 2083 },
-  });
 
   const pendingCount = leaves.filter((l) => PENDING_STATUSES.includes(l.status)).length;
 

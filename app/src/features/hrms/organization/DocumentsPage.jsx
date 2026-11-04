@@ -146,18 +146,6 @@ export function DocumentsPage() {
   const expired = documents.filter((d) => d.status === "Expired").length;
 
   // Filtered documents for "All Documents"
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
-
-  useEffect(() => {
-    setPage(1);
-  }, [searchTerm, selectedCategory, statusFilter, pageSize]);
-
-  const paginatedAllDocs = useMemo(() => {
-    const start = (page - 1) * pageSize;
-    return filteredAllDocs.slice(start, start + pageSize);
-  }, [filteredAllDocs, page, pageSize]);
-
   const filteredAllDocs = useMemo(() => {
     return documents.filter((d) => {
       const q = search.toLowerCase();
@@ -179,6 +167,18 @@ export function DocumentsPage() {
       return matchesSearch && matchesCat && matchesStatus && matchesScope;
     });
   }, [documents, search, categoryFilter, statusFilter, scopeFilter]);
+
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  useEffect(() => {
+    setPage(1);
+  }, [search, categoryFilter, statusFilter, scopeFilter, pageSize]);
+
+  const paginatedAllDocs = useMemo(() => {
+    const start = (page - 1) * pageSize;
+    return filteredAllDocs.slice(start, start + pageSize);
+  }, [filteredAllDocs, page, pageSize]);
 
   // Selected employee object and documents
   const currentSelectedEmployee = useMemo(() => {

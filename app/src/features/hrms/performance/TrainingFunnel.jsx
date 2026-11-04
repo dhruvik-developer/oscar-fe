@@ -487,14 +487,8 @@ export default function TrainingFunnel({ embedded = false, onBack }) {
                             </div>
 
                             {/* Trainer info */}
-                            <div className="flex items-center gap-1 text-[10.5px] text-slate-600 mt-0.5 min-w-0">
-                              {item.avatar ? (
-                                <img src={item.avatar} alt="" className="w-3.5 h-3.5 rounded-full object-cover shrink-0" />
-                              ) : (
-                                <div className="w-3.5 h-3.5 rounded-full bg-slate-200 grid place-items-center text-[7.5px] font-bold text-slate-600 shrink-0">
-                                  {item.trainer ? item.trainer[0] : "U"}
-                                </div>
-                              )}
+                            <div className="flex items-center gap-1.5 text-[10.5px] text-slate-600 mt-0.5 min-w-0">
+                              <Avatar name={item.trainer || "Unassigned"} size="xs" className="!w-4 !h-4 !text-[8px]" />
                               <span className="truncate">{item.trainer || "Unassigned"}</span>
                             </div>
 

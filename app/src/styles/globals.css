@@ -748,6 +748,10 @@ img { display: block; max-width: 100%; }
   .app-shell {
     grid-template-columns: var(--sidebar-width, 280px) minmax(0, 1fr);
   }
+
+  .main-col {
+    grid-column: 2;
+  }
 }
 
 .main-col {
@@ -808,9 +812,13 @@ img { display: block; max-width: 100%; }
   flex-direction: column;
   justify-content: space-between;
   padding: 16px 12px 14px 14px;
-  position: sticky;
+  position: fixed;
   top: 0;
+  bottom: 0;
+  left: 0;
+  width: var(--sidebar-width, 280px);
   height: 100vh;
+  height: 100dvh;
   overflow-x: hidden !important;
   overflow-y: hidden;
   z-index: 30;

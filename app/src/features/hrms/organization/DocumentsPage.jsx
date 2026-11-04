@@ -115,6 +115,75 @@ export function DocumentsPage() {
   const [editReplacement, setEditReplacement] = useState(null);
   const [savingEdit, setSavingEdit] = useState(false);
 
+  // Upload modal state (Single category-based upload)
+  const [uploadModalOpen, setUploadModalOpen] = useState(false);
+  const [uploadCategory, setUploadCategory] = useState("Contract");
+  const [uploadEmpName, setUploadEmpName] = useState(selectedEmpName);
+  const [uploadTitle, setUploadTitle] = useState("");
+  const [uploadExpiry, setUploadExpiry] = useState("");
+  const [uploadFile, setUploadFile] = useState(null);
+  const [uploadLoading, setUploadLoading] = useState(false);
+  const modalFileInputRef = useRef(null);
+
+  function openUploadModal(category = "Contract", empName = null) {
+    const cat = category === "All" ? "Contract" : category;
+    const emp = empName || (activeTab === "employee" ? selectedEmpName : activeTab === "my" ? myDocUser : "All Staff");
+    setUploadCategory(cat);
+    setUploadEmpName(emp);
+    setUploadTitle("");
+    setUploadExpiry("");
+    setUploadFile(null);
+    setUploadLoading(false);
+    setUploadModalOpen(true);
+  }
+
+  function handleModalFileSelect(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reason = rejectReason(file);
+    if (reason) {
+      showToast(reason);
+      return;
+    }
+    setUploadFile(file);
+    if (!uploadTitle.trim()) {
+      const baseName = file.name.replace(/\.[^/.]+$/, "");
+      const formatted = baseName
+        .replace(/[_-]+/g, " ")
+        .replace(/\b\w/g, (c) => c.toUpperCase());
+      setUploadTitle(formatted);
+    }
+  }
+
+  async function handleSaveUpload() {
+    if (!uploadFile) {
+      showToast("Please select a PDF file from your device.");
+      return;
+    }
+    setUploadLoading(true);
+    const title = uploadTitle.trim() || uploadFile.name;
+    try {
+      await addDocument({
+        file: uploadFile,
+        title,
+        category: uploadCategory,
+        employeeId: employeeIdFor(uploadEmpName),
+        expiry: uploadExpiry || null,
+        description: `Uploaded ${uploadCategory} record: ${uploadFile.name}`,
+        tags: [uploadCategory, "Document Vault"],
+      });
+      showToast(`Saved "${title}" under ${uploadCategory} for ${uploadEmpName}`);
+      setUploadModalOpen(false);
+      if (activeTab === "employee") {
+        setEmpCategoryFilter(uploadCategory);
+      }
+    } catch (err) {
+      showToast(`Could not save document: ${err?.message || "server error"}`);
+    } finally {
+      setUploadLoading(false);
+    }
+  }
+
   // Hidden native file inputs: new uploads, and a replacement for the edited document
   const deviceFileInputRef = useRef(null);
   const replaceFileInputRef = useRef(null);
@@ -416,57 +485,7 @@ export function DocumentsPage() {
         }
         subtitle="Manage company compliance policies, employee personnel dossiers, and personal records in PDF format"
         guide={hrmsGuides.documents}
-        actions={
-          <button
-            type="button"
-            onClick={() =>
-              triggerSelectFromDevice(
-                activeTab === "employee" ? selectedEmpName : activeTab === "my" ? myDocUser : "All Staff"
-              )
-            }
-            className="inline-flex items-center gap-2 px-5 py-2.5 bg-navy text-white rounded-xl text-[13.5px] font-semibold hover:bg-navy/90 transition cursor-pointer shadow-sm"
-          >
-            <UploadCloud size={17} />
-            <span>{uploadingCount > 0 ? `Uploading ${uploadingCount}…` : "Select PDF from Device"}</span>
-          </button>
-        }
       />
-
-      {/* Drag & Drop Quick Notice Zone */}
-      <div
-        onClick={() =>
-          triggerSelectFromDevice(
-            activeTab === "employee" ? selectedEmpName : activeTab === "my" ? myDocUser : "All Staff"
-          )
-        }
-        className="border-2 border-dashed border-slate-200 hover:border-navy/60 bg-slate-50/60 hover:bg-navy/5 rounded-2xl p-4.5 flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left transition cursor-pointer"
-      >
-        <div className="flex items-center gap-3.5">
-          <div className="w-10 h-10 rounded-xl bg-navy/10 text-navy flex items-center justify-center shrink-0">
-            <FileUp size={22} />
-          </div>
-          <div>
-            <div className="text-[13.5px] font-semibold text-slate-900">
-              Click to select PDF from device or drag &amp; drop here
-            </div>
-            <div className="text-[12px] text-muted">
-              Target destination:{" "}
-              <b className="text-navy">
-                {activeTab === "employee"
-                  ? `${selectedEmpName}'s Dossier`
-                  : activeTab === "my"
-                  ? `${myDocUser}'s Personal Vault`
-                  : "Company Repository (All Staff)"}
-              </b>{" "}
-              • Accepted format: PDF (.pdf)
-            </div>
-          </div>
-        </div>
-
-        <span className="px-3 py-1.5 bg-white border border-bdr rounded-xl text-[12px] font-semibold text-slate-800 shadow-xs shrink-0">
-          Browse Device Files
-        </span>
-      </div>
 
       {/* KPI Overview Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -645,11 +664,11 @@ export function DocumentsPage() {
             <div className="flex flex-wrap lg:flex-nowrap items-center gap-2">
               <button
                 type="button"
-                onClick={() => triggerSelectFromDevice("All Staff")}
+                onClick={() => openUploadModal("Contract", "All Staff")}
                 className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-navy text-white rounded-xl text-[12.5px] font-semibold hover:bg-navy/90 transition cursor-pointer shadow-xs"
               >
-                <UploadCloud size={14} />
-                <span>Select PDF from Device</span>
+                <Plus size={14} />
+                <span>Upload Document</span>
               </button>
             </div>
           </div>
@@ -874,15 +893,7 @@ export function DocumentsPage() {
                       }`}
                     >
                       <div className="flex items-center gap-2.5 min-w-0">
-                        <img
-                          src={
-                            emp.avatar ||
-                            emp.img ||
-                            `https://i.pravatar.cc/100?u=${encodeURIComponent(emp.name)}`
-                          }
-                          alt={emp.name}
-                          className="w-9 h-9 rounded-full object-cover border border-slate-200 shrink-0"
-                        />
+                        <Avatar name={emp.name} size="md" />
                         <div className="min-w-0">
                           <div className="text-[13px] font-semibold text-slate-900 truncate">
                             {emp.name}
@@ -921,15 +932,7 @@ export function DocumentsPage() {
             {/* Employee Profile Header Banner */}
             <div className="bg-white border border-bdr rounded-2xl p-5 shadow-xs flex flex-wrap justify-between items-center gap-4">
               <div className="flex items-center gap-4">
-                <img
-                  src={
-                    currentSelectedEmployee.avatar ||
-                    currentSelectedEmployee.img ||
-                    `https://i.pravatar.cc/100?u=${encodeURIComponent(currentSelectedEmployee.name)}`
-                  }
-                  alt={currentSelectedEmployee.name}
-                  className="w-14 h-14 rounded-2xl object-cover border border-slate-200 shadow-xs"
-                />
+                <Avatar name={currentSelectedEmployee.name} size="xl" className="rounded-2xl" />
                 <div>
                   <div className="flex items-center gap-2.5">
                     <h2 className="text-[18px] font-bold text-slate-900 leading-tight">
@@ -946,29 +949,17 @@ export function DocumentsPage() {
                   </p>
                 </div>
               </div>
-
-              {/* Direct Select from Device for Employee */}
-              <div className="flex flex-wrap lg:flex-nowrap items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => triggerSelectFromDevice(currentSelectedEmployee.name)}
-                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-navy text-white rounded-xl text-[12.5px] font-semibold hover:bg-navy/90 transition cursor-pointer shadow-xs"
-                >
-                  <UploadCloud size={15} />
-                  <span>Select PDF from Device</span>
-                </button>
-              </div>
             </div>
 
-            {/* Dossier Category Filter Pills */}
+            {/* Dossier Category Filter Pills & Single Category-Based Upload Button */}
             <div className="flex flex-wrap items-center justify-between gap-3 bg-white border border-bdr rounded-2xl p-3 shadow-xs">
               <div className="flex flex-wrap items-center gap-1.5">
                 {[
                   "All",
-                  "Identity",
                   "Contract",
                   "Educational",
                   "Financial",
+                  "Identity",
                   "Compliance",
                   "Legal",
                 ].map((cat) => (
@@ -987,9 +978,20 @@ export function DocumentsPage() {
                 ))}
               </div>
 
-              <div className="text-[12px] text-muted pr-1">
-                <span className="font-semibold text-slate-800">{filteredEmployeeDocs.length}</span>{" "}
-                PDF files in dossier
+              <div className="flex items-center gap-3">
+                <div className="text-[12px] text-muted pr-1">
+                  <span className="font-semibold text-slate-800">{filteredEmployeeDocs.length}</span>{" "}
+                  PDF files
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => openUploadModal(empCategoryFilter === "All" ? "Contract" : empCategoryFilter, selectedEmpName)}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-navy text-white rounded-xl text-[12.5px] font-semibold hover:bg-navy/90 transition cursor-pointer shadow-xs"
+                >
+                  <Plus size={15} />
+                  <span>Upload {empCategoryFilter === "All" ? "Document" : empCategoryFilter}</span>
+                </button>
               </div>
             </div>
 
@@ -1004,11 +1006,11 @@ export function DocumentsPage() {
                   </p>
                   <button
                     type="button"
-                    onClick={() => triggerSelectFromDevice(selectedEmpName)}
+                    onClick={() => openUploadModal(empCategoryFilter === "All" ? "Contract" : empCategoryFilter, selectedEmpName)}
                     className="mt-4 inline-flex items-center gap-2 px-4.5 py-2.5 bg-navy text-white rounded-xl text-[13px] font-semibold hover:bg-navy/90 transition cursor-pointer"
                   >
-                    <UploadCloud size={16} />
-                    Select PDF from Device
+                    <Plus size={16} />
+                    Upload {empCategoryFilter === "All" ? "Document" : empCategoryFilter}
                   </button>
                 </div>
               ) : (
@@ -1146,7 +1148,7 @@ export function DocumentsPage() {
               </div>
             </div>
 
-            {/* Quick action buttons & View-As selector */}
+            {/* View-As selector */}
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
               <div className="flex items-center gap-2 bg-white/10 backdrop-blur-xs p-1.5 rounded-xl border border-white/15 text-[12px]">
                 <span className="text-white/70 pl-2">Active User:</span>
@@ -1165,16 +1167,6 @@ export function DocumentsPage() {
                     ))}
                 </select>
               </div>
-
-              {/* Direct Select from Device for My Documents */}
-              <button
-                type="button"
-                onClick={() => triggerSelectFromDevice(myDocUser)}
-                className="inline-flex items-center gap-2 px-5 py-2.5 bg-white text-navy font-bold rounded-xl text-[13px] shadow-md hover:bg-slate-100 transition cursor-pointer"
-              >
-                <UploadCloud size={16} />
-                <span>Select PDF from Device</span>
-              </button>
             </div>
           </div>
 
@@ -1219,9 +1211,19 @@ export function DocumentsPage() {
               )}
             </div>
 
-            <span className="text-[12px] text-muted">
-              {filteredMyDocs.length} personal record{filteredMyDocs.length === 1 ? "" : "s"}
-            </span>
+            <div className="flex items-center gap-3">
+              <span className="text-[12px] text-muted">
+                {filteredMyDocs.length} personal record{filteredMyDocs.length === 1 ? "" : "s"}
+              </span>
+              <button
+                type="button"
+                onClick={() => openUploadModal(myDocCategoryFilter === "All" ? "Contract" : myDocCategoryFilter, myDocUser)}
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-navy text-white rounded-xl text-[12.5px] font-semibold hover:bg-navy/90 transition cursor-pointer shadow-xs"
+              >
+                <Plus size={15} />
+                <span>Upload {myDocCategoryFilter === "All" ? "Document" : myDocCategoryFilter}</span>
+              </button>
+            </div>
           </div>
 
           {/* My Documents Grid */}
@@ -1235,11 +1237,11 @@ export function DocumentsPage() {
                 </p>
                 <button
                   type="button"
-                  onClick={() => triggerSelectFromDevice(myDocUser)}
+                  onClick={() => openUploadModal(myDocCategoryFilter === "All" ? "Contract" : myDocCategoryFilter, myDocUser)}
                   className="mt-4 inline-flex items-center gap-2 px-5 py-2.5 bg-navy text-white rounded-xl text-[13px] font-semibold hover:bg-navy/90 transition cursor-pointer"
                 >
-                  <UploadCloud size={16} />
-                  Select PDF from Device
+                  <Plus size={16} />
+                  Upload {myDocCategoryFilter === "All" ? "Document" : myDocCategoryFilter}
                 </button>
               </div>
             ) : (
@@ -1324,6 +1326,164 @@ export function DocumentsPage() {
       )}
 
       {/* =========================================================================
+          MODAL 0: UPLOAD DOCUMENT ACCORDING TO CATEGORY
+         ========================================================================= */}
+      <Modal
+        isOpen={uploadModalOpen}
+        onClose={() => { if (!uploadLoading) setUploadModalOpen(false); }}
+        title={`Upload Document - ${uploadCategory}`}
+        size="md"
+        footer={
+          <>
+            <button
+              type="button"
+              className="px-4 py-2 border border-bdr rounded-xl text-[13px] hover:bg-slate-50 font-medium cursor-pointer"
+              disabled={uploadLoading}
+              onClick={() => setUploadModalOpen(false)}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={uploadLoading || !uploadFile}
+              className="inline-flex items-center gap-2 px-5 py-2 bg-navy text-white rounded-xl text-[13px] font-semibold hover:bg-navy/90 transition cursor-pointer shadow-xs disabled:opacity-50"
+              onClick={handleSaveUpload}
+            >
+              <UploadCloud size={16} />
+              <span>{uploadLoading ? "Uploading & Saving…" : "Save Document"}</span>
+            </button>
+          </>
+        }
+      >
+        <div className="flex flex-col gap-4">
+          {/* Target Employee Indicator */}
+          <div className="bg-slate-50 border border-bdr rounded-xl p-3 flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <Avatar name={uploadEmpName} size="sm" />
+              <div>
+                <div className="text-[11px] text-muted font-medium">Assigned To</div>
+                <div className="text-[13px] font-bold text-slate-900">{uploadEmpName}</div>
+              </div>
+            </div>
+            {activeTab !== "employee" && (
+              <select
+                value={uploadEmpName}
+                onChange={(e) => setUploadEmpName(e.target.value)}
+                className="text-[12px] px-2.5 py-1 bg-white border border-bdr rounded-lg text-slate-800 focus:outline-none focus:border-navy cursor-pointer"
+              >
+                <option value="All Staff">All Staff (Company-wide)</option>
+                {employees.map((e) => (
+                  <option key={e.id} value={e.name}>{e.name}</option>
+                ))}
+              </select>
+            )}
+          </div>
+
+          {/* Category Dropdown */}
+          <div>
+            <label className="block text-[12px] font-semibold text-slate-700 mb-1">
+              Document Category
+            </label>
+            <select
+              value={uploadCategory}
+              onChange={(e) => setUploadCategory(e.target.value)}
+              className="w-full px-3 py-2 rounded-xl border border-bdr text-[13px] bg-off focus:bg-white focus:outline-none focus:border-navy cursor-pointer"
+            >
+              <option value="Contract">Contract (Offer letter, Employment agreement, NDA)</option>
+              <option value="Educational">Educational (Degrees, Certificates, Transcripts)</option>
+              <option value="Financial">Financial (Payslips, Form 16, Tax docs, Bank passbook)</option>
+              <option value="Identity">Identity (Aadhaar, Passport, PAN card, Driving license)</option>
+              <option value="Compliance">Compliance (Visa, Work permits, Policy acknowledgments)</option>
+              <option value="Legal">Legal (Statutory filings, Legal undertakings)</option>
+              <option value="Policy">Policy (Company handbook, Standard operating procedures)</option>
+              <option value="General">General</option>
+            </select>
+          </div>
+
+          {/* PDF File Picker */}
+          <div>
+            <label className="block text-[12px] font-semibold text-slate-700 mb-1">
+              PDF Document File <span className="text-rose-500">*</span>
+            </label>
+            <input
+              type="file"
+              ref={modalFileInputRef}
+              accept=".pdf,application/pdf"
+              className="hidden"
+              onChange={handleModalFileSelect}
+            />
+            <div
+              onClick={() => modalFileInputRef.current?.click()}
+              className={`border-2 border-dashed rounded-xl p-4 text-center cursor-pointer transition ${
+                uploadFile
+                  ? "border-emerald-300 bg-emerald-50/40"
+                  : "border-slate-200 hover:border-navy/60 bg-slate-50/50 hover:bg-navy/5"
+              }`}
+            >
+              {uploadFile ? (
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2.5 text-left">
+                    <div className="w-9 h-9 rounded-lg bg-rose-50 text-rose-700 border border-rose-200 flex items-center justify-center font-bold text-[10px]">
+                      PDF
+                    </div>
+                    <div>
+                      <div className="text-[13px] font-semibold text-slate-900 truncate max-w-[220px]">
+                        {uploadFile.name}
+                      </div>
+                      <div className="text-[11px] text-muted">
+                        {(uploadFile.size / 1024).toFixed(1)} KB • Ready to save
+                      </div>
+                    </div>
+                  </div>
+                  <span className="text-[11.5px] font-semibold text-navy hover:underline">Change File</span>
+                </div>
+              ) : (
+                <div className="py-2">
+                  <UploadCloud size={28} className="mx-auto text-slate-400 mb-1" />
+                  <div className="text-[13px] font-semibold text-slate-800">
+                    Click to browse and choose PDF
+                  </div>
+                  <div className="text-[11.5px] text-muted mt-0.5">
+                    Accepted format: PDF only (up to 25 MB)
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Document Title */}
+          <div>
+            <label className="block text-[12px] font-semibold text-slate-700 mb-1">
+              Document Title
+            </label>
+            <input
+              type="text"
+              value={uploadTitle}
+              onChange={(e) => setUploadTitle(e.target.value)}
+              placeholder="e.g. Employment Contract 2026"
+              className="w-full px-3.5 py-2 rounded-xl border border-bdr text-[13px] bg-off focus:bg-white focus:outline-none focus:border-navy"
+            />
+          </div>
+
+          {/* Expiry Date (Optional) */}
+          <div>
+            <label className="block text-[12px] font-semibold text-slate-700 mb-1">
+              Expiry Date <span className="text-muted font-normal">(Optional)</span>
+            </label>
+            <input
+              type="date"
+              value={uploadExpiry}
+              onChange={(e) => setUploadExpiry(e.target.value)}
+              className="w-full px-3 py-2 rounded-xl border border-bdr text-[12.5px] bg-off focus:bg-white focus:outline-none focus:border-navy"
+            />
+            <p className="text-[11px] text-muted mt-1">
+              Leave blank if permanent. Applies to passports, visas, or fixed-term contracts.
+            </p>
+          </div>
+        </div>
+      </Modal>
+
+      {/* =========================================================================
           MODAL 1: PREVIEW PDF DOCUMENT MODAL (INTERACTIVE PDF VIEWER)
          ========================================================================= */}
       <Modal
@@ -1343,7 +1503,7 @@ export function DocumentsPage() {
             <button
               type="button"
               className="inline-flex items-center gap-1.5 px-4.5 py-2 bg-navy text-white rounded-xl text-[13px] font-semibold hover:bg-navy/90 transition cursor-pointer shadow-xs"
-              disabled={!previewDoc?.hasFile}
+              disabled={!previewDoc?.hasFile && !previewDoc?.fileId}
               onClick={() => {
                 if (previewDoc) {
                   handleDownload(previewDoc);

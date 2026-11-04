@@ -146,13 +146,19 @@ export default function HRAdminPage({ defaultTab }) {
   const setTrainingEnabled = useAppStore((s) => s.setTrainingEnabled);
 
   const [searchParams] = useSearchParams();
-  const initialTab = searchParams.get("tab") || defaultTab || "teams";
+  const rawTab = searchParams.get("tab") || defaultTab;
+  const initialTab = (rawTab && rawTab !== "teams" && rawTab !== "offers") ? rawTab : "working-days";
   const [activeTab, setActiveTab] = useState(initialTab);
 
   useEffect(() => {
     const tabParam = searchParams.get("tab");
-    if (tabParam) setActiveTab(tabParam);
-    else if (defaultTab) setActiveTab(defaultTab);
+    if (tabParam && tabParam !== "teams" && tabParam !== "offers") {
+      setActiveTab(tabParam);
+    } else if (defaultTab && defaultTab !== "teams" && defaultTab !== "offers") {
+      setActiveTab(defaultTab);
+    } else {
+      setActiveTab("working-days");
+    }
   }, [defaultTab, searchParams]);
 
   // Payroll Store Integration for Department Working Days & Hours
@@ -866,6 +872,7 @@ export default function HRAdminPage({ defaultTab }) {
 
   // ── 9 Top KPI Button Cards Configuration ──
   const TOP_KPI_BUTTONS = [
+    /*
     {
       id: "teams",
       label: "Teams",
@@ -875,6 +882,7 @@ export default function HRAdminPage({ defaultTab }) {
       iconColor: "text-blue-700",
       accentBg: "bg-blue-50 text-blue-700 border-blue-200",
     },
+    */
     {
       id: "working-days",
       label: "Work Schedule",
@@ -893,6 +901,7 @@ export default function HRAdminPage({ defaultTab }) {
       iconColor: "text-emerald-700",
       accentBg: "bg-emerald-50 text-emerald-700 border-emerald-200",
     },
+    /*
     {
       id: "offers",
       label: "Offer Letters",
@@ -902,6 +911,7 @@ export default function HRAdminPage({ defaultTab }) {
       iconColor: "text-teal-700",
       accentBg: "bg-teal-50 text-teal-700 border-teal-200",
     },
+    */
     {
       id: "terminations",
       label: "Terminations",
@@ -979,6 +989,7 @@ export default function HRAdminPage({ defaultTab }) {
                   <div className="px-3 py-1.5 text-[11px] font-bold text-muted uppercase tracking-wider">
                     Create / Initiate
                   </div>
+                  {/*
                   <button
                     type="button"
                     onClick={() => {
@@ -989,6 +1000,7 @@ export default function HRAdminPage({ defaultTab }) {
                   >
                     <Users size={14} className="text-blue-700" /> New Team / Squad
                   </button>
+                  */}
                   <button
                     type="button"
                     onClick={() => {
@@ -999,6 +1011,7 @@ export default function HRAdminPage({ defaultTab }) {
                   >
                     <ShieldCheck size={14} className="text-emerald-700" /> Approval Workflow
                   </button>
+                  {/*
                   <button
                     type="button"
                     onClick={() => {
@@ -1009,6 +1022,7 @@ export default function HRAdminPage({ defaultTab }) {
                   >
                     <FileCheck2 size={14} className="text-teal-700" /> Generate Offer Letter
                   </button>
+                  */}
                   <button
                     type="button"
                     onClick={() => {
@@ -1054,7 +1068,8 @@ export default function HRAdminPage({ defaultTab }) {
             </div>
 
             {/* Contextual Primary Action Button */}
-            {activeTab === "teams" && (
+            {/* Teams action button commented out */}
+            {false && (
               <button
                 type="button"
                 onClick={handleOpenAddTeam}
@@ -1095,7 +1110,8 @@ export default function HRAdminPage({ defaultTab }) {
                 <Plus size={16} /> New Approval Chain
               </button>
             )}
-            {activeTab === "offers" && (
+            {/* Offers action button commented out */}
+            {false && (
               <button
                 type="button"
                 onClick={() => setIsGenerateOfferModalOpen(true)}
@@ -1155,7 +1171,7 @@ export default function HRAdminPage({ defaultTab }) {
 
       {/* ── TOP BUTTONS: Interactive 9 KPI Buttons ── */}
       {/* Clicking any button immediately switches the view */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-9 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3">
         {TOP_KPI_BUTTONS.map((btn) => {
           const isActive = activeTab === btn.id;
           const Icon = btn.icon;
@@ -2370,7 +2386,7 @@ export default function HRAdminPage({ defaultTab }) {
               </div>
               <span className="text-[12px] font-medium text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200 flex items-center gap-1.5">
                 <Check size={12} />
-                Auto-Saved to Local Storage
+                Auto-Synced & Saved
               </span>
             </div>
 
@@ -3374,20 +3390,24 @@ export default function HRAdminPage({ defaultTab }) {
         onUpdateTermination={handleUpdateTermination}
       />
 
-      {/* ── Modal: Offer Letter Live Editor & PDF ── */}
+      {/* ── Modal: Offer Letter Live Editor & PDF (Commented out) ── */}
+      {/*
       <OfferLetterModal
         isOpen={isOfferLetterModalOpen}
         onClose={() => setIsOfferLetterModalOpen(false)}
         offer={activeOfferLetter}
         onUpdateOffer={handleUpdateOffer}
       />
+      */}
 
-      {/* ── Modal: Generate Offer Letter (Connected to Recruits) ── */}
+      {/* ── Modal: Generate Offer Letter (Connected to Recruits) (Commented out) ── */}
+      {/*
       <GenerateOfferModal
         isOpen={isGenerateOfferModalOpen}
         onClose={() => setIsGenerateOfferModalOpen(false)}
         onSubmit={handleCreateOffer}
       />
+      */}
     </div>
   );
 }

@@ -70,7 +70,7 @@ export default function Trainers({ embedded = false, onBack }) {
       </div> }
   ];
 
-  function FormFields() {
+  function renderFormFields() {
     return <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <label className="sm:col-span-2 flex flex-col gap-1"><span className="text-[11px] font-medium text-muted">Trainer Name *</span><input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="h-9 px-3 bg-white border border-bdr rounded-xl text-[13px]" placeholder="Sarah Mitchell" /></label>
         <label className="flex flex-col gap-1"><span className="text-[11px] font-medium text-muted">Specialization</span><select value={form.specialization} onChange={(e) => setForm({ ...form, specialization: e.target.value })} className="h-9 px-3 bg-white border border-bdr rounded-xl text-[13px]"><option>Leadership</option><option>Engineering</option><option>Design</option><option>Marketing</option><option>Finance</option><option>Operations</option></select></label>
@@ -131,11 +131,11 @@ export default function Trainers({ embedded = false, onBack }) {
       <DataTable columns={cols} data={filtered} emptyTitle="No trainers found" emptyDesc="Add a trainer to get started." emptyAction={<Button onClick={() => setAddOpen(true)}>+ Add Trainer</Button>} />
 
       <Modal isOpen={addOpen} onClose={() => setAddOpen(false)} title="Add Trainer" footer={<><Button variant="secondary" onClick={() => setAddOpen(false)}>Cancel</Button><Button onClick={save}>Save Trainer</Button></>}>
-        <FormFields />
+        {renderFormFields()}
       </Modal>
 
       <Modal isOpen={!!editRow} onClose={() => setEditRow(null)} title="Edit Trainer" footer={<><Button variant="secondary" onClick={() => setEditRow(null)}>Cancel</Button><Button onClick={save}>Save Trainer</Button></>}>
-        <FormFields />
+        {renderFormFields()}
       </Modal>
 
       <Drawer isOpen={!!viewRow} onClose={() => setViewRow(null)} title={viewRow?.name ?? ""} subtitle={viewRow?.specialization} footer={<Button variant="secondary" onClick={() => setViewRow(null)}>Close</Button>}>

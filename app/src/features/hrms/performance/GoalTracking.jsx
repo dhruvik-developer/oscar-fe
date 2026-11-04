@@ -7,6 +7,7 @@ import { ProgressBar } from "../../../components/hrms/ProgressBar";
 import { Modal } from "../../../components/hrms/Modal";
 import { Drawer } from "../../../components/hrms/Drawer";
 import { Button } from "../../../components/hrms/Button";
+import { Avatar } from "../../../components/hrms/Avatar";
 import { useAppStore } from "../../../stores/appStore";
 import { Eye, Pencil, Trash2 } from "lucide-react";
 import PageHeader from "../../../components/ui/PageHeader";
@@ -128,7 +129,7 @@ export default function GoalTracking() {
     }
   }
   const cols = [
-    { key: "employee", header: "Employee", sortable: true, render: (r) => <div className="flex items-center gap-2">{r.avatar ? <img src={r.avatar} alt="" className="w-7 h-7 rounded-full" /> : <span className="w-7 h-7 rounded-full bg-slate-200 text-slate-600 grid place-items-center text-[10px] font-bold">{String(r.employee || "?").slice(0, 1).toUpperCase()}</span>}{r.employee}</div> },
+    { key: "employee", header: "Employee", sortable: true, render: (r) => <div className="flex items-center gap-2"><Avatar name={r.employee} size="xs" />{r.employee}</div> },
     { key: "goal", header: "Goal", render: (r) => <span className="max-w-[260px] truncate block">{r.goal}</span> },
     { key: "target", header: "Target" },
     { key: "current", header: "Current" },
@@ -144,7 +145,7 @@ export default function GoalTracking() {
         <button onClick={() => setDeleteRow(r)} className="w-7 h-7 rounded-lg hover:bg-red-50 text-red-600 grid place-items-center"><Trash2 size={14} /></button>
       </div> }
   ];
-  function FormFields() {
+  function renderFormFields() {
     return <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <label className="flex flex-col gap-1">
           <span className="flex items-center justify-between">
@@ -211,8 +212,8 @@ export default function GoalTracking() {
     }}
   />
       <DataTable columns={cols} data={filtered} emptyTitle="No goals" emptyDesc="Create your first goal to get started." emptyAction={<Button onClick={() => setAddOpen(true)}>+ Add Goal</Button>} />
-      <Modal isOpen={addOpen} onClose={() => setAddOpen(false)} title="Add Goal" footer={<><Button variant="secondary" onClick={() => setAddOpen(false)}>Cancel</Button><Button onClick={save}>Save Goal</Button></>}><FormFields /></Modal>
-      <Modal isOpen={!!editRow} onClose={() => setEditRow(null)} title="Edit Goal" footer={<><Button variant="secondary" onClick={() => setEditRow(null)}>Cancel</Button><Button onClick={save}>Save Goal</Button></>}><FormFields /></Modal>
+      <Modal isOpen={addOpen} onClose={() => setAddOpen(false)} title="Add Goal" footer={<><Button variant="secondary" onClick={() => setAddOpen(false)}>Cancel</Button><Button onClick={save}>Save Goal</Button></>}>{renderFormFields()}</Modal>
+      <Modal isOpen={!!editRow} onClose={() => setEditRow(null)} title="Edit Goal" footer={<><Button variant="secondary" onClick={() => setEditRow(null)}>Cancel</Button><Button onClick={save}>Save Goal</Button></>}>{renderFormFields()}</Modal>
       <Drawer isOpen={!!viewRow} onClose={() => setViewRow(null)} title={viewRow?.goal ?? ""} subtitle={`${viewRow?.employee} \u2022 Due ${viewRow?.due}`} footer={<Button variant="secondary" onClick={() => setViewRow(null)}>Close</Button>}>
         {viewRow && <div className="space-y-3 text-[13px]"><div>Target: {viewRow.target} • Current: {viewRow.current}</div><ProgressBar value={viewRow.progress} /><div>Status: <StatusBadge status={viewRow.status} /></div></div>}
       </Drawer>

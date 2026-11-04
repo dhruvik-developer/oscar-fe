@@ -443,7 +443,7 @@ export default function BulkAttendance() {
       />
 
       <style>{`
-        .bulk-att-page { background: #f8fafc; margin: -24px -28px -40px; padding: 18px 26px 28px; min-height: calc(100vh - 62px); }
+        .bulk-att-page { background: #f8fafc; margin: -16px -24px -24px; padding: 18px 24px 28px; min-height: calc(100vh - 62px); }
 
         .bulk-card { background: #fff; border: 1px solid #e8edf3; border-radius: 16px; box-shadow: 0 1px 3px rgba(16,24,40,0.03); }
         .bulk-filter-card { border: none; padding: 14px 18px; margin-bottom: 16px; }

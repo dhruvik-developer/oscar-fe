@@ -88,6 +88,7 @@ export default function Requests() {
   const refreshRequests = useAttendanceStore((s) => s.refreshRequests);
   const setRequestStatus = useAttendanceStore((s) => s.setRequestStatus);
   const addRequest = useAttendanceStore((s) => s.addRequest);
+  const updateRequest = useAttendanceStore((s) => s.updateRequest);
 
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState(null);
@@ -154,6 +155,7 @@ export default function Requests() {
 
   const [showRegModal, setShowRegModal] = useState(false);
   const [showEarlyModal, setShowEarlyModal] = useState(false);
+  const [editingReq, setEditingReq] = useState(null);
   const [regForm, setRegForm] = useState(emptyRegForm);
   const [earlyForm, setEarlyForm] = useState(emptyEarlyForm);
   const [submitting, setSubmitting] = useState(false);
@@ -252,14 +254,58 @@ export default function Requests() {
     decide(id, "Rejected", remark);
   };
 
-  function openRegModal() {
-    setRegForm({ ...emptyRegForm(), reqIn: flexibility.shiftStart || "09:30", reqOut: flexibility.shiftEnd || "18:30" });
+  function openRegModal(reqToEdit = null) {
+    if (reqToEdit) {
+      setEditingReq(reqToEdit);
+      setRegForm({
+        employeeId: reqToEdit.employeeId || "",
+        date: reqToEdit.isoDate || toISO(reqToEdit.date) || localISODate(),
+        reqIn: reqToEdit.reqIn || "09:30",
+        reqOut: reqToEdit.reqOut || "18:30",
+        requestedStatus: reqToEdit.requestedStatus || "Present",
+        reason: reqToEdit.reasonText || reqToEdit.reason || "",
+      });
+    } else {
+      setEditingReq(null);
+      setRegForm({
+        ...emptyRegForm(),
+        reqIn: flexibility.shiftStart || "09:30",
+        reqOut: flexibility.shiftEnd || "18:30",
+      });
+    }
     setShowRegModal(true);
   }
 
-  function openEarlyModal() {
-    setEarlyForm({ ...emptyEarlyForm(), reqIn: flexibility.shiftStart || "09:30" });
+  function openEarlyModal(reqToEdit = null) {
+    if (reqToEdit) {
+      setEditingReq(reqToEdit);
+      setEarlyForm({
+        employeeId: reqToEdit.employeeId || "",
+        date: reqToEdit.isoDate || toISO(reqToEdit.date) || localISODate(),
+        reqIn: reqToEdit.reqIn || "09:30",
+        reqOut: reqToEdit.reqOut || "16:30",
+        reason: reqToEdit.reasonText || reqToEdit.reason || "",
+      });
+    } else {
+      setEditingReq(null);
+      setEarlyForm({
+        ...emptyEarlyForm(),
+        reqIn: flexibility.shiftStart || "09:30",
+      });
+    }
     setShowEarlyModal(true);
+  }
+
+  function handleEditRequest(r) {
+    if (r.status === "Approved") {
+      showToast("Approved attendance requests cannot be modified or edited.", "error");
+      return;
+    }
+    if (r.type === "Early Leave") {
+      openEarlyModal(r);
+    } else {
+      openRegModal(r);
+    }
   }
 
   async function submitRequest(payload, successMsg, close) {
@@ -279,42 +325,134 @@ export default function Requests() {
     }
   }
 
-  const handleRegSubmit = () => {
+  const handleRegSubmit = async () => {
     if (!regForm.employeeId) return showToast("Please select an employee.", "error");
     if (!regForm.date) return showToast("Please choose a date.", "error");
     if (!regForm.reason.trim()) return showToast("Please enter a reason for the regularization.", "error");
-    const tag = regForm.requestedStatus === "Half Day" ? "[Half Day] " : regForm.requestedStatus === "WFH" ? "[Work From Home] " : "";
-    submitRequest(
-      {
-        employeeId: regForm.employeeId,
-        date: regForm.date,
-        requestedCheckIn: regForm.reqIn,
-        requestedCheckOut: regForm.reqOut,
-        requestedStatus: regForm.requestedStatus,
-        reason: `${tag}${regForm.reason.trim()}`,
-      },
-      "Regularization request submitted.",
-      () => setShowRegModal(false)
+
+    const targetIsoDate = toISO(regForm.date);
+    const approvedExists = requestsList.find(
+      (r) =>
+        String(r.employeeId) === String(regForm.employeeId) &&
+        (r.isoDate === targetIsoDate || toISO(r.date) === targetIsoDate) &&
+        r.status === "Approved" &&
+        (!editingReq || r.id !== editingReq.id)
     );
+    if (approvedExists) {
+      return showToast("An attendance request for this date has already been approved and cannot be modified.", "error");
+    }
+
+    const tag = regForm.requestedStatus === "Half Day" ? "[Half Day] " : regForm.requestedStatus === "WFH" ? "[Work From Home] " : "";
+    const payload = {
+      employeeId: regForm.employeeId,
+      date: regForm.date,
+      requestedCheckIn: regForm.reqIn,
+      requestedCheckOut: regForm.reqOut,
+      requestedStatus: regForm.requestedStatus,
+      reason: `${tag}${regForm.reason.trim()}`,
+    };
+
+    if (editingReq) {
+      setSubmitting(true);
+      try {
+        await updateRequest(editingReq.id, payload);
+        showToast("Attendance request updated successfully.");
+        setShowRegModal(false);
+        setEditingReq(null);
+      } catch (err) {
+        showToast(`Failed to update request — ${describeError(err)}`, "error");
+      } finally {
+        setSubmitting(false);
+      }
+      return;
+    }
+
+    const pendingExists = requestsList.find(
+      (r) =>
+        String(r.employeeId) === String(regForm.employeeId) &&
+        (r.isoDate === targetIsoDate || toISO(r.date) === targetIsoDate) &&
+        r.status === "Pending"
+    );
+    if (pendingExists) {
+      setSubmitting(true);
+      try {
+        await updateRequest(pendingExists.id, payload);
+        showToast("Existing pending request for this date updated.");
+        setShowRegModal(false);
+      } catch (err) {
+        showToast(`Failed to update request — ${describeError(err)}`, "error");
+      } finally {
+        setSubmitting(false);
+      }
+      return;
+    }
+
+    submitRequest(payload, "Regularization request submitted.", () => setShowRegModal(false));
   };
 
-  const handleEarlySubmit = () => {
+  const handleEarlySubmit = async () => {
     if (!earlyForm.employeeId) return showToast("Please select an employee.", "error");
     if (!earlyForm.date) return showToast("Please choose a date.", "error");
     if (!earlyForm.reqOut) return showToast("Please enter the early check-out time.", "error");
     if (!earlyForm.reason.trim()) return showToast("Please enter a reason for the early clock-out.", "error");
-    submitRequest(
-      {
-        employeeId: earlyForm.employeeId,
-        date: earlyForm.date,
-        requestedCheckIn: earlyForm.reqIn,
-        requestedCheckOut: earlyForm.reqOut,
-        requestedStatus: "Present",
-        reason: `[Early Leave] ${earlyForm.reason.trim()}`,
-      },
-      "Early clock-out request submitted.",
-      () => setShowEarlyModal(false)
+
+    const targetIsoDate = toISO(earlyForm.date);
+    const approvedExists = requestsList.find(
+      (r) =>
+        String(r.employeeId) === String(earlyForm.employeeId) &&
+        (r.isoDate === targetIsoDate || toISO(r.date) === targetIsoDate) &&
+        r.status === "Approved" &&
+        (!editingReq || r.id !== editingReq.id)
     );
+    if (approvedExists) {
+      return showToast("An attendance request for this date has already been approved and cannot be modified.", "error");
+    }
+
+    const payload = {
+      employeeId: earlyForm.employeeId,
+      date: earlyForm.date,
+      requestedCheckIn: earlyForm.reqIn,
+      requestedCheckOut: earlyForm.reqOut,
+      requestedStatus: "Present",
+      reason: `[Early Leave] ${earlyForm.reason.trim()}`,
+    };
+
+    if (editingReq) {
+      setSubmitting(true);
+      try {
+        await updateRequest(editingReq.id, payload);
+        showToast("Early clock-out request updated successfully.");
+        setShowEarlyModal(false);
+        setEditingReq(null);
+      } catch (err) {
+        showToast(`Failed to update request — ${describeError(err)}`, "error");
+      } finally {
+        setSubmitting(false);
+      }
+      return;
+    }
+
+    const pendingExists = requestsList.find(
+      (r) =>
+        String(r.employeeId) === String(earlyForm.employeeId) &&
+        (r.isoDate === targetIsoDate || toISO(r.date) === targetIsoDate) &&
+        r.status === "Pending"
+    );
+    if (pendingExists) {
+      setSubmitting(true);
+      try {
+        await updateRequest(pendingExists.id, payload);
+        showToast("Existing pending request for this date updated.");
+        setShowEarlyModal(false);
+      } catch (err) {
+        showToast(`Failed to update request — ${describeError(err)}`, "error");
+      } finally {
+        setSubmitting(false);
+      }
+      return;
+    }
+
+    submitRequest(payload, "Early clock-out request submitted.", () => setShowEarlyModal(false));
   };
 
   const employeeSelect = (value, onChange) => (
@@ -454,6 +592,15 @@ export default function Requests() {
                   <td>
                     {r.status === "Pending" ? (
                       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <button
+                          type="button"
+                          onClick={() => handleEditRequest(r)}
+                          className="req-btn-view"
+                          style={{ padding: "4px 8px", fontSize: "12px", border: "1px solid #cbd5e1" }}
+                          title="Edit this request"
+                        >
+                          Edit
+                        </button>
                         <button type="button" disabled={busyId === r.id} onClick={() => setApproveId(r.id)} className="req-btn-approve">
                           {busyId === r.id ? "…" : "Approve"}
                         </button>
@@ -462,9 +609,16 @@ export default function Requests() {
                         </button>
                       </div>
                     ) : (
-                      <button type="button" onClick={() => setSelectedReq(r)} className="req-btn-view">
-                        View
-                      </button>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <button type="button" onClick={() => setSelectedReq(r)} className="req-btn-view">
+                          View
+                        </button>
+                        {r.status === "Approved" && (
+                          <span style={{ fontSize: "11px", color: "#15803d", fontWeight: 600, background: "#dcfce7", padding: "2px 6px", borderRadius: "6px" }}>
+                            Locked
+                          </span>
+                        )}
+                      </div>
                     )}
                   </td>
                 </tr>
@@ -497,6 +651,17 @@ export default function Requests() {
         footer={
           selectedReq?.status === "Pending" ? (
             <>
+              <button
+                type="button"
+                className="btn-outline"
+                onClick={() => {
+                  const r = selectedReq;
+                  setSelectedReq(null);
+                  handleEditRequest(r);
+                }}
+              >
+                Edit Request
+              </button>
               <button
                 type="button"
                 className="btn-outline"
@@ -567,6 +732,24 @@ export default function Requests() {
               <div style={{ wordBreak: "break-all" }}><strong>Request ID:</strong> {selectedReq.id}</div>
             </div>
 
+            {selectedReq.status === "Approved" && (
+              <div
+                style={{
+                  padding: "10px 14px",
+                  borderRadius: 10,
+                  background: "#f0fdf4",
+                  border: "1px solid #bbf7d0",
+                  color: "#166534",
+                  fontSize: "12.5px",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                }}
+              >
+                <span>🔒 This attendance request has been approved and locked. It cannot be edited, modified, or re-submitted.</span>
+              </div>
+            )}
+
             {selectedReq.remark && (
               <div
                 style={{
@@ -587,15 +770,25 @@ export default function Requests() {
       {/* Regularize Modal */}
       <Modal
         isOpen={showRegModal}
-        onClose={() => setShowRegModal(false)}
-        title="New Regularization Request"
+        onClose={() => {
+          setShowRegModal(false);
+          setEditingReq(null);
+        }}
+        title={editingReq ? `Edit Regularization Request — ${shortId(editingReq.id)}` : "New Regularization Request"}
         footer={
           <>
-            <button type="button" className="btn-outline" onClick={() => setShowRegModal(false)}>
+            <button
+              type="button"
+              className="btn-outline"
+              onClick={() => {
+                setShowRegModal(false);
+                setEditingReq(null);
+              }}
+            >
               Cancel
             </button>
             <button type="button" className="btn-primary" disabled={submitting} onClick={handleRegSubmit}>
-              {submitting ? "Submitting…" : "Submit Request"}
+              {submitting ? (editingReq ? "Updating…" : "Submitting…") : (editingReq ? "Update Request" : "Submit Request")}
             </button>
           </>
         }
@@ -652,15 +845,25 @@ export default function Requests() {
       {/* Early Clock-Out Modal */}
       <Modal
         isOpen={showEarlyModal}
-        onClose={() => setShowEarlyModal(false)}
-        title="Early Clock-Out Request"
+        onClose={() => {
+          setShowEarlyModal(false);
+          setEditingReq(null);
+        }}
+        title={editingReq ? `Edit Early Clock-Out Request — ${shortId(editingReq.id)}` : "Early Clock-Out Request"}
         footer={
           <>
-            <button type="button" className="btn-outline" onClick={() => setShowEarlyModal(false)}>
+            <button
+              type="button"
+              className="btn-outline"
+              onClick={() => {
+                setShowEarlyModal(false);
+                setEditingReq(null);
+              }}
+            >
               Cancel
             </button>
             <button type="button" className="btn-primary" disabled={submitting} onClick={handleEarlySubmit}>
-              {submitting ? "Submitting…" : "Submit Request"}
+              {submitting ? (editingReq ? "Updating…" : "Submitting…") : (editingReq ? "Update Request" : "Submit Request")}
             </button>
           </>
         }
@@ -729,7 +932,7 @@ export default function Requests() {
       />
 
       <style>{`
-        .req-page { background: #f8fafc; margin: -24px -28px -40px; padding: 18px 26px 28px; min-height: calc(100vh - 62px); }
+        .req-page { background: #f8fafc; margin: -16px -24px -24px; padding: 18px 24px 28px; min-height: calc(100vh - 62px); }
 
         .req-btn-outline { background: #fff; border: 1px solid #d1d5db; border-radius: 10px; padding: 8px 18px; font-size: 13.5px; font-weight: 600; color: #374151; cursor: pointer; transition: background 0.15s ease; box-shadow: 0 1px 2px rgba(0,0,0,0.03); }
         .req-btn-outline:hover { background: #f9fafb; }

@@ -6,6 +6,7 @@ import { DataTable } from "../../../components/hrms/DataTable";
 import { StatusBadge } from "../../../components/hrms/StatusBadge";
 import { Modal } from "../../../components/hrms/Modal";
 import { Button } from "../../../components/hrms/Button";
+import { Avatar } from "../../../components/hrms/Avatar";
 import PageHeader from "../../../components/ui/PageHeader";
 import { hrmsGuides } from "../../../data/hrms/hrmsGuides";
 import {
@@ -169,7 +170,7 @@ export default function Dashboard() {
       sortable: true,
       render: (r) => (
         <div className="flex items-center gap-2.5">
-          <img src={r.avatar} alt="" className="w-7 h-7 rounded-full object-cover border border-[#e2e8f0]" />
+          <Avatar name={r.employee} size="sm" />
           <div>
             <div className="font-medium text-slate-800 text-[13px]">{r.employee}</div>
             <div className="text-[11px] text-slate-500">{r.designation} • {r.department}</div>

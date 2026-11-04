@@ -123,9 +123,11 @@ const ACTIVITY = [];
 
 export default function HRMSDashboard() {
   const setToast = useAppStore((s) => s.setToast);
+  const hydrateHrms = useAppStore((s) => s.hydrateHrms);
   const [serverStats, setServerStats] = useState(null);
 
   useEffect(() => {
+    hydrateHrms?.();
     pullHrmsDashboard()
       .then((res) => {
         const data = res?.data || res;
@@ -136,7 +138,7 @@ export default function HRMSDashboard() {
       .catch((err) => {
         console.warn("[HRMS] Live dashboard stats fetch failed:", err?.message || err);
       });
-  }, []);
+  }, [hydrateHrms]);
 
   const [showNotice, setShowNotice] = useState(true);
 
@@ -466,7 +468,10 @@ export default function HRMSDashboard() {
       )}
 
       {/* Analytics Volume Chart (Workforce, Attendance, Leave, Payroll, etc.) */}
-      <AnalyticsVolumeChart />
+      <AnalyticsVolumeChart
+        serverAnalytics={serverStats?.analytics}
+        serverDepartments={serverStats?.departments}
+      />
 
       {/* Main grid - Recent Activity + Quick Request */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, alignItems: "start" }}>
@@ -1061,7 +1066,7 @@ export default function HRMSDashboard() {
       </Modal>
 
       <style>{`
-        .hrms-dash { background: #f7f9fc; margin: -24px -28px -40px; padding: 18px 26px 28px; min-height: calc(100vh - 62px); }
+        .hrms-dash { background: #f7f9fc; margin: -16px -24px -24px; padding: 18px 24px 28px; min-height: calc(100vh - 62px); }
         .hrms-manage-pill-btn { display: inline-flex; align-items: center; gap: 5px; background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 999px; padding: 4px 10px; font-size: 11.5px; font-weight: 600; color: #475569; cursor: pointer; transition: all 0.15s ease; }
         .hrms-manage-pill-btn:hover { background: #e2e8f0; color: #0f172a; border-color: #cbd5e1; }
         .hrms-crumb { display: flex; align-items: center; gap: 6px; font-size: 13px; color: #6b7a90; margin-bottom: 10px; }

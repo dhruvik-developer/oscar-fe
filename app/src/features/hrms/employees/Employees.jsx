@@ -491,7 +491,7 @@ export default function Employees() {
 
         .emp-action-btn { border: none; background: transparent; color: #64748b; cursor: pointer; padding: 4px; border-radius: 6px; display: grid; place-items: center; transition: all 0.15s ease; }
         .emp-action-btn:hover { color: #0f172a; background: #e2e8f0; }
-        .emp-dir-page { background: #f8fafc; margin: -24px -28px -40px; padding: 18px 26px 28px; min-height: calc(100vh - 62px); }
+        .emp-dir-page { background: #f8fafc; margin: -16px -24px -24px; padding: 18px 24px 28px; min-height: calc(100vh - 62px); }
         .emp-crumb { display: flex; align-items: center; gap: 6px; font-size: 13px; color: #6b7a90; margin-bottom: 10px; }
         .emp-title-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; flex-wrap: wrap; margin-bottom: 16px; }
         .emp-title { margin: 0; font-size: 24px; font-weight: 800; color: #111827; letter-spacing: -0.01em; }

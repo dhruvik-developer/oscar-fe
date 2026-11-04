@@ -272,16 +272,7 @@ export function PoDetailsModal({
 
         {/* Footer */}
         <div className="flex items-center justify-between pt-3 border-t border-slate-200 mt-3">
-          <button
-            type="button"
-            onClick={() => {
-              onClose();
-              onOpenBatchRegistry?.(po);
-            }}
-            className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg font-semibold flex items-center gap-1.5 text-xs shadow-2xs transition cursor-pointer"
-          >
-            <Package size={13} /> Open in Batch Registry <ArrowRight size={12} />
-          </button>
+<div></div>
           <button
             type="button"
             onClick={onClose}

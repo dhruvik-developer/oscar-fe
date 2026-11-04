@@ -681,7 +681,6 @@ export default function QCPendingInspectionsPage() {
                 <th className="py-2.5 px-3">Item Code</th>
                 <th className="py-2.5 px-3">Item Name</th>
                 <th className="py-2.5 px-3">Lot No.</th>
-                <th className="py-2.5 px-3 text-center">Taka/Roll</th>
                 <th className="py-2.5 px-3 text-right">Received Qty</th>
                 <th className="py-2.5 px-3 text-right">Pending Qty</th>
                 <th className="py-2.5 px-3 text-center">UOM</th>
@@ -733,7 +732,6 @@ export default function QCPendingInspectionsPage() {
                         {r.itemName}
                       </td>
                       <td className="py-2 px-3 font-mono text-slate-600">{r.lotNo}</td>
-                      <td className="py-2 px-3 text-center font-mono">{r.takaRoll}</td>
                       <td className="py-2 px-3 text-right font-mono font-medium">
                         {Number(r.receivedQty).toLocaleString('en-IN')}
                       </td>
@@ -1438,10 +1436,7 @@ export default function QCPendingInspectionsPage() {
                   <span className="text-slate-400 block text-[10px]">Lot No.</span>
                   <span className="font-mono font-semibold">{viewDetailsItem.lotNo}</span>
                 </div>
-                <div>
-                  <span className="text-slate-400 block text-[10px]">Taka/Roll</span>
-                  <span className="font-mono">{viewDetailsItem.takaRoll}</span>
-                </div>
+
                 <div>
                   <span className="text-slate-400 block text-[10px]">Received Qty</span>
                   <span className="font-semibold">{viewDetailsItem.receivedQty} {viewDetailsItem.uom}</span>

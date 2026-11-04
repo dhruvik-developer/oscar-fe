@@ -1,5 +1,8 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Link } from 'react-router-dom';
+import { ArrowDownLeft, ShieldCheck, ChevronDown, ChevronUp } from 'lucide-react';
+import ReceiveReturnModal from '../batches/ReceiveReturnModal';
+import GreyQcInlineSlide from '../../purchase/GreyQcInlineSlide';
 import {
   CheckCircle2,
   RotateCcw,
@@ -54,7 +57,42 @@ export default function QCReinspectionPage() {
   const [page, setPage] = useState(1);
   const [busyId, setBusyId] = useState(null);
   const [qcRow, setQcRow] = useState(null);
+  const [receiveModalRow, setReceiveModalRow] = useState(null);
+  const [qcModalTarget, setQcModalTarget] = useState(null);
+  const [expandedRowIds, setExpandedRowIds] = useState(new Set());
   const [toast, setToast] = useState(null);
+
+  const toggleRowExpand = (id) => {
+    setExpandedRowIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handleOpenQc = (r, specificReceiptId = null) => {
+    const returns = r.returns || [];
+    const pendingReturn = returns.find((ret) => ret.qcStatus === 'Pending') || returns[0];
+    const initialReceiptId =
+      specificReceiptId ||
+      r.pendingQcReceiptId ||
+      pendingReturn?.receiptId ||
+      pendingReturn?.goodsReceiptId ||
+      r.receiptId ||
+      r.latestReceiptId ||
+      pendingReturn?.grnNumber;
+
+    setQcModalTarget({
+      po: {
+        id: r.originalPoId,
+        poNumber: r.originalPoNumber,
+        vendorName: r.vendor,
+      },
+      initialReceiptId,
+      reprocessRecord: r,
+    });
+  };
 
   const fetchRecords = useCallback(async () => {
     setLoading(true);
@@ -130,7 +168,16 @@ export default function QCReinspectionPage() {
 
   const renderAction = (r) => {
     const busy = busyId === r.id;
-    const base = 'inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-semibold transition disabled:opacity-50';
+    const base = 'inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition disabled:opacity-50 cursor-pointer';
+    const sent = Number(r.sentQty || 0);
+    const returned = Number(r.returnedQty || 0);
+    const outstanding = Number(r.outstandingQty !== undefined ? r.outstandingQty : (sent - returned));
+    const canReceive = (r.canReceiveReturn !== undefined ? r.canReceiveReturn : outstanding > 0) && r.status !== 'Completed';
+    const hasReturned = returned > 0;
+    const isQcPending = (r.reprocessQcStatus === 'Pending' || (r.returns && r.returns.some((ret) => ret.qcStatus === 'Pending'))) && hasReturned;
+    const isQcPassed = r.reprocessQcStatus === 'Passed';
+    const isQcRejected = r.reprocessQcStatus === 'Rejected';
+
     if (r.status === 'Pending') {
       return (
         <button type="button" disabled={busy} onClick={() => moveTo(r, 'Sent to Vendor', 'sent to processor')} className={`${base} bg-amber-500 text-white hover:bg-amber-600`}>
@@ -138,24 +185,59 @@ export default function QCReinspectionPage() {
         </button>
       );
     }
-    if (r.status === 'Sent to Vendor' || r.status === 'In Process') {
-      return (
-        <button type="button" disabled={busy} onClick={() => moveTo(r, 'Received', 'marked received')} className={`${base} bg-blue-600 text-white hover:bg-blue-700`}>
-          {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Inbox className="w-3.5 h-3.5" />} Mark Received
-        </button>
-      );
-    }
-    if (r.status === 'Received') {
-      return (
-        <button type="button" onClick={() => setQcRow(r)} className={`${base} bg-purple-600 text-white hover:bg-purple-700`}>
-          <ClipboardCheck className="w-3.5 h-3.5" /> QC Again
-        </button>
-      );
-    }
+
     return (
-      <button type="button" onClick={() => setQcRow(r)} className={`${base} border border-slate-300 bg-white text-slate-700 hover:bg-slate-50`}>
-        View Result
-      </button>
+      <div className="flex items-center justify-end gap-1.5 flex-wrap">
+        {/* Perform QC button directly on the right */}
+        {isQcPending && (
+          <button
+            type="button"
+            onClick={() => handleOpenQc(r)}
+            className="inline-flex items-center gap-1.5 rounded-md bg-gradient-to-r from-blue-600 via-indigo-600 to-indigo-700 px-2.5 py-1 text-[10px] font-bold text-white shadow-xs transition-all duration-150 hover:from-blue-700 hover:via-indigo-700 hover:to-indigo-800 hover:shadow-md active:scale-95 group cursor-pointer"
+            title={`Perform Reprocess Quality Inspection for ${r.reprocessBatchCode || r.reprocessNo}`}
+          >
+            <ShieldCheck size={12} className="stroke-[2.5] text-indigo-100 group-hover:scale-110 transition-transform" />
+            <span>Perform QC</span>
+          </button>
+        )}
+
+        {isQcPassed && (
+          <span className="inline-flex items-center gap-1 rounded-md border border-emerald-300/80 bg-emerald-50 px-2 py-0.5 text-[9.5px] font-bold text-emerald-800 shadow-2xs">
+            <CheckCircle2 size={11} className="stroke-[2.5] text-emerald-600" />
+            <span>QC Passed</span>
+          </span>
+        )}
+
+        {isQcRejected && (
+          <span className="inline-flex items-center gap-1 rounded-md border border-rose-300 bg-rose-50 px-2 py-0.5 text-[9.5px] font-bold text-rose-800 shadow-2xs">
+            <AlertCircle size={11} className="stroke-[2.5] text-rose-600" />
+            <span>QC Rejected</span>
+          </span>
+        )}
+
+        {canReceive && (
+          <button
+            type="button"
+            onClick={() => setReceiveModalRow(r)}
+            className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-700 shadow-2xs cursor-pointer"
+            title="Receive reprocessed fabric returned by processor"
+          >
+            <ArrowDownLeft className="w-3.5 h-3.5" /> Receive Return
+          </button>
+        )}
+
+        {!canReceive && outstanding <= 0 && isQcPassed && (
+          <span className="inline-flex items-center rounded-lg px-2 py-0.5 text-[10px] font-semibold border border-slate-200 bg-slate-100 text-slate-500">
+            Fully Returned
+          </span>
+        )}
+
+        {r.jwoId && r.status === 'Received' && !isQcPending && !isQcPassed && (
+          <button type="button" onClick={() => setQcRow(r)} className={`${base} bg-purple-600 text-white hover:bg-purple-700`}>
+            <ClipboardCheck className="w-3.5 h-3.5" /> QC Again
+          </button>
+        )}
+      </div>
     );
   };
 
@@ -241,35 +323,132 @@ export default function QCReinspectionPage() {
               <tr>
                 <th className="p-3">Reprocess No.</th>
                 <th className="p-3">Date</th>
-                <th className="p-3">Source (GRN / Inward)</th>
+                <th className="p-3">Original PO & Batch</th>
                 <th className="p-3">Fabric</th>
-                <th className="p-3">Lot</th>
-                <th className="p-3">Processor</th>
-                <th className="p-3 text-right">Qty (m)</th>
+                <th className="p-3">Processor / Vendor</th>
+                <th className="p-3 text-right">Sent (m)</th>
+                <th className="p-3 text-right">Returned (m)</th>
+                <th className="p-3 text-right">Outstanding (m)</th>
+                <th className="p-3 text-center">QC Status</th>
                 <th className="p-3">Status</th>
-                <th className="p-3 text-right">Next Step</th>
+                <th className="p-3 text-right">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {loading ? (
-                <tr><td colSpan={9} className="p-8 text-center text-slate-500"><Loader2 className="w-5 h-5 animate-spin inline mr-2" />Loading...</td></tr>
+                <tr><td colSpan={11} className="p-8 text-center text-slate-500"><Loader2 className="w-5 h-5 animate-spin inline mr-2" />Loading...</td></tr>
               ) : pageRows.length === 0 ? (
-                <tr><td colSpan={9} className="p-10 text-center text-slate-400">Nothing in this step.</td></tr>
+                <tr><td colSpan={11} className="p-10 text-center text-slate-400">Nothing in this step.</td></tr>
               ) : (
                 pageRows.map((r) => (
-                  <tr key={r.id} className="hover:bg-slate-50/60">
-                    <td className="p-3 font-semibold text-blue-700">{r.reprocessNo}</td>
+                  <React.Fragment key={r.id}>
+                    <tr className="hover:bg-slate-50/60">
+                    <td className="p-3 font-semibold text-blue-700 font-mono">{r.reprocessNo}</td>
                     <td className="p-3 text-slate-600">{r.date}</td>
-                    <td className="p-3 font-mono text-slate-700">{r.sourceQcNo || '—'}</td>
-                    <td className="p-3 text-slate-800">{r.fabricItem || '—'}</td>
-                    <td className="p-3 font-mono text-slate-600">{r.lotNo || '—'}</td>
-                    <td className="p-3 text-slate-800">{r.vendor || '—'}</td>
-                    <td className="p-3 text-right font-semibold">{fmt(r.sentQty)}</td>
                     <td className="p-3">
-                      <span className={`inline-block rounded-full border px-2 py-0.5 text-[11px] font-semibold ${TONES[stepOf(r.status).tone].pill}`}>{r.status}</span>
+                      <div className="font-semibold text-slate-800">{r.originalPoNumber || r.sourceQcNo || '—'}</div>
+                      <div className="text-[10px] font-mono text-slate-500">
+                        {r.originalBatchCode || r.lotNo || '—'}
+                        {r.reprocessBatchCode && <span className="text-indigo-600 font-semibold"> → {r.reprocessBatchCode}</span>}
+                      </div>
+                    </td>
+                    <td className="p-3 text-slate-800">{r.fabricItem || '—'}</td>
+                    <td className="p-3 text-slate-800">{r.vendor || '—'}</td>
+                    <td className="p-3 text-right font-semibold tabular-nums">{fmt(r.sentQty)}</td>
+                    <td className="p-3 text-right font-semibold text-blue-700 tabular-nums">
+                      <div>{fmt(r.returnedQty)}</div>
+                      {r.returns && r.returns.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => toggleRowExpand(r.id)}
+                          className="inline-flex items-center gap-0.5 text-[9.5px] font-semibold text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
+                          title="View individual return receipts and inspections"
+                        >
+                          {expandedRowIds.has(r.id) ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
+                          <span>{r.returns.length} return{r.returns.length === 1 ? '' : 's'}</span>
+                        </button>
+                      )}
+                    </td>
+                    <td className="p-3 text-right tabular-nums">
+                      <span className={`font-bold ${Number(r.outstandingQty !== undefined ? r.outstandingQty : (Number(r.sentQty || 0) - Number(r.returnedQty || 0))) > 0 ? 'text-amber-700' : 'text-emerald-700'}`}>
+                        {fmt(r.outstandingQty !== undefined ? r.outstandingQty : (Number(r.sentQty || 0) - Number(r.returnedQty || 0)))}
+                      </span>
+                    </td>
+                    <td className="p-3 text-center">
+                      <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold ${
+                        r.reprocessQcStatus === 'Passed' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
+                        r.reprocessQcStatus === 'Rejected' ? 'bg-rose-50 text-rose-700 border border-rose-200' :
+                        'bg-amber-50 text-amber-700 border border-amber-200'
+                      }`}>
+                        {r.reprocessQcStatus || 'Pending'}
+                      </span>
+                    </td>
+                    <td className="p-3">
+                      <span className={`inline-block rounded-full border px-2 py-0.5 text-[11px] font-semibold ${TONES[stepOf(r.status)?.tone]?.pill || 'bg-slate-100 text-slate-700 border-slate-200'}`}>{r.status}</span>
                     </td>
                     <td className="p-3 text-right">{renderAction(r)}</td>
                   </tr>
+                  {expandedRowIds.has(r.id) && r.returns && r.returns.length > 0 && (
+                    <tr key={`${r.id}-returns`} className="bg-slate-50/80 border-y border-slate-200">
+                      <td colSpan={11} className="p-3 pl-8">
+                        <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-xs">
+                          <h6 className="text-[11px] font-bold text-slate-800 mb-2 flex items-center gap-1.5">
+                            <span className="h-1.5 w-1.5 rounded-full bg-blue-600" />
+                            Return Receipts History ({r.returns.length}) — {r.reprocessNo} ({r.reprocessBatchCode || r.originalBatchCode})
+                          </h6>
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-[10.5px] text-left">
+                              <thead className="bg-slate-100/70 text-[9px] font-bold uppercase text-slate-500">
+                                <tr>
+                                  <th className="px-2.5 py-1.5">GRN Number</th>
+                                  <th className="px-2.5 py-1.5">Return Date</th>
+                                  <th className="px-2.5 py-1.5 text-right">Return Qty (m)</th>
+                                  <th className="px-2.5 py-1.5">Vendor Challan</th>
+                                  <th className="px-2.5 py-1.5">QC Status</th>
+                                  <th className="px-2.5 py-1.5 text-right">Action</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-100">
+                                {r.returns.map((ret) => (
+                                  <tr key={ret.id || ret.grnNumber} className="hover:bg-blue-50/30">
+                                    <td className="px-2.5 py-1.5 font-mono font-bold text-blue-700">{ret.grnNumber}</td>
+                                    <td className="px-2.5 py-1.5 text-slate-600">{ret.returnDate}</td>
+                                    <td className="px-2.5 py-1.5 text-right font-mono font-bold text-slate-800">{fmt(ret.returnQty)}</td>
+                                    <td className="px-2.5 py-1.5 font-mono text-slate-600">{ret.vendorChallan || '—'}</td>
+                                    <td className="px-2.5 py-1.5">
+                                      <span className={`inline-block px-1.5 py-0.5 rounded text-[9px] font-bold ${
+                                        ret.qcStatus === 'Passed' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
+                                        ret.qcStatus === 'Rejected' ? 'bg-rose-50 text-rose-700 border border-rose-200' :
+                                        'bg-amber-50 text-amber-700 border border-amber-200'
+                                      }`}>
+                                        {ret.qcStatus || 'Pending'}
+                                      </span>
+                                    </td>
+                                    <td className="px-2.5 py-1.5 text-right">
+                                      {ret.qcStatus === 'Pending' ? (
+                                        <button
+                                          type="button"
+                                          onClick={() => handleOpenQc(r, ret.receiptId || ret.goodsReceiptId)}
+                                          className="inline-flex items-center gap-1 rounded-md bg-gradient-to-r from-blue-600 via-indigo-600 to-indigo-700 px-2 py-0.5 text-[9.5px] font-bold text-white shadow-xs hover:from-blue-700 hover:via-indigo-700 hover:to-indigo-800 active:scale-95 cursor-pointer"
+                                          title={`Perform QC for return ${ret.grnNumber}`}
+                                        >
+                                          <ShieldCheck size={11} className="stroke-[2.5] text-indigo-100" />
+                                          <span>Perform QC</span>
+                                        </button>
+                                      ) : (
+                                        <span className="text-[10px] text-slate-400 font-medium">Completed</span>
+                                      )}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                  </React.Fragment>
                 ))
               )}
             </tbody>
@@ -286,6 +465,42 @@ export default function QCReinspectionPage() {
         </div>
       </div>
 
+            {receiveModalRow && (
+        <ReceiveReturnModal
+          record={receiveModalRow}
+          onClose={() => setReceiveModalRow(null)}
+          onDone={async (updatedRecord, andPerformQc) => {
+            const rowData = updatedRecord?.data || updatedRecord || receiveModalRow;
+            setReceiveModalRow(null);
+            setToast({ type: 'success', text: `Return received for ${receiveModalRow.reprocessNo}.` });
+            await fetchRecords();
+            if (andPerformQc) {
+              handleOpenQc(rowData);
+            }
+          }}
+        />
+      )}
+
+      {/* ── Reprocess QC Inspection Modal (GreyQcInlineSlide) ── */}
+      {qcModalTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-2 sm:p-4 animate-in fade-in">
+          <div className="bg-white border border-slate-200 shadow-2xl rounded-2xl w-full max-w-5xl max-h-[95vh] sm:max-h-[92vh] overflow-y-auto flex flex-col p-4 sm:p-6 text-xs">
+            <GreyQcInlineSlide
+              po={qcModalTarget.po}
+              initialReceiptId={qcModalTarget.initialReceiptId}
+              onClose={() => setQcModalTarget(null)}
+              onQcSaved={async () => {
+                setQcModalTarget(null);
+                setToast({
+                  type: 'success',
+                  text: `Reprocess QC completed successfully for ${qcModalTarget.reprocessRecord?.reprocessNo || 'return receipt'}.`,
+                });
+                await fetchRecords();
+              }}
+            />
+          </div>
+        </div>
+      )}
       {qcRow && (
         <QcAgainModal
           row={qcRow}

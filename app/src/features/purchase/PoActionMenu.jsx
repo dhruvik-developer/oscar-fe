@@ -4,7 +4,6 @@ import {
   Eye,
   Pencil,
   Copy,
-  Package,
   PackageCheck,
   ShieldCheck,
   Truck,
@@ -29,7 +28,6 @@ export function PoActionMenu({
   onViewDetails,
   onEdit,
   onDuplicate,
-  onBatchRegistry,
   onReceiveGoods,
   onPerformQc,
   onSupplierDispatch,
@@ -170,21 +168,6 @@ export function PoActionMenu({
       <div className="px-3 pt-1 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
         Operations
       </div>
-
-      <button
-        type="button"
-        role="menuitem"
-        disabled={isCancelled}
-        onClick={() => handleAction(onBatchRegistry)}
-        className={`w-full px-3 py-1.5 text-left flex items-center gap-2 transition-colors ${
-          !isCancelled
-            ? 'hover:bg-blue-50 hover:text-blue-700 cursor-pointer text-slate-700'
-            : 'opacity-40 cursor-not-allowed text-slate-400'
-        }`}
-      >
-        <Package size={13} className="text-blue-500 shrink-0" />
-        <span>Batch Registry</span>
-      </button>
 
       <button
         type="button"

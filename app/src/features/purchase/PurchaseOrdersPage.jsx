@@ -822,30 +822,13 @@ export const PurchaseOrdersPage = () => {
                 statusLabel: isGrnPartial ? 'Partially Received' : undefined,
             },
             {
-                key: 'lot_taka_creation',
-                label: 'Lot / Taka Creation',
-                docNumber: takas.length > 0
-                    ? (isTakaPartial
-                        ? `${takas.length} Rolls (${totalTakaQty.toLocaleString('en-IN')} / ${totalOrderedQty.toLocaleString('en-IN')} M)`
-                        : `${takas.length} Rolls (${totalTakaQty.toLocaleString('en-IN')} M)`)
-                    : undefined,
-                status: isTakaComplete
-                    ? 'completed'
-                    : isTakaPartial
-                    ? 'partial'
-                    : (effectiveGrnQty > 0 || activeTimelineSlide === 'lot_taka_creation')
-                    ? 'current'
-                    : 'pending',
-                statusLabel: isTakaPartial ? 'Partially Created' : undefined,
-            },
-            {
                 key: 'grey_fabric_qc',
                 label: 'Grey Fabric QC',
                 status: isQcComplete
                     ? 'completed'
                     : isQcPartial
                     ? 'partial'
-                    : (takas.length > 0 || activeTimelineSlide === 'grey_fabric_qc')
+                    : (effectiveGrnQty > 0 || activeTimelineSlide === 'grey_fabric_qc')
                     ? 'current'
                     : 'pending',
                 statusLabel: isQcPartial ? 'QC In Progress' : undefined,
@@ -1359,16 +1342,7 @@ export const PurchaseOrdersPage = () => {
                       >
                         <ChevronRight size={15} className={`transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`} />
                       </button>
-                      {status !== 'Cancelled' && (
-                        <button
-                          type="button"
-                          onClick={() => navigate(`/inventory/batches?po=${encodeURIComponent(p.id)}&poNumber=${encodeURIComponent(p.poNumber || '')}&view=po`)}
-                          className="inline-flex items-center gap-1 whitespace-nowrap rounded-md border border-blue-200 bg-blue-50 px-2 py-1 text-[10px] font-semibold text-blue-700 transition-colors hover:bg-blue-100"
-                          title={`Manage receipt, batches, QC & dispatch for ${p.poNumber || 'this PO'} in Batch Registry`}
-                        >
-                          <Package size={11} /> Batch Registry
-                        </button>
-                      )}
+
                       {renderMoreActionsButton(p)}
                     </div>
                   </div>
@@ -1892,7 +1866,6 @@ export const PurchaseOrdersPage = () => {
           onViewDetails={(po) => setDetailsModalPo(po)}
           onEdit={(po) => handleOpenEditModal(po)}
           onDuplicate={(po) => handleClonePo(po)}
-          onBatchRegistry={(po) => navigate(`/inventory/batches?po=${encodeURIComponent(po.id)}&poNumber=${encodeURIComponent(po.poNumber || '')}&view=po`)}
           onReceiveGoods={(po) => {
             if (getOscarStatus(po) === 'Fully Received') {
               showToast('All ordered quantity has already been received for this purchase order.');

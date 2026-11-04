@@ -1864,6 +1864,17 @@ export default function BatchRegistryPage() {
                           </span>
                         </td>
                         <td className="px-4 py-3 text-right whitespace-nowrap space-x-1.5" onClick={(e) => e.stopPropagation()}>
+                          {(batch.qcStatus === 'Rejected' || Number(batch.rejectedQty || 0) > 0) && (
+                            <button
+                              type="button"
+                              onClick={() => setReprocessBatch(batch)}
+                              className="px-2 py-1 rounded-md border border-indigo-200 bg-indigo-50/70 text-indigo-700 hover:bg-indigo-100 text-xs font-semibold cursor-pointer inline-flex items-center gap-1"
+                              title="Send rejected fabric for reprocessing"
+                            >
+                              <RefreshCw size={11} />
+                              <span>Reprocess</span>
+                            </button>
+                          )}
                           <button
                             type="button"
                             onClick={() => open(batch.batchCode)}
@@ -1975,6 +1986,16 @@ export default function BatchRegistryPage() {
                               <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-[10px] font-semibold whitespace-nowrap ${STATUS_STYLE[b.status] || STATUS_STYLE.Closed}`}><span className={`w-1.5 h-1.5 rounded-full ${STATUS_DOT[b.status] || STATUS_DOT.Closed}`} />{b.status}</span>
                             </td>
                             <td className="px-3 py-3 text-right whitespace-nowrap space-x-1" onClick={(e) => e.stopPropagation()}>
+                              {(b.qcStatus === 'Rejected' || Number(b.rejectedQty || 0) > 0) && (
+                                <button
+                                  type="button"
+                                  onClick={() => setReprocessBatch(b)}
+                                  className="p-1.5 rounded-md border border-indigo-200 bg-indigo-50/70 text-indigo-700 hover:bg-indigo-100 text-xs font-semibold cursor-pointer"
+                                  title="Send rejected fabric for reprocessing"
+                                >
+                                  <RefreshCw size={12} />
+                                </button>
+                              )}
                               <button type="button" onClick={() => open(b.batchCode)} title="Open Batch 360°" aria-label={`Open ${b.batchCode}`} className="p-1.5 rounded-md border border-slate-200 text-blue-700 hover:bg-blue-50 cursor-pointer">
                                 <Eye size={13} />
                               </button>

@@ -33,7 +33,7 @@ const paymentOutGuide = {
         'Always verify the vendor bill reference number before disbursing funds to prevent duplicate payment vouchers.',
     ],
 };
-export const PaymentOutPage = () => {
+export const PaymentOutPage = ({ embedded = false }) => {
     const { paymentOuts, purchaseBills, purchaseOrders, vendors, bankAccounts, addPaymentOut, applyVendorAdvanceToBill, getVendorAdvanceBalance, getBillOutstanding, formatCurrency, formatDateDDMMYYYY, getCurrentISODate } = useERP();
     const [showAddModal, setShowAddModal] = useState(false);
     const [selectedBillId, setSelectedBillId] = useState('');
@@ -205,9 +205,21 @@ export const PaymentOutPage = () => {
     const electronicCount = activePayments.filter((p) => p.mode && p.mode !== 'Cash' && p.mode !== 'Cheque').length;
 
     return (<div className="space-y-6">
-      <PageHeader title="Payment Out Vouchers" subtitle="Vendor disbursements, ACH/Wire payment authorizations, automatic bank debit, and Accounts Payable liability reduction." guide={paymentOutGuide} actions={<Button icon={Plus} onClick={handleOpenModal}>
+      {!embedded ? (
+        <PageHeader title="Payment Out Vouchers" subtitle="Vendor disbursements, ACH/Wire payment authorizations, automatic bank debit, and Accounts Payable liability reduction." guide={paymentOutGuide} actions={<Button icon={Plus} onClick={handleOpenModal}>
+              New Payment Voucher
+            </Button>}/>
+      ) : (
+        <div className="flex flex-wrap items-center justify-between gap-3 pb-1">
+          <div>
+            <h2 className="text-base font-bold text-slate-900">Payments & Disbursements</h2>
+            <p className="text-xs text-slate-500">Vendor disbursements, ACH/Wire authorizations, and Accounts Payable settlements.</p>
+          </div>
+          <Button icon={Plus} onClick={handleOpenModal}>
             New Payment Voucher
-          </Button>}/>
+          </Button>
+        </div>
+      )}
 
       {/* Payment Out KPI Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

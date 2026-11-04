@@ -586,11 +586,11 @@ const router = createBrowserRouter([
       { path: 'accounts/general-ledger', element: <Page component={GeneralLedgerPage} /> },
       { path: 'accounts/supplier-ledger', element: <Page component={SupplierLedgerPage} title="Supplier Ledger" /> },
       { path: 'accounts/customer-ledger', element: <Navigate to="/accounts/supplier-ledger?type=customer" replace /> },
-      { path: 'accounts/notes', element: <Page component={StandaloneNotesPage} title="Debit / Credit Notes" /> },
+      { path: 'accounts/notes', element: <Navigate to="/accounts/general-ledger?tab=notes" replace /> },
       { path: 'accounts/reports', element: <Page component={FinancialReportsPage} /> },
-      { path: 'accounts/accounting-log', element: <Page component={AccountingLogPage} title="Accounting Log" /> },
+      { path: 'accounts/accounting-log', element: <Navigate to="/accounts/chart-of-accounts?tab=accounting-log" replace /> },
       { path: 'accounts/chart-of-accounts', element: <Page component={ChartOfAccountsPage} title="Chart of Accounts" /> },
-      { path: 'accounts/expense-categories', element: <Page component={ExpenseCategoriesPage} title="Expense Categories" /> },
+      { path: 'accounts/expense-categories', element: <Navigate to="/accounts/chart-of-accounts?tab=expense-categories" replace /> },
 
       // ── HRMS ──────────────────────────────────────────────
       { path: 'hrms', element: <Navigate to="/hrms/dashboard" replace /> },

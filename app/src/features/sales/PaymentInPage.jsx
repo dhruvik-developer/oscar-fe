@@ -33,7 +33,7 @@ const paymentInGuide = {
         'Each recorded payment immediately adjusts the customer’s live credit balance in Customer 360°.',
     ],
 };
-export const PaymentInPage = () => {
+export const PaymentInPage = ({ embedded = false }) => {
     const { paymentIns, invoices, customers, addPaymentIn, getInvoiceOutstanding, formatCurrency, formatDateDDMMYYYY, getCurrentDateFormatted } = useERP();
     const [showAddModal, setShowAddModal] = useState(false);
     const [selectedInvoiceId, setSelectedInvoiceId] = useState(invoices[0]?.id || '');
@@ -136,14 +136,31 @@ export const PaymentInPage = () => {
     const wireCount = paymentIns.filter(p => (p.mode || '').toLowerCase().includes('wire') || (p.mode || '').toLowerCase().includes('bank')).length;
 
     return (<div className="space-y-6">
-      <PageHeader title="Payment Receipts & AR Collections" subtitle="Record incoming payments, allocate across customer open invoices, automatically credit cash/bank, and post double-entry General Ledger receipts." guide={paymentInGuide} actions={<Button icon={Plus} onClick={() => {
-                if (invoices.length > 0) {
-                    handleInvoiceChange(invoices[0].id);
-                }
-                setShowAddModal(true);
-            }}>
+      {!embedded ? (
+        <PageHeader title="Payment Receipts & AR Collections" subtitle="Record incoming payments, allocate across customer open invoices, automatically credit cash/bank, and post double-entry General Ledger receipts." guide={paymentInGuide} actions={<Button icon={Plus} onClick={() => {
+                  if (invoices.length > 0) {
+                      handleInvoiceChange(invoices[0].id);
+                  }
+                  setShowAddModal(true);
+              }}>
+              Record Payment In
+            </Button>}/>
+      ) : (
+        <div className="flex flex-wrap items-center justify-between gap-3 pb-1">
+          <div>
+            <h2 className="text-base font-bold text-slate-900">Receipts & AR Collections</h2>
+            <p className="text-xs text-slate-500">Record customer collections, allocate across open invoices, and update cash/bank balances.</p>
+          </div>
+          <Button icon={Plus} onClick={() => {
+            if (invoices.length > 0) {
+              handleInvoiceChange(invoices[0].id);
+            }
+            setShowAddModal(true);
+          }}>
             Record Payment In
-          </Button>}/>
+          </Button>
+        </div>
+      )}
 
       {/* Payment In KPI Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

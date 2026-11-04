@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   Download,
   Printer,
@@ -39,11 +40,11 @@ import { useTableSort } from '../../hooks/useTableSort';
 import SortableTh from '../../components/ui/SortableTh';
 
 const TABS = [
-  { id: 'pl', label: 'Profit & Loss' },
+  { id: 'pl', label: 'Profit & Loss (P&L)' },
   { id: 'bs', label: 'Balance Sheet' },
+  { id: 'ageing', label: 'Outstanding (AR / AP Ageing)' },
   { id: 'cashflow', label: 'Cash Flow' },
   { id: 'gst', label: 'GST Summary (GSTR-1 / 3B)' },
-  { id: 'ageing', label: 'AR / AP Ageing' },
   { id: 'budget', label: 'Budgets & Variances' },
 ];
 
@@ -73,7 +74,15 @@ function LineRow({ label, value, total = false, indent = false }) {
 }
 
 export function FinancialReportsPage() {
-  const [reportType, setReportType] = useState('pl');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const reportType = searchParams.get('tab') || 'pl';
+  const setReportType = (t) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set('tab', t);
+      return next;
+    });
+  };
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [asOf, setAsOf] = useState('');

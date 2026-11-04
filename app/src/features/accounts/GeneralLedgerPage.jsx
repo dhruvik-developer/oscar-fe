@@ -1,4 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import StandaloneNotesPage from './StandaloneNotesPage';
 import { Plus, Trash2, RotateCcw, Search } from 'lucide-react';
 import { api } from '../../services/api';
 import { Button } from '../../components/ui/Button';
@@ -44,6 +46,7 @@ const PAGE_SIZE = 25;
 const TABS = [
   { id: 'journal', label: 'Journal Entries' },
   { id: 'ledger', label: 'Account Ledger' },
+  { id: 'notes', label: 'Debit / Credit Notes' },
   { id: 'trial', label: 'Trial Balance' },
 ];
 
@@ -605,7 +608,15 @@ function TrialBalanceTab({ refreshKey }) {
 
 /* ───────────────────────── Page ───────────────────────── */
 export const GeneralLedgerPage = () => {
-  const [tab, setTab] = useState('journal');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tab = searchParams.get('tab') || 'journal';
+  const setTab = (t) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set('tab', t);
+      return next;
+    });
+  };
   const [accounts, setAccounts] = useState([]);
   const [accountsError, setAccountsError] = useState('');
   const [refreshKey, setRefreshKey] = useState(0);
@@ -645,6 +656,7 @@ export const GeneralLedgerPage = () => {
         <JournalTab accounts={activeAccounts} accountsError={accountsError} onPosted={() => setRefreshKey((k) => k + 1)} />
       )}
       {tab === 'ledger' && <LedgerTab accounts={accounts} accountsError={accountsError} />}
+      {tab === 'notes' && <StandaloneNotesPage embedded />}
       {tab === 'trial' && <TrialBalanceTab refreshKey={refreshKey} />}
     </div>
   );

@@ -348,18 +348,7 @@ export const NAV = [
           { label: 'QC Reports', to: '/inventory/qc/reports' },
         ],
       },
-      // [DISABLED] Lot & Taka section commented out
-      // {
-      //   label: 'Lot & Taka',
-      //   icon: Tag,
-      //   defaultOpen: false,
-      //   navigateOnOpen: true,
-      //   children: [
-      //     { label: 'Lot / Taka Register', to: '/inventory/lot-register', dot: true },
-      //     { label: 'Taka Tag Print', to: '/inventory/taka-tags' },
-      //     { label: 'Production Runs (In-house)', to: '/inventory/production-runs' },
-      //   ],
-      // },
+      { label: 'Production Runs (In-house)', icon: Factory, to: '/inventory/production-runs' },
       {
         label: 'Warehouse & Movement',
         icon: Warehouse,

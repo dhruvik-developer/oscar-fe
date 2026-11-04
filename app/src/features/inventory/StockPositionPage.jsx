@@ -1733,10 +1733,10 @@ export function StockPositionPage() {
                                 batchCode: row.lotNo || row.itemCode,
                               })}
                               className="inline-flex items-center gap-1.5 rounded-md bg-gradient-to-r from-blue-600 via-indigo-600 to-indigo-700 px-2.5 py-1 text-[10px] font-bold text-white shadow-xs transition-all duration-150 hover:from-blue-700 hover:via-indigo-700 hover:to-indigo-800 hover:shadow-md active:scale-95 group cursor-pointer"
-                              title={`Perform Quality Inspection for ${row.lotNo || row.itemCode}`}
+                              title={`Perform Reprocess Quality Inspection for ${row.lotNo || row.itemCode}`}
                             >
                               <ShieldCheck size={12} className="stroke-[2.5] text-indigo-100 group-hover:scale-110 transition-transform" />
-                              <span>Perform QC</span>
+                              <span>Reprocess QC</span>
                             </button>
                           ) : (
                             <span className="text-slate-400 text-[10.5px]">—</span>

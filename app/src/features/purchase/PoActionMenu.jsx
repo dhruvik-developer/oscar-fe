@@ -4,10 +4,12 @@ import {
   Eye,
   Pencil,
   Copy,
+  Package,
   PackageCheck,
   ShieldCheck,
   Truck,
   Receipt,
+  CreditCard,
   IndianRupee,
   Clock,
   Printer,
@@ -28,9 +30,11 @@ export function PoActionMenu({
   onViewDetails,
   onEdit,
   onDuplicate,
+  onBatchRegistry,
   onReceiveGoods,
   onPerformQc,
   onSupplierDispatch,
+  onPayVendorBill,
   onMatchVendorBill,
   onViewLandedCosts,
   onMovementHistory,
@@ -172,6 +176,21 @@ export function PoActionMenu({
       <button
         type="button"
         role="menuitem"
+        disabled={isCancelled}
+        onClick={() => handleAction(onBatchRegistry)}
+        className={`w-full px-3 py-1.5 text-left flex items-center gap-2 transition-colors ${
+          !isCancelled
+            ? 'hover:bg-blue-50 hover:text-blue-700 cursor-pointer text-slate-700'
+            : 'opacity-40 cursor-not-allowed text-slate-400'
+        }`}
+      >
+        <Package size={13} className="text-blue-500 shrink-0" />
+        <span>Batch Registry</span>
+      </button>
+
+      <button
+        type="button"
+        role="menuitem"
         disabled={!canReceiveGoods}
         onClick={() => handleAction(onReceiveGoods)}
         title={
@@ -217,16 +236,16 @@ export function PoActionMenu({
         type="button"
         role="menuitem"
         disabled={!canMatchBill}
-        onClick={() => handleAction(onMatchVendorBill)}
-        title={!canMatchBill ? 'Unavailable for draft or cancelled POs' : 'Match supplier invoice / bill'}
+        onClick={() => handleAction(onPayVendorBill || onMatchVendorBill)}
+        title={!canMatchBill ? 'Unavailable for draft or cancelled POs' : 'Pay vendor bills & match actual batch costs'}
         className={`w-full px-3 py-1.5 text-left flex items-center gap-2 transition-colors ${
           canMatchBill
-            ? 'hover:bg-violet-50 hover:text-violet-700 cursor-pointer text-slate-700'
+            ? 'hover:bg-emerald-50 hover:text-emerald-700 cursor-pointer text-slate-700'
             : 'opacity-40 cursor-not-allowed text-slate-400'
         }`}
       >
-        <Receipt size={13} className="text-violet-600 shrink-0" />
-        <span>Match Vendor Bill</span>
+        <CreditCard size={13} className="text-emerald-600 shrink-0" />
+        <span>Pay Vendor Bill</span>
       </button>
 
       <div className="my-1 border-t border-slate-100" />

@@ -197,7 +197,7 @@ export default function QCReinspectionPage() {
             title={`Perform Reprocess Quality Inspection for ${r.reprocessBatchCode || r.reprocessNo}`}
           >
             <ShieldCheck size={12} className="stroke-[2.5] text-indigo-100 group-hover:scale-110 transition-transform" />
-            <span>Perform QC</span>
+            <span>Reprocess QC</span>
           </button>
         )}
 
@@ -430,10 +430,10 @@ export default function QCReinspectionPage() {
                                           type="button"
                                           onClick={() => handleOpenQc(r, ret.receiptId || ret.goodsReceiptId)}
                                           className="inline-flex items-center gap-1 rounded-md bg-gradient-to-r from-blue-600 via-indigo-600 to-indigo-700 px-2 py-0.5 text-[9.5px] font-bold text-white shadow-xs hover:from-blue-700 hover:via-indigo-700 hover:to-indigo-800 active:scale-95 cursor-pointer"
-                                          title={`Perform QC for return ${ret.grnNumber}`}
+                                          title={`Perform Reprocess QC for return ${ret.grnNumber}`}
                                         >
                                           <ShieldCheck size={11} className="stroke-[2.5] text-indigo-100" />
-                                          <span>Perform QC</span>
+                                          <span>Reprocess QC</span>
                                         </button>
                                       ) : (
                                         <span className="text-[10px] text-slate-400 font-medium">Completed</span>

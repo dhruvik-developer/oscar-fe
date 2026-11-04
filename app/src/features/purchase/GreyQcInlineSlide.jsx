@@ -70,11 +70,19 @@ export function GreyQcInlineSlide({ po, initialReceiptId, onClose, onQcSaved, on
 
       // If a specific targetReceiptId was requested and is not yet in loadedGrns, fetch it directly
       if (targetReceiptId && !loadedGrns.some((g) => String(g.id) === String(targetReceiptId) || String(g.receiptNumber || g.grn_number || '').toLowerCase() === String(targetReceiptId).toLowerCase())) {
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(targetReceiptId));
         try {
-          const directRes = await api.get(`/purchase/receipts/${targetReceiptId}/`);
-          const single = directRes?.data || directRes;
-          if (single && single.id) {
-            loadedGrns = [single, ...loadedGrns];
+          if (isUuid) {
+            const directRes = await api.get(`/purchase/receipts/${targetReceiptId}/`);
+            const single = directRes?.data || directRes;
+            if (single && single.id) {
+              loadedGrns = [single, ...loadedGrns];
+            }
+          } else {
+            const searchRes = await api.get('/purchase/receipts/', { params: { search: targetReceiptId, limit: 10 } });
+            const list = Array.isArray(searchRes) ? searchRes : (searchRes.results || searchRes.rows || searchRes.data || []);
+            const match = list.find((g) => String(g.id) === String(targetReceiptId) || String(g.receiptNumber || g.grn_number || '').toLowerCase() === String(targetReceiptId).toLowerCase());
+            if (match) loadedGrns = [match, ...loadedGrns];
           }
         } catch {
           try {
@@ -126,6 +134,36 @@ export function GreyQcInlineSlide({ po, initialReceiptId, onClose, onQcSaved, on
     return Number(currentGrn.total_received_qty || currentGrn.receivedQty || 0);
   }, [currentGrn]);
 
+  const currentGrnQcStatus = currentGrn?.qc_status || currentGrn?.qcStatus || 'Pending';
+  const currentGrnMeta = useMemo(() => {
+    try {
+      const raw = currentGrn?.qc_note || currentGrn?.qcNote;
+      return typeof raw === 'string' ? JSON.parse(raw || '{}') : (raw || {});
+    } catch {
+      return {};
+    }
+  }, [currentGrn]);
+
+  const reprocessPendingMtr = useMemo(() => {
+    const rp = Number(currentGrnMeta.reprocessQty || currentGrnMeta.cumulative?.reprocess || 0);
+    return rp > 0 ? rp : (po?.isReprocess || po?.reprocessQty ? Number(po.reprocessQty || 10) : 0);
+  }, [currentGrnMeta, po]);
+
+  const effectiveGrnStatus = useMemo(() => {
+    if (['Approved', 'Passed'].includes(currentGrnQcStatus)) return 'Passed';
+    if (currentGrnQcStatus === 'Rejected') return 'Rejected';
+    if (currentGrnQcStatus === 'Partially Approved') {
+      return reprocessPendingMtr > 0 ? 'In Reprocess' : 'Passed';
+    }
+    return currentGrnQcStatus || 'Pending';
+  }, [currentGrnQcStatus, reprocessPendingMtr]);
+
+  const isReprocessMode = Boolean(
+    po?.isReprocess ||
+    (currentGrnQcStatus === 'Partially Approved' && reprocessPendingMtr > 0) ||
+    ['Reprocess', 'Rework'].includes(currentGrnQcStatus)
+  );
+
   // Transform current GRN lines into pure Batch-Wise QC items
   useEffect(() => {
     if (!currentGrn) {
@@ -133,17 +171,41 @@ export function GreyQcInlineSlide({ po, initialReceiptId, onClose, onQcSaved, on
       return;
     }
 
-    const isGrnCompleted = currentGrn.qc_status && currentGrn.qc_status !== 'Pending';
+    const isGrnCompleted = !isReprocessMode && effectiveGrnStatus && effectiveGrnStatus !== 'Pending';
     const lines = currentGrn.lines || [];
 
+    const recordedGoodTotal = Number(currentGrnMeta.goodQty ?? currentGrnMeta.cumulative?.good ?? (['Approved', 'Passed'].includes(effectiveGrnStatus) ? grnReceivedMeters : 0));
+    const recordedRejectTotal = Number(currentGrnMeta.rejectedQty ?? currentGrnMeta.rejectQty ?? currentGrnMeta.cumulative?.reject ?? (effectiveGrnStatus === 'Rejected' ? grnReceivedMeters : 0));
+    const recordedReprocessTotal = Number(currentGrnMeta.reprocessQty ?? currentGrnMeta.cumulative?.reprocess ?? 0);
+    const recordedSampleTotal = Number(currentGrnMeta.secondQualityQty ?? currentGrnMeta.secondQty ?? currentGrnMeta.cumulative?.second ?? 0);
+
     const batchRows = lines.map((line, idx) => {
-      const qty = Number(line.received_qty || line.receivedQty || 0);
-      const isPassed = currentGrn.qc_status === 'Approved';
-      const isRejected = currentGrn.qc_status === 'Rejected';
-      const batchCode = line.batchCode || (line.batch_number ? `BAT-${line.batch_number}` : `BAT-${currentGrn.grn_number || 'GRN'}-${idx + 1}`);
+      const fullQty = Number(line.received_qty || line.receivedQty || 0);
+      const inspectQty = isReprocessMode ? (reprocessPendingMtr > 0 ? reprocessPendingMtr : fullQty) : fullQty;
+      const isApproved = !isReprocessMode && ['Approved', 'Passed'].includes(effectiveGrnStatus);
+      const isRejected = !isReprocessMode && effectiveGrnStatus === 'Rejected';
+      const batchCode = line.batchCode || po?.batchCode || (line.batch_number ? `BAT-${line.batch_number}` : `BAT-${currentGrn.grn_number || 'GRN'}-${idx + 1}`);
       const lotNumber = line.batch_number || line.lot_number || `LOT-${idx + 1}`;
-      const location = line.currentLocation || (isPassed ? 'WH-MAIN (Godown)' : isRejected ? 'SYS-REJECT' : 'SYS-QC-HOLD');
-      const status = isPassed ? 'Passed' : isRejected ? 'Rejected' : (line.qcStatus || currentGrn.qc_status || 'Pending');
+      const location = isReprocessMode
+        ? 'SYS-REPROCESS (Reprocess Stock)'
+        : line.currentLocation || (isApproved ? 'WH-MAIN (Godown)' : isRejected ? 'SYS-REJECT' : 'SYS-QC-HOLD');
+      const status = isReprocessMode
+        ? 'Reprocess Pending'
+        : (isApproved ? 'Passed' : isRejected ? 'Rejected' : (line.qcStatus === 'Partially Approved' ? (reprocessPendingMtr > 0 ? 'Reprocess' : 'Passed') : line.qcStatus || effectiveGrnStatus || 'Pending'));
+
+      const lineFraction = grnReceivedMeters > 0 ? (fullQty / grnReceivedMeters) : 1;
+      const actualGood = isGrnCompleted
+        ? (lines.length === 1 ? recordedGoodTotal : Math.round(recordedGoodTotal * lineFraction * 100) / 100)
+        : (isReprocessMode ? inspectQty : fullQty);
+      const actualReject = isGrnCompleted
+        ? (lines.length === 1 ? recordedRejectTotal : Math.round(recordedRejectTotal * lineFraction * 100) / 100)
+        : 0;
+      const actualReprocess = isGrnCompleted
+        ? (lines.length === 1 ? recordedReprocessTotal : Math.round(recordedReprocessTotal * lineFraction * 100) / 100)
+        : 0;
+      const actualSample = isGrnCompleted
+        ? (lines.length === 1 ? recordedSampleTotal : Math.round(recordedSampleTotal * lineFraction * 100) / 100)
+        : 0;
 
       return {
         id: line.id || `line-${idx}`,
@@ -151,22 +213,22 @@ export function GreyQcInlineSlide({ po, initialReceiptId, onClose, onQcSaved, on
         batchCode,
         lotNumber,
         itemName: line.itemName || line.item || 'Grey Fabric',
-        quantity: qty,
+        quantity: inspectQty,
         currentLocation: location,
         qcStatus: status,
-        disposition: isPassed ? 'Passed' : isRejected ? 'Rejected' : 'Passed',
+        disposition: isReprocessMode ? 'Passed' : (isApproved ? 'Passed' : isRejected ? 'Rejected' : 'Passed'),
         inspection: {
-          good: isRejected ? 0 : qty,
-          reprocess: 0,
-          reject: isRejected ? qty : 0,
-          sample: 0,
-          isInspected: isGrnCompleted,
+          good: actualGood,
+          reprocess: actualReprocess,
+          reject: actualReject,
+          sample: actualSample,
+          isInspected: isReprocessMode || isGrnCompleted,
         },
       };
     });
 
     setBatches(batchRows);
-  }, [currentGrn]);
+  }, [currentGrn, isReprocessMode, reprocessPendingMtr, currentGrnQcStatus, effectiveGrnStatus, currentGrnMeta, grnReceivedMeters, po]);
 
   const batchTotalMeters = useMemo(() => {
     return batches.reduce((s, b) => s + Number(b.quantity || 0), 0);
@@ -297,7 +359,7 @@ export function GreyQcInlineSlide({ po, initialReceiptId, onClose, onQcSaved, on
     setActiveInspectBatch(null);
   };
 
-  const isGrnAlreadyCompleted = currentGrn && currentGrn.qc_status && currentGrn.qc_status !== 'Pending';
+  const isGrnAlreadyCompleted = !isReprocessMode && Boolean(currentGrn && currentGrnQcStatus && currentGrnQcStatus !== 'Pending');
 
   const stats = useMemo(() => {
     const totalBatches = batches.length;
@@ -376,6 +438,7 @@ export function GreyQcInlineSlide({ po, initialReceiptId, onClose, onQcSaved, on
 
       const payload = {
         receiptId: currentGrn.id,
+        isReprocess: isReprocessMode,
         goodQty: stats.goodMeters,
         secondQty: stats.sampleMeters,
         sampleQty: stats.sampleMeters,
@@ -384,7 +447,9 @@ export function GreyQcInlineSlide({ po, initialReceiptId, onClose, onQcSaved, on
         holdQty: 0,
         remarks:
           remarks ||
-          `Batch QC inspection completed by ${inspectorName} for ${currentGrn.grn_number}. Accepted: ${numIN(stats.goodMeters)} m, Reprocess: ${numIN(stats.reprocessMeters)} m, Reject: ${numIN(stats.rejectedMeters)} m.`,
+          (isReprocessMode
+            ? `Reprocess QC inspection completed by ${inspectorName} for ${currentGrn.grn_number}. Accepted: ${numIN(stats.goodMeters)} m, Reject: ${numIN(stats.rejectedMeters)} m.`
+            : `Batch QC inspection completed by ${inspectorName} for ${currentGrn.grn_number}. Accepted: ${numIN(stats.goodMeters)} m, Reprocess: ${numIN(stats.reprocessMeters)} m, Reject: ${numIN(stats.rejectedMeters)} m.`),
         lines: batches.map((b) => {
           const len = Number(b.quantity || 0);
           const insp = b.inspection?.isInspected ? b.inspection : null;
@@ -439,7 +504,7 @@ export function GreyQcInlineSlide({ po, initialReceiptId, onClose, onQcSaved, on
                 Stage 4 • Inward Quality Control
               </span>
               <h3 className="text-sm font-extrabold text-slate-900">
-                Batch Quality Control (QC Inspection)
+                {isReprocessMode ? 'Reprocess Quality Control (QC Inspection)' : 'Batch Quality Control (QC Inspection)'}
               </h3>
             </div>
             <p className="text-[11px] text-slate-500 font-medium mt-0.5">
@@ -480,6 +545,12 @@ export function GreyQcInlineSlide({ po, initialReceiptId, onClose, onQcSaved, on
             {grnList.map((g) => {
               const isSelected = String(g.id) === String(selectedGrnId);
               const gStatus = g.qc_status || g.qcStatus || 'Pending';
+              let gMeta = {};
+              try {
+                gMeta = typeof g.qc_note === 'string' ? JSON.parse(g.qc_note || '{}') : (g.qc_note || {});
+              } catch {}
+              const gRp = Number(gMeta.reprocessQty || gMeta.cumulative?.reprocess || 0);
+              const effectiveGStatus = (gStatus === 'Approved' || gStatus === 'Passed') ? 'Passed' : (gStatus === 'Partially Approved' && gRp <= 0 ? 'Passed' : gStatus === 'Partially Approved' ? 'Reprocess' : gStatus);
               return (
                 <button
                   key={g.id}
@@ -493,13 +564,13 @@ export function GreyQcInlineSlide({ po, initialReceiptId, onClose, onQcSaved, on
                 >
                   <span>{g.grn_number || g.grnNumber}</span>
                   <span className={`text-[9.5px] px-1.5 py-0.2 rounded font-semibold ${
-                    gStatus === 'Approved'
+                    effectiveGStatus === 'Approved' || effectiveGStatus === 'Passed'
                       ? 'bg-emerald-100 text-emerald-800'
-                      : gStatus === 'Rejected'
+                      : effectiveGStatus === 'Rejected'
                       ? 'bg-rose-100 text-rose-800'
                       : 'bg-amber-100 text-amber-800'
                   }`}>
-                    {gStatus}
+                    {effectiveGStatus}
                   </span>
                 </button>
               );
@@ -535,7 +606,7 @@ export function GreyQcInlineSlide({ po, initialReceiptId, onClose, onQcSaved, on
           <p className="text-xs font-black text-purple-900 mt-1 flex items-center gap-1">
             {isGrnAlreadyCompleted ? (
               <span className="text-emerald-700 flex items-center gap-1">
-                <CheckCircle2 size={12} /> {currentGrn.qc_status}
+                <CheckCircle2 size={12} /> {effectiveGrnStatus}
               </span>
             ) : (
               <span className="text-amber-700 flex items-center gap-1">
@@ -543,21 +614,35 @@ export function GreyQcInlineSlide({ po, initialReceiptId, onClose, onQcSaved, on
               </span>
             )}
           </p>
-          <span className="text-[9.5px] text-purple-600 truncate block">Ready for Inspection</span>
+          <span className="text-[9.5px] text-purple-600 truncate block">
+            {isGrnAlreadyCompleted ? 'Inspection Completed' : 'Ready for Inspection'}
+          </span>
         </div>
       </div>
 
-      {isGrnAlreadyCompleted && (
+      {isReprocessMode ? (
+        <div className="p-3 bg-amber-50 border border-amber-200 text-amber-900 rounded-xl text-xs flex items-start gap-2 shadow-2xs">
+          <RefreshCw className="w-4 h-4 text-amber-600 shrink-0 mt-0.5 animate-spin" style={{ animationDuration: '6s' }} />
+          <div>
+            <span className="font-extrabold block text-amber-950">Reprocess Quality Inspection:</span>
+            <span>
+              Inspecting <strong>{numIN(reprocessPendingMtr || stats.totalMeters)} m</strong> of fabric held in <strong>SYS-REPROCESS (Reprocess Stock)</strong>.
+              {currentGrnMeta.goodQty ? ` (${numIN(currentGrnMeta.goodQty)} m previously approved and released to godown). ` : ' '}
+              Passed quantity will be moved directly to warehouse godown stock.
+            </span>
+          </div>
+        </div>
+      ) : isGrnAlreadyCompleted ? (
         <div className="p-3 bg-blue-50 border border-blue-200 text-blue-900 rounded-xl text-xs flex items-start gap-2 shadow-2xs">
           <Info className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
           <div>
             <span className="font-extrabold block">QC Inspection Already Completed:</span>
             <span>
-              {currentGrn.grn_number} has already been inspected with verdict <strong>{currentGrn.qc_status}</strong>. Material has been posted to inventory stock.
+              {currentGrn.grn_number} has already been inspected with verdict <strong>{effectiveGrnStatus === 'Approved' ? 'QC Passed' : effectiveGrnStatus === 'Passed' ? 'QC Passed' : effectiveGrnStatus}</strong>. Material has been posted to inventory stock.
             </span>
           </div>
         </div>
-      )}
+      ) : null}
 
       {/* ── Main QC Inspection Form & Table ── */}
       <form onSubmit={handleCompleteQc} className="space-y-4">
@@ -742,7 +827,11 @@ export function GreyQcInlineSlide({ po, initialReceiptId, onClose, onQcSaved, on
             <button
               type="submit"
               disabled={submitting || batches.length === 0 || isGrnAlreadyCompleted}
-              className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-xs cursor-pointer transition-colors"
+              className={`px-4 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-xs cursor-pointer transition-colors ${
+                isReprocessMode
+                  ? 'bg-gradient-to-r from-blue-600 via-indigo-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white'
+                  : 'bg-indigo-600 hover:bg-indigo-700 text-white'
+              } disabled:opacity-40 disabled:cursor-not-allowed`}
             >
               {submitting ? (
                 <>
@@ -750,7 +839,7 @@ export function GreyQcInlineSlide({ po, initialReceiptId, onClose, onQcSaved, on
                 </>
               ) : (
                 <>
-                  <FileCheck size={14} /> Submit QC & Post to Stock
+                  <FileCheck size={14} /> {isReprocessMode ? 'Submit Reprocess QC & Release to Stock' : 'Submit QC & Post to Stock'}
                 </>
               )}
             </button>

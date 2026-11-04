@@ -301,10 +301,10 @@ export default function ReceiveReturnModal({ record, onClose, onDone }) {
             onClick={(e) => submit(e, true)}
             disabled={saving || !returnQty || parseFloat(returnQty) <= 0 || (isOverReceipt && !allowOverride)}
             className="h-9 px-4 rounded-lg bg-gradient-to-r from-blue-600 via-indigo-600 to-indigo-700 hover:from-blue-700 hover:via-indigo-700 hover:to-indigo-800 text-white font-bold disabled:opacity-50 cursor-pointer flex items-center gap-1.5 shadow-md active:scale-95 transition-all"
-            title="Receive returned stock and immediately open QC inspection"
+            title="Receive returned fabric and immediately open Reprocess QC inspection"
           >
             <ShieldCheck size={14} className="stroke-[2.5] text-indigo-100" />
-            {saving ? 'Processing…' : 'Receive & Perform QC'}
+            {saving ? 'Processing…' : 'Receive & Reprocess QC'}
           </button>
         </div>
       </form>

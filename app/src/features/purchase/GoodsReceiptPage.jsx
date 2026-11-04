@@ -307,15 +307,13 @@ export const GoodsReceiptPage = () => {
         orderedQty: lineOrdered,
         remainingQty: remaining,
         receivedQty: targetQty > 0 ? targetQty : '',
-        unitCost: Number(it.rate || it.unitPrice || 0),
+        unitCost: Number(it.rate || it.unitPrice || 0) > 0 ? Number(it.rate || it.unitPrice || 0) : '',
+        poRate: Number(it.rate || it.unitPrice || 0),
+        totalCost: targetQty > 0 && Number(it.rate || it.unitPrice || 0) > 0 ? Math.round(targetQty * Number(it.rate || it.unitPrice) * 100) / 100 : '',
         uom: it.uom || '',
         batchNumber: '',
         fabricWidth: it.fabricWidth || '',
         remarks: '',
-        takas: [
-          { id: `t-${idx + 1}-1`, takaNumber: '1', qty: targetQty > 0 ? targetQty : '', weight: '', width: it.fabricWidth ? String(it.fabricWidth) : '', remarks: '' },
-        ],
-        showTakas: true,
       };
     });
 
@@ -361,8 +359,10 @@ export const GoodsReceiptPage = () => {
           itemName: '',
           poLineId: '',
           orderedQty: 0,
-          receivedQty: 0,
-          unitCost: 0,
+          receivedQty: '',
+          unitCost: '',
+          poRate: 0,
+          totalCost: '',
           uom: '',
           batchNumber: '',
           fabricWidth: '',
@@ -390,6 +390,25 @@ export const GoodsReceiptPage = () => {
         // If receivedQty changed and there's 1 taka, auto-sync its qty
         if (field === 'receivedQty' && updated.takas?.length === 1) {
           updated.takas = [{ ...updated.takas[0], qty: Number(val) || 0 }];
+        }
+        if (field === 'receivedQty') {
+          const rQty = Number(val) || 0;
+          const uCost = Number(updated.unitCost) || 0;
+          if (uCost > 0 && rQty > 0) {
+            updated.totalCost = Math.round(rQty * uCost * 100) / 100;
+          }
+        } else if (field === 'unitCost') {
+          const uCost = Number(val) || 0;
+          const rQty = Number(updated.receivedQty) || 0;
+          if (rQty > 0 && val !== '') {
+            updated.totalCost = Math.round(rQty * uCost * 100) / 100;
+          }
+        } else if (field === 'totalCost') {
+          const tCost = Number(val) || 0;
+          const rQty = Number(updated.receivedQty) || 0;
+          if (rQty > 0 && val !== '') {
+            updated.unitCost = Math.round((tCost / rQty) * 100) / 100;
+          }
         }
         return updated;
       }),
@@ -488,12 +507,7 @@ export const GoodsReceiptPage = () => {
         if (!l.itemId) throw new Error(`Line ${i + 1}: Select the item received.`);
         if (!(rQty > 0)) throw new Error(`Line ${i + 1}: Received quantity must be greater than zero.`);
 
-        if (l.takas && l.takas.length > 0) {
-          const takaSum = l.takas.reduce((s, t) => s + (Number(t.qty) || 0), 0);
-          if (Math.abs(takaSum - rQty) > 0.001) {
-            throw new Error(`Line ${i + 1}: Sum of taka meters (${takaSum} m) does not match received quantity (${rQty} m).`);
-          }
-        }
+
       }
 
       const payload = {
@@ -509,17 +523,11 @@ export const GoodsReceiptPage = () => {
           orderedQty: Number(l.orderedQty) || 0,
           receivedQty: Number(l.receivedQty) || 0,
           unitCost: Number(l.unitCost) || 0,
+          totalCost: Number(l.totalCost) || (Number(l.receivedQty) * Number(l.unitCost)) || 0,
           uom: l.uom || undefined,
           batchNumber: l.batchNumber || undefined,
           fabricWidth: l.fabricWidth ? Number(l.fabricWidth) : null,
           remarks: l.remarks || '',
-          takas: (l.takas || []).map((t, tIdx) => ({
-            takaNumber: t.takaNumber || String(tIdx + 1),
-            qty: Number(t.qty) || 0,
-            weight: t.weight ? Number(t.weight) : null,
-            width: t.width ? Number(t.width) : null,
-            remarks: t.remarks || '',
-          })),
         })),
       };
 
@@ -954,7 +962,7 @@ export const GoodsReceiptPage = () => {
                           )}
                         </div>
 
-                        <div className="sm:col-span-2">
+                        <div className="sm:col-span-3">
                           <label className="block text-[11px] font-semibold text-slate-700 mb-1">Received (m) *</label>
                           <input
                             type="number"
@@ -967,17 +975,6 @@ export const GoodsReceiptPage = () => {
                         </div>
 
                         <div className="sm:col-span-2">
-                          <label className="block text-[11px] font-semibold text-slate-500 mb-1">Batch / Lot #</label>
-                          <input
-                            type="text"
-                            value={line.batchNumber}
-                            placeholder="Auto (server)"
-                            onChange={(e) => handleUpdateLine(line.id, 'batchNumber', e.target.value)}
-                            className="w-full px-3 py-1.5 border border-slate-300 rounded-lg bg-white font-mono uppercase text-xs"
-                          />
-                        </div>
-
-                        <div className="sm:col-span-1">
                           <label className="block text-[11px] font-semibold text-slate-500 mb-1">Width (in)</label>
                           <input
                             type="number"
@@ -999,6 +996,75 @@ export const GoodsReceiptPage = () => {
                         </div>
                       </div>
 
+                      {/* Dedicated Batch & Costing Row (Ek batch kitne me padi) */}
+                      <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end p-2.5 bg-blue-50/40 rounded-xl border border-blue-200/70 shadow-2xs">
+                        <div className="sm:col-span-4">
+                          <label className="block text-[11px] font-semibold text-slate-700 mb-1">Batch / Lot #</label>
+                          <input
+                            type="text"
+                            value={line.batchNumber}
+                            placeholder="Auto (server)"
+                            onChange={(e) => handleUpdateLine(line.id, 'batchNumber', e.target.value)}
+                            className="w-full px-3 py-1.5 border border-slate-300 rounded-lg bg-white font-mono uppercase text-xs"
+                          />
+                        </div>
+
+                        <div className="sm:col-span-3">
+                          <label className="block text-[11px] font-semibold text-slate-700 mb-1 flex items-center justify-between">
+                            <span>Rate (₹ / meter)</span>
+                            {Number(line.poRate) > 0 && (
+                              <span className="text-[9.5px] text-slate-400 font-normal">PO: ₹{line.poRate}</span>
+                            )}
+                          </label>
+                          <div className="relative">
+                            <span className="absolute inset-y-0 left-0 pl-2.5 flex items-center text-slate-400 font-bold text-xs pointer-events-none">
+                              ₹
+                            </span>
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={line.unitCost !== undefined && line.unitCost !== '' ? line.unitCost : ''}
+                              placeholder="0.00"
+                              onChange={(e) => handleUpdateLine(line.id, 'unitCost', e.target.value)}
+                              className="w-full pl-6 pr-2.5 py-1.5 border border-slate-300 rounded-lg bg-white font-mono text-xs font-bold text-slate-900 focus:border-blue-500 focus:outline-none"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="sm:col-span-5">
+                          <div className="flex items-center justify-between mb-1">
+                            <label className="block text-[11px] font-semibold text-blue-900 flex items-center gap-1">
+                              <span>Batch Cost (₹)</span>
+                              <span className="text-[10px] text-blue-600 font-normal">(Rupees me kitne me padi)</span>
+                            </label>
+                            {Number(line.receivedQty) > 0 && Number(line.unitCost) > 0 && (
+                              <span className="text-[10px] text-blue-700 font-bold font-mono">
+                                {Number(line.receivedQty).toLocaleString('en-IN', { maximumFractionDigits: 2 })} m × ₹{Number(line.unitCost).toLocaleString('en-IN', { maximumFractionDigits: 2 })}
+                              </span>
+                            )}
+                          </div>
+                          <div className="relative">
+                            <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-blue-600 font-bold text-sm pointer-events-none">
+                              ₹
+                            </span>
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={
+                                line.totalCost !== undefined && line.totalCost !== ''
+                                  ? line.totalCost
+                                  : (Number(line.receivedQty) > 0 && Number(line.unitCost) > 0)
+                                  ? (Math.round(Number(line.receivedQty) * Number(line.unitCost) * 100) / 100)
+                                  : ''
+                              }
+                              placeholder="0.00"
+                              onChange={(e) => handleUpdateLine(line.id, 'totalCost', e.target.value)}
+                              className="w-full pl-7 pr-3 py-1.5 border-2 border-blue-400 bg-white rounded-lg font-mono text-xs font-black text-blue-900 focus:border-blue-600 focus:outline-none shadow-2xs"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
                       {/* Variance Indicator */}
                       {Number(line.orderedQty) > 0 && (
                         <div className="flex items-center gap-3 text-[11px] pt-1">
@@ -1017,99 +1083,65 @@ export const GoodsReceiptPage = () => {
                         </div>
                       )}
 
-                      {/* Taka Breakdown Sub-Table */}
-                      <div className="bg-slate-50 rounded-lg p-3 border border-slate-200 space-y-2 mt-2">
-                        <div className="flex items-center justify-between">
-                          <span className="font-semibold text-slate-700 text-[11px] flex items-center gap-1.5">
-                            <Layers size={13} className="text-blue-600" /> Taka / Roll Breakdown ({line.takas?.length || 0} rolls)
+                      {/* Clean Batch Details Section (Batch-Wise Receiving Only) */}
+                      <div className="bg-slate-50/90 rounded-xl p-3.5 border border-blue-200/80 space-y-3 mt-2 shadow-2xs">
+                        <div className="flex items-center justify-between border-b border-slate-200/80 pb-2">
+                          <span className="font-extrabold text-[#17294e] text-xs flex items-center gap-1.5">
+                            <Package size={14} className="text-blue-700" />
+                            Batch Details — Auto-Generated Batch
                           </span>
-                          <div className="flex items-center gap-2">
-                            <button
-                              type="button"
-                              onClick={() => handleAutoSplitTakas(line.id)}
-                              className="text-[11px] font-semibold text-blue-600 hover:text-blue-800 underline"
-                            >
-                              Auto Split
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleAddTaka(line.id)}
-                              className="inline-flex items-center gap-1 rounded bg-white px-2 py-1 text-[11px] font-semibold text-slate-700 border border-slate-200 hover:bg-slate-50 shadow-2xs"
-                            >
-                              <Plus size={11} /> Add Taka
-                            </button>
+                          <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-100/70 text-blue-800 font-bold">
+                            Batch Number: Auto (assigned on save)
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                          <div>
+                            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Fabric / Item</span>
+                            <span className="mt-1 block font-bold text-slate-800 text-xs truncate" title={line.itemName}>
+                              {line.itemName}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Actual Rate per Meter (₹)</span>
+                            <div className="relative mt-1">
+                              <span className="absolute inset-y-0 left-0 pl-2.5 flex items-center text-slate-400 font-bold pointer-events-none text-xs">₹</span>
+                              <input
+                                type="number"
+                                step="0.01"
+                                value={line.unitCost ?? ''}
+                                onChange={(e) => {
+                                  const newRate = e.target.value === '' ? '' : Number(e.target.value);
+                                  const rQty = Number(line.receivedQty) || 0;
+                                  const newTotal = newRate !== '' ? Math.round(rQty * Number(newRate) * 100) / 100 : '';
+                                  handleUpdateLine(line.id, 'unitCost', newRate);
+                                  handleUpdateLine(line.id, 'totalCost', newTotal);
+                                }}
+                                className="w-full pl-6 pr-2 py-1.5 border border-slate-300 rounded-lg bg-white font-mono text-xs font-bold text-slate-800 focus:border-blue-600 focus:outline-none"
+                                placeholder="0.00"
+                              />
+                            </div>
+                          </div>
+                          <div>
+                            <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider block">Batch Total Amount</span>
+                            <div className="mt-1 p-1.5 px-3 rounded-lg border-2 border-emerald-400 bg-emerald-50/80 flex items-center justify-between">
+                              <span className="text-[11px] font-semibold text-emerald-800">Batch Total:</span>
+                              <span className="font-mono text-sm font-black text-emerald-950 tabular-nums">
+                                ₹{((Number(line.receivedQty) || 0) * (Number(line.unitCost) || 0)).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </span>
+                            </div>
                           </div>
                         </div>
 
-                        {/* Takas Grid */}
-                        <div className="space-y-1.5">
-                          {(line.takas || []).map((t, tIdx) => (
-                            <div key={t.id} className="grid grid-cols-12 gap-2 items-center text-xs">
-                              <div className="col-span-2">
-                                <input
-                                  type="text"
-                                  placeholder="Roll #"
-                                  value={t.takaNumber}
-                                  onChange={(e) => handleUpdateTaka(line.id, t.id, 'takaNumber', e.target.value)}
-                                  className="w-full px-2 py-1 border border-slate-200 rounded bg-white font-mono text-[11px]"
-                                />
-                              </div>
-                              <div className="col-span-3">
-                                <input
-                                  type="number"
-                                  step="0.01"
-                                  placeholder="Meters *"
-                                  value={t.qty}
-                                  onChange={(e) => handleUpdateTaka(line.id, t.id, 'qty', e.target.value)}
-                                  className="w-full px-2 py-1 border border-slate-300 rounded bg-white font-mono font-semibold text-slate-800 text-[11px]"
-                                />
-                              </div>
-                              <div className="col-span-2">
-                                <input
-                                  type="number"
-                                  step="0.01"
-                                  placeholder="Weight (kg)"
-                                  value={t.weight || ''}
-                                  onChange={(e) => handleUpdateTaka(line.id, t.id, 'weight', e.target.value)}
-                                  className="w-full px-2 py-1 border border-slate-200 rounded bg-white font-mono text-[11px]"
-                                />
-                              </div>
-                              <div className="col-span-4">
-                                <input
-                                  type="text"
-                                  placeholder="Remarks / Defect notes"
-                                  value={t.remarks || ''}
-                                  onChange={(e) => handleUpdateTaka(line.id, t.id, 'remarks', e.target.value)}
-                                  className="w-full px-2 py-1 border border-slate-200 rounded bg-white text-[11px]"
-                                />
-                              </div>
-                              <div className="col-span-1 text-right">
-                                <button
-                                  type="button"
-                                  onClick={() => handleRemoveTaka(line.id, t.id)}
-                                  className="p-1 text-slate-400 hover:text-rose-600 rounded"
-                                >
-                                  <X size={13} />
-                                </button>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-
-                        {/* Taka Sum Validation Banner */}
-                        <div className={`p-2 rounded flex items-center justify-between text-[11px] font-medium ${
-                          takaMatch ? 'bg-emerald-100/60 text-emerald-800' : 'bg-amber-100/80 text-amber-900 border border-amber-300'
-                        }`}>
-                          <span>
-                            Total Taka Rolls: <strong>{line.takas?.length || 0}</strong> • Sum: <strong>{numIN(takaSum)} m</strong>
-                          </span>
-                          {takaMatch ? (
-                            <span className="font-semibold text-emerald-700">✓ Matches line quantity ({numIN(line.receivedQty)} m)</span>
-                          ) : (
-                            <span className="font-bold text-amber-800">
-                              ⚠️ Difference: {takaDiff > 0 ? `-${numIN(takaDiff)} m remaining` : `+${numIN(Math.abs(takaDiff))} m excess`}
-                            </span>
-                          )}
+                        <div>
+                          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Batch Remarks / Notes</span>
+                          <input
+                            type="text"
+                            placeholder="e.g. Batch quality observations or delivery remarks"
+                            value={line.remarks || ''}
+                            onChange={(e) => handleUpdateLine(line.id, 'remarks', e.target.value)}
+                            className="mt-1 w-full px-2.5 py-1.5 border border-slate-200 rounded-lg bg-white text-xs text-slate-700 focus:border-blue-500 focus:outline-none"
+                          />
                         </div>
                       </div>
                     </div>

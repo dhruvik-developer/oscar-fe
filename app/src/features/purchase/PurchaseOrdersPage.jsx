@@ -20,6 +20,7 @@ import { GreyQcInlineSlide } from './GreyQcInlineSlide';
 import { GreyStockUpdatedInlineSlide } from './GreyStockUpdatedInlineSlide';
 import { VendorBillInlineSlide } from './VendorBillInlineSlide';
 import { SupplierBillMatchingInlineSlide } from './SupplierBillMatchingInlineSlide';
+import { PayVendorBillModal } from './PayVendorBillModal';
 import { AgencyBillMatchingInlineSlide } from './AgencyBillMatchingInlineSlide';
 import { SupplierPaymentInlineSlide } from './SupplierPaymentInlineSlide';
 import { PoProductionInstructionSection } from './PoProductionInstructionSection';
@@ -271,6 +272,7 @@ export const PurchaseOrdersPage = () => {
     const [actionMenuTarget, setActionMenuTarget] = useState(null);
     const [expandedPoId, setExpandedPoId] = useState(null);
     const [expandedBatches, setExpandedBatches] = useState([]);
+    const [expandedPoGroup, setExpandedPoGroup] = useState(null);
     const [expandedBatchesLoading, setExpandedBatchesLoading] = useState(false);
     const [expandedBatchesError, setExpandedBatchesError] = useState('');
     const [expandedBatchesReload, setExpandedBatchesReload] = useState(0);
@@ -316,6 +318,7 @@ export const PurchaseOrdersPage = () => {
     useEffect(() => {
       if (!expandedPoId) {
         setExpandedBatches([]);
+        setExpandedPoGroup(null);
         setExpandedBatchesError('');
         setExpandedBatchesLoading(false);
         return undefined;
@@ -334,6 +337,7 @@ export const PurchaseOrdersPage = () => {
       }).then((response) => {
         if (cancelled) return;
         const group = (response?.groups || []).find((item) => String(item.poId) === String(expandedPoId));
+        setExpandedPoGroup(group || null);
         setExpandedBatches(group?.batches || []);
       }).catch((error) => {
         if (cancelled) return;
@@ -1342,7 +1346,16 @@ export const PurchaseOrdersPage = () => {
                       >
                         <ChevronRight size={15} className={`transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`} />
                       </button>
-
+                      {status !== 'Cancelled' && (
+                        <button
+                          type="button"
+                          onClick={() => navigate(`/inventory/batches?po=${encodeURIComponent(p.id)}&poNumber=${encodeURIComponent(p.poNumber || '')}&view=po`)}
+                          className="inline-flex items-center gap-1 whitespace-nowrap rounded-md border border-blue-200 bg-blue-50 px-2 py-1 text-[10px] font-semibold text-blue-700 transition-colors hover:bg-blue-100"
+                          title={`Manage receipt, batches, QC & dispatch for ${p.poNumber || 'this PO'} in Batch Registry`}
+                        >
+                          <Package size={11} /> Batch Registry
+                        </button>
+                      )}
                       {renderMoreActionsButton(p)}
                     </div>
                   </div>
@@ -1360,6 +1373,66 @@ export const PurchaseOrdersPage = () => {
                         </h5>
                         {expandedBatchesLoading && <span className="text-[10px] font-medium text-slate-500">Loading linked batches…</span>}
                       </div>
+
+                      {/* PO Summary KPI Banner */}
+                      {(() => {
+                        const ordQty = Number(expandedPoGroup?.orderedQty || getPoQty(p) || 0);
+                        const recQty = Number(expandedPoGroup?.receivedQty || getPoReceivedQty(p) || 0);
+                        const remQty = Math.max(0, ordQty - recQty);
+                        const totalBatchAmt = expandedPoGroup?.totalBatchAmount
+                          ? Number(expandedPoGroup.totalBatchAmount)
+                          : expandedBatches.reduce((s, b) => s + (Number(b.batchAmount) || (Number(b.batchQty || 0) * Number(b.actualRate || 0))), 0);
+                        const qcPending = expandedPoGroup?.qcPendingQty != null
+                          ? Number(expandedPoGroup.qcPendingQty)
+                          : expandedBatches.filter(b => b.qcStatus === 'Pending' || b.pendingQcReceiptId).reduce((s, b) => s + (Number(b.batchQty) || 0), 0);
+                        const accepted = expandedPoGroup?.qcPassedQty != null
+                          ? Number(expandedPoGroup.qcPassedQty)
+                          : expandedBatches.reduce((s, b) => s + (Number(b.acceptedQty) || 0), 0);
+                        const rejected = expandedPoGroup?.qcRejectedQty != null
+                          ? Number(expandedPoGroup.qcRejectedQty)
+                          : expandedBatches.reduce((s, b) => s + (Number(b.qcRejectedQty) || 0), 0);
+                        const avail = expandedPoGroup?.availableQty != null
+                          ? Number(expandedPoGroup.availableQty)
+                          : expandedBatches.reduce((s, b) => s + (Number(b.availableQty) || 0), 0);
+
+                        return (
+                          <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-8">
+                            <div className="rounded-lg border border-slate-200 bg-white p-2 shadow-2xs">
+                              <span className="block text-[9.5px] font-bold uppercase tracking-wider text-slate-400">Total Ordered</span>
+                              <span className="block mt-0.5 text-xs font-black font-mono text-slate-800 tabular-nums">{formatQty(ordQty, uom, { units })}</span>
+                            </div>
+                            <div className="rounded-lg border border-blue-200 bg-blue-50/60 p-2 shadow-2xs">
+                              <span className="block text-[9.5px] font-bold uppercase tracking-wider text-blue-700">Total Received</span>
+                              <span className="block mt-0.5 text-xs font-black font-mono text-blue-900 tabular-nums">{formatQty(recQty, uom, { units })}</span>
+                            </div>
+                            <div className={`rounded-lg border p-2 shadow-2xs ${remQty > 0 ? 'border-amber-200 bg-amber-50/60' : 'border-slate-200 bg-white'}`}>
+                              <span className={`block text-[9.5px] font-bold uppercase tracking-wider ${remQty > 0 ? 'text-amber-700' : 'text-slate-400'}`}>Remaining Qty</span>
+                              <span className={`block mt-0.5 text-xs font-black font-mono tabular-nums ${remQty > 0 ? 'text-amber-900' : 'text-slate-600'}`}>{formatQty(remQty, uom, { units })}</span>
+                            </div>
+                            <div className="rounded-lg border border-emerald-200 bg-emerald-50/60 p-2 shadow-2xs">
+                              <span className="block text-[9.5px] font-bold uppercase tracking-wider text-emerald-700">Total Batch Amount</span>
+                              <span className="block mt-0.5 text-xs font-black font-mono text-emerald-900 tabular-nums">{formatCurrency(totalBatchAmt)}</span>
+                            </div>
+                            <div className={`rounded-lg border p-2 shadow-2xs ${qcPending > 0 ? 'border-amber-300 bg-amber-50' : 'border-slate-200 bg-white'}`}>
+                              <span className={`block text-[9.5px] font-bold uppercase tracking-wider ${qcPending > 0 ? 'text-amber-800' : 'text-slate-400'}`}>QC Pending</span>
+                              <span className={`block mt-0.5 text-xs font-black font-mono tabular-nums ${qcPending > 0 ? 'text-amber-900' : 'text-slate-600'}`}>{formatQty(qcPending, uom, { units })}</span>
+                            </div>
+                            <div className="rounded-lg border border-teal-200 bg-teal-50/60 p-2 shadow-2xs">
+                              <span className="block text-[9.5px] font-bold uppercase tracking-wider text-teal-700">Accepted Qty</span>
+                              <span className="block mt-0.5 text-xs font-black font-mono text-teal-900 tabular-nums">{formatQty(accepted, uom, { units })}</span>
+                            </div>
+                            <div className={`rounded-lg border p-2 shadow-2xs ${rejected > 0 ? 'border-rose-300 bg-rose-50' : 'border-slate-200 bg-white'}`}>
+                              <span className={`block text-[9.5px] font-bold uppercase tracking-wider ${rejected > 0 ? 'text-rose-700' : 'text-slate-400'}`}>Rejected Qty</span>
+                              <span className={`block mt-0.5 text-xs font-black font-mono tabular-nums ${rejected > 0 ? 'text-rose-900' : 'text-slate-600'}`}>{formatQty(rejected, uom, { units })}</span>
+                            </div>
+                            <div className="rounded-lg border border-indigo-200 bg-indigo-50/60 p-2 shadow-2xs">
+                              <span className="block text-[9.5px] font-bold uppercase tracking-wider text-indigo-700">Available Stock</span>
+                              <span className="block mt-0.5 text-xs font-black font-mono text-indigo-900 tabular-nums">{formatQty(avail, uom, { units })}</span>
+                            </div>
+                          </div>
+                        );
+                      })()}
+
                       {expandedBatchesError ? (
                         <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-[11px] text-rose-700" role="alert">
                           <span>{expandedBatchesError}</span>
@@ -1377,27 +1450,58 @@ export const PurchaseOrdersPage = () => {
                         </p>
                       ) : (
                         <div className="overflow-x-auto rounded-lg border border-[#d8e4f4] bg-white">
-                          <table className="w-full min-w-[1050px] border-collapse text-left text-[10.5px]">
+                          <table className="w-full min-w-[1200px] border-collapse text-left text-[10.5px]">
                             <thead className="bg-[#edf4ff] text-[9px] font-bold uppercase tracking-wide text-slate-500">
                               <tr>
-                                {['Batch Number', 'Receipt / GRN Number', 'Receipt Date', 'Received Quantity', 'QC Status', 'Accepted Quantity', 'Rejected Quantity', 'Stock Status', 'Location', 'Action'].map((heading) => (
+                                {[
+                                  'Batch Number',
+                                  'Receipt / GRN Number',
+                                  'Receipt Date',
+                                  'Received Quantity',
+                                  'Actual Rate',
+                                  'Batch Amount',
+                                  'QC Status',
+                                  'Accepted Quantity',
+                                  'Rejected Quantity',
+                                  'Reprocess Status',
+                                  'Stock Status',
+                                  'Actions'
+                                ].map((heading) => (
                                   <th key={heading} className="whitespace-nowrap px-2.5 py-2">{heading}</th>
                                 ))}
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
                               {expandedBatches.map((batch) => {
-                                const qcStatus = batch.qcStatus || 'Not Inspected';
-                                const isQcPassed = qcStatus === 'Passed';
-                                const isQcInProgress = qcStatus === 'In Progress';
-                                const isQcPending = Boolean(batch.pendingQcReceiptId) && !isQcPassed && !isQcInProgress;
-                                const qcClass = ['Passed', 'Pass', 'Approved'].includes(qcStatus)
+                                const rawQc = batch.qcStatus || 'Pending';
+                                const hasReprocess = Number(batch.reprocessQty || 0) > 0 || batch.reprocessStatus === 'In Reprocess';
+                                const hasPending = Boolean(batch.pendingQcReceiptId) && !hasReprocess;
+                                const accQty = Number(batch.acceptedQty || 0);
+                                const rejQty = Number(batch.qcRejectedQty || 0);
+                                const isQcDone = !hasPending && !hasReprocess && (accQty > 0 || rejQty > 0 || ['Passed', 'Pass', 'Approved', 'Partially Approved'].includes(rawQc));
+                                
+                                // Clean QC Status: NEVER display Partially Approved if QC is completed
+                                const displayQcStatus = hasReprocess
+                                  ? 'Reprocess'
+                                  : hasPending
+                                  ? 'Pending'
+                                  : (isQcDone || accQty > 0 || ['Passed', 'Pass', 'Approved', 'Partially Approved'].includes(rawQc)) && accQty > 0
+                                  ? 'Passed'
+                                  : isQcDone && rejQty > 0
+                                  ? 'Rejected'
+                                  : (rawQc === 'Approved' ? 'Passed' : rawQc === 'Partially Approved' ? 'Passed' : rawQc);
+
+                                const qcBadgeCls = displayQcStatus === 'Passed'
                                   ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                                  : ['Rejected', 'Reject'].includes(qcStatus)
-                                    ? 'border-rose-200 bg-rose-50 text-rose-700'
-                                    : ['Pending', 'QC Hold', 'On Hold', 'Mixed', 'Partially Approved', 'Not Inspected'].includes(qcStatus)
-                                      ? 'border-amber-200 bg-amber-50 text-amber-700'
-                                      : 'border-slate-200 bg-slate-100 text-slate-700';
+                                  : displayQcStatus === 'Reprocess'
+                                  ? 'border-purple-200 bg-purple-50 text-purple-700'
+                                  : displayQcStatus === 'Rejected'
+                                  ? 'border-rose-200 bg-rose-50 text-rose-700'
+                                  : 'border-amber-200 bg-amber-50 text-amber-700';
+
+                                const rateVal = Number(batch.actualRate) || 0;
+                                const batchQtyNum = Number(batch.batchQty) || 0;
+                                const batchAmt = Number(batch.batchAmount) || (batchQtyNum * rateVal);
                                 const receiptDates = batch.receiptDates || [];
                                 const receiptDateLabel = receiptDates.length
                                   ? receiptDates.map((date) => formatDateDDMMYYYY(date)).join(', ')
@@ -1406,17 +1510,37 @@ export const PurchaseOrdersPage = () => {
 
                                 return (
                                   <tr key={batch.id || batch.batchCode} className="text-slate-700 hover:bg-blue-50/40">
+                                    {/* 1. Batch Number */}
                                     <td className="whitespace-nowrap px-2.5 py-2 font-mono font-bold text-blue-700">{batch.batchCode || '—'}</td>
+                                    {/* 2. Receipt / GRN Number */}
                                     <td className="px-2.5 py-2 font-mono text-[10px]">{(batch.receiptNumbers || []).join(', ') || batch.sourceDocumentNumber || '—'}</td>
+                                    {/* 3. Receipt Date */}
                                     <td className="whitespace-nowrap px-2.5 py-2 text-[10px]" title={receiptDateLabel}>{receiptDateLabel}</td>
-                                    <td className="whitespace-nowrap px-2.5 py-2 font-mono font-semibold tabular-nums">{formatQty(Number(batch.batchQty) || 0, batch.uom || uom, { units })}</td>
+                                    {/* 4. Received Quantity */}
+                                    <td className="whitespace-nowrap px-2.5 py-2 font-mono font-semibold tabular-nums">{formatQty(batchQtyNum, batch.uom || uom, { units })}</td>
+                                    {/* 5. Actual Rate */}
+                                    <td className="whitespace-nowrap px-2.5 py-2 font-mono font-semibold tabular-nums text-slate-800">₹{rateVal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}/m</td>
+                                    {/* 6. Batch Amount */}
+                                    <td className="whitespace-nowrap px-2.5 py-2 font-mono font-bold tabular-nums text-emerald-800">{formatCurrency(batchAmt)}</td>
+                                    {/* 7. QC Status */}
                                     <td className="px-2.5 py-2">
-                                      <span className={`whitespace-nowrap rounded-full border px-1.5 py-0.5 text-[9px] font-bold ${qcClass}`}>{qcStatus}</span>
+                                      <span className={`whitespace-nowrap rounded-full border px-2 py-0.5 text-[9.5px] font-bold ${qcBadgeCls}`}>{displayQcStatus}</span>
                                     </td>
-                                    <td className="whitespace-nowrap px-2.5 py-2 font-mono font-semibold tabular-nums text-emerald-700">{formatQty(Number(batch.acceptedQty) || 0, batch.uom || uom, { units })}</td>
-                                    <td className="whitespace-nowrap px-2.5 py-2 font-mono font-semibold tabular-nums text-rose-600">{formatQty(Number(batch.qcRejectedQty) || 0, batch.uom || uom, { units })}</td>
-                                    <td className="whitespace-nowrap px-2.5 py-2">{batch.status || '—'}</td>
-                                    <td className="px-2.5 py-2">{(batch.locationNames || []).join(', ') || '—'}</td>
+                                    {/* 8. Accepted Quantity */}
+                                    <td className="whitespace-nowrap px-2.5 py-2 font-mono font-semibold tabular-nums text-emerald-700">{formatQty(accQty, batch.uom || uom, { units })}</td>
+                                    {/* 9. Rejected Quantity */}
+                                    <td className="whitespace-nowrap px-2.5 py-2 font-mono font-semibold tabular-nums text-rose-600">{formatQty(rejQty, batch.uom || uom, { units })}</td>
+                                    {/* 10. Reprocess Status */}
+                                    <td className="whitespace-nowrap px-2.5 py-2 text-[10px]">
+                                      {hasReprocess ? (
+                                        <span className="font-semibold text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded border border-purple-200">In Reprocess</span>
+                                      ) : (
+                                        <span className="text-slate-400">None</span>
+                                      )}
+                                    </td>
+                                    {/* 11. Stock Status */}
+                                    <td className="whitespace-nowrap px-2.5 py-2 font-medium">{batch.status || (accQty > 0 ? 'In Stock' : 'Quarantined')}</td>
+                                    {/* 12. Actions */}
                                     <td className="whitespace-nowrap px-2.5 py-2">
                                       <div className="flex items-center gap-1.5">
                                         <button
@@ -1428,42 +1552,31 @@ export const PurchaseOrdersPage = () => {
                                           <Eye size={10.5} className="text-slate-400" />
                                           <span>Batch 360°</span>
                                         </button>
-                                        {isQcPassed ? (
-                                          <span className="inline-flex items-center gap-1 rounded-md border border-emerald-300/80 bg-emerald-50 px-2 py-0.5 text-[9.5px] font-bold text-emerald-800 shadow-2xs">
-                                            <CheckCircle2 size={11} className="stroke-[2.5] text-emerald-600" />
-                                            <span>QC Passed</span>
-                                          </span>
-                                        ) : isQcInProgress ? (
-                                          <span className="inline-flex items-center gap-1 rounded-md border border-amber-300 bg-amber-50 px-2 py-0.5 text-[9.5px] font-bold text-amber-800 shadow-2xs">
-                                            <Clock size={11} className="animate-spin text-amber-600" style={{ animationDuration: '3s' }} />
-                                            <span>QC In Progress</span>
-                                          </span>
-                                        ) : ['Rejected', 'Reject'].includes(qcStatus) ? (
-                                          <span className="inline-flex items-center gap-1 rounded-md border border-rose-300 bg-rose-50 px-2 py-0.5 text-[9.5px] font-bold text-rose-800 shadow-2xs">
-                                            <AlertCircle size={11} className="stroke-[2.5] text-rose-600" />
-                                            <span>QC Rejected</span>
-                                          </span>
-                                        ) : qcStatus === 'Rework' ? (
+
+                                        {hasReprocess ? (
                                           <button
                                             type="button"
                                             onClick={() => setQcModalPo({
                                               ...p,
                                               initialReceiptId: batch.pendingQcReceiptId || batch.receiptNumbers?.[0] || batch.sourceDocumentNumber,
                                               batchCode: batch.batchCode,
+                                              isReprocess: true,
+                                              reprocessQty: batch.reprocessQty,
                                             })}
-                                            className="inline-flex items-center gap-1.5 rounded-md bg-gradient-to-r from-amber-500 to-amber-600 px-2.5 py-1 text-[10px] font-bold text-white shadow-xs transition-all duration-150 hover:from-amber-600 hover:to-amber-700 hover:shadow-md active:scale-95 cursor-pointer"
-                                            title={`Re-check reworked fabric of ${batch.batchCode}`}
+                                            className="inline-flex items-center gap-1.5 rounded-md bg-gradient-to-r from-blue-600 via-indigo-600 to-indigo-700 px-2.5 py-1 text-[10px] font-bold text-white shadow-xs transition-all duration-150 hover:from-blue-700 hover:via-indigo-700 hover:to-indigo-800 hover:shadow-md active:scale-95 group cursor-pointer"
+                                            title={`Perform Reprocess Quality Inspection for ${batch.receiptNumbers?.[0] || batch.batchCode}`}
                                           >
-                                            <RefreshCw size={11} className="stroke-[2.5] text-amber-100" />
-                                            <span>Re-check</span>
+                                            <ShieldCheck size={12} className="stroke-[2.5] text-indigo-100 group-hover:scale-110 transition-transform" />
+                                            <span>Reprocess QC</span>
                                           </button>
-                                        ) : (
+                                        ) : hasPending ? (
                                           <button
                                             type="button"
                                             onClick={() => setQcModalPo({
                                               ...p,
                                               initialReceiptId: batch.pendingQcReceiptId || batch.receiptNumbers?.[0] || batch.sourceDocumentNumber,
                                               batchCode: batch.batchCode,
+                                              isReprocess: false,
                                             })}
                                             className="inline-flex items-center gap-1.5 rounded-md bg-gradient-to-r from-blue-600 via-indigo-600 to-indigo-700 px-2.5 py-1 text-[10px] font-bold text-white shadow-xs transition-all duration-150 hover:from-blue-700 hover:via-indigo-700 hover:to-indigo-800 hover:shadow-md active:scale-95 group cursor-pointer"
                                             title={`Perform Quality Inspection for ${batch.receiptNumbers?.[0] || batch.batchCode}`}
@@ -1471,6 +1584,21 @@ export const PurchaseOrdersPage = () => {
                                             <ShieldCheck size={12} className="stroke-[2.5] text-indigo-100 group-hover:scale-110 transition-transform" />
                                             <span>Perform QC</span>
                                           </button>
+                                        ) : isQcDone && accQty > 0 ? (
+                                          <span className="inline-flex items-center gap-1 rounded-md border border-emerald-300/80 bg-emerald-50 px-2 py-0.5 text-[9.5px] font-bold text-emerald-800 shadow-2xs">
+                                            <CheckCircle2 size={11} className="stroke-[2.5] text-emerald-600" />
+                                            <span>QC Passed</span>
+                                          </span>
+                                        ) : isQcDone && accQty === 0 && rejQty > 0 ? (
+                                          <span className="inline-flex items-center gap-1 rounded-md border border-rose-300 bg-rose-50 px-2 py-0.5 text-[9.5px] font-bold text-rose-800 shadow-2xs">
+                                            <AlertCircle size={11} className="stroke-[2.5] text-rose-600" />
+                                            <span>QC Rejected</span>
+                                          </span>
+                                        ) : (
+                                          <span className="inline-flex items-center gap-1 rounded-md border border-emerald-300/80 bg-emerald-50 px-2 py-0.5 text-[9.5px] font-bold text-emerald-800 shadow-2xs">
+                                            <CheckCircle2 size={11} className="stroke-[2.5] text-emerald-600" />
+                                            <span>QC Passed</span>
+                                          </span>
                                         )}
                                       </div>
                                     </td>
@@ -1866,6 +1994,7 @@ export const PurchaseOrdersPage = () => {
           onViewDetails={(po) => setDetailsModalPo(po)}
           onEdit={(po) => handleOpenEditModal(po)}
           onDuplicate={(po) => handleClonePo(po)}
+          onBatchRegistry={(po) => navigate(`/inventory/batches?po=${encodeURIComponent(po.id)}&poNumber=${encodeURIComponent(po.poNumber || '')}&view=po`)}
           onReceiveGoods={(po) => {
             if (getOscarStatus(po) === 'Fully Received') {
               showToast('All ordered quantity has already been received for this purchase order.');
@@ -1875,6 +2004,7 @@ export const PurchaseOrdersPage = () => {
           }}
           onPerformQc={(po) => setQcModalPo(po)}
           onSupplierDispatch={(po) => setDispatchModalPo(po)}
+          onPayVendorBill={(po) => setBillMatchModalPo(po)}
           onMatchVendorBill={(po) => setBillMatchModalPo(po)}
           onViewLandedCosts={(po) => setLandedCostPo(po)}
           onMovementHistory={(po) => setMovementHistoryPo(po)}
@@ -1957,22 +2087,17 @@ export const PurchaseOrdersPage = () => {
         </div>
       )}
 
-      {/* ── Match Vendor Bill Compact Modal ── */}
+      {/* ── Pay Vendor Bill Modal Workspace ── */}
       {billMatchModalPo && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-2 sm:p-4 animate-in fade-in">
-          <div className="bg-white border border-slate-200 shadow-2xl rounded-2xl w-full max-w-5xl max-h-[95vh] sm:max-h-[92vh] overflow-y-auto flex flex-col p-4 sm:p-6 text-xs">
-            <SupplierBillMatchingInlineSlide
-              po={billMatchModalPo}
-              onClose={() => setBillMatchModalPo(null)}
-              onBillMatched={() => {
-                setBillMatchModalPo(null);
-                if (typeof refreshCollections === 'function') {
-                  refreshCollections(['purchaseOrders', 'purchaseBills']);
-                }
-              }}
-            />
-          </div>
-        </div>
+        <PayVendorBillModal
+          po={billMatchModalPo}
+          onClose={() => setBillMatchModalPo(null)}
+          onBillUpdated={() => {
+            if (typeof refreshCollections === 'function') {
+              refreshCollections(['purchaseOrders', 'purchaseBills', 'vendorBills']);
+            }
+          }}
+        />
       )}
 
       {/* ── View Landed Costs Modal ── */}

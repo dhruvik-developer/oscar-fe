@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
+  Package,
   PackageCheck,
+  IndianRupee,
   Plus,
   Trash2,
   Layers,
@@ -101,16 +103,6 @@ export function GoodsReceiptInlineSlide({ po, delivery, onClose, onReceiptSaved,
           batchNumber: '',
           fabricWidth: 44,
           remarks: '',
-          takas: [
-            {
-              id: `t-${Date.now()}-1`,
-              takaNumber: '1',
-              qty: '',
-              weight: '',
-              width: '44',
-              remarks: '',
-            },
-          ],
         },
       ];
     }
@@ -131,20 +123,12 @@ export function GoodsReceiptInlineSlide({ po, delivery, onClose, onReceiptSaved,
         remainingQty: remaining,
         receivedQty: targetQty !== '' && Number(targetQty) > 0 ? targetQty : '',
         unitCost: Number(it.rate || it.unitPrice || 0),
+        poRate: Number(it.rate || it.unitPrice || 0),
+        totalCost: targetQty > 0 && Number(it.rate || it.unitPrice) > 0 ? Math.round(Number(targetQty) * Number(it.rate || it.unitPrice) * 100) / 100 : '',
         uom: it.uom || 'MTR',
         batchNumber: '',
         fabricWidth: it.fabricWidth || 44,
         remarks: '',
-        takas: [
-          {
-            id: `t-${idx + 1}-1`,
-            takaNumber: '1',
-            qty: targetQty !== '' && Number(targetQty) > 0 ? targetQty : '',
-            weight: '',
-            width: it.fabricWidth ? String(it.fabricWidth) : '44',
-            remarks: '',
-          },
-        ],
       };
     });
   }, [po, delivery, resolveMasterItemId, masterItems]);
@@ -302,6 +286,7 @@ export function GoodsReceiptInlineSlide({ po, delivery, onClose, onReceiptSaved,
       const targetQty = remaining;
       const itemId = resolveMasterItemId(it, targetPo);
 
+      const poRate = Number(it.rate || it.unitPrice || 0);
       return {
         id: `line-${idx + 1}`,
         itemId,
@@ -310,7 +295,9 @@ export function GoodsReceiptInlineSlide({ po, delivery, onClose, onReceiptSaved,
         orderedQty: lineOrdered,
         remainingQty: remaining,
         receivedQty: targetQty > 0 ? targetQty : '',
-        unitCost: Number(it.rate || it.unitPrice || 0),
+        unitCost: poRate > 0 ? poRate : '',
+        poRate,
+        totalCost: targetQty > 0 && poRate > 0 ? Math.round(targetQty * poRate * 100) / 100 : '',
         uom: it.uom || 'MTR',
         batchNumber: '',
         fabricWidth: it.fabricWidth || 44,
@@ -347,7 +334,9 @@ export function GoodsReceiptInlineSlide({ po, delivery, onClose, onReceiptSaved,
           poLineId: null,
           orderedQty: 0,
           receivedQty: '',
-          unitCost: 0,
+          unitCost: '',
+          poRate: 0,
+          totalCost: '',
           uom: 'MTR',
           batchNumber: '',
           fabricWidth: 44,
@@ -382,6 +371,25 @@ export function GoodsReceiptInlineSlide({ po, delivery, onClose, onReceiptSaved,
         const updated = { ...l, [field]: val };
         if (field === 'receivedQty' && updated.takas?.length === 1) {
           updated.takas = [{ ...updated.takas[0], qty: Number(val) || 0 }];
+        }
+        if (field === 'receivedQty') {
+          const rQty = Number(val) || 0;
+          const uCost = Number(updated.unitCost) || 0;
+          if (uCost > 0 && rQty > 0) {
+            updated.totalCost = Math.round(rQty * uCost * 100) / 100;
+          }
+        } else if (field === 'unitCost') {
+          const uCost = Number(val) || 0;
+          const rQty = Number(updated.receivedQty) || 0;
+          if (rQty > 0 && val !== '') {
+            updated.totalCost = Math.round(rQty * uCost * 100) / 100;
+          }
+        } else if (field === 'totalCost') {
+          const tCost = Number(val) || 0;
+          const rQty = Number(updated.receivedQty) || 0;
+          if (rQty > 0 && val !== '') {
+            updated.unitCost = Math.round((tCost / rQty) * 100) / 100;
+          }
         }
         return updated;
       }),
@@ -487,12 +495,7 @@ export function GoodsReceiptInlineSlide({ po, delivery, onClose, onReceiptSaved,
         if (!l.itemId) throw new Error(`Line ${i + 1}: Select the item received.`);
         if (!(rQty > 0)) throw new Error(`Line ${i + 1}: Received quantity must be greater than zero.`);
 
-        if (l.takas && l.takas.length > 0) {
-          const takaSum = l.takas.reduce((s, t) => s + (Number(t.qty) || 0), 0);
-          if (Math.abs(takaSum - rQty) > 0.001) {
-            throw new Error(`Line ${i + 1}: Sum of taka meters (${takaSum} m) does not match received quantity (${rQty} m).`);
-          }
-        }
+
       }
 
       const payload = {
@@ -508,17 +511,11 @@ export function GoodsReceiptInlineSlide({ po, delivery, onClose, onReceiptSaved,
           orderedQty: Number(l.orderedQty) || 0,
           receivedQty: Number(l.receivedQty) || 0,
           unitCost: Number(l.unitCost) || 0,
+          totalCost: Number(l.totalCost) || (Number(l.receivedQty) * Number(l.unitCost)) || 0,
           uom: l.uom || 'MTR',
           batchNumber: l.batchNumber || undefined,
           fabricWidth: l.fabricWidth ? Number(l.fabricWidth) : null,
           remarks: l.remarks || '',
-          takas: (l.takas || []).map((t, tIdx) => ({
-            takaNumber: t.takaNumber || String(tIdx + 1),
-            qty: Number(t.qty) || 0,
-            weight: t.weight ? Number(t.weight) : null,
-            width: t.width ? Number(t.width) : null,
-            remarks: t.remarks || '',
-          })),
         })),
       };
 
@@ -560,7 +557,7 @@ export function GoodsReceiptInlineSlide({ po, delivery, onClose, onReceiptSaved,
               </h3>
             </div>
             <p className="text-[11px] text-slate-500 font-medium mt-0.5">
-              Capture intake directly against supplier challan or purchase order with roll/taka breakdown
+              Capture batch-wise intake directly against supplier challan or purchase order
             </p>
           </div>
         </div>
@@ -783,6 +780,7 @@ export function GoodsReceiptInlineSlide({ po, delivery, onClose, onReceiptSaved,
 
             return (
               <div key={line.id} className="border border-slate-200 rounded-xl p-3.5 bg-white shadow-2xs space-y-3">
+                {/* Primary Fabric Info Row */}
                 <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
                   <div className="sm:col-span-4">
                     <label className="block text-[11px] font-bold text-slate-500 mb-1">
@@ -851,7 +849,7 @@ export function GoodsReceiptInlineSlide({ po, delivery, onClose, onReceiptSaved,
                     )}
                   </div>
 
-                  <div className="sm:col-span-2">
+                  <div className="sm:col-span-3">
                     <label className="block text-[11px] font-bold text-slate-700 mb-1">
                       Received (m) <span className="text-rose-500">*</span>
                     </label>
@@ -867,19 +865,6 @@ export function GoodsReceiptInlineSlide({ po, delivery, onClose, onReceiptSaved,
 
                   <div className="sm:col-span-2">
                     <label className="block text-[11px] font-bold text-slate-500 mb-1">
-                      Batch / Lot #
-                    </label>
-                    <input
-                      type="text"
-                      value={line.batchNumber}
-                      placeholder="Auto (server)"
-                      onChange={(e) => handleUpdateLine(line.id, 'batchNumber', e.target.value)}
-                      className="w-full px-3 py-1.5 border border-slate-300 rounded-lg bg-white font-mono uppercase text-xs"
-                    />
-                  </div>
-
-                  <div className="sm:col-span-1">
-                    <label className="block text-[11px] font-bold text-slate-500 mb-1">
                       Width (in)
                     </label>
                     <input
@@ -894,11 +879,82 @@ export function GoodsReceiptInlineSlide({ po, delivery, onClose, onReceiptSaved,
                     <button
                       type="button"
                       onClick={() => handleRemoveLine(line.id)}
-                      className="p-1.5 text-slate-400 hover:text-rose-600 rounded-md hover:bg-rose-50"
+                      className="p-1.5 text-slate-400 hover:text-rose-600 rounded-md hover:bg-rose-50 transition"
                       title="Remove Line"
                     >
                       <Trash2 size={15} />
                     </button>
+                  </div>
+                </div>
+
+                {/* Dedicated Batch & Costing Row (Ek batch kitne me padi) */}
+                <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end p-2.5 bg-emerald-50/40 rounded-xl border border-emerald-200/70 shadow-2xs">
+                  <div className="sm:col-span-4">
+                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                      Batch / Lot #
+                    </label>
+                    <input
+                      type="text"
+                      value={line.batchNumber}
+                      placeholder="Auto (server)"
+                      onChange={(e) => handleUpdateLine(line.id, 'batchNumber', e.target.value)}
+                      className="w-full px-3 py-1.5 border border-slate-300 rounded-lg bg-white font-mono uppercase text-xs"
+                    />
+                  </div>
+
+                  <div className="sm:col-span-3">
+                    <label className="block text-[11px] font-bold text-slate-700 mb-1 flex items-center justify-between">
+                      <span>Rate (₹ / meter)</span>
+                      {Number(line.poRate) > 0 && (
+                        <span className="text-[9.5px] text-slate-400 font-normal">PO: ₹{line.poRate}</span>
+                      )}
+                    </label>
+                    <div className="relative">
+                      <span className="absolute inset-y-0 left-0 pl-2.5 flex items-center text-slate-400 font-bold text-xs pointer-events-none">
+                        ₹
+                      </span>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={line.unitCost !== undefined && line.unitCost !== '' ? line.unitCost : ''}
+                        placeholder="0.00"
+                        onChange={(e) => handleUpdateLine(line.id, 'unitCost', e.target.value)}
+                        className="w-full pl-6 pr-2.5 py-1.5 border border-slate-300 rounded-lg bg-white font-mono text-xs font-bold text-slate-900 focus:border-emerald-500 focus:outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="sm:col-span-5">
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-[11px] font-bold text-emerald-800 flex items-center gap-1">
+                        <span>Batch Cost (₹)</span>
+                        <span className="text-[10px] text-emerald-600 font-normal">(Rupees me kitne me padi)</span>
+                      </label>
+                      {Number(line.receivedQty) > 0 && Number(line.unitCost) > 0 && (
+                        <span className="text-[10px] text-emerald-700 font-bold font-mono">
+                          {numIN(line.receivedQty)} m × ₹{numIN(line.unitCost)}
+                        </span>
+                      )}
+                    </div>
+                    <div className="relative">
+                      <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-emerald-600 font-bold text-sm pointer-events-none">
+                        ₹
+                      </span>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={
+                          line.totalCost !== undefined && line.totalCost !== ''
+                            ? line.totalCost
+                            : (Number(line.receivedQty) > 0 && Number(line.unitCost) > 0)
+                            ? (Math.round(Number(line.receivedQty) * Number(line.unitCost) * 100) / 100)
+                            : ''
+                        }
+                        placeholder="0.00"
+                        onChange={(e) => handleUpdateLine(line.id, 'totalCost', e.target.value)}
+                        className="w-full pl-7 pr-3 py-1.5 border-2 border-emerald-500/80 bg-white rounded-lg font-mono text-xs font-black text-emerald-900 focus:border-emerald-600 focus:outline-none shadow-2xs"
+                      />
+                    </div>
                   </div>
                 </div>
 
@@ -921,101 +977,65 @@ export function GoodsReceiptInlineSlide({ po, delivery, onClose, onReceiptSaved,
                   </div>
                 )}
 
-                <div className="bg-slate-50/90 rounded-xl p-3 border border-slate-200 space-y-2 mt-2">
-                  <div className="flex items-center justify-between">
-                    <span className="font-extrabold text-slate-700 text-[11px] flex items-center gap-1.5">
-                      <Layers size={13} className="text-emerald-700" />
-                      Taka / Roll Breakdown ({line.takas?.length || 0} rolls)
+                {/* Clean Batch Details Section (Batch-Wise Receiving Only) */}
+                <div className="bg-slate-50/90 rounded-xl p-3.5 border border-blue-200/80 space-y-3 mt-2 shadow-2xs">
+                  <div className="flex items-center justify-between border-b border-slate-200/80 pb-2">
+                    <span className="font-extrabold text-[#17294e] text-xs flex items-center gap-1.5">
+                      <Package size={14} className="text-blue-700" />
+                      Batch Details — Auto-Generated Batch
                     </span>
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => handleAutoSplitTakas(line.id)}
-                        className="text-[11px] font-extrabold text-emerald-800 hover:text-emerald-950 underline cursor-pointer"
-                      >
-                        Auto Split
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleAddTaka(line.id)}
-                        className="inline-flex items-center gap-1 rounded-md bg-white px-2 py-1 text-[11px] font-bold text-slate-700 border border-slate-200 hover:bg-slate-50 shadow-2xs"
-                      >
-                        <Plus size={11} /> Add Taka
-                      </button>
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-100/70 text-blue-800 font-bold">
+                      Batch Number: Auto (assigned on save)
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                    <div>
+                      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Fabric / Item</span>
+                      <span className="mt-1 block font-bold text-slate-800 text-xs truncate" title={line.itemName}>
+                        {line.itemName}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Actual Rate per Meter (₹)</span>
+                      <div className="relative mt-1">
+                        <span className="absolute inset-y-0 left-0 pl-2.5 flex items-center text-slate-400 font-bold pointer-events-none text-xs">₹</span>
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={line.unitCost ?? ''}
+                          onChange={(e) => {
+                            const newRate = e.target.value === '' ? '' : Number(e.target.value);
+                            const rQty = Number(line.receivedQty) || 0;
+                            const newTotal = newRate !== '' ? Math.round(rQty * Number(newRate) * 100) / 100 : '';
+                            handleUpdateLine(line.id, 'unitCost', newRate);
+                            handleUpdateLine(line.id, 'totalCost', newTotal);
+                          }}
+                          className="w-full pl-6 pr-2 py-1.5 border border-slate-300 rounded-lg bg-white font-mono text-xs font-bold text-slate-800 focus:border-blue-600 focus:outline-none"
+                          placeholder="0.00"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider block">Batch Total Amount</span>
+                      <div className="mt-1 p-1.5 px-3 rounded-lg border-2 border-emerald-400 bg-emerald-50/80 flex items-center justify-between">
+                        <span className="text-[11px] font-semibold text-emerald-800">Batch Total:</span>
+                        <span className="font-mono text-sm font-black text-emerald-950 tabular-nums">
+                          ₹{((Number(line.receivedQty) || 0) * (Number(line.unitCost) || 0)).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </span>
+                      </div>
                     </div>
                   </div>
 
-                  <div className="space-y-1.5">
-                    {(line.takas || []).map((t) => (
-                      <div key={t.id} className="grid grid-cols-12 gap-2 items-center text-xs">
-                        <div className="col-span-2">
-                          <input
-                            type="text"
-                            placeholder="Roll #"
-                            value={t.takaNumber}
-                            onChange={(e) => handleUpdateTaka(line.id, t.id, 'takaNumber', e.target.value)}
-                            className="w-full px-2 py-1 border border-slate-200 rounded-md bg-white font-mono text-[11px]"
-                          />
-                        </div>
-                        <div className="col-span-3">
-                          <input
-                            type="number"
-                            step="0.01"
-                            placeholder="Meters *"
-                            value={t.qty}
-                            onChange={(e) => handleUpdateTaka(line.id, t.id, 'qty', e.target.value)}
-                            className="w-full px-2 py-1 border border-emerald-300 rounded-md bg-white font-mono font-bold text-slate-800 text-[11px] focus:border-emerald-600 focus:outline-none"
-                          />
-                        </div>
-                        <div className="col-span-2">
-                          <input
-                            type="number"
-                            step="0.01"
-                            placeholder="Weight (kg)"
-                            value={t.weight || ''}
-                            onChange={(e) => handleUpdateTaka(line.id, t.id, 'weight', e.target.value)}
-                            className="w-full px-2 py-1 border border-slate-200 rounded-md bg-white font-mono text-[11px]"
-                          />
-                        </div>
-                        <div className="col-span-4">
-                          <input
-                            type="text"
-                            placeholder="Remarks / Defect notes"
-                            value={t.remarks || ''}
-                            onChange={(e) => handleUpdateTaka(line.id, t.id, 'remarks', e.target.value)}
-                            className="w-full px-2 py-1 border border-slate-200 rounded-md bg-white text-[11px]"
-                          />
-                        </div>
-                        <div className="col-span-1 text-right">
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveTaka(line.id, t.id)}
-                            className="p-1 text-slate-400 hover:text-rose-600 rounded"
-                          >
-                            <X size={13} />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className={`p-2 rounded-lg flex items-center justify-between text-[11px] font-semibold ${
-                    takaMatch
-                      ? 'bg-emerald-100/70 text-emerald-900 border border-emerald-300'
-                      : 'bg-amber-100/90 text-amber-950 border border-amber-300'
-                  }`}>
-                    <span>
-                      Total Taka Rolls: <strong>{line.takas?.length || 0}</strong> • Sum: <strong>{numIN(takaSum)} m</strong>
-                    </span>
-                    {takaMatch ? (
-                      <span className="font-extrabold text-emerald-800">
-                        ✓ Matches line quantity ({numIN(line.receivedQty)} m)
-                      </span>
-                    ) : (
-                      <span className="font-extrabold text-amber-900">
-                        ⚠️ Difference: {takaDiff > 0 ? `-${numIN(takaDiff)} m remaining` : `+${numIN(Math.abs(takaDiff))} m excess`}
-                      </span>
-                    )}
+                  <div>
+                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Batch Remarks / Notes</span>
+                    <input
+                      type="text"
+                      placeholder="e.g. Batch quality observations or delivery remarks"
+                      value={line.remarks || ''}
+                      onChange={(e) => handleUpdateLine(line.id, 'remarks', e.target.value)}
+                      className="mt-1 w-full px-2.5 py-1.5 border border-slate-200 rounded-lg bg-white text-xs text-slate-700 focus:border-blue-500 focus:outline-none"
+                    />
                   </div>
                 </div>
               </div>
@@ -1055,16 +1075,7 @@ export function GoodsReceiptInlineSlide({ po, delivery, onClose, onReceiptSaved,
               <CheckCircle2 size={14} />
               {submitting ? 'Recording GRN...' : 'Submit GRN Intake'}
             </button>
-            {onNextStep && (
-              <button
-                type="button"
-                onClick={() => onNextStep('lot_taka_creation')}
-                className="px-4 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-xs cursor-pointer transition-colors"
-              >
-                <span>Next: Lot / Taka Creation</span>
-                <ArrowRight size={13} />
-              </button>
-            )}
+
           </div>
         </div>
       </form>

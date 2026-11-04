@@ -210,7 +210,21 @@ export default function BrokerCommissionPage() {
     }
   }, [selectedBrokerId]);
 
-  // 5. Fetch Analytics
+  // 5. Fetch Analytics & Bank Accounts
+  const fetchBankAccounts = useCallback(async () => {
+    try {
+      const res = await accountingService.getBankAccounts({ page_size: 100 });
+      const rows = Array.isArray(res) ? res : res?.results || res?.data || [];
+      setBankAccountsList(rows);
+      if (rows.length > 0) {
+        const def = rows.find((b) => b.is_default || b.isDefault) || rows[0];
+        if (def) setBankAccount(def.id);
+      }
+    } catch (err) {
+      console.error('Failed to load bank accounts:', err);
+    }
+  }, []);
+
   const fetchAnalytics = useCallback(async () => {
     try {
       const res = await salesService.getBrokerAnalytics();
@@ -222,8 +236,9 @@ export default function BrokerCommissionPage() {
 
   useEffect(() => {
     fetchBrokers();
+    fetchBankAccounts();
     fetchAnalytics();
-  }, [fetchBrokers, fetchAnalytics]);
+  }, [fetchBrokers, fetchBankAccounts, fetchAnalytics]);
 
   useEffect(() => {
     if (activeTab === 'leads') {

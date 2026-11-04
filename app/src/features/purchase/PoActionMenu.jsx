@@ -96,7 +96,7 @@ export function PoActionMenu({
   const isFullyReceived = status === 'Fully Received';
 
   const canEdit = isDraft;
-  const canReceiveGoods = !isDraft && !isPendingApproval && !isCancelled;
+  const canReceiveGoods = !isDraft && !isPendingApproval && !isCancelled && !isFullyReceived;
   const canPerformQc = !isDraft && !isPendingApproval && !isCancelled;
   const canDispatch = !isDraft && !isPendingApproval && !isCancelled;
   const canMatchBill = !isDraft && !isCancelled;
@@ -197,7 +197,7 @@ export function PoActionMenu({
             : isCancelled
             ? 'Order cancelled'
             : isFullyReceived
-            ? 'View receipt history or record excess intake'
+            ? 'All ordered quantity has already been received'
             : 'Record inward goods receipt (GRN)'
         }
         className={`w-full px-3 py-1.5 text-left flex items-center justify-between gap-2 transition-colors ${
@@ -212,28 +212,6 @@ export function PoActionMenu({
         </span>
         {isFullyReceived && <span className="text-[9.5px] text-emerald-700 font-semibold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">Received</span>}
         {isPartiallyReceived && <span className="text-[9.5px] text-amber-700 font-semibold bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">Partial</span>}
-      </button>
-
-      <button
-        type="button"
-        role="menuitem"
-        disabled={!canPerformQc}
-        onClick={() => handleAction(onPerformQc)}
-        title={
-          isDraft || isPendingApproval
-            ? 'Order must be approved before quality inspection'
-            : isCancelled
-            ? 'Order cancelled'
-            : 'Inspect rolls, log defects & taka grades'
-        }
-        className={`w-full px-3 py-1.5 text-left flex items-center gap-2 transition-colors ${
-          canPerformQc
-            ? 'hover:bg-indigo-50 hover:text-indigo-700 cursor-pointer text-slate-700'
-            : 'opacity-40 cursor-not-allowed text-slate-400'
-        }`}
-      >
-        <ShieldCheck size={13} className="text-indigo-600 shrink-0" />
-        <span>Perform QC</span>
       </button>
 
       <button

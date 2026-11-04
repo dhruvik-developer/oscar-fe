@@ -23,7 +23,7 @@ function numIN(val) {
   return n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-export function GreyQcInlineSlide({ po, onClose, onQcSaved, onNextStep, onPrevStep }) {
+export function GreyQcInlineSlide({ po, initialReceiptId, onClose, onQcSaved, onNextStep, onPrevStep }) {
   const { showToast, refreshCollections } = useERP() || {};
 
   const [loading, setLoading] = useState(false);
@@ -77,7 +77,17 @@ export function GreyQcInlineSlide({ po, onClose, onQcSaved, onNextStep, onPrevSt
       setAllLots(lots);
 
       if (loadedGrns.length > 0) {
-        setSelectedGrnId((prev) => (prev && loadedGrns.some((g) => String(g.id) === String(prev)) ? prev : String(loadedGrns[0].id)));
+        const targetReceiptId = initialReceiptId || po?.initialReceiptId;
+        setSelectedGrnId((prev) => {
+          if (targetReceiptId) {
+            const match = loadedGrns.find(
+              (g) => String(g.id) === String(targetReceiptId) ||
+                     String(g.receiptNumber || g.grn_number || g.grnNumber || '').toLowerCase() === String(targetReceiptId).toLowerCase()
+            );
+            if (match) return String(match.id);
+          }
+          return (prev && loadedGrns.some((g) => String(g.id) === String(prev)) ? prev : String(loadedGrns[0].id));
+        });
       }
     } catch (err) {
       console.warn('Failed to load QC data:', err);

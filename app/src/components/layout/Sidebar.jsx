@@ -288,7 +288,8 @@ export const NAV = [
       { label: 'Goods Receipt', icon: PackageCheck, to: '/purchase/receipts' },
       // [DISABLED] Supplier Reconciliation commented out
       // { label: 'Supplier Reconciliation', icon: GitCompare, to: '/purchase/reconciliation' },
-      { label: 'Supplier Ledger', icon: BookOpen, to: '/purchase/supplier-ledger' },
+      // [MOVED to Accounts] Supplier Ledger moved to Accounts module
+      // { label: 'Supplier Ledger', icon: BookOpen, to: '/purchase/supplier-ledger' },
       { label: 'Vendor Bills', icon: Receipt, to: '/purchase/vendor-bills' },
       { label: 'Bill Matching', icon: GitCompare, to: '/purchase/bill-matching' },
       { label: 'Purchase Bills', icon: Receipt, to: '/purchase/bills' },
@@ -403,6 +404,8 @@ export const NAV = [
       { label: 'Day Book & Position', icon: BookOpen, to: '/accounts/day-book' },
       { label: 'Cash / Bank', icon: Landmark, to: '/accounts/cash-bank' },
       { label: 'General Ledger', icon: FileText, to: '/accounts/general-ledger' },
+      { label: 'Supplier Ledger', icon: BookOpen, to: '/accounts/supplier-ledger' },
+      { label: 'Customer Ledger', icon: Users, to: '/accounts/supplier-ledger?type=customer' },
       { label: 'Debit / Credit Notes', icon: Receipt, to: '/accounts/notes' },
       { label: 'Financial Reports', icon: PieChart, to: '/accounts/reports' },
       { label: 'Chart of Accounts', icon: ListChecks, to: '/accounts/chart-of-accounts' },

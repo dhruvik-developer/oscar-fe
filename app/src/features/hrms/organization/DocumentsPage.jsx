@@ -127,7 +127,7 @@ export function DocumentsPage() {
 
   function openUploadModal(category = "Contract", empName = null) {
     const cat = category === "All" ? "Contract" : category;
-    const emp = empName || (activeTab === "employee" ? selectedEmpName : activeTab === "my" ? myDocUser : "All Staff");
+    const emp = empName || (activeTab === "employee" ? selectedEmpName : activeTab === "my" ? (myDocUser || currentUser?.name || "admin1") : "All Staff");
     setUploadCategory(cat);
     setUploadEmpName(emp);
     setUploadTitle("");
@@ -176,6 +176,8 @@ export function DocumentsPage() {
       setUploadModalOpen(false);
       if (activeTab === "employee") {
         setEmpCategoryFilter(uploadCategory);
+      } else if (activeTab === "my") {
+        setMyDocCategoryFilter(uploadCategory);
       }
     } catch (err) {
       showToast(`Could not save document: ${err?.message || "server error"}`);
@@ -205,7 +207,12 @@ export function DocumentsPage() {
   /** Server employee id for a scope name; null means company-wide (All Staff). */
   function employeeIdFor(scopeName) {
     if (!scopeName || scopeName === "All Staff") return null;
-    return employees.find((x) => x.name === scopeName)?.id || null;
+    const found = employees.find((x) => x.name === scopeName || x.id === scopeName);
+    if (found?.id) return found.id;
+    if (currentUser && (currentUser.name === scopeName || currentUser.email === scopeName || scopeName === "admin1")) {
+      return currentUser.employeeUuid || currentUser.employee_id || currentUser.employeeId || null;
+    }
+    return null;
   }
 
   // KPI Statistics calculations
@@ -276,10 +283,16 @@ export function DocumentsPage() {
 
   // Documents for "My Documents"
   const myDocs = useMemo(() => {
-    return documents.filter(
-      (d) => d.employee?.toLowerCase() === myDocUser.toLowerCase()
-    );
-  }, [documents, myDocUser]);
+    const curEmpId = currentUser?.employeeUuid || currentUser?.employee_id || currentUser?.employeeId;
+    return documents.filter((d) => {
+      if (myDocUser && d.employee && d.employee.toLowerCase() === myDocUser.toLowerCase()) return true;
+      if (curEmpId && (d.employeeId === curEmpId || d.employee_id === curEmpId)) return true;
+      if (myDocUser && currentUser?.name && myDocUser.toLowerCase() === currentUser.name.toLowerCase()) {
+        if (d.employee && d.employee.toLowerCase() === currentUser.name.toLowerCase()) return true;
+      }
+      return false;
+    });
+  }, [documents, myDocUser, currentUser]);
 
   const filteredMyDocs = useMemo(() => {
     if (myDocCategoryFilter === "All") return myDocs;
@@ -1365,13 +1378,16 @@ export function DocumentsPage() {
                 <div className="text-[13px] font-bold text-slate-900">{uploadEmpName}</div>
               </div>
             </div>
-            {activeTab !== "employee" && (
+            {activeTab === "all" && (
               <select
                 value={uploadEmpName}
                 onChange={(e) => setUploadEmpName(e.target.value)}
                 className="text-[12px] px-2.5 py-1 bg-white border border-bdr rounded-lg text-slate-800 focus:outline-none focus:border-navy cursor-pointer"
               >
                 <option value="All Staff">All Staff (Company-wide)</option>
+                {currentUser?.name && !employees.some((e) => e.name === currentUser.name) && (
+                  <option value={currentUser.name}>{currentUser.name} (You)</option>
+                )}
                 {employees.map((e) => (
                   <option key={e.id} value={e.name}>{e.name}</option>
                 ))}

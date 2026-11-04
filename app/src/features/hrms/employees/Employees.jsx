@@ -51,6 +51,7 @@ export default function Employees() {
     dept: "Engineering",
     location: "Mumbai",
     managerId: "",
+    standardSalary: "",
   });
 
   const filtered = useMemo(
@@ -86,6 +87,8 @@ export default function Employees() {
       manager: managerRow?.name || undefined,
       reportingManager: managerRow?.name || undefined,
       reportingManagerId: form.managerId || undefined,
+      standardSalary: form.standardSalary ? Math.max(0, Number(form.standardSalary)) : 0,
+      standard_salary: form.standardSalary ? Math.max(0, Number(form.standardSalary)) : 0,
       joiningDate: new Date().toISOString().slice(0, 10),
       status: "Active",
       avatar: null,
@@ -97,7 +100,7 @@ export default function Employees() {
       }
     }).catch(() => {});
     setShowForm(false);
-    setForm({ name: "", email: "", designation: "Senior Engineer", dept: "Engineering", location: "Mumbai", managerId: "" });
+    setForm({ name: "", email: "", designation: "Senior Engineer", dept: "Engineering", location: "Mumbai", managerId: "", standardSalary: "" });
   }
 
   async function handleDelete(id, name) {
@@ -462,6 +465,28 @@ export default function Employees() {
                 value={form.location}
                 onChange={(e) => setForm({ ...form, location: e.target.value })}
               />
+            </div>
+          </div>
+          <div className="form-row">
+            <div className="form-group" style={{ width: "100%" }}>
+              <label className="form-label">Standard Monthly Salary (₹)</label>
+              <input
+                className="form-input font-mono"
+                type="number"
+                min="0"
+                step="500"
+                placeholder="e.g. 50000"
+                value={form.standardSalary}
+                onChange={(e) => setForm({ ...form, standardSalary: e.target.value })}
+              />
+              <span style={{ fontSize: "11px", color: "#64748b", marginTop: 4, display: "block" }}>
+                Baseline monthly CTC used for payroll, attendance deductions, and payslip generation.
+              </span>
+              {form.standardSalary && Number(form.standardSalary) > 0 ? (
+                <span style={{ fontSize: "11px", color: "#166534", marginTop: 2, display: "block", fontWeight: 600 }}>
+                  Live Daily Rate: ₹{Math.round(Number(form.standardSalary) / 24).toLocaleString("en-IN")}/day (connected to attendance deductions in payroll)
+                </span>
+              ) : null}
             </div>
           </div>
         </div>

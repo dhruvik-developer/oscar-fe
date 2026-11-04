@@ -15,6 +15,7 @@ import { Badge } from "../../../components/hrms/Badge";
 import Modal from "../../../components/ui/Modal";
 import MasterSourceLink from "../../../components/common/MasterSourceLink";
 import PageHeader from "../../../components/ui/PageHeader";
+import AppPagination from "../../../components/ui/AppPagination";
 import { hrmsGuides } from "../../../data/hrms/hrmsGuides";
 import { Avatar } from "../../../components/hrms/Avatar";
 import {
@@ -145,6 +146,18 @@ export function DocumentsPage() {
   const expired = documents.filter((d) => d.status === "Expired").length;
 
   // Filtered documents for "All Documents"
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  useEffect(() => {
+    setPage(1);
+  }, [searchTerm, selectedCategory, statusFilter, pageSize]);
+
+  const paginatedAllDocs = useMemo(() => {
+    const start = (page - 1) * pageSize;
+    return filteredAllDocs.slice(start, start + pageSize);
+  }, [filteredAllDocs, page, pageSize]);
+
   const filteredAllDocs = useMemo(() => {
     return documents.filter((d) => {
       const q = search.toLowerCase();
@@ -796,6 +809,14 @@ export function DocumentsPage() {
                 </tbody>
               </table>
             </div>
+            <AppPagination
+              total={filteredAllDocs.length}
+              page={page}
+              pageSize={pageSize}
+              onPageChange={setPage}
+              onPageSizeChange={setPageSize}
+              pageSizeOptions={[10, 25, 50, 100]}
+            />
           </div>
         </div>
       )}

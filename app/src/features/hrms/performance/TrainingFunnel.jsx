@@ -27,6 +27,7 @@ import { Drawer } from "../../../components/hrms/Drawer";
 import { Modal } from "../../../components/hrms/Modal";
 import { Button } from "../../../components/hrms/Button";
 import PageHeader from "../../../components/ui/PageHeader";
+import AppPagination from "../../../components/ui/AppPagination";
 import { hrmsGuides } from "../../../data/hrms/hrmsGuides";
 
 const STAGE_DROP_STYLES = {
@@ -86,6 +87,14 @@ export default function TrainingFunnel({ embedded = false, onBack }) {
   });
 
   // Filtered list
+  const [listPage, setListPage] = useState(1);
+  const [listPageSize, setListPageSize] = useState(10);
+
+  const paginatedTrainings = useMemo(() => {
+    const start = (listPage - 1) * listPageSize;
+    return filteredTrainings.slice(start, start + listPageSize);
+  }, [filteredTrainings, listPage, listPageSize]);
+
   const filteredTrainings = useMemo(() => {
     return trainings.filter((t) => {
       if (deptFilter !== "All" && t.department !== deptFilter) return false;
@@ -553,7 +562,7 @@ export default function TrainingFunnel({ embedded = false, onBack }) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-bdr/60">
-                {filteredTrainings.map((t) => {
+                {paginatedTrainings.map((t) => {
                   const stageObj =
                     TRAINING_FUNNEL_STAGES.find((s) => s.key === t.stage) ||
                     TRAINING_FUNNEL_STAGES[0];
@@ -611,6 +620,14 @@ export default function TrainingFunnel({ embedded = false, onBack }) {
                 })}
               </tbody>
             </table>
+            <AppPagination
+              total={filteredTrainings.length}
+              page={listPage}
+              pageSize={listPageSize}
+              onPageChange={setListPage}
+              onPageSizeChange={setListPageSize}
+              pageSizeOptions={[10, 25, 50]}
+            />
           </div>
         )}
 

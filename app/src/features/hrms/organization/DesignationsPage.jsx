@@ -7,6 +7,7 @@ import { hrmsSync, isBackendEnabled } from '../../../services/hrmsSync';
 import { Plus, Award, Search, Edit2, Trash2 } from 'lucide-react';
 import { useTableSort } from '../../../hooks/useTableSort';
 import SortableTh from '../../../components/ui/SortableTh';
+import AppPagination from '../../../components/ui/AppPagination';
 
 export function DesignationsPage() {
   const showToast = useAppStore((s) => s.showToast);
@@ -40,6 +41,18 @@ export function DesignationsPage() {
       String(d.department ?? '').toLowerCase().includes(q.toLowerCase()) ||
       String(d.level ?? '').toLowerCase().includes(q.toLowerCase())
   );
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  useEffect(() => {
+    setPage(1);
+  }, [q, deptFilter, levelFilter, pageSize]);
+
+  const paginatedRows = useMemo(() => {
+    const start = (page - 1) * pageSize;
+    return sort.rows.slice(start, start + pageSize);
+  }, [sort.rows, page, pageSize]);
+
   const sort = useTableSort(filtered, { accessors: { count: (d) => d.count || 0 } });
 
   async function handleCreate(e) {
@@ -159,7 +172,7 @@ export function DesignationsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-bdr/40 text-[13px]">
-                {sort.rows.map((r) => (
+                {paginatedRows.map((r) => (
                   <tr key={r.id} className="hover:bg-off/60 transition-colors">
                     <td className="py-4 px-5 font-semibold text-slate-900 flex items-center gap-2">
                       <Award size={15} className="text-navy shrink-0" />
@@ -205,6 +218,14 @@ export function DesignationsPage() {
               </tbody>
             </table>
           </div>
+          <AppPagination
+            total={filtered.length}
+            page={page}
+            pageSize={pageSize}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+            pageSizeOptions={[10, 25, 50]}
+          />
         </div>
       )}
 

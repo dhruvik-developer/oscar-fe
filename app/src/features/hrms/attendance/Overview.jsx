@@ -18,6 +18,7 @@ import {
   describeError,
 } from "../../../services/hrmsSync";
 import { useTableSort } from "../../../hooks/useTableSort";
+import AppPagination from "../../../components/ui/AppPagination";
 import SortableTh from "../../../components/ui/SortableTh";
 
 const STATUS_FILTERS = ["All", "Present", "Late", "Half Day", "WFH", "Absent", "On Leave", "Not Marked", "Holiday", "Week Off"];
@@ -156,6 +157,18 @@ export default function AttendanceOverview() {
   }, [rows, search, deptFilter, statusFilter, shiftFilter, locFilter, typeFilter]);
 
   const sort = useTableSort(filtered);
+
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  useEffect(() => {
+    setPage(1);
+  }, [search, deptFilter, statusFilter, shiftFilter, locFilter, typeFilter, dateVal, pageSize]);
+
+  const paginatedRows = useMemo(() => {
+    const start = (page - 1) * pageSize;
+    return sort.rows.slice(start, start + pageSize);
+  }, [sort.rows, page, pageSize]);
 
   const statsData = useMemo(() => {
     const total = summary.total || 0;
@@ -461,7 +474,8 @@ export default function AttendanceOverview() {
                     </td>
                   </tr>
                 )}
-                {sort.rows.map((row) => (
+
+                {paginatedRows.map((row) => (
                   <tr key={row.employeeId}>
                     <td>
                       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -491,6 +505,7 @@ export default function AttendanceOverview() {
                           {row.leavePaid === false ? " (unpaid)" : ""}
                         </div>
                       )}
+
                     </td>
                     <td>
                       <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
@@ -523,10 +538,19 @@ export default function AttendanceOverview() {
                     </td>
                   </tr>
                 )}
+
               </tbody>
             </table>
           </div>
         )}
+        <AppPagination
+          total={filtered.length}
+          page={page}
+          pageSize={pageSize}
+          onPageChange={setPage}
+          onPageSizeChange={setPageSize}
+          pageSizeOptions={[10, 25, 50, 100]}
+        />
       </div>
 
       {/* Quick update modal */}
@@ -542,6 +566,7 @@ export default function AttendanceOverview() {
                 Clear marking
               </button>
             )}
+
             <button type="button" className="btn-outline" onClick={() => setEditRow(null)}>
               Cancel
             </button>
@@ -586,6 +611,7 @@ export default function AttendanceOverview() {
                     </div>
                   </div>
                 )}
+
                 <div className="form-group">
                   <label className="form-label">Remark</label>
                   <input className="form-input" value={editForm.remark} onChange={(e) => setEditForm({ ...editForm, remark: e.target.value })} placeholder="Optional note" />
@@ -595,8 +621,10 @@ export default function AttendanceOverview() {
                 </div>
               </>
             )}
+
           </div>
         )}
+
       </Modal>
 
       {/* Regularize Attendance Modal */}
@@ -662,8 +690,8 @@ export default function AttendanceOverview() {
         .att-mgmt-page { background: #f8fafc; margin: -24px -28px -40px; padding: 18px 26px 28px; min-height: calc(100vh - 62px); }
         .att-export-btn { display: inline-flex; align-items: center; gap: 6px; background: #fff; border: 1px solid #d1d5db; border-radius: 10px; padding: 8px 16px; font-size: 13.5px; font-weight: 600; color: #374151; cursor: pointer; transition: background 0.15s ease; box-shadow: 0 1px 2px rgba(0,0,0,0.03); }
         .att-export-btn:hover { background: #f9fafb; }
-        .att-reg-btn { background: #16233a; color: #fff; border: none; border-radius: 10px; padding: 9px 18px; font-size: 13.5px; font-weight: 700; cursor: pointer; transition: background 0.15s ease; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
-        .att-reg-btn:hover { background: #0f172a; }
+        .att-reg-btn { background: var(--primary); color: #fff; border: none; border-radius: 10px; padding: 9px 18px; font-size: 13.5px; font-weight: 700; cursor: pointer; transition: background 0.15s ease; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+        .att-reg-btn:hover { background: var(--primary-dark); }
 
         .att-banner { display: flex; align-items: center; gap: 10px; background: #ecfdf5; border: 1px solid #a7f3d0; color: #065f46; border-radius: 12px; padding: 10px 14px; font-size: 13px; margin-bottom: 14px; }
 
@@ -719,7 +747,7 @@ export default function AttendanceOverview() {
 
         .att-pill-row { display: flex; flex-wrap: wrap; gap: 6px; }
         .att-pill { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 6px 12px; font-size: 12.5px; font-weight: 500; color: #475569; cursor: pointer; }
-        .att-pill.active { background: #16233a; color: #fff; border-color: #16233a; font-weight: 600; }
+        .att-pill.active { background: var(--primary); color: #fff; border-color: var(--primary); font-weight: 600; }
         .att-lock-note { background: #eff6ff; border: 1px solid #bfdbfe; color: #1e3a8a; border-radius: 10px; padding: 12px; font-size: 13px; }
 
         @media (max-width: 1280px) {

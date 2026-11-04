@@ -11,6 +11,7 @@ import MasterSourceLink from "../../../components/common/MasterSourceLink";
 import { localISODate, describeError } from "../../../services/hrmsSync";
 import { useTableSort } from "../../../hooks/useTableSort";
 import SortableTh from "../../../components/ui/SortableTh";
+import AppPagination from "../../../components/ui/AppPagination";
 
 const BASE_STATUSES = ["Pending", "Approved", "Rejected"];
 const REG_STATUSES = ["Present", "Half Day", "WFH"];
@@ -191,6 +192,18 @@ export default function Requests() {
     accessors: { reqIn: (r) => r.reqIn || r.reqOut || "" },
   });
 
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  useEffect(() => {
+    setPage(1);
+  }, [tab, search, deptFilter, typeFilter, statusFilter, dateFilter, pageSize]);
+
+  const paginatedRows = useMemo(() => {
+    const start = (page - 1) * pageSize;
+    return sort.rows.slice(start, start + pageSize);
+  }, [sort.rows, page, pageSize]);
+
   const countForTab = (t) => (t === "All" ? requestsList.length : requestsList.filter((r) => r.type === t).length);
   const pendingCount = requestsList.filter((r) => r.status === "Pending").length;
 
@@ -324,10 +337,10 @@ export default function Requests() {
         guide={hrmsGuides.attendanceRequests}
         actions={
           <>
-            <button type="button" onClick={openRegModal} className="req-btn-outline">
-              New Regularization
+            <button type="button" onClick={openRegModal} className="req-btn-primary">
+              Regularize Attendance
             </button>
-            <button type="button" onClick={openEarlyModal} className="req-btn-primary">
+            <button type="button" onClick={openEarlyModal} className="req-btn-outline">
               Early Clock-Out Request
             </button>
           </>
@@ -403,7 +416,7 @@ export default function Requests() {
                   </td>
                 </tr>
               )}
-              {sort.rows.map((r) => (
+              {paginatedRows.map((r) => (
                 <tr key={r.id}>
                   <td>
                     <button type="button" onClick={() => setSelectedReq(r)} className="req-id-link" title={r.id}>
@@ -466,6 +479,14 @@ export default function Requests() {
             </tbody>
           </table>
         </div>
+        <AppPagination
+          total={filtered.length}
+          page={page}
+          pageSize={pageSize}
+          onPageChange={setPage}
+          onPageSizeChange={setPageSize}
+          pageSizeOptions={[10, 25, 50, 100]}
+        />
       </div>
 
       {/* Detail Modal */}
@@ -712,12 +733,12 @@ export default function Requests() {
 
         .req-btn-outline { background: #fff; border: 1px solid #d1d5db; border-radius: 10px; padding: 8px 18px; font-size: 13.5px; font-weight: 600; color: #374151; cursor: pointer; transition: background 0.15s ease; box-shadow: 0 1px 2px rgba(0,0,0,0.03); }
         .req-btn-outline:hover { background: #f9fafb; }
-        .req-btn-primary { background: #16233a; color: #fff; border: none; border-radius: 10px; padding: 9px 18px; font-size: 13.5px; font-weight: 700; cursor: pointer; transition: background 0.15s ease; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
-        .req-btn-primary:hover { background: #0f172a; }
+        .req-btn-primary { background: var(--primary); color: #fff; border: none; border-radius: 10px; padding: 9px 18px; font-size: 13.5px; font-weight: 700; cursor: pointer; transition: background 0.15s ease; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+        .req-btn-primary:hover { background: var(--primary-dark); }
 
         .req-tabs { display: inline-flex; align-items: center; gap: 3px; background: #f4f4f6; border: 1px solid #e5e7eb; border-radius: 999px; padding: 3px 4px; margin-bottom: 16px; max-width: 100%; overflow-x: auto; scrollbar-width: none; }
         .req-tab { border: 1.5px solid transparent; border-radius: 999px; padding: 5px 16px; font-size: 13px; font-weight: 500; color: #8e9baa; background: transparent; cursor: pointer; transition: all 0.15s ease; flex-shrink: 0; white-space: nowrap; }
-        .req-tab.active { font-weight: 600; color: #000000; background: #ffffff; border-color: #000000; box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
+        .req-tab.active { font-weight: 600; color: var(--primary); background: #ffffff; border-color: var(--primary); box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
 
         .req-card { background: #fff; border: 1px solid #e8edf3; border-radius: 16px; box-shadow: 0 1px 3px rgba(16,24,40,0.03); }
         .req-filter-card { border: none; padding: 14px 18px; margin-bottom: 16px; }

@@ -251,7 +251,7 @@ export default function Dashboard() {
         actions={
           <button
             onClick={handleOpenNewCycle}
-            className="bg-[#16233a] text-white px-4 py-2 rounded-xl text-[13px] font-medium hover:bg-[#0f172a] transition shadow-2xs flex items-center gap-1.5"
+            className="bg-primary hover:bg-primary-hover text-white px-4 py-2 rounded-xl text-[13px] font-medium transition shadow-2xs flex items-center gap-1.5 cursor-pointer"
           >
             <Plus size={15} />
             New Review Cycle
@@ -416,7 +416,7 @@ export default function Dashboard() {
                 onClick={() => setStageFilter(st)}
                 className={`h-8 px-3 rounded-xl text-[12px] font-medium transition ${
                   stageFilter === st
-                    ? "bg-[#16233a] text-white shadow-2xs"
+                    ? "bg-primary text-white shadow-2xs"
                     : "bg-white text-slate-600 border border-[#e2e8f0] hover:bg-slate-50"
                 }`}
               >

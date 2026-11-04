@@ -578,7 +578,9 @@ html.dark,
 .bg-\[\#1e3a8a\],
 .bg-\[\#1b2b4a\],
 .bg-\[\#19273c\],
-.bg-\[\#111f36\] {
+.bg-\[\#111f36\],
+.bg-\[\#16233a\],
+button.bg-\[\#16233a\] {
   background-color: var(--primary) !important;
   color: #ffffff !important;
 }
@@ -586,7 +588,9 @@ html.dark,
 .hrms-submit:hover,
 .hover\:bg-navy:hover,
 .hover\:bg-navy\/90:hover,
-.hover\:bg-\[\#1e40af\]:hover {
+.hover\:bg-\[\#1e40af\]:hover,
+.hover\:bg-\[\#0f172a\]:hover,
+button.bg-\[\#16233a\]:hover {
   background-color: var(--primary-dark) !important;
   color: #ffffff !important;
 }

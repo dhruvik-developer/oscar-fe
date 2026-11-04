@@ -11,6 +11,7 @@ import { Avatar } from "../../../components/hrms/Avatar";
 import MasterSourceLink from "../../../components/common/MasterSourceLink";
 import { useTableSort } from "../../../hooks/useTableSort";
 import SortableTh from "../../../components/ui/SortableTh";
+import AppPagination from "../../../components/ui/AppPagination";
 import {
   Calendar,
   Search,
@@ -420,6 +421,38 @@ export default function Leave() {
     accessors: { dates: (r) => String(r.dates || "").split(" – ")[0] },
   });
   const compOffSort = useTableSort(compOffCredits);
+  // Leave queue pagination
+  const [leavePage, setLeavePage] = useState(1);
+  const [leavePageSize, setLeavePageSize] = useState(5);
+
+  useEffect(() => {
+    setLeavePage(1);
+  }, [queueFilter, typeFilter, search, leavePageSize]);
+
+  const paginatedLeaves = useMemo(() => {
+    const start = (leavePage - 1) * leavePageSize;
+    return filteredLeaves.slice(start, start + leavePageSize);
+  }, [filteredLeaves, leavePage, leavePageSize]);
+
+  // Governance table pagination
+  const [govPage, setGovPage] = useState(1);
+  const [govPageSize, setGovPageSize] = useState(10);
+
+  useEffect(() => {
+    setGovPage(1);
+  }, [tab, govPageSize]);
+
+  const currentGovRows = tab === "compoff"
+    ? compOffSort.rows
+    : tab === "encashment"
+    ? encashmentSort.rows
+    : delegationSort.rows;
+
+  const paginatedGovRows = useMemo(() => {
+    const start = (govPage - 1) * govPageSize;
+    return currentGovRows.slice(start, start + govPageSize);
+  }, [currentGovRows, govPage, govPageSize]);
+
   const encashmentSort = useTableSort(encashments, {
     accessors: { amount: (e) => e.amount || e.days * 2083 },
   });
@@ -471,7 +504,7 @@ export default function Leave() {
         guide={hrmsGuides.leave}
         actions={
           <>
-            <button
+            {/* <button
               type="button"
               onClick={() => setCompOffModalOpen(true)}
               className="inline-flex items-center gap-1.5 px-3.5 py-2.5 bg-white border border-slate-300 text-slate-700 rounded-xl text-[13px] font-medium shadow-2xs hover:bg-slate-50 transition-colors cursor-pointer"
@@ -486,7 +519,7 @@ export default function Leave() {
             >
               <Coins size={15} className="text-emerald-700" />
               Encash Leave
-            </button>
+            </button> */}
             <button
               type="button"
               onClick={() => setApplyModalOpen(true)}
@@ -829,7 +862,7 @@ export default function Leave() {
 
           {/* Leaves List with clean internal scrolling */}
           <div className="space-y-3.5 mt-1 max-h-[600px] overflow-y-auto pr-2">
-            {filteredLeaves.map((l) => {
+            {paginatedLeaves.map((l) => {
               const isPending = PENDING_STATUSES.includes(l.status);
               const currentDelegateId = delegateSelect[l.id] ?? l.delegateId ?? "";
               const currentDelegate = employeeName(currentDelegateId) || (currentDelegateId ? "" : delegateNameOf(l));
@@ -978,16 +1011,14 @@ export default function Leave() {
             )}
           </div>
 
-          {filteredLeaves.length > 0 && (
-            <div className="pt-2 border-t border-bdr/60 flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 lg:gap-0 text-[11.5px] text-muted">
-              <span>Showing {filteredLeaves.length} leave application{filteredLeaves.length === 1 ? "" : "s"}</span>
-              {filteredLeaves.length > 3 && (
-                <span className="text-[11px] font-medium text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
-                  Scroll for more
-                </span>
-              )}
-            </div>
-          )}
+          <AppPagination
+            total={filteredLeaves.length}
+            page={leavePage}
+            pageSize={leavePageSize}
+            onPageChange={setLeavePage}
+            onPageSizeChange={setLeavePageSize}
+            pageSizeOptions={[5, 10, 20]}
+          />
         </div>
       </div>
 
@@ -1146,7 +1177,7 @@ export default function Leave() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-bdr/40 text-[13px]">
-                {compOffSort.rows.map((c) => (
+                {paginatedGovRows.map((c) => (
                   <tr key={c.id} className="hover:bg-slate-50/60 transition">
                     <td className="py-3.5 px-5">
                       <div className="flex items-center gap-2.5">
@@ -1232,7 +1263,7 @@ export default function Leave() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-bdr/40 text-[13px]">
-                {encashmentSort.rows.map((e) => (
+                {paginatedGovRows.map((e) => (
                   <tr key={e.id} className="hover:bg-slate-50/60 transition">
                     <td className="py-3.5 px-5">
                       <div className="flex items-center gap-2.5">
@@ -1301,6 +1332,14 @@ export default function Leave() {
             </table>
           </div>
         )}
+        <AppPagination
+          total={currentGovRows.length}
+          page={govPage}
+          pageSize={govPageSize}
+          onPageChange={setGovPage}
+          onPageSizeChange={setGovPageSize}
+          pageSizeOptions={[10, 25, 50]}
+        />
       </div>
 
       {/* ── Modal 1: Apply Leave Modal ── */}

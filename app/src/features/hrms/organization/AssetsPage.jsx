@@ -11,6 +11,7 @@ import { hrmsGuides } from "../../../data/hrms/hrmsGuides";
 import MasterSourceLink from "../../../components/common/MasterSourceLink";
 import { useTableSort } from "../../../hooks/useTableSort";
 import SortableTh from "../../../components/ui/SortableTh";
+import AppPagination from "../../../components/ui/AppPagination";
 import {
   Laptop,
   Monitor,
@@ -449,6 +450,30 @@ export function AssetsPage() {
       date: (r) => r.createdAt || r.requestedDate || "",
     },
   });
+
+  const [assetPage, setAssetPage] = useState(1);
+  const [assetPageSize, setAssetPageSize] = useState(10);
+
+  useEffect(() => {
+    setAssetPage(1);
+  }, [search, categoryFilter, statusFilter, assetPageSize]);
+
+  const paginatedAssets = useMemo(() => {
+    const start = (assetPage - 1) * assetPageSize;
+    return assetSort.rows.slice(start, start + assetPageSize);
+  }, [assetSort.rows, assetPage, assetPageSize]);
+
+  const [reqPage, setReqPage] = useState(1);
+  const [reqPageSize, setReqPageSize] = useState(10);
+
+  useEffect(() => {
+    setReqPage(1);
+  }, [reqSearch, reqStatusFilter, reqPriorityFilter, reqTypeFilter, reqPageSize]);
+
+  const paginatedRequests = useMemo(() => {
+    const start = (reqPage - 1) * reqPageSize;
+    return requestSort.rows.slice(start, start + reqPageSize);
+  }, [requestSort.rows, reqPage, reqPageSize]);
 
   const reqCancelled = requests.filter((r) => r.status === "Cancelled").length;
   const reqTotal = requests.length;
@@ -960,7 +985,7 @@ export function AssetsPage() {
                       </td>
                     </tr>
                   ) : (
-                    assetSort.rows.map((r) => {
+                    paginatedAssets.map((r) => {
                       const cost = fmtCost(r.purchaseCost);
                       return (
                         <tr key={r.id} className="hover:bg-off/60 transition-colors">
@@ -1094,6 +1119,14 @@ export function AssetsPage() {
                 </tbody>
               </table>
             </div>
+            <AppPagination
+              total={filtered.length}
+              page={assetPage}
+              pageSize={assetPageSize}
+              onPageChange={setAssetPage}
+              onPageSizeChange={setAssetPageSize}
+              pageSizeOptions={[10, 25, 50, 100]}
+            />
           </div>
         </>
       )}
@@ -1228,7 +1261,7 @@ export function AssetsPage() {
                       </td>
                     </tr>
                   ) : (
-                    requestSort.rows.map((req) => {
+                    paginatedRequests.map((req) => {
                       const isInventory = req.requestType === "Inventory";
                       const unitUnavailable =
                         isInventory && req.status === "Pending" && req.requestedAssetStatus && req.requestedAssetStatus !== "Available";
@@ -1387,6 +1420,14 @@ export function AssetsPage() {
                 </tbody>
               </table>
             </div>
+            <AppPagination
+              total={filteredRequests.length}
+              page={reqPage}
+              pageSize={reqPageSize}
+              onPageChange={setReqPage}
+              onPageSizeChange={setReqPageSize}
+              pageSizeOptions={[10, 25, 50, 100]}
+            />
           </div>
         </>
       )}

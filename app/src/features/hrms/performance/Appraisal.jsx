@@ -484,7 +484,7 @@ export default function Appraisal() {
               <button
                 onClick={() => setRole("HR")}
                 className={`px-2.5 py-1 rounded-lg text-[12px] font-medium transition ${
-                  role === "HR" ? "bg-[#16233a] text-white shadow-2xs" : "text-slate-600 hover:text-slate-900"
+                  role === "HR" ? "bg-primary text-white shadow-2xs" : "text-slate-600 hover:text-slate-900"
                 }`}
               >
                 HR / Admin
@@ -492,7 +492,7 @@ export default function Appraisal() {
               <button
                 onClick={() => setRole("Manager")}
                 className={`px-2.5 py-1 rounded-lg text-[12px] font-medium transition ${
-                  role === "Manager" ? "bg-[#16233a] text-white shadow-2xs" : "text-slate-600 hover:text-slate-900"
+                  role === "Manager" ? "bg-primary text-white shadow-2xs" : "text-slate-600 hover:text-slate-900"
                 }`}
               >
                 Manager
@@ -500,7 +500,7 @@ export default function Appraisal() {
               <button
                 onClick={() => setRole("Employee")}
                 className={`px-2.5 py-1 rounded-lg text-[12px] font-medium transition ${
-                  role === "Employee" ? "bg-[#16233a] text-white shadow-2xs" : "text-slate-600 hover:text-slate-900"
+                  role === "Employee" ? "bg-primary text-white shadow-2xs" : "text-slate-600 hover:text-slate-900"
                 }`}
               >
                 Employee

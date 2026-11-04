@@ -55,6 +55,7 @@ import {
   DEFAULT_DEPARTMENT_WORKING_DAYS,
   DEFAULT_DEPARTMENT_WORKING_HOURS,
 } from "../../../stores/payrollStore";
+import AppPagination from "../../../components/ui/AppPagination";
 import TerminationLetterModal from "./TerminationLetterModal";
 import OfferLetterModal from "./OfferLetterModal";
 import GenerateOfferModal from "./GenerateOfferModal";
@@ -215,6 +216,96 @@ export default function HRAdminPage({ defaultTab }) {
   const [resignationFilter, setResignationFilter] = useState("all");
   const [complaintPriorityFilter, setComplaintPriorityFilter] = useState("all");
   const [holidayFilter, setHolidayFilter] = useState("all");
+
+  // Admin pagination state
+  const [adminPage, setAdminPage] = useState(1);
+  const [adminPageSize, setAdminPageSize] = useState(10);
+
+  useEffect(() => {
+    setAdminPage(1);
+  }, [activeTab, search, teamDeptFilter, chainStatusFilter, offerStatusFilter, terminationFilter, resignationFilter, complaintPriorityFilter, holidayFilter, adminPageSize]);
+
+  const filteredTeams = useMemo(() => teams.filter((t) => {
+    const matchSearch =
+      !search ||
+      String(t.name ?? '').toLowerCase().includes(search.toLowerCase()) ||
+      String(t.lead ?? '').toLowerCase().includes(search.toLowerCase()) ||
+      String(t.id ?? '').toLowerCase().includes(search.toLowerCase()) ||
+      String(t.dept ?? '').toLowerCase().includes(search.toLowerCase());
+    const matchDept = teamDeptFilter === "all" || t.dept === teamDeptFilter;
+    return matchSearch && matchDept;
+  }), [teams, search, teamDeptFilter]);
+
+  const paginatedTeams = useMemo(() => {
+    const start = (adminPage - 1) * adminPageSize;
+    return filteredTeams.slice(start, start + adminPageSize);
+  }, [filteredTeams, adminPage, adminPageSize]);
+
+  const filteredApprovalChains = useMemo(() => approvalChains.filter((c) => {
+    const matchSearch =
+      !search ||
+      String(c.module ?? '').toLowerCase().includes(search.toLowerCase()) ||
+      String(c.tier1 ?? '').toLowerCase().includes(search.toLowerCase()) ||
+      String(c.tier2 ?? '').toLowerCase().includes(search.toLowerCase()) ||
+      String(c.tier3 ?? '').toLowerCase().includes(search.toLowerCase());
+    const matchStatus = chainStatusFilter === "all" || c.status === chainStatusFilter;
+    return matchSearch && matchStatus;
+  }), [approvalChains, search, chainStatusFilter]);
+
+  const paginatedApprovalChains = useMemo(() => {
+    const start = (adminPage - 1) * adminPageSize;
+    return filteredApprovalChains.slice(start, start + adminPageSize);
+  }, [filteredApprovalChains, adminPage, adminPageSize]);
+
+  const filteredOffers = useMemo(() => offersList.filter((o) => {
+    const matchSearch =
+      !search ||
+      o.candidateName?.toLowerCase().includes(search.toLowerCase()) ||
+      o.position?.toLowerCase().includes(search.toLowerCase()) ||
+      o.id?.toLowerCase().includes(search.toLowerCase());
+    const matchStatus = offerStatusFilter === "all" || o.status === offerStatusFilter;
+    return matchSearch && matchStatus;
+  }), [offersList, search, offerStatusFilter]);
+
+  const paginatedOffers = useMemo(() => {
+    const start = (adminPage - 1) * adminPageSize;
+    return filteredOffers.slice(start, start + adminPageSize);
+  }, [filteredOffers, adminPage, adminPageSize]);
+
+  const filteredTerminations = useMemo(() => terminations.filter((t) => {
+    if (!search) return true;
+    return (
+      t.employee?.toLowerCase().includes(search.toLowerCase()) ||
+      t.employeeId?.toLowerCase().includes(search.toLowerCase()) ||
+      t.role?.toLowerCase().includes(search.toLowerCase()) ||
+      t.id?.toLowerCase().includes(search.toLowerCase())
+    );
+  }), [terminations, search]);
+
+  const paginatedTerminations = useMemo(() => {
+    const start = (adminPage - 1) * adminPageSize;
+    return filteredTerminations.slice(start, start + adminPageSize);
+  }, [filteredTerminations, adminPage, adminPageSize]);
+
+  const paginatedResignations = useMemo(() => {
+    const start = (adminPage - 1) * adminPageSize;
+    return resignations.slice(start, start + adminPageSize);
+  }, [resignations, adminPage, adminPageSize]);
+
+  const paginatedComplaints = useMemo(() => {
+    const start = (adminPage - 1) * adminPageSize;
+    return complaints.slice(start, start + adminPageSize);
+  }, [complaints, adminPage, adminPageSize]);
+
+  const paginatedHolidays = useMemo(() => {
+    const start = (adminPage - 1) * adminPageSize;
+    return holidays.slice(start, start + adminPageSize);
+  }, [holidays, adminPage, adminPageSize]);
+
+  const paginatedWorkingDays = useMemo(() => {
+    const start = (adminPage - 1) * adminPageSize;
+    return departmentsConfig.slice(start, start + adminPageSize);
+  }, [departmentsConfig, adminPage, adminPageSize]);
 
   // Quick Action Dropdown State
   const [isQuickActionOpen, setIsQuickActionOpen] = useState(false);
@@ -1198,18 +1289,7 @@ export default function HRAdminPage({ defaultTab }) {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-bdr/40">
-                  {teams
-                    .filter((t) => {
-                      const matchSearch =
-                        !search ||
-                        String(t.name ?? '').toLowerCase().includes(search.toLowerCase()) ||
-                        String(t.lead ?? '').toLowerCase().includes(search.toLowerCase()) ||
-                        String(t.id ?? '').toLowerCase().includes(search.toLowerCase()) ||
-                        String(t.dept ?? '').toLowerCase().includes(search.toLowerCase());
-                      const matchDept = teamDeptFilter === "all" || t.dept === teamDeptFilter;
-                      return matchSearch && matchDept;
-                    })
-                    .map((t) => (
+                  {paginatedTeams.map((t) => (
                       <tr key={t.id} className="hover:bg-off/60 transition">
                         <td className="py-4 px-5">
                           <div className="flex items-center gap-3">
@@ -1266,16 +1346,7 @@ export default function HRAdminPage({ defaultTab }) {
                 </tbody>
               </table>
 
-              {teams.filter((t) => {
-                const matchSearch =
-                  !search ||
-                  String(t.name ?? '').toLowerCase().includes(search.toLowerCase()) ||
-                  String(t.lead ?? '').toLowerCase().includes(search.toLowerCase()) ||
-                  String(t.id ?? '').toLowerCase().includes(search.toLowerCase()) ||
-                  String(t.dept ?? '').toLowerCase().includes(search.toLowerCase());
-                const matchDept = teamDeptFilter === "all" || t.dept === teamDeptFilter;
-                return matchSearch && matchDept;
-              }).length === 0 && (
+              {filteredTeams.length === 0 && (
                 <div className="py-12 text-center text-muted">
                   <Users size={32} className="mx-auto mb-2 opacity-40" />
                   <p className="font-semibold text-slate-700">No teams matching criteria</p>
@@ -1283,6 +1354,14 @@ export default function HRAdminPage({ defaultTab }) {
                 </div>
               )}
             </div>
+            <AppPagination
+              total={filteredTeams.length}
+              page={adminPage}
+              pageSize={adminPageSize}
+              onPageChange={setAdminPage}
+              onPageSizeChange={setAdminPageSize}
+              pageSizeOptions={[10, 25, 50]}
+            />
           </div>
         </div>
       )}
@@ -1363,19 +1442,7 @@ export default function HRAdminPage({ defaultTab }) {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-bdr/40">
-                  {approvalChains
-                    .filter((c) => {
-                      const matchSearch =
-                        !search ||
-                        String(c.module ?? '').toLowerCase().includes(search.toLowerCase()) ||
-                        String(c.tier1 ?? '').toLowerCase().includes(search.toLowerCase()) ||
-                        String(c.tier2 ?? '').toLowerCase().includes(search.toLowerCase()) ||
-                        String(c.tier3 ?? '').toLowerCase().includes(search.toLowerCase());
-                      const matchStatus =
-                        chainStatusFilter === "all" || c.status === chainStatusFilter;
-                      return matchSearch && matchStatus;
-                    })
-                    .map((c) => (
+                  {paginatedApprovalChains.map((c) => (
                       <tr key={c.id} className="hover:bg-off/60 transition">
                         <td className="py-4 px-5 font-bold text-slate-900">
                           <div className="flex items-center gap-2">
@@ -1450,6 +1517,14 @@ export default function HRAdminPage({ defaultTab }) {
                 </tbody>
               </table>
             </div>
+            <AppPagination
+              total={filteredApprovalChains.length}
+              page={adminPage}
+              pageSize={adminPageSize}
+              onPageChange={setAdminPage}
+              onPageSizeChange={setAdminPageSize}
+              pageSizeOptions={[10, 25, 50]}
+            />
           </div>
         </div>
       )}
@@ -1567,18 +1642,7 @@ export default function HRAdminPage({ defaultTab }) {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-bdr/40">
-                  {offersList
-                    .filter((o) => {
-                      const matchSearch =
-                        !search ||
-                        o.candidateName?.toLowerCase().includes(search.toLowerCase()) ||
-                        o.position?.toLowerCase().includes(search.toLowerCase()) ||
-                        o.id?.toLowerCase().includes(search.toLowerCase());
-                      const matchStatus =
-                        offerStatusFilter === "all" || o.status === offerStatusFilter;
-                      return matchSearch && matchStatus;
-                    })
-                    .map((o) => (
+                  {paginatedOffers.map((o) => (
                       <tr key={o.id} className="hover:bg-off/60 transition">
                         <td className="py-4 px-5">
                           <div className="font-bold text-slate-900">{o.candidateName}</div>
@@ -1663,6 +1727,14 @@ export default function HRAdminPage({ defaultTab }) {
                 </tbody>
               </table>
             </div>
+            <AppPagination
+              total={filteredOffers.length}
+              page={adminPage}
+              pageSize={adminPageSize}
+              onPageChange={setAdminPage}
+              onPageSizeChange={setAdminPageSize}
+              pageSizeOptions={[10, 25, 50]}
+            />
           </div>
         </div>
       )}
@@ -1701,17 +1773,7 @@ export default function HRAdminPage({ defaultTab }) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-bdr/40">
-                {terminations
-                  .filter((t) => {
-                    if (!search) return true;
-                    return (
-                      t.employee?.toLowerCase().includes(search.toLowerCase()) ||
-                      t.employeeId?.toLowerCase().includes(search.toLowerCase()) ||
-                      t.role?.toLowerCase().includes(search.toLowerCase()) ||
-                      t.id?.toLowerCase().includes(search.toLowerCase())
-                    );
-                  })
-                  .map((t) => (
+                {paginatedTerminations.map((t) => (
                     <tr key={t.id} className="hover:bg-off/60 transition">
                       <td className="py-4 px-5">
                         <div className="font-bold text-slate-900">{t.employee}</div>
@@ -1786,6 +1848,14 @@ export default function HRAdminPage({ defaultTab }) {
               </tbody>
             </table>
           </div>
+          <AppPagination
+            total={filteredTerminations.length}
+            page={adminPage}
+            pageSize={adminPageSize}
+            onPageChange={setAdminPage}
+            onPageSizeChange={setAdminPageSize}
+            pageSizeOptions={[10, 25, 50]}
+          />
         </div>
       )}
 
@@ -1821,7 +1891,7 @@ export default function HRAdminPage({ defaultTab }) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-bdr/40">
-                {resignations.map((r) => (
+                {paginatedResignations.map((r) => (
                   <tr key={r.id} className="hover:bg-off/60 transition">
                     <td className="py-4 px-5">
                       <div className="font-bold text-slate-900">{r.employee}</div>
@@ -1867,6 +1937,14 @@ export default function HRAdminPage({ defaultTab }) {
               </tbody>
             </table>
           </div>
+          <AppPagination
+            total={resignations.length}
+            page={adminPage}
+            pageSize={adminPageSize}
+            onPageChange={setAdminPage}
+            onPageSizeChange={setAdminPageSize}
+            pageSizeOptions={[10, 25, 50]}
+          />
         </div>
       )}
 
@@ -1902,7 +1980,7 @@ export default function HRAdminPage({ defaultTab }) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-bdr/40">
-                {complaints.map((c) => (
+                {paginatedComplaints.map((c) => (
                   <tr key={c.id} className="hover:bg-off/60 transition">
                     <td className="py-4 px-5">
                       <div className="font-bold text-slate-900">{c.id}</div>
@@ -1957,6 +2035,14 @@ export default function HRAdminPage({ defaultTab }) {
               </tbody>
             </table>
           </div>
+          <AppPagination
+            total={complaints.length}
+            page={adminPage}
+            pageSize={adminPageSize}
+            onPageChange={setAdminPage}
+            onPageSizeChange={setAdminPageSize}
+            pageSizeOptions={[10, 25, 50]}
+          />
         </div>
       )}
 
@@ -1991,7 +2077,7 @@ export default function HRAdminPage({ defaultTab }) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-bdr/40">
-                {holidays.map((h) => (
+                {paginatedHolidays.map((h) => (
                   <tr key={h.id} className="hover:bg-off/60 transition">
                     <td className="py-4 px-5 font-bold text-slate-900 flex items-center gap-2">
                       <Calendar size={15} className="text-navy" />
@@ -2043,6 +2129,14 @@ export default function HRAdminPage({ defaultTab }) {
               </tbody>
             </table>
           </div>
+          <AppPagination
+            total={holidays.length}
+            page={adminPage}
+            pageSize={adminPageSize}
+            onPageChange={setAdminPage}
+            onPageSizeChange={setAdminPageSize}
+            pageSizeOptions={[10, 25, 50]}
+          />
         </div>
       )}
 
@@ -2293,7 +2387,7 @@ export default function HRAdminPage({ defaultTab }) {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-bdr/60">
-                  {departmentsConfig.map((dept) => {
+                  {paginatedWorkingDays.map((dept) => {
                     const currentDays = getDepartmentDays(departmentWorkingDays, dept.name);
                     const currentHours = getDepartmentHours(departmentWorkingHours, dept.name);
                     const staffCount = payrollEmployees.filter(
@@ -2387,6 +2481,14 @@ export default function HRAdminPage({ defaultTab }) {
                 </tbody>
               </table>
             </div>
+            <AppPagination
+              total={departmentsConfig.length}
+              page={adminPage}
+              pageSize={adminPageSize}
+              onPageChange={setAdminPage}
+              onPageSizeChange={setAdminPageSize}
+              pageSizeOptions={[10, 25, 50]}
+            />
           </div>
 
           {/* Leave Policy, Carry-Forward & Sandwich-Leave Governance Card */}

@@ -22,6 +22,7 @@ import { useIncentiveStore } from "../../../stores/incentiveStore";
 import { describeError } from "../../../services/resourceSync";
 import { useTableSort } from "../../../hooks/useTableSort";
 import SortableTh from "../../../components/ui/SortableTh";
+import AppPagination from "../../../components/ui/AppPagination";
 
 const BASIS_LABELS = {
   INVOICE: "Invoice Value",
@@ -233,6 +234,26 @@ export default function IncentivesPage() {
     },
   });
 
+  const [schemePage, setSchemePage] = useState(1);
+  const [schemePageSize, setSchemePageSize] = useState(5);
+
+  const paginatedSchemes = useMemo(() => {
+    const start = (schemePage - 1) * schemePageSize;
+    return (schemeSort.rows || []).slice(start, start + schemePageSize);
+  }, [schemeSort.rows, schemePage, schemePageSize]);
+
+  const [accrualPage, setAccrualPage] = useState(1);
+  const [accrualPageSize, setAccrualPageSize] = useState(10);
+
+  useEffect(() => {
+    setAccrualPage(1);
+  }, [search, statusFilter, accrualPageSize]);
+
+  const paginatedAccruals = useMemo(() => {
+    const start = (accrualPage - 1) * accrualPageSize;
+    return accrualSort.rows.slice(start, start + accrualPageSize);
+  }, [accrualSort.rows, accrualPage, accrualPageSize]);
+
   const schemeSort = useTableSort(schemes || [], {
     accessors: {
       basis: (s) => BASIS_LABELS[s.basis] || s.basis,
@@ -366,7 +387,7 @@ export default function IncentivesPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {schemeSort.rows.map((s) => (
+                {paginatedSchemes.map((s) => (
                   <tr key={s.id} className="hover:bg-soft/50 transition">
                     <td className="py-2.5 px-4">
                       <div className="font-medium text-text">{s.name}</div>
@@ -411,6 +432,14 @@ export default function IncentivesPage() {
             </table>
           </div>
         )}
+        <AppPagination
+          total={(schemes || []).length}
+          page={schemePage}
+          pageSize={schemePageSize}
+          onPageChange={setSchemePage}
+          onPageSizeChange={setSchemePageSize}
+          pageSizeOptions={[5, 10, 20]}
+        />
       </div>
 
       {/* Filter and Search Bar */}
@@ -467,7 +496,7 @@ export default function IncentivesPage() {
                   </td>
                 </tr>
               ) : (
-                accrualSort.rows.map((row) => (
+                paginatedAccruals.map((row) => (
                   <tr key={row.id} className="hover:bg-soft/50 transition">
                     <td className="py-3 px-4">
                       <div className="font-medium text-text">{row.employeeName || row.employee?.name || "Salesperson"}</div>
@@ -552,6 +581,14 @@ export default function IncentivesPage() {
             </tbody>
           </table>
         </div>
+        <AppPagination
+          total={filteredAccruals.length}
+          page={accrualPage}
+          pageSize={accrualPageSize}
+          onPageChange={setAccrualPage}
+          onPageSizeChange={setAccrualPageSize}
+          pageSizeOptions={[10, 25, 50, 100]}
+        />
       </div>
 
       {/* Calculate Quarterly Modal */}

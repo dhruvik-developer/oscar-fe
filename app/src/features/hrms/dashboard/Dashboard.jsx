@@ -1102,7 +1102,7 @@ export default function HRMSDashboard() {
         .hrms-iconbtn:hover { background: #f8fafc; color: #111827; }
         .hrms-afilter { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 4px; }
         .hrms-achip { border: 1px solid #e2e8f0; background: #f8fafc; color: #64748b; font-size: 11.5px; font-weight: 600; border-radius: 999px; padding: 4px 11px; cursor: pointer; }
-        .hrms-achip.active { background: #111f36; border-color: #111f36; color: #fff; }
+        .hrms-achip.active { background: var(--primary); border-color: var(--primary); color: #fff; }
         .hrms-arow { display: flex; gap: 10px; position: relative; align-items: flex-start; border: 1px solid transparent; border-radius: 10px; padding: 6px; margin: 0 -6px; cursor: pointer; }
         .hrms-arow:hover { background: #f8fafc; border-color: #f1f5f9; }
         .hrms-arow:hover .hrms-ax { opacity: 1; }
@@ -1117,8 +1117,8 @@ export default function HRMSDashboard() {
         .hrms-input { width: 100%; border: 1px solid #e2e8f0; background: #f8fafc; border-radius: 10px; padding: 10px 12px; font-size: 13px; color: #334155; margin-bottom: 10px; outline: none; box-sizing: border-box; transition: all 0.15s ease; }
         .hrms-input:focus { border-color: #94a3b8; background: #fff; }
         .hrms-area { resize: none; margin-bottom: 12px; color: #334155; }
-        .hrms-submit { width: 100%; background: #19273c; color: #fff; border: 0; border-radius: 10px; padding: 12px; font-size: 13.5px; font-weight: 700; cursor: pointer; transition: background 0.15s ease; }
-        .hrms-submit:hover { background: #0f172a; }
+        .hrms-submit { width: 100%; background: var(--primary); color: #fff; border: 0; border-radius: 10px; padding: 12px; font-size: 13.5px; font-weight: 700; cursor: pointer; transition: background 0.15s ease; }
+        .hrms-submit:hover { background: var(--primary-dark); }
         .hrms-date-wrap { display: flex; align-items: center; justify-content: space-between; }
         .hrms-date-native { position: absolute; right: -6px; top: -6px; width: 32px; height: 28px; opacity: 0; cursor: pointer; }
         .hrms-date-native::-webkit-calendar-picker-indicator { cursor: pointer; opacity: 1; }

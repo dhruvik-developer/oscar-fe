@@ -30,7 +30,7 @@ export default function Employees() {
   const [showForm, setShowForm] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedEmployee, setSelectedEmployee] = useState(null);
-  const pageSize = 5;
+  const [pageSize, setPageSize] = useState(10);
 
   useEffect(() => {
     useAppStore.getState().refreshHrms?.("employees");
@@ -370,6 +370,8 @@ export default function Employees() {
           page={currentPage}
           pageSize={pageSize}
           onPageChange={setCurrentPage}
+          onPageSizeChange={setPageSize}
+          pageSizeOptions={[10, 25, 50, 100]}
         />
       </div>
 
@@ -496,8 +498,8 @@ export default function Employees() {
         .emp-sub { margin: 4px 0 0; font-size: 13px; color: #6b7280; }
         .emp-export-btn { display: inline-flex; align-items: center; gap: 6px; background: #fff; border: 1px solid #d1d5db; border-radius: 10px; padding: 8px 16px; font-size: 13.5px; font-weight: 600; color: #374151; cursor: pointer; transition: background 0.15s ease; box-shadow: 0 1px 2px rgba(0,0,0,0.03); }
         .emp-export-btn:hover { background: #f9fafb; }
-        .emp-add-btn { background: #16233a; color: #fff; border: none; border-radius: 10px; padding: 9px 18px; font-size: 13.5px; font-weight: 700; cursor: pointer; transition: background 0.15s ease; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
-        .emp-add-btn:hover { background: #0f172a; }
+        .emp-add-btn { background: var(--primary); color: #fff; border: none; border-radius: 10px; padding: 9px 18px; font-size: 13.5px; font-weight: 700; cursor: pointer; transition: background 0.15s ease; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+        .emp-add-btn:hover { background: var(--primary-dark); }
         
         .emp-card { background: #fff; border: 1px solid #e8edf3; border-radius: 16px; box-shadow: 0 1px 3px rgba(16,24,40,0.03); }
         .emp-filter-card { border: none; padding: 12px 18px; display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; margin-bottom: 16px; }

@@ -521,16 +521,30 @@ const useAttendanceStoreBase = create((set, get) => ({
     get().refreshAttendance();
   },
 
-  saveFlexibility: (flexibility) => {
+  saveFlexibility: async (flexibility) => {
     set({ flexibility });
-    pushFlexibility(flexibility)
-      .then(() => {
-        get().refreshAttendance();
-        get().fetchTodayPunch();
-      })
-      .catch((err) => {
-        console.warn("[HRMS] flexibility not saved:", err?.message || err);
-      });
+    try {
+      const res = await pushFlexibility(flexibility);
+      get().refreshAttendance();
+      get().fetchTodayPunch();
+      return res || true;
+    } catch (err) {
+      console.warn("[HRMS] flexibility not saved:", err?.message || err);
+      return null;
+    }
+  },
+
+  loadFlexibility: async () => {
+    try {
+      const flex = await pullFlexibility();
+      if (flex && typeof flex === "object") {
+        set({ flexibility: flex });
+        return flex;
+      }
+    } catch (err) {
+      console.warn("[HRMS] loadFlexibility failed:", err?.message || err);
+    }
+    return null;
   },
 
   // Which view the screen shows (HR vs employee); a UI choice, not stored data.

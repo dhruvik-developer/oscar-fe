@@ -2,6 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { fetchMe } from '../services/authService';
 import { hasStoredSession } from '../utils/authUtils';
 import { useAppStore } from '../stores/appStore';
+import { registerAppStore } from '../services/lazyModules';
+
+registerAppStore(useAppStore);
 
 /**
  * SessionGate — turns the stored token back into a real user before the app

@@ -495,14 +495,6 @@ export default function Flexibility() {
           >
             Discard Changes
           </button>
-          <button
-            type="button"
-            onClick={save}
-            disabled={!canEdit || saving || !loaded}
-            className="px-4 py-2 text-[12.5px] font-semibold text-white bg-[#1e3a8a] rounded-xl hover:bg-[#1e40af] disabled:opacity-50"
-          >
-            {saving ? "Saving…" : "Save Changes"}
-          </button>
         </div>
       </div>
     </div>

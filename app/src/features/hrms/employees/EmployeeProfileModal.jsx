@@ -469,33 +469,53 @@ export default function EmployeeProfileModal({ isOpen, employee, onClose, onEmpl
                       <tr>
                         <th className="p-2.5">Date</th>
                         <th className="p-2.5">Status</th>
-                        <th className="p-2.5">Check In</th>
-                        <th className="p-2.5">Check Out</th>
-                        <th className="p-2.5">Work Hours</th>
+                        <th className="p-2.5">First Punch</th>
+                        <th className="p-2.5">Last Punch</th>
+                        <th className="p-2.5">Break</th>
+                        <th className="p-2.5">Net Work Hours</th>
+                        <th className="p-2.5">Late</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-[#f1f5f9]">
-                      {employeeAttendance.map((rec, i) => (
-                        <tr key={rec.id || i} className="hover:bg-[#f8fafc]">
-                          <td className="p-2.5 font-medium text-slate-900">{rec.date || "—"}</td>
-                          <td className="p-2.5">
-                            <span
-                              className={`px-2 py-0.5 rounded-full text-[11px] font-semibold ${
-                                rec.status === "Present"
-                                  ? "bg-emerald-50 text-emerald-700"
-                                  : rec.status === "Half Day"
-                                  ? "bg-amber-50 text-amber-700"
-                                  : "bg-slate-100 text-slate-700"
-                              }`}
-                            >
-                              {rec.status || "Present"}
-                            </span>
-                          </td>
-                          <td className="p-2.5 text-slate-600">{rec.checkIn || rec.inTime || "09:30 AM"}</td>
-                          <td className="p-2.5 text-slate-600">{rec.checkOut || rec.outTime || "06:30 PM"}</td>
-                          <td className="p-2.5 text-slate-600 font-medium">{rec.workHours || "8.5 hrs"}</td>
-                        </tr>
-                      ))}
+                      {employeeAttendance.map((rec, i) => {
+                        const firstPunch = rec.firstPunch || rec.first_punch || rec.checkIn || rec.inTime || "—";
+                        const lastPunch = rec.lastPunch || rec.last_punch || rec.checkOut || rec.outTime || "—";
+                        const breakMin = rec.totalBreakMinutes ?? rec.total_break_minutes ?? 0;
+                        const lateMin = rec.lateMinutes ?? rec.late_minutes ?? 0;
+                        const netHours = rec.formattedWorkingHours || (rec.workingHours != null && Number(rec.workingHours) > 0 ? `${Number(rec.workingHours).toFixed(1)} hrs` : (rec.workHours || "—"));
+
+                        return (
+                          <tr key={rec.id || i} className="hover:bg-[#f8fafc]">
+                            <td className="p-2.5 font-medium text-slate-900">{rec.date || "—"}</td>
+                            <td className="p-2.5">
+                              <span
+                                className={`px-2 py-0.5 rounded-full text-[11px] font-semibold ${
+                                  rec.status === "Present"
+                                    ? "bg-emerald-50 text-emerald-700"
+                                    : rec.status === "Half Day"
+                                    ? "bg-amber-50 text-amber-700"
+                                    : "bg-slate-100 text-slate-700"
+                                }`}
+                              >
+                                {rec.status || "Present"}
+                              </span>
+                            </td>
+                            <td className="p-2.5 text-slate-600 font-mono text-[11px]">{firstPunch}</td>
+                            <td className="p-2.5 text-slate-600 font-mono text-[11px]">{lastPunch}</td>
+                            <td className="p-2.5 text-amber-600 font-medium">{breakMin > 0 ? `${breakMin}m` : "0m"}</td>
+                            <td className="p-2.5 text-slate-700 font-semibold">{netHours}</td>
+                            <td className="p-2.5">
+                              {lateMin > 0 ? (
+                                <span className="px-1.5 py-0.5 rounded bg-rose-50 text-rose-700 font-semibold text-[10px]">
+                                  {lateMin} min late
+                                </span>
+                              ) : (
+                                <span className="text-slate-400 text-[11px]">On time</span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>

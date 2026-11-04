@@ -134,10 +134,12 @@ export default function Appraisal() {
   // Sync to Employee Profile
   function handleSyncToProfile(r) {
     const success = syncRatingToProfile(r.id);
+    const ratingVal = Number(r?.rating ?? r?.finalRating ?? r?.managerRating ?? r?.selfRating ?? 0);
+    const empName = r?.employee || r?.employeeName || 'Employee';
     if (success) {
-      showToast(`Appraisal rating (${r.rating.toFixed(1)}/5) synced to ${r.employee}'s employee profile & bonus record!`);
+      showToast(`Appraisal rating (${ratingVal.toFixed(1)}/5) synced to ${empName}'s employee profile & bonus record!`);
     } else {
-      showToast(`Rating (${r.rating.toFixed(1)}/5) recorded for ${r.employee}.`);
+      showToast(`Rating (${ratingVal.toFixed(1)}/5) recorded for ${empName}.`);
     }
   }
 

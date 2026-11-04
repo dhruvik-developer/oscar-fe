@@ -16,6 +16,39 @@
  */
 import { getStoredToken } from '../utils/authUtils';
 
+let appStoreRef = null;
+
+/**
+ * Register the main app store reference for permission checks.
+ */
+export function registerAppStore(store) {
+  appStoreRef = store;
+}
+
+/**
+ * Check if the active session holds the required permission(s).
+ * Accepts a permission string or an array of strings (any match = true).
+ * Superusers and users with '*' permission always pass.
+ */
+export function sessionCan(permission) {
+  if (!permission) return true;
+  const store = appStoreRef || (typeof window !== 'undefined' ? window.__evenmore_appStore : null);
+  if (!store) return true;
+  const state = store.getState?.();
+  if (!state) return true;
+
+  const user = state.currentUser;
+  // If the user profile has not finished loading yet, avoid falsely blocking reads
+  if (!user && getStoredToken()) return true;
+
+  if (user?.is_superuser || user?.isSuperuser) return true;
+  const permissions = state.permissions || [];
+  if (permissions.includes('*')) return true;
+
+  const reqList = Array.isArray(permission) ? permission : [permission];
+  return reqList.some((code) => permissions.includes(code));
+}
+
 /** How long a failed hydration is left alone before a read may retry it. */
 const RETRY_AFTER_MS = 15000;
 

@@ -3,7 +3,6 @@ import {
   Calendar as CalendarIcon,
   Plus,
   Search,
-  Download,
   Filter,
   RotateCcw,
   Sparkles,
@@ -14,6 +13,7 @@ import {
 } from "lucide-react";
 import { useAppStore } from "../../../stores/appStore";
 import { useCalendarStore } from "../../../stores/calendarStore";
+import hrmsSync from "../../../services/hrmsSync";
 import { EVENT_CATEGORIES, DEPARTMENTS, MONTH_NAMES } from "./calendarConfig";
 import {
   formatDateKey,
@@ -73,6 +73,36 @@ export function CalendarPage() {
   const [modalDefaultDate, setModalDefaultDate] = useState("");
   const [deptDropdownOpen, setDeptDropdownOpen] = useState(false);
   const deptRef = useRef(null);
+
+  useEffect(() => {
+    // Automatically load backend holidays into calendar
+    let cancelled = false;
+    hrmsSync.pull('holidays')
+      .then((holidaysList) => {
+        if (cancelled || !Array.isArray(holidaysList) || holidaysList.length === 0) return;
+        holidaysList.forEach((h) => {
+          const hDate = h.date || h.holidayDate;
+          if (!hDate) return;
+          const existing = events.find((ev) => (ev.date === hDate || ev.startDate === hDate) && (ev.title === h.name || ev.title === h.title));
+          if (!existing) {
+            addEvent({
+              title: h.name || h.title,
+              date: hDate,
+              startDate: hDate,
+              endDate: hDate,
+              category: "Holiday",
+              department: "All Departments",
+              location: "All Locations",
+              description: h.description || `Official Holiday: ${h.name || h.title}`,
+              isMandatory: true,
+              isServerSynced: true,
+            });
+          }
+        });
+      })
+      .catch((err) => console.warn("[HRMS] calendar holidays sync:", err));
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => {
     function handleClickOutside(e) {
@@ -303,17 +333,6 @@ export function CalendarPage() {
                 </button>
               ))}
             </div>
-
-            {/* Export to ICS button */}
-            <button
-              type="button"
-              onClick={handleExport}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-white border border-bdr text-slate-700 rounded-xl text-[13px] font-medium hover:bg-off transition shadow-xs cursor-pointer"
-              title="Export calendar to iCal (.ics) for Google/Outlook Calendar"
-            >
-              <Download size={15} />
-              Export (.ics)
-            </button>
 
             {/* Add Event Button */}
             <button

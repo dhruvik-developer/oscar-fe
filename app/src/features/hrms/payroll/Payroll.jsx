@@ -37,6 +37,7 @@ import { aggregatePayrollStats, formatINR } from "./salaryCalculations";
 import { describeError, localISODate } from "../../../services/hrmsSync";
 import { Badge } from "../../../components/hrms/Badge";
 import PageHeader from "../../../components/ui/PageHeader";
+import AppPagination from "../../../components/ui/AppPagination";
 import { hrmsGuides } from "../../../data/hrms/hrmsGuides";
 import { Avatar } from "../../../components/hrms/Avatar";
 
@@ -559,6 +560,19 @@ export default function Payroll() {
     });
   }, [computedEmployeePayrolls, empSearch, deptFilter, statusFilter]);
 
+  // Employee-wise table pagination
+  const [empPage, setEmpPage] = useState(1);
+  const [empPageSize, setEmpPageSize] = useState(10);
+
+  useEffect(() => {
+    setEmpPage(1);
+  }, [empSearch, deptFilter, statusFilter, period, empPageSize]);
+
+  const paginatedEmployees = useMemo(() => {
+    const start = (empPage - 1) * empPageSize;
+    return filteredEmployees.slice(start, start + empPageSize);
+  }, [filteredEmployees, empPage, empPageSize]);
+
   // Own salary: the signed-in employee's payslips, newest first.
   const ownHistory = useMemo(
     () =>
@@ -567,6 +581,19 @@ export default function Payroll() {
         .sort((a, b) => String(b.period || b.month || "").localeCompare(String(a.period || a.month || ""))),
     [ownHistoryRaw]
   );
+
+  // My Salary / History table pagination
+  const [historyPage, setHistoryPage] = useState(1);
+  const [historyPageSize, setHistoryPageSize] = useState(10);
+
+  useEffect(() => {
+    setHistoryPage(1);
+  }, [period, historyPageSize]);
+
+  const paginatedHistory = useMemo(() => {
+    const start = (historyPage - 1) * historyPageSize;
+    return ownHistory.slice(start, start + historyPageSize);
+  }, [ownHistory, historyPage, historyPageSize]);
   const ownRecord = useMemo(
     () => ownHistory.find((h) => h.period === period) || ownHistory[0] || null,
     [ownHistory, period]
@@ -1349,7 +1376,7 @@ export default function Payroll() {
                       </td>
                     </tr>
                   ) : (
-                    filteredEmployees.map((p) => {
+                    paginatedEmployees.map((p) => {
                       const rowBusy = busyRowId === p.id;
                       const editable = p.status === "In Progress" || p.status === "Ready for Review" || !p.status;
                       return (
@@ -1515,6 +1542,14 @@ export default function Payroll() {
                 </tbody>
               </table>
             </div>
+            <AppPagination
+              total={filteredEmployees.length}
+              page={empPage}
+              pageSize={empPageSize}
+              onPageChange={setEmpPage}
+              onPageSizeChange={setEmpPageSize}
+              pageSizeOptions={[10, 25, 50, 100]}
+            />
           </div>
         </div>
       )}
@@ -1758,7 +1793,7 @@ export default function Payroll() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-bdr/40">
-                  {ownHistory.map((h) => (
+                  {paginatedHistory.map((h) => (
                     <tr key={h.id} className="hover:bg-slate-50/60 transition">
                       <td className="py-3 px-5 font-medium text-slate-900">{slipMonth(h)}</td>
                       <td className="py-3 px-5"><Badge tone={statusTone(h.status)}>{h.status}</Badge></td>
@@ -1798,6 +1833,14 @@ export default function Payroll() {
                 </tbody>
               </table>
             </div>
+            <AppPagination
+              total={ownHistory.length}
+              page={historyPage}
+              pageSize={historyPageSize}
+              onPageChange={setHistoryPage}
+              onPageSizeChange={setHistoryPageSize}
+              pageSizeOptions={[10, 25, 50]}
+            />
           </div>
         </div>
       )}

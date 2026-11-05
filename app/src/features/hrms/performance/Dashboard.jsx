@@ -6,6 +6,7 @@ import { DataTable } from "../../../components/hrms/DataTable";
 import { StatusBadge } from "../../../components/hrms/StatusBadge";
 import { Modal } from "../../../components/hrms/Modal";
 import { Button } from "../../../components/hrms/Button";
+import { Avatar } from "../../../components/hrms/Avatar";
 import PageHeader from "../../../components/ui/PageHeader";
 import { hrmsGuides } from "../../../data/hrms/hrmsGuides";
 import {
@@ -169,7 +170,7 @@ export default function Dashboard() {
       sortable: true,
       render: (r) => (
         <div className="flex items-center gap-2.5">
-          <img src={r.avatar} alt="" className="w-7 h-7 rounded-full object-cover border border-[#e2e8f0]" />
+          <Avatar name={r.employee} size="sm" />
           <div>
             <div className="font-medium text-slate-800 text-[13px]">{r.employee}</div>
             <div className="text-[11px] text-slate-500">{r.designation} • {r.department}</div>
@@ -251,7 +252,7 @@ export default function Dashboard() {
         actions={
           <button
             onClick={handleOpenNewCycle}
-            className="bg-[#16233a] text-white px-4 py-2 rounded-xl text-[13px] font-medium hover:bg-[#0f172a] transition shadow-2xs flex items-center gap-1.5"
+            className="bg-primary hover:bg-primary-hover text-white px-4 py-2 rounded-xl text-[13px] font-medium transition shadow-2xs flex items-center gap-1.5 cursor-pointer"
           >
             <Plus size={15} />
             New Review Cycle
@@ -416,7 +417,7 @@ export default function Dashboard() {
                 onClick={() => setStageFilter(st)}
                 className={`h-8 px-3 rounded-xl text-[12px] font-medium transition ${
                   stageFilter === st
-                    ? "bg-[#16233a] text-white shadow-2xs"
+                    ? "bg-primary text-white shadow-2xs"
                     : "bg-white text-slate-600 border border-[#e2e8f0] hover:bg-slate-50"
                 }`}
               >

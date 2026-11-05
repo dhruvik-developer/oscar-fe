@@ -20,6 +20,7 @@ import {
   Briefcase,
   ChevronRight,
   Eye,
+  Pencil,
   Plane,
   ShieldCheck,
   Shield,
@@ -906,6 +907,34 @@ export default function EmployeePortal() {
     }
   };
 
+  const handleEditPortalAttendanceRequest = (req) => {
+    if (String(req.status || '').toLowerCase() === 'approved') {
+      showToast?.('Approved attendance requests cannot be modified or edited.', 'error');
+      return;
+    }
+    const rawDate = req.date || req.work_date || todayISO();
+    const cleanReason = String(req.reason || '').replace(/^\[[^\]]*\]\s*/, '');
+    if (req.requestType === 'EARLY') {
+      setEarlyLeaveForm({
+        date: rawDate,
+        departureTime: req.requestedOut || req.checkOut || '15:00',
+        category: 'Doctor / Medical Appointment',
+        reason: cleanReason,
+      });
+      setIsEarlyLeaveModalOpen(true);
+    } else {
+      setRegForm({
+        date: rawDate,
+        type: 'Missed Punch In',
+        requestedCheckIn: req.requestedIn || req.checkIn || '09:00',
+        requestedCheckOut: req.requestedOut || req.checkOut || '18:30',
+        requestedStatus: req.requestedStatus || 'Present',
+        reason: cleanReason,
+      });
+      setIsRegModalOpen(true);
+    }
+  };
+
   // 3. Submit Early Leave / Clock-Out Request
   const handleSubmitEarlyLeave = async (e) => {
     e.preventDefault();
@@ -915,6 +944,18 @@ export default function EmployeePortal() {
     }
     if (!earlyLeaveForm.reason.trim()) {
       showToast?.('Please specify why you need to leave early.', 'error');
+      return;
+    }
+
+    const targetDate = earlyLeaveForm.date;
+    const existingApproved = unifiedRequests.find(
+      (r) =>
+        ['REGULARIZATION', 'EARLY', 'HALFDAY'].includes(r.requestType) &&
+        (r.date === targetDate || r.work_date === targetDate) &&
+        String(r.status || '').toLowerCase() === 'approved'
+    );
+    if (existingApproved) {
+      showToast?.('An attendance request for this date has already been approved and cannot be modified.', 'error');
       return;
     }
 
@@ -954,6 +995,18 @@ export default function EmployeePortal() {
     }
     if (!regForm.reason.trim()) {
       showToast?.('Please state the reason for attendance regularization.', 'error');
+      return;
+    }
+
+    const targetDate = regForm.date;
+    const existingApproved = unifiedRequests.find(
+      (r) =>
+        ['REGULARIZATION', 'EARLY', 'HALFDAY'].includes(r.requestType) &&
+        (r.date === targetDate || r.work_date === targetDate) &&
+        String(r.status || '').toLowerCase() === 'approved'
+    );
+    if (existingApproved) {
+      showToast?.('An attendance request for this date has already been approved and cannot be modified.', 'error');
       return;
     }
 
@@ -2425,6 +2478,15 @@ export default function EmployeePortal() {
 
                     <td className="py-3 px-5 text-right">
                       <div className="inline-flex flex-wrap items-center justify-end gap-1.5">
+                        {['REGULARIZATION', 'EARLY'].includes(req.requestType) && String(req.status || '').toLowerCase() === 'pending' && (
+                          <button
+                            type="button"
+                            onClick={() => handleEditPortalAttendanceRequest(req)}
+                            className="px-2.5 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 text-[11px] font-semibold inline-flex items-center gap-1 cursor-pointer transition-colors"
+                          >
+                            <Pencil size={12} /> Edit
+                          </button>
+                        )}
                         {req.requestType === 'ASSET' && req.canWithdraw && (
                           <button
                             type="button"
@@ -3279,6 +3341,11 @@ export default function EmployeePortal() {
           }
         >
           <div className="space-y-3.5 text-xs">
+            {String(viewRequestModal.status || '').toLowerCase() === 'approved' && (
+              <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold flex items-center gap-2">
+                <span>🔒 This request is approved and locked. It cannot be changed or edited.</span>
+              </div>
+            )}
             <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-bdr">
               <span className="font-bold text-slate-700">HR Verification Status:</span>
               <span>{getStatusBadge(viewRequestModal.status)}</span>

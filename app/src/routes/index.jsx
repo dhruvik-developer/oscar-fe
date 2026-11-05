@@ -60,6 +60,15 @@ const PMSDailyProductionPage = lazy(() => import('../features/pms/production/Dai
 const PMSPublicProductionEntryPage = lazy(() => import('../features/pms/production/PublicProductionEntryPage'));
 const PMSProductionCompletionPage = lazy(() => import('../features/pms/production/ProductionCompletionVerificationPage'));
 
+// Loom & Weaving Manufacturing Subsystem
+const LoomDashboardPage = lazy(() => import('../features/pms/loom/LoomDashboardPage'));
+const MachinesAndBeamsPage = lazy(() => import('../features/pms/loom/MachinesAndBeamsPage'));
+const DailyLoomEntryPage = lazy(() => import('../features/pms/loom/DailyLoomEntryPage'));
+const YarnManagementPage = lazy(() => import('../features/pms/loom/YarnManagementPage'));
+const LoomProgramsPage = lazy(() => import('../features/pms/loom/LoomProgramsPage'));
+const FabricOutPage = lazy(() => import('../features/pms/loom/FabricOutPage'));
+const LoomMastersPage = lazy(() => import('../features/pms/loom/LoomMastersPage'));
+
 // ── HRMS (Lazy Loaded) ───────────────────────────────────────
 const HRMSDashboard = lazy(() => import('../features/hrms/dashboard/Dashboard'));
 const Employees = lazy(() => import('../features/hrms/employees/Employees'));
@@ -416,7 +425,8 @@ const router = createBrowserRouter([
       // { path: 'crm/quotations', element: <Page component={QuotationsPage} /> },
 
       // ── PMS — Project Management ──────────────────────────
-      { path: 'pms', element: <Page component={PMSDashboard} /> },
+      { path: 'pms', element: <Page component={LoomDashboardPage} /> },
+      { path: 'pms/legacy-dashboard', element: <Page component={PMSDashboard} /> },
       { path: 'pms/projects', element: <Page component={PMSProjectsPage} /> },
       { path: 'pms/projects/:id', element: <Page component={PMSProjectDetailPage} /> },
       { path: 'pms/my-projects', element: <Page component={PMSMyProjectsPage} /> },
@@ -429,6 +439,15 @@ const router = createBrowserRouter([
       { path: 'pms/production-instructions', element: <Page component={PMSProductionInstructionsPage} /> },
       { path: 'pms/daily-production', element: <Page component={PMSDailyProductionPage} /> },
       { path: 'pms/production-completion', element: <Page component={PMSProductionCompletionPage} /> },
+
+      // Loom & Weaving Manufacturing
+      { path: 'pms/loom-dashboard', element: <Page component={LoomDashboardPage} /> },
+      { path: 'pms/looms', element: <Page component={MachinesAndBeamsPage} /> },
+      { path: 'pms/loom-daily', element: <Page component={DailyLoomEntryPage} /> },
+      { path: 'pms/yarn', element: <Page component={YarnManagementPage} /> },
+      { path: 'pms/programs', element: <Page component={LoomProgramsPage} /> },
+      { path: 'pms/fabric-out', element: <Page component={FabricOutPage} /> },
+      { path: 'pms/loom-masters', element: <Page component={LoomMastersPage} /> },
       // Salesperson incentive lives in HRMS only; old links land there.
       { path: 'production/incentives', element: <Navigate to="/hrms/incentives" replace /> },
       { path: 'pms/incentives', element: <Navigate to="/hrms/incentives" replace /> },

@@ -65,7 +65,7 @@ const useDocumentStoreBase = create((set, get) => ({
 
   /** The stored file as a Blob, through a freshly signed download link. */
   fetchDocumentFile: async (doc) => {
-    if (!doc?.hasFile) throw new Error("No file is attached to this document.");
+    if (!doc?.hasFile && !doc?.fileId) throw new Error("No file is attached to this document.");
     const res = await api.get(`/hrms/documents/${doc.id}/download/`);
     const link = res?.downloadUrl || res?.data?.downloadUrl;
     if (!link) throw new Error("The server did not return a download link.");

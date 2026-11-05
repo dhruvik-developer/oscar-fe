@@ -221,7 +221,7 @@ export default function KpiData() {
     { value: "Draft", label: "Draft" },
   ];
 
-  function FormFields() {
+  function renderFormFields() {
     return (
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <label className="sm:col-span-2 flex flex-col gap-1">
@@ -394,7 +394,7 @@ export default function KpiData() {
           </>
         }
       >
-        <FormFields />
+        {renderFormFields()}
       </Modal>
 
       {/* Edit Modal */}
@@ -411,7 +411,7 @@ export default function KpiData() {
           </>
         }
       >
-        <FormFields />
+        {renderFormFields()}
       </Modal>
 
       {/* View Drawer */}

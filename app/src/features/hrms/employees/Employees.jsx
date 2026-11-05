@@ -11,17 +11,31 @@ import { useTableSort } from "../../../hooks/useTableSort";
 import SortableTh from "../../../components/ui/SortableTh";
 
 const DEPARTMENTS = ["All", "Engineering", "Design", "Marketing", "Finance", "HR", "Operations", "Sales"];
-const STATUSES = ["All", "Active", "On Leave", "Probation"];
+const STATUSES = [
+  "All",
+  "Active",
+  "Inactive",
+  "On Leave",
+  "Probation",
+  "Notice Period",
+  "Resigned",
+  "Terminated",
+];
 
 const statusStyles = {
   Active: { background: "#e6f4ea", color: "#15803d", border: "#a7f3d0" },
+  Inactive: { background: "#f1f5f9", color: "#64748b", border: "#cbd5e1" },
   "On Leave": { background: "#fef3c7", color: "#b45309", border: "#fde68a" },
   Probation: { background: "#f1f5f9", color: "#475569", border: "#cbd5e1" },
+  "Notice Period": { background: "#fff7ed", color: "#c2410c", border: "#ffedd5" },
+  Resigned: { background: "#fef2f2", color: "#b91c1c", border: "#fecaca" },
+  Terminated: { background: "#fee2e2", color: "#991b1b", border: "#fca5a5" },
 };
 
 export default function Employees() {
   const storeEmployees = useAppStore((s) => s.employees || []);
   const addStoreEmployee = useAppStore((s) => s.addEmployee);
+  const updateStoreEmployee = useAppStore((s) => s.updateEmployee);
   const deleteStoreEmployee = useAppStore((s) => s.deleteEmployee);
   const setToast = useAppStore((s) => s.setToast || s.showToast);
   const [dept, setDept] = useState("All");
@@ -30,7 +44,7 @@ export default function Employees() {
   const [showForm, setShowForm] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedEmployee, setSelectedEmployee] = useState(null);
-  const pageSize = 5;
+  const [pageSize, setPageSize] = useState(10);
 
   useEffect(() => {
     useAppStore.getState().refreshHrms?.("employees");
@@ -51,6 +65,7 @@ export default function Employees() {
     dept: "Engineering",
     location: "Mumbai",
     managerId: "",
+    standardSalary: "",
   });
 
   const filtered = useMemo(
@@ -86,6 +101,8 @@ export default function Employees() {
       manager: managerRow?.name || undefined,
       reportingManager: managerRow?.name || undefined,
       reportingManagerId: form.managerId || undefined,
+      standardSalary: form.standardSalary ? Math.max(0, Number(form.standardSalary)) : 0,
+      standard_salary: form.standardSalary ? Math.max(0, Number(form.standardSalary)) : 0,
       joiningDate: new Date().toISOString().slice(0, 10),
       status: "Active",
       avatar: null,
@@ -97,7 +114,7 @@ export default function Employees() {
       }
     }).catch(() => {});
     setShowForm(false);
-    setForm({ name: "", email: "", designation: "Senior Engineer", dept: "Engineering", location: "Mumbai", managerId: "" });
+    setForm({ name: "", email: "", designation: "Senior Engineer", dept: "Engineering", location: "Mumbai", managerId: "", standardSalary: "" });
   }
 
   async function handleDelete(id, name) {
@@ -268,9 +285,38 @@ export default function Employees() {
                     <td style={{ color: "#374151" }}>{row.department}</td>
                     <td style={{ color: "#374151" }}>{row.manager || row.reportingManager || "—"}</td>
                     <td>
-                      <span className="emp-status" style={{ ...statusStyles[row.status] }}>
-                        {row.status}
-                      </span>
+                      <select
+                        value={row.status || "Active"}
+                        onClick={(e) => e.stopPropagation()}
+                        onChange={async (e) => {
+                          e.stopPropagation();
+                          const nextStatus = e.target.value;
+                          try {
+                            await updateStoreEmployee(row.id, { status: nextStatus });
+                            setToast(`Status updated to ${nextStatus} for ${row.name}`);
+                          } catch (err) {
+                            setToast(`Could not update status: ${err?.message || "Error"}`);
+                          }
+                        }}
+                        className="emp-status-select"
+                        style={{
+                          ...(statusStyles[row.status] || statusStyles.Active),
+                          cursor: "pointer",
+                          fontSize: "12px",
+                          fontWeight: "600",
+                          borderRadius: "999px",
+                          padding: "3px 10px",
+                          border: "1px solid",
+                          outline: "none",
+                        }}
+                        title="Change Employee Status"
+                      >
+                        {STATUSES.filter((s) => s !== "All").map((st) => (
+                          <option key={st} value={st} style={{ background: "#fff", color: "#1f2937" }}>
+                            {st}
+                          </option>
+                        ))}
+                      </select>
                     </td>
                     <td>
                       <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
@@ -355,9 +401,38 @@ export default function Employees() {
                 </div>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 12 }}>
                   <span className="emp-id">{row.empId || row.employeeCode || row.id}</span>
-                  <span className="emp-status" style={{ ...statusStyles[row.status] }}>
-                    {row.status}
-                  </span>
+                  <select
+                    value={row.status || "Active"}
+                    onClick={(e) => e.stopPropagation()}
+                    onChange={async (e) => {
+                      e.stopPropagation();
+                      const nextStatus = e.target.value;
+                      try {
+                        await updateStoreEmployee(row.id, { status: nextStatus });
+                        setToast(`Status updated to ${nextStatus} for ${row.name}`);
+                      } catch (err) {
+                        setToast(`Could not update status: ${err?.message || "Error"}`);
+                      }
+                    }}
+                    className="emp-status-select"
+                    style={{
+                      ...(statusStyles[row.status] || statusStyles.Active),
+                      cursor: "pointer",
+                      fontSize: "12px",
+                      fontWeight: "600",
+                      borderRadius: "999px",
+                      padding: "3px 10px",
+                      border: "1px solid",
+                      outline: "none",
+                    }}
+                    title="Change Employee Status"
+                  >
+                    {STATUSES.filter((s) => s !== "All").map((st) => (
+                      <option key={st} value={st} style={{ background: "#fff", color: "#1f2937" }}>
+                        {st}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
             ))}
@@ -370,6 +445,8 @@ export default function Employees() {
           page={currentPage}
           pageSize={pageSize}
           onPageChange={setCurrentPage}
+          onPageSizeChange={setPageSize}
+          pageSizeOptions={[10, 25, 50, 100]}
         />
       </div>
 
@@ -462,6 +539,28 @@ export default function Employees() {
               />
             </div>
           </div>
+          <div className="form-row">
+            <div className="form-group" style={{ width: "100%" }}>
+              <label className="form-label">Standard Monthly Salary (₹)</label>
+              <input
+                className="form-input font-mono"
+                type="number"
+                min="0"
+                step="500"
+                placeholder="e.g. 50000"
+                value={form.standardSalary}
+                onChange={(e) => setForm({ ...form, standardSalary: e.target.value })}
+              />
+              <span style={{ fontSize: "11px", color: "#64748b", marginTop: 4, display: "block" }}>
+                Baseline monthly CTC used for payroll, attendance deductions, and payslip generation.
+              </span>
+              {form.standardSalary && Number(form.standardSalary) > 0 ? (
+                <span style={{ fontSize: "11px", color: "#166534", marginTop: 2, display: "block", fontWeight: 600 }}>
+                  Live Daily Rate: ₹{Math.round(Number(form.standardSalary) / 24).toLocaleString("en-IN")}/day (connected to attendance deductions in payroll)
+                </span>
+              ) : null}
+            </div>
+          </div>
         </div>
       </Modal>
 
@@ -489,15 +588,15 @@ export default function Employees() {
 
         .emp-action-btn { border: none; background: transparent; color: #64748b; cursor: pointer; padding: 4px; border-radius: 6px; display: grid; place-items: center; transition: all 0.15s ease; }
         .emp-action-btn:hover { color: #0f172a; background: #e2e8f0; }
-        .emp-dir-page { background: #f8fafc; margin: -24px -28px -40px; padding: 18px 26px 28px; min-height: calc(100vh - 62px); }
+        .emp-dir-page { background: #f8fafc; margin: -16px -24px -24px; padding: 18px 24px 28px; min-height: calc(100vh - 62px); }
         .emp-crumb { display: flex; align-items: center; gap: 6px; font-size: 13px; color: #6b7a90; margin-bottom: 10px; }
         .emp-title-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; flex-wrap: wrap; margin-bottom: 16px; }
         .emp-title { margin: 0; font-size: 24px; font-weight: 800; color: #111827; letter-spacing: -0.01em; }
         .emp-sub { margin: 4px 0 0; font-size: 13px; color: #6b7280; }
         .emp-export-btn { display: inline-flex; align-items: center; gap: 6px; background: #fff; border: 1px solid #d1d5db; border-radius: 10px; padding: 8px 16px; font-size: 13.5px; font-weight: 600; color: #374151; cursor: pointer; transition: background 0.15s ease; box-shadow: 0 1px 2px rgba(0,0,0,0.03); }
         .emp-export-btn:hover { background: #f9fafb; }
-        .emp-add-btn { background: #16233a; color: #fff; border: none; border-radius: 10px; padding: 9px 18px; font-size: 13.5px; font-weight: 700; cursor: pointer; transition: background 0.15s ease; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
-        .emp-add-btn:hover { background: #0f172a; }
+        .emp-add-btn { background: var(--primary); color: #fff; border: none; border-radius: 10px; padding: 9px 18px; font-size: 13.5px; font-weight: 700; cursor: pointer; transition: background 0.15s ease; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+        .emp-add-btn:hover { background: var(--primary-dark); }
         
         .emp-card { background: #fff; border: 1px solid #e8edf3; border-radius: 16px; box-shadow: 0 1px 3px rgba(16,24,40,0.03); }
         .emp-filter-card { border: none; padding: 12px 18px; display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; margin-bottom: 16px; }

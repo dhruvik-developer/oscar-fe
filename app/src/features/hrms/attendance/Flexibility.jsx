@@ -145,7 +145,7 @@ export default function Flexibility() {
               type="button"
               onClick={save}
               disabled={!canEdit || saving || !loaded}
-              className="inline-flex items-center gap-1.5 px-5 py-2 bg-[#1e3a8a] text-white rounded-xl text-[13px] font-semibold hover:bg-[#1e40af] disabled:opacity-50 transition shadow-xs"
+              className="inline-flex items-center gap-1.5 px-5 py-2 bg-primary text-white rounded-xl text-[13px] font-semibold hover:bg-primary-dark disabled:opacity-50 transition shadow-xs"
             >
               <Check size={15} />
               {saving ? "Saving…" : "Save Changes"}

@@ -21,6 +21,7 @@ import { Button } from '../../../components/ui/Button';
 import { productionService, hrmsService } from '../../../services/domainServices';
 import MasterSourceLink from '../../../components/common/MasterSourceLink';
 import { formatINR, formatDate, unwrapList, describeApiError } from '../../accounts/accountingShared';
+import { useERP } from '../../../context/ERPContext';
 
 const STATUS_PILLS = {
   Draft: 'bg-slate-100 text-slate-700 border-slate-300',
@@ -37,6 +38,7 @@ const BASIS_LABELS = {
 };
 
 export default function IncentiveSchemesPage() {
+  const { showToast } = useERP();
   const [activeTab, setActiveTab] = useState('schemes'); // 'schemes' | 'calculations'
 
   // Schemes State
@@ -231,18 +233,20 @@ export default function IncentiveSchemesPage() {
   const handleApproveCalc = async (id) => {
     try {
       await productionService.approveIncentiveCalculation(id);
+      showToast('Incentive calculation approved', 'success');
       loadCalculations();
     } catch (err) {
-      alert(describeApiError(err));
+      showToast(describeApiError(err), 'error');
     }
   };
 
   const handlePostCalc = async (id) => {
     try {
       await productionService.postIncentiveCalculation(id);
+      showToast('Incentive calculation posted to payroll', 'success');
       loadCalculations();
     } catch (err) {
-      alert(describeApiError(err));
+      showToast(describeApiError(err), 'error');
     }
   };
 
@@ -255,10 +259,11 @@ export default function IncentiveSchemesPage() {
         payment_mode: payMode,
         reference: payRef,
       });
+      showToast('Incentive payment recorded successfully', 'success');
       setPayTarget(null);
       loadCalculations();
     } catch (err) {
-      alert(describeApiError(err));
+      showToast(describeApiError(err), 'error');
     } finally {
       setPaying(false);
     }
@@ -269,9 +274,10 @@ export default function IncentiveSchemesPage() {
     if (!reason) return;
     try {
       await productionService.reverseIncentiveCalculation(id, { reason });
+      showToast('Incentive calculation reversed', 'success');
       loadCalculations();
     } catch (err) {
-      alert(describeApiError(err));
+      showToast(describeApiError(err), 'error');
     }
   };
 

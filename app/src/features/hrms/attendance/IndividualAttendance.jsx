@@ -65,6 +65,34 @@ function toHHMM(value) {
   return m ? `${m[1].padStart(2, "0")}:${m[2]}` : String(value);
 }
 
+function toTimeInputValue(val) {
+  if (!val || val === "—" || val === "-" || val === "--:--") return "";
+  const s = String(val).trim();
+  if (s.includes("T")) {
+    const d = new Date(s);
+    if (!isNaN(d.getTime())) {
+      return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+    }
+  }
+  const match = s.match(/(\d{1,2}):(\d{2})(?::\d{2})?\s*(AM|PM)?/i);
+  if (match) {
+    let hours = parseInt(match[1], 10);
+    const mins = match[2];
+    const ampm = match[3]?.toUpperCase();
+    if (ampm === "PM" && hours < 12) hours += 12;
+    if (ampm === "AM" && hours === 12) hours = 0;
+    return `${String(hours).padStart(2, "0")}:${mins}`;
+  }
+  const single = s.match(/^(\d{1,2})$/);
+  if (single) {
+    const h = parseInt(single[1], 10);
+    if (h >= 0 && h <= 23) {
+      return `${String(h).padStart(2, "0")}:00`;
+    }
+  }
+  return "";
+}
+
 function isRecordForEmployee(r, emp) {
   if (!r || !emp) return false;
   const empId = String(emp.id || "").toLowerCase();
@@ -617,6 +645,8 @@ export default function IndividualAttendance() {
         isoDate: cell.isoDate,
         date: cell.formattedDate || cell.record.date,
         dayNum: cell.dayNum,
+        checkIn: toTimeInputValue(cell.record.rawCheckIn || cell.record.checkIn),
+        checkOut: toTimeInputValue(cell.record.rawCheckOut || cell.record.checkOut),
       });
     } else {
       setEditItem({
@@ -1049,7 +1079,13 @@ export default function IndividualAttendance() {
                           <td>
                             <button
                               type="button"
-                              onClick={() => setEditItem({ ...r, isoDate: r.isoDate, dayNum: r.dayNum })}
+                              onClick={() => setEditItem({
+                                ...r,
+                                isoDate: r.isoDate,
+                                dayNum: r.dayNum,
+                                checkIn: toTimeInputValue(r.rawCheckIn || r.checkIn),
+                                checkOut: toTimeInputValue(r.rawCheckOut || r.checkOut),
+                              })}
                               className="ind-btn-edit"
                             >
                               Edit
@@ -1149,6 +1185,8 @@ export default function IndividualAttendance() {
                                   isoDate: r.isoDate,
                                   date: r.date,
                                   dayNum: r.dayNum,
+                                  checkIn: toTimeInputValue(r.record.rawCheckIn || r.record.checkIn),
+                                  checkOut: toTimeInputValue(r.record.rawCheckOut || r.record.checkOut),
                                 });
                               } else {
                                 setEditItem({
@@ -1332,19 +1370,19 @@ export default function IndividualAttendance() {
               <div className="form-group">
                 <label className="form-label">Check In Time</label>
                 <input
-                  className="form-input"
-                  value={editItem.checkIn || ""}
+                  type="time"
+                  className="form-input cursor-pointer font-mono"
+                  value={toTimeInputValue(editItem.checkIn)}
                   onChange={(e) => setEditItem({ ...editItem, checkIn: e.target.value })}
-                  placeholder="09:30"
                 />
               </div>
               <div className="form-group">
                 <label className="form-label">Check Out Time</label>
                 <input
-                  className="form-input"
-                  value={editItem.checkOut || ""}
+                  type="time"
+                  className="form-input cursor-pointer font-mono"
+                  value={toTimeInputValue(editItem.checkOut)}
                   onChange={(e) => setEditItem({ ...editItem, checkOut: e.target.value })}
-                  placeholder="18:30"
                 />
               </div>
             </div>

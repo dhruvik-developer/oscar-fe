@@ -75,7 +75,6 @@ export function CalendarPage() {
   const deptRef = useRef(null);
 
   useEffect(() => {
-    // Automatically load backend holidays into calendar
     let cancelled = false;
     hrmsSync.pull('holidays')
       .then((holidaysList) => {
@@ -83,25 +82,39 @@ export function CalendarPage() {
         holidaysList.forEach((h) => {
           const hDate = h.date || h.holidayDate;
           if (!hDate) return;
-          const existing = events.find((ev) => (ev.date === hDate || ev.startDate === hDate) && (ev.title === h.name || ev.title === h.title));
+          const currentEvents = useCalendarStore.getState().events;
+          const existing = currentEvents.find(
+            (ev) =>
+              ev.sourceId === h.id ||
+              ev.source_id === h.id ||
+              ((ev.date === hDate || ev.startDate === hDate) &&
+                (ev.title || '').toLowerCase() === (h.name || h.title || '').toLowerCase())
+          );
           if (!existing) {
             addEvent({
+              id: `EV-HOL-${h.id}`,
+              source_id: h.id,
+              sourceId: h.id,
+              source_type: 'Holiday',
               title: h.name || h.title,
               date: hDate,
               startDate: hDate,
               endDate: hDate,
-              category: "Holiday",
-              department: "All Departments",
-              location: "All Locations",
-              description: h.description || `Official Holiday: ${h.name || h.title}`,
+              type: 'Holiday',
+              category: 'Holiday',
+              department: 'All Departments',
+              location: h.appliesTo || h.applies_to || 'All Locations',
+              description: h.description || `${h.type || h.holiday_type || 'Official'} Holiday: ${h.name || h.title}`,
               isMandatory: true,
               isServerSynced: true,
             });
           }
         });
       })
-      .catch((err) => console.warn("[HRMS] calendar holidays sync:", err));
-    return () => { cancelled = true; };
+      .catch((err) => console.warn('[HRMS] calendar holidays sync:', err));
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -254,9 +267,9 @@ export function CalendarPage() {
   // Upcoming holidays
   const upcomingHolidays = useMemo(() => {
     return events
-      .filter((ev) => ev.type === "Holiday" && (ev.startDate || ev.date) >= selectedDate)
+      .filter((ev) => (ev.type === "Holiday" || ev.category === "Holiday") && (ev.startDate || ev.date) >= selectedDate)
       .sort((a, b) => (a.startDate || a.date).localeCompare(b.startDate || b.date))
-      .slice(0, 4);
+      .slice(0, 6);
   }, [events, selectedDate]);
 
   // Upcoming fun & culture events
@@ -283,9 +296,30 @@ export function CalendarPage() {
   const handleSaveEvent = (eventData, id) => {
     if (id) {
       updateEvent(id, eventData);
+      if (eventData.type === "Holiday" || eventData.category === "Holiday") {
+        hrmsSync.pull('holidays').then((list) => {
+          const match = (list || []).find((h) => (h.name || '').toLowerCase() === (eventData.title || '').toLowerCase());
+          if (match?.id) {
+            hrmsSync.update('holidays', match.id, {
+              name: eventData.title,
+              date: eventData.startDate || eventData.date,
+              type: "National Gazetted",
+              appliesTo: eventData.location || "All Locations",
+            }).catch(console.warn);
+          }
+        }).catch(console.warn);
+      }
       showToast(`Updated "${eventData.title}"`);
     } else {
       const created = addEvent(eventData);
+      if (eventData.type === "Holiday" || eventData.category === "Holiday") {
+        hrmsSync.create('holidays', {
+          name: eventData.title,
+          date: eventData.startDate || eventData.date,
+          type: "National Gazetted",
+          appliesTo: eventData.location || "All Locations",
+        }).catch(console.warn);
+      }
       showToast(`Scheduled "${created.title}"`);
     }
     setIsModalOpen(false);
@@ -294,6 +328,16 @@ export function CalendarPage() {
   const handleDeleteEvent = (id) => {
     const target = events.find((e) => e.id === id);
     deleteEvent(id);
+    if (target && (target.type === "Holiday" || target.category === "Holiday")) {
+      hrmsSync.pull('holidays').then((list) => {
+        const match = (list || []).find(
+          (h) => (target.source_id && h.id === target.source_id) || (h.name || '').toLowerCase() === (target.title || '').toLowerCase()
+        );
+        if (match?.id) {
+          hrmsSync.remove('holidays', match.id).catch(console.warn);
+        }
+      }).catch(console.warn);
+    }
     setIsModalOpen(false);
     showToast(target ? `Deleted "${target.title}"` : "Event deleted");
   };

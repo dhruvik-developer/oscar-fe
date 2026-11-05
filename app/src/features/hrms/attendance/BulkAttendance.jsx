@@ -16,6 +16,7 @@ import {
 import { Avatar } from "../../../components/hrms/Avatar";
 import { useTableSort } from "../../../hooks/useTableSort";
 import SortableTh from "../../../components/ui/SortableTh";
+import AppPagination from "../../../components/ui/AppPagination";
 
 const STATUS_OPTIONS = ["Present", "Late", "Half Day", "WFH", "Absent", "On Leave"];
 const FILTER_STATUSES = ["Present", "Late", "Half Day", "WFH", "Absent", "On Leave", "Not Marked", "Holiday", "Week Off"];
@@ -103,6 +104,18 @@ export default function BulkAttendance() {
   const sort = useTableSort(filtered, {
     accessors: { checkIn: (e) => e.checkIn || e.checkOut || "" },
   });
+
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  useEffect(() => {
+    setPage(1);
+  }, [dept, location, shift, statusFilter, search, date, pageSize]);
+
+  const paginatedRows = useMemo(() => {
+    const start = (page - 1) * pageSize;
+    return sort.rows.slice(start, start + pageSize);
+  }, [sort.rows, page, pageSize]);
 
   const selectable = useMemo(() => filtered.filter((e) => !e.leaveType), [filtered]);
   const selectedRows = useMemo(() => rows.filter((e) => selectedIds.has(e.employeeId) && !e.leaveType), [rows, selectedIds]);
@@ -344,7 +357,7 @@ export default function BulkAttendance() {
                     </td>
                   </tr>
                 )}
-                {sort.rows.map((e) => {
+                {paginatedRows.map((e) => {
                   const locked = Boolean(e.leaveType);
                   return (
                     <tr key={e.employeeId} className={locked ? "bulk-row-locked" : ""}>
@@ -400,6 +413,14 @@ export default function BulkAttendance() {
             </table>
           </div>
         )}
+        <AppPagination
+          total={filtered.length}
+          page={page}
+          pageSize={pageSize}
+          onPageChange={setPage}
+          onPageSizeChange={setPageSize}
+          pageSizeOptions={[10, 25, 50, 100]}
+        />
       </div>
 
       <ConfirmModal
@@ -422,7 +443,7 @@ export default function BulkAttendance() {
       />
 
       <style>{`
-        .bulk-att-page { background: #f8fafc; margin: -24px -28px -40px; padding: 18px 26px 28px; min-height: calc(100vh - 62px); }
+        .bulk-att-page { background: #f8fafc; margin: -16px -24px -24px; padding: 18px 24px 28px; min-height: calc(100vh - 62px); }
 
         .bulk-card { background: #fff; border: 1px solid #e8edf3; border-radius: 16px; box-shadow: 0 1px 3px rgba(16,24,40,0.03); }
         .bulk-filter-card { border: none; padding: 14px 18px; margin-bottom: 16px; }
@@ -439,17 +460,17 @@ export default function BulkAttendance() {
         .bulk-banner { background: #ecfdf5; border: 1px solid #a7f3d0; color: #065f46; border-radius: 12px; padding: 10px 14px; font-size: 13px; margin-bottom: 14px; }
 
         .bulk-action-card { border: none; padding: 14px 18px; display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; margin-bottom: 16px; }
-        .bulk-checkbox { width: 16px; height: 16px; border-radius: 4px; accent-color: #16233a; cursor: pointer; }
+        .bulk-checkbox { width: 16px; height: 16px; border-radius: 4px; accent-color: var(--primary); cursor: pointer; }
 
         .bulk-pills-group { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
         .bulk-pill { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 6px 14px; font-size: 12.5px; font-weight: 500; color: #475569; cursor: pointer; transition: all 0.15s ease; }
         .bulk-pill:hover { background: #f8fafc; color: #111827; }
-        .bulk-pill.active { background: #16233a; color: #fff; border-color: #16233a; font-weight: 600; }
+        .bulk-pill.active { background: var(--primary); color: #fff; border-color: var(--primary); font-weight: 600; }
 
         .bulk-btn-outline { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 8px 16px; font-size: 13px; font-weight: 500; color: #475569; cursor: pointer; }
         .bulk-btn-outline:hover:not(:disabled) { background: #fef2f2; color: #b91c1c; border-color: #fecaca; }
-        .bulk-btn-save { background: #16233a; color: #fff; border: none; border-radius: 10px; padding: 9px 20px; font-size: 13.5px; font-weight: 700; cursor: pointer; transition: background 0.15s ease; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
-        .bulk-btn-save:hover:not(:disabled) { background: #0f172a; }
+        .bulk-btn-save { background: var(--primary); color: #fff; border: none; border-radius: 10px; padding: 9px 20px; font-size: 13.5px; font-weight: 700; cursor: pointer; transition: background 0.15s ease; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+        .bulk-btn-save:hover:not(:disabled) { background: var(--primary-dark); }
         .bulk-btn-save:disabled, .bulk-btn-outline:disabled { opacity: 0.5; cursor: not-allowed; }
 
         .bulk-main-card { overflow: hidden; }

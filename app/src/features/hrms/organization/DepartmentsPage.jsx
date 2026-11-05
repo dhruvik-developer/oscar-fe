@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useAppStore } from '../../../stores/appStore';
 import { Badge } from '../../../components/hrms/Badge';
 import Modal from '../../../components/ui/Modal';
@@ -8,6 +8,7 @@ import { hrmsSync, isBackendEnabled } from '../../../services/hrmsSync';
 import { Avatar } from "../../../components/hrms/Avatar";
 import { useTableSort } from '../../../hooks/useTableSort';
 import SortableTh from '../../../components/ui/SortableTh';
+import AppPagination from '../../../components/ui/AppPagination';
 import {
   Building2,
   Plus,
@@ -52,6 +53,7 @@ export function DepartmentsPage() {
     String(d.name ?? '').toLowerCase().includes(q.toLowerCase()) ||
     String(d.head ?? '').toLowerCase().includes(q.toLowerCase())
   );
+
   const sort = useTableSort(filtered, {
     accessors: {
       teams: (d) => d.teams || 0,
@@ -60,6 +62,18 @@ export function DepartmentsPage() {
       status: (d) => d.status || 'Active',
     },
   });
+
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  useEffect(() => {
+    setPage(1);
+  }, [q, pageSize]);
+
+  const paginatedRows = useMemo(() => {
+    const start = (page - 1) * pageSize;
+    return sort.rows.slice(start, start + pageSize);
+  }, [sort.rows, page, pageSize]);
 
   async function handleCreate(e) {
     e.preventDefault();
@@ -203,7 +217,7 @@ export function DepartmentsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-bdr/40 text-[13px]">
-                {sort.rows.map((d) => (
+                {paginatedRows.map((d) => (
                   <tr key={d.id} className="hover:bg-off/60 transition-colors">
                     <td className="py-4 px-5 font-semibold text-slate-900 flex items-center gap-2">
                       <Building2 size={16} className="text-navy shrink-0" />
@@ -253,6 +267,14 @@ export function DepartmentsPage() {
               </tbody>
             </table>
           </div>
+          <AppPagination
+            total={filtered.length}
+            page={page}
+            pageSize={pageSize}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+            pageSizeOptions={[10, 25, 50]}
+          />
         </div>
       ) : (
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">

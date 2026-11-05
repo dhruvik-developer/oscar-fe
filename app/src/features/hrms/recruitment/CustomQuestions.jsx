@@ -167,7 +167,7 @@ export default function CustomQuestions() {
     },
   ];
 
-  function FormFields() {
+  function renderFormFields() {
     return (
       <div className="space-y-4 text-[13px]">
         <label className="flex flex-col gap-1.5">
@@ -333,7 +333,7 @@ export default function CustomQuestions() {
           </>
         }
       >
-        <FormFields />
+        {renderFormFields()}
       </Modal>
 
       {/* Edit Modal */}
@@ -350,7 +350,7 @@ export default function CustomQuestions() {
           </>
         }
       >
-        <FormFields />
+        {renderFormFields()}
       </Modal>
 
       {/* View Question Modal */}

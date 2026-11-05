@@ -13,6 +13,8 @@ import {
 } from './productionStatus';
 import GenerateFinalJobWorkPOModal from '../../purchase/GenerateFinalJobWorkPOModal';
 import { PrintProductionCompletionModal } from './PrintProductionCompletionModal';
+import { useERP } from '../../../context/ERPContext';
+import { ConfirmModal } from '../../../components/ui/ConfirmModal';
 
 const fmtM = (n) => (n === null || n === undefined || n === '' ? '—' : `${fmtNum(n)} M`);
 const fmtDate = (d) => {
@@ -26,6 +28,8 @@ const fmtINR = (n) => (n === null || n === undefined || n === ''
 
 export default function ProductionCompletionVerificationPage() {
   const navigate = useNavigate();
+  const { showToast } = useERP();
+  const [confirmCompleteOpen, setConfirmCompleteOpen] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
 
   const [instructions, setInstructions] = useState([]);
@@ -148,15 +152,16 @@ export default function ProductionCompletionVerificationPage() {
 
   const handleComplete = async () => {
     if (!activePiId) return;
-    if (!window.confirm('Mark this instruction as Completed (pending verification)?')) return;
     setActionError(null);
     setActionNotice(null);
     setBusy('complete');
     try {
       await api.post(`/production/instructions/${activePiId}/complete/`);
+      showToast('Instruction marked as Completed (pending verification)', 'success');
       await loadCompletionData(activePiId);
     } catch (err) {
       setActionError(`Mark Complete failed: ${errorText(err)}`);
+      showToast(`Mark Complete failed: ${errorText(err)}`, 'error');
     } finally {
       setBusy(null);
     }
@@ -164,17 +169,19 @@ export default function ProductionCompletionVerificationPage() {
 
   const handleGeneratePo = async () => {
     if (!activePiId) return;
-    if (!window.confirm('Generate the Final Job Work PO for this instruction?')) return;
     setActionError(null);
     setActionNotice(null);
     setBusy('po');
     try {
       const res = await api.post(`/production/instructions/${activePiId}/generate-po/`);
       setDetail(res);
-      setActionNotice(res?.finalPoNumber ? `Final Job Work PO ${res.finalPoNumber} created.` : 'Final Job Work PO created.');
+      const msg = res?.finalPoNumber ? `Final Job Work PO ${res.finalPoNumber} created.` : 'Final Job Work PO created.';
+      setActionNotice(msg);
+      showToast(msg, 'success');
       await loadCompletionData(activePiId);
     } catch (err) {
       setActionError(`Generate Final PO failed: ${errorText(err)}`);
+      showToast(`Generate Final PO failed: ${errorText(err)}`, 'error');
     } finally {
       setBusy(null);
     }
@@ -213,7 +220,7 @@ export default function ProductionCompletionVerificationPage() {
   };
 
   return (
-    <div className="min-h-[calc(100vh-62px)] bg-[#eef3fb] p-3 md:p-4 space-y-3">
+    <div className="pms-screen w-full space-y-3 sm:space-y-3.5">
       {/* Title */}
       <PageHeader
         title="Production Completion & Verification"
@@ -280,7 +287,7 @@ export default function ProductionCompletionVerificationPage() {
           <div className="ml-auto flex flex-wrap items-center gap-2">
             {hasData && canMarkComplete(status) && (
               <button
-                onClick={handleComplete}
+                onClick={() => setConfirmCompleteOpen(true)}
                 disabled={busy !== null}
                 className="inline-flex items-center gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-3 py-1.5 text-[12px] font-bold text-amber-700 hover:bg-amber-100 disabled:opacity-50"
               >
@@ -384,8 +391,8 @@ export default function ProductionCompletionVerificationPage() {
           <span className="grid h-5 w-5 place-items-center rounded-full bg-[#2563eb] text-[11px] font-extrabold text-white">2</span>
           <h2 className="text-[13px] font-extrabold text-[#2563eb]">Daily Production Summary (Auto from Daily Production)</h2>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[860px] text-center text-[12px]">
+        <div className="pms-table-container">
+          <table className="w-full min-w-[860px] text-center text-[12px] pms-sticky-header">
             <thead>
               <tr className="border-b border-slate-100 text-slate-500">
                 {['#', 'Date', 'Produced Qty (M)', 'Cumulative Qty (M)', 'Balance Qty (M)', 'Entered By', 'Remarks'].map((h) => (
@@ -540,6 +547,18 @@ export default function ProductionCompletionVerificationPage() {
         onClose={() => setShowPrintModal(false)}
         completionData={completionData}
         detail={detail}
+      />
+      <ConfirmModal
+        isOpen={confirmCompleteOpen}
+        onClose={() => setConfirmCompleteOpen(false)}
+        onConfirm={async () => {
+          setConfirmCompleteOpen(false);
+          await handleComplete();
+        }}
+        title="Complete Production Instruction"
+        message="Mark this instruction as Completed (pending verification)?"
+        confirmText="Mark Complete"
+        variant="warning"
       />
     </div>
   );

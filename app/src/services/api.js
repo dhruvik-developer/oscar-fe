@@ -191,7 +191,11 @@ export async function apiClient(
 ) {
   const token = getAuthToken();
   const normalizedEp = normalizeEndpoint(endpoint);
-  const queryParams = query || params || customConfig.params || null;
+  const queryParams =
+    query ||
+    params ||
+    customConfig.params ||
+    (method === 'GET' && Object.keys(customConfig).length > 0 ? customConfig : null);
   const url = `${API_BASE_URL}${normalizedEp}${queryParams ? buildQuery(queryParams) : ''}`;
 
   const requestHeaders = {

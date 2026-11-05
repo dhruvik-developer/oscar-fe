@@ -389,7 +389,21 @@ const useAttendanceStoreBase = create((set, get) => ({
   },
 
   // Refresh attendance records from API
+  refreshRequests: async () => {
+    try {
+      const reqRows = await pullTracked("attendanceRegularizations");
+      if (reqRows && Array.isArray(reqRows)) {
+        set({ requests: reqRows });
+        writeThrough("attendanceRegularizations", reqRows);
+      }
+      return reqRows;
+    } catch {
+      return null;
+    }
+  },
+
   refreshAttendance: async () => {
+
     if (!canReadAttendance()) return null;
     try {
       const recs = await pullTracked("attendance");
@@ -456,17 +470,99 @@ const useAttendanceStoreBase = create((set, get) => ({
     return { records: recs };
   }),
 
-  addRequest: (r) => set((s) => {
-    const newReq = {
-      id: r.id || `REQ-${Date.now().toString().slice(-4)}`,
-      submitted: "Today",
-      status: "Pending",
-      ...r,
-    };
-    const reqs = [newReq, ...s.requests];
-    writeThrough("attendanceRegularizations", reqs);
-    return { requests: reqs };
-  }),
+  addRequest: async (r) => {
+    if (isBackendEnabled()) {
+      try {
+        const payload = {
+          employeeId: isServerId(r.employeeId) ? r.employeeId : undefined,
+          date: r.date,
+          requestedCheckIn: r.requestedCheckIn || r.reqIn,
+          requestedCheckOut: r.requestedCheckOut || r.reqOut,
+          requestedStatus: r.requestedStatus,
+          reason: r.reason,
+        };
+        const res = await api.post("/hrms/attendance/regularizations/", payload);
+        await get().refreshRequests?.();
+        return res;
+      } catch (err) {
+        throw err;
+      }
+    }
+
+    set((s) => {
+      const existingApproved = s.requests.find(
+        (item) =>
+          String(item.employeeId) === String(r.employeeId) &&
+          item.date === r.date &&
+          item.status === "Approved"
+      );
+      if (existingApproved) {
+        throw new Error("An attendance request for this date has already been approved and cannot be modified.");
+      }
+
+      const pendingIdx = s.requests.findIndex(
+        (item) =>
+          String(item.employeeId) === String(r.employeeId) &&
+          item.date === r.date &&
+          item.status === "Pending"
+      );
+      let reqs;
+      if (pendingIdx >= 0) {
+        reqs = [...s.requests];
+        reqs[pendingIdx] = { ...reqs[pendingIdx], ...r, submitted: "Today" };
+      } else {
+        const newReq = {
+          id: r.id || `REQ-${Date.now().toString().slice(-4)}`,
+          submitted: "Today",
+          status: "Pending",
+          ...r,
+        };
+        reqs = [newReq, ...s.requests];
+      }
+      writeThrough("attendanceRegularizations", reqs);
+      return { requests: reqs };
+    });
+    return true;
+  },
+
+  updateRequest: async (id, r) => {
+    const targetReq = get().requests.find((item) => item.id === id);
+    if (targetReq && targetReq.status === "Approved") {
+      throw new Error("Approved attendance requests cannot be modified or edited.");
+    }
+
+    if (isBackendEnabled() && isServerId(id)) {
+      const payload = {
+        date: r.date,
+        requestedCheckIn: r.requestedCheckIn || r.reqIn,
+        requestedCheckOut: r.requestedCheckOut || r.reqOut,
+        requestedStatus: r.requestedStatus,
+        reason: r.reason,
+      };
+      await api.patch(`/hrms/attendance/regularizations/${id}/`, payload);
+      await get().refreshRequests?.();
+      return true;
+    }
+
+    set((s) => {
+      const reqs = s.requests.map((item) =>
+        item.id === id
+          ? {
+              ...item,
+              ...r,
+              reqIn: r.requestedCheckIn || r.reqIn || item.reqIn,
+              reqOut: r.requestedCheckOut || r.reqOut || item.reqOut,
+              requestedIn: r.requestedCheckIn || r.reqIn || item.requestedIn,
+              requestedOut: r.requestedCheckOut || r.reqOut || item.requestedOut,
+              status: "Pending",
+            }
+          : item
+      );
+      writeThrough("attendanceRegularizations", reqs);
+      return { requests: reqs };
+    });
+    return true;
+  },
 
   setRequestStatus: async (id, status, extra = {}) => {
     const targetReq = get().requests.find((r) => r.id === id);
@@ -518,19 +614,34 @@ const useAttendanceStoreBase = create((set, get) => ({
     });
 
     get().fetchTodayPunch();
-    get().refreshAttendance();
+    get().refreshAttendance();
+    get().refreshRequests();
   },
 
-  saveFlexibility: (flexibility) => {
+  saveFlexibility: async (flexibility) => {
     set({ flexibility });
-    pushFlexibility(flexibility)
-      .then(() => {
-        get().refreshAttendance();
-        get().fetchTodayPunch();
-      })
-      .catch((err) => {
-        console.warn("[HRMS] flexibility not saved:", err?.message || err);
-      });
+    try {
+      const res = await pushFlexibility(flexibility);
+      get().refreshAttendance();
+      get().fetchTodayPunch();
+      return res || true;
+    } catch (err) {
+      console.warn("[HRMS] flexibility not saved:", err?.message || err);
+      return null;
+    }
+  },
+
+  loadFlexibility: async () => {
+    try {
+      const flex = await pullFlexibility();
+      if (flex && typeof flex === "object") {
+        set({ flexibility: flex });
+        return flex;
+      }
+    } catch (err) {
+      console.warn("[HRMS] loadFlexibility failed:", err?.message || err);
+    }
+    return null;
   },
 
   // Which view the screen shows (HR vs employee); a UI choice, not stored data.

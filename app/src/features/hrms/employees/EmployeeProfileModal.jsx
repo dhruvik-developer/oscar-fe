@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from "react";
+import { Link } from "react-router-dom";
 import {
   X,
   Mail,
@@ -19,10 +20,14 @@ import {
   Shield,
   Layers,
   ChevronRight,
+  CreditCard,
+  ExternalLink,
 } from "lucide-react";
 import { Avatar } from "../../../components/hrms/Avatar";
 import { useAppStore } from "../../../stores/appStore";
 import { useAssetStore } from "../../../stores/assetStore";
+import { usePayrollStore, getDepartmentDays } from "../../../stores/payrollStore";
+import { calculateSalaryComponents, formatINR } from "../payroll/salaryCalculations";
 
 const DEPARTMENTS = [
   "Engineering",
@@ -36,14 +41,26 @@ const DEPARTMENTS = [
   "Sales Department",
 ];
 
-const STATUS_OPTIONS = ["Active", "On Leave", "Probation"];
+const STATUS_OPTIONS = [
+  "Active",
+  "Inactive",
+  "On Leave",
+  "Probation",
+  "Notice Period",
+  "Resigned",
+  "Terminated",
+];
 const EMPLOYMENT_TYPES = ["Full Time", "Contract", "Intern", "Part Time"];
 const SHIFT_OPTIONS = ["General", "Flexible", "Night", "Morning"];
 
 const statusStyles = {
   Active: { bg: "#e6f4ea", text: "#15803d", border: "#a7f3d0" },
+  Inactive: { bg: "#f1f5f9", text: "#64748b", border: "#cbd5e1" },
   "On Leave": { bg: "#fef3c7", text: "#b45309", border: "#fde68a" },
   Probation: { bg: "#f1f5f9", text: "#475569", border: "#cbd5e1" },
+  "Notice Period": { bg: "#fff7ed", text: "#c2410c", border: "#ffedd5" },
+  Resigned: { bg: "#fef2f2", text: "#b91c1c", border: "#fecaca" },
+  Terminated: { bg: "#fee2e2", text: "#991b1b", border: "#fca5a5" },
 };
 
 export default function EmployeeProfileModal({ isOpen, employee, onClose, onEmployeeUpdated }) {
@@ -68,6 +85,7 @@ export default function EmployeeProfileModal({ isOpen, employee, onClose, onEmpl
     managerId: "",
     employmentType: "Full Time",
     shift: "General",
+    standardSalary: "",
     status: "Active",
     joiningDate: "",
   });
@@ -85,6 +103,7 @@ export default function EmployeeProfileModal({ isOpen, employee, onClose, onEmpl
         managerId: employee.managerId || employee.reportingManagerId || "",
         employmentType: employee.employmentType || "Full Time",
         shift: employee.shift || "General",
+        standardSalary: employee.standardSalary ?? employee.standard_salary ?? "",
         status: employee.status || "Active",
         joiningDate: employee.joiningDate || employee.joining || employee.doj || "",
       });
@@ -102,40 +121,154 @@ export default function EmployeeProfileModal({ isOpen, employee, onClose, onEmpl
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isOpen, onClose]);
 
-  if (!isOpen || !employee) return null;
+  // Live Attendance & Payroll calculations
+  const payrollEmployees = usePayrollStore((s) => s.employees) || [];
+  const departmentWorkingDays = usePayrollStore((s) => s.departmentWorkingDays);
+  const loadPayroll = usePayrollStore((s) => s.load);
 
-  const empId = employee.empId || employee.employeeCode || employee.id || "EMP";
-  const empName = employee.name || "Employee";
-  const statusInfo = statusStyles[employee.status] || statusStyles.Active;
+  useEffect(() => {
+    if (isOpen) {
+      loadPayroll?.();
+    }
+  }, [isOpen, loadPayroll]);
+
+  const currentMonthPrefix = useMemo(() => new Date().toISOString().slice(0, 7), []);
+
+  const empId = employee?.empId || employee?.employeeCode || employee?.id || "EMP";
+  const empName = employee?.name || "Employee";
+  const statusInfo = (employee && statusStyles[employee.status]) || statusStyles.Active;
 
   // Filter attendance records for this employee
-  const employeeAttendance = attendanceList.filter((a) => {
-    const idMatch = a.employeeId && String(a.employeeId) === String(employee.id);
-    const nameMatch = a.employeeName && a.employeeName.toLowerCase() === empName.toLowerCase();
-    const codeMatch = a.employeeCode && a.employeeCode === empId;
-    return idMatch || nameMatch || codeMatch;
-  });
+  const employeeAttendance = useMemo(() => {
+    if (!employee) return [];
+    return attendanceList.filter((a) => {
+      const idMatch = a.employeeId && String(a.employeeId) === String(employee.id);
+      const nameMatch = a.employeeName && a.employeeName.toLowerCase() === empName.toLowerCase();
+      const codeMatch = a.employeeCode && a.employeeCode === empId;
+      return idMatch || nameMatch || codeMatch;
+    });
+  }, [attendanceList, employee, empName, empId]);
 
   // Filter leaves for this employee
-  const employeeLeaves = leavesList.filter((l) => {
-    const idMatch = l.employeeId && String(l.employeeId) === String(employee.id);
-    const nameMatch = l.employeeName && l.employeeName.toLowerCase() === empName.toLowerCase();
-    return idMatch || nameMatch;
-  });
+  const employeeLeaves = useMemo(() => {
+    if (!employee) return [];
+    return leavesList.filter((l) => {
+      const idMatch = l.employeeId && String(l.employeeId) === String(employee.id);
+      const nameMatch = l.employeeName && l.employeeName.toLowerCase() === empName.toLowerCase();
+      return idMatch || nameMatch;
+    });
+  }, [leavesList, employee, empName]);
 
   // Filter assigned assets for this employee
-  const employeeAssets = assetList.filter((ast) => {
-    const idMatch = ast.assignedToId && String(ast.assignedToId) === String(employee.id);
-    const nameMatch = ast.assignedTo && ast.assignedTo.toLowerCase() === empName.toLowerCase();
-    return idMatch || nameMatch;
-  });
+  const employeeAssets = useMemo(() => {
+    if (!employee) return [];
+    return assetList.filter((ast) => {
+      const idMatch = ast.assignedToId && String(ast.assignedToId) === String(employee.id);
+      const nameMatch = ast.assignedTo && ast.assignedTo.toLowerCase() === empName.toLowerCase();
+      return idMatch || nameMatch;
+    });
+  }, [assetList, employee, empName]);
 
   // Manager details
-  const reportingManagerName =
-    employee.manager ||
-    employee.reportingManager ||
-    allEmployees.find((x) => String(x.id) === String(employee.managerId))?.name ||
-    "—";
+  const reportingManagerName = useMemo(() => {
+    if (!employee) return "—";
+    return (
+      employee.manager ||
+      employee.reportingManager ||
+      allEmployees.find((x) => String(x.id) === String(employee.managerId))?.name ||
+      "—"
+    );
+  }, [employee, allEmployees]);
+
+  const currentMonthAttendance = useMemo(() => {
+    return employeeAttendance.filter((a) => {
+      const d = String(a.date || a.work_date || a.workDate || "");
+      return d.startsWith(currentMonthPrefix);
+    });
+  }, [employeeAttendance, currentMonthPrefix]);
+
+  const currentMonthLeaves = useMemo(() => {
+    return employeeLeaves.filter((l) => {
+      const d = String(l.startDate || l.start_date || l.from || "");
+      return d.startsWith(currentMonthPrefix);
+    });
+  }, [employeeLeaves, currentMonthPrefix]);
+
+  const attendedDaysCount = useMemo(() => {
+    let days = 0;
+    for (const a of currentMonthAttendance) {
+      if (a.status === "Present" || a.status === "Late" || a.status === "WFH") {
+        days += 1;
+      } else if (a.status === "Half Day") {
+        days += 0.5;
+      }
+    }
+    return days;
+  }, [currentMonthAttendance]);
+
+  const paidLeavesCount = useMemo(() => {
+    return currentMonthLeaves
+      .filter((l) => (l.status === "Approved" || l.status === "approved") && !l.isUnpaid && l.type !== "Loss of Pay")
+      .reduce((sum, l) => sum + (Number(l.days) || 1), 0);
+  }, [currentMonthLeaves]);
+
+  // Find server payslip row for this employee if available
+  const activePayslip = useMemo(() => {
+    if (!employee) return null;
+    return (
+      payrollEmployees.find(
+        (p) =>
+          String(p.employeeId) === String(employee.id) ||
+          String(p.empId) === String(empId) ||
+          (p.name && p.name.toLowerCase() === empName.toLowerCase())
+      ) || null
+    );
+  }, [payrollEmployees, employee, empId, empName]);
+
+  const deptScheduledDays = useMemo(() => {
+    if (!employee) return 24;
+    return getDepartmentDays(departmentWorkingDays, employee.department || employee.dept) || 24;
+  }, [departmentWorkingDays, employee]);
+
+  const baseStandardSalary = Number(employee?.standardSalary || employee?.standard_salary || 0);
+
+  // Live calculation derived from employee attendance & salary rate
+  const liveCalculation = useMemo(() => {
+    if (activePayslip) {
+      return {
+        standardSalary: Number(activePayslip.standardSalary) || baseStandardSalary,
+        totalDays: Number(activePayslip.totalDays) || deptScheduledDays,
+        attendedDays: Number(activePayslip.attendedDays) || 0,
+        paidLeaves: Number(activePayslip.paidLeaves) || 0,
+        absentDays: Number(activePayslip.absentDays) || 0,
+        unpaidLeaves: Number(activePayslip.unpaidLeaves) || 0,
+        perDaySalary: Number(activePayslip.perDaySalary) || (deptScheduledDays > 0 ? Math.round(baseStandardSalary / deptScheduledDays) : 0),
+        attendanceDeduction: Number(activePayslip.attendanceDeduction) || 0,
+        earnedSalary: Number(activePayslip.earnedSalary) || baseStandardSalary,
+        additionalEarnings: Number(activePayslip.additionalEarnings) || 0,
+        deductions: Number(activePayslip.deductions) || 0,
+        advance: Number(activePayslip.advance) || 0,
+        netPayable: Number(activePayslip.netPayable || activePayslip.remainingPayable) || 0,
+        status: activePayslip.status || "In Progress",
+        isServerSlip: true,
+      };
+    }
+
+    const calc = calculateSalaryComponents({
+      standardSalary: baseStandardSalary,
+      totalDays: deptScheduledDays,
+      attendedDays: currentMonthAttendance.length > 0 ? attendedDaysCount : deptScheduledDays,
+      paidLeaves: paidLeavesCount,
+    });
+
+    return {
+      ...calc,
+      status: "Attendance Sync Active",
+      isServerSlip: false,
+    };
+  }, [activePayslip, baseStandardSalary, deptScheduledDays, currentMonthAttendance.length, attendedDaysCount, paidLeavesCount]);
+
+  if (!isOpen || !employee) return null;
 
   const handleSave = async (e) => {
     e?.preventDefault();
@@ -146,14 +279,22 @@ export default function EmployeeProfileModal({ isOpen, employee, onClose, onEmpl
     setSaving(true);
     try {
       const selectedMgr = allEmployees.find((x) => String(x.id) === String(form.managerId));
+      const parsedSalary = form.standardSalary !== "" && form.standardSalary !== null && !isNaN(Number(form.standardSalary))
+        ? Math.max(0, Number(form.standardSalary))
+        : 0;
       const updates = {
         ...form,
+        standardSalary: parsedSalary,
+        standard_salary: parsedSalary,
         manager: selectedMgr ? selectedMgr.name : form.managerId ? reportingManagerName : "",
         reportingManager: selectedMgr ? selectedMgr.name : form.managerId ? reportingManagerName : "",
       };
 
       const result = await updateStoreEmployee(employee.id, updates);
       showToast?.(`Profile updated for ${form.name}`);
+      try {
+        usePayrollStore.getState().load?.();
+      } catch {}
       onEmployeeUpdated?.({ ...employee, ...updates });
       setActiveTab("overview");
     } catch (err) {
@@ -190,16 +331,31 @@ export default function EmployeeProfileModal({ isOpen, employee, onClose, onEmpl
                 <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-white truncate">
                   {empName}
                 </h2>
-                <span
-                  className="px-2.5 py-0.5 rounded-full text-xs font-semibold border"
+                <select
+                  value={employee.status || "Active"}
+                  onChange={async (e) => {
+                    const nextSt = e.target.value;
+                    try {
+                      await updateStoreEmployee(employee.id, { status: nextSt });
+                      setForm((f) => ({ ...f, status: nextSt }));
+                      onEmployeeUpdated?.({ ...employee, status: nextSt });
+                      showToast?.(`Status changed to ${nextSt}`);
+                    } catch (err) {}
+                  }}
+                  className="px-2.5 py-0.5 rounded-full text-xs font-semibold border cursor-pointer outline-none transition"
                   style={{
                     backgroundColor: statusInfo.bg,
                     color: statusInfo.text,
                     borderColor: statusInfo.border,
                   }}
+                  title="Change Employment Status"
                 >
-                  {employee.status || "Active"}
-                </span>
+                  {STATUS_OPTIONS.map((st) => (
+                    <option key={st} value={st} style={{ background: "#fff", color: "#1f2937" }}>
+                      {st}
+                    </option>
+                  ))}
+                </select>
                 <span className="px-2.5 py-0.5 rounded-md bg-white/15 text-slate-200 text-xs font-mono font-medium">
                   {empId}
                 </span>
@@ -295,6 +451,18 @@ export default function EmployeeProfileModal({ isOpen, employee, onClose, onEmpl
               </span>
             )}
             {activeTab === "leaves" && (
+              <span className="absolute bottom-0 left-0 right-0 h-[2.5px] bg-slate-900 rounded-t" />
+            )}
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("payroll")}
+            className={`py-3 px-3 relative transition-colors cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
+              activeTab === "payroll" ? "text-slate-950 font-bold" : "text-slate-500 hover:text-slate-800"
+            }`}
+          >
+            Salary &amp; Payroll
+            {activeTab === "payroll" && (
               <span className="absolute bottom-0 left-0 right-0 h-[2.5px] bg-slate-900 rounded-t" />
             )}
           </button>
@@ -418,6 +586,95 @@ export default function EmployeeProfileModal({ isOpen, employee, onClose, onEmpl
                     <span className="text-slate-900 font-semibold text-xs mt-0.5 block">
                       {employee.shift || "General (09:30 - 18:30)"}
                     </span>
+                  </div>
+                  <div className="p-2.5 rounded-lg bg-emerald-50/50 border border-emerald-200/60">
+                    <span className="text-[11px] text-emerald-800 font-medium block">Standard Monthly Salary (CTC)</span>
+                    <span className="text-emerald-700 font-bold text-xs mt-0.5 block font-mono">
+                      {Number(employee.standardSalary || employee.standard_salary) > 0
+                        ? `₹${Number(employee.standardSalary || employee.standard_salary).toLocaleString("en-IN")}`
+                        : "Not configured (₹0)"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Live Compensation & Attendance-Linked Payroll Card */}
+              <div className="border border-emerald-200/80 rounded-xl p-4 bg-gradient-to-br from-emerald-50/40 via-white to-slate-50/50 shadow-2xs">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <CreditCard size={15} className="text-emerald-700" />
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800">
+                      Live Compensation &amp; Attendance-Linked Payroll
+                    </h3>
+                  </div>
+                  <span
+                    className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${
+                      liveCalculation.status === "Paid"
+                        ? "bg-emerald-100 text-emerald-800"
+                        : liveCalculation.status === "Approved"
+                        ? "bg-blue-100 text-blue-800"
+                        : "bg-amber-100 text-amber-800"
+                    }`}
+                  >
+                    {liveCalculation.status}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3">
+                  <div className="p-2.5 rounded-lg bg-white border border-[#e2e8f0]">
+                    <span className="text-[10.5px] text-slate-500 font-medium block">Standard Monthly CTC</span>
+                    <span className="text-slate-900 font-bold text-xs mt-0.5 block font-mono">
+                      {baseStandardSalary > 0 ? formatINR(baseStandardSalary) : "₹0 (Not set)"}
+                    </span>
+                    <span className="text-[10px] text-slate-400 block mt-0.5">
+                      {liveCalculation.perDaySalary > 0 ? `${formatINR(liveCalculation.perDaySalary)} / day` : "—"}
+                    </span>
+                  </div>
+
+                  <div className="p-2.5 rounded-lg bg-white border border-[#e2e8f0]">
+                    <span className="text-[10.5px] text-slate-500 font-medium block">Attended vs Scheduled</span>
+                    <span className="text-emerald-700 font-bold text-xs mt-0.5 block">
+                      {liveCalculation.attendedDays}d attended
+                    </span>
+                    <span className="text-[10px] text-slate-500 block mt-0.5">
+                      / {liveCalculation.totalDays} scheduled days
+                    </span>
+                  </div>
+
+                  <div className="p-2.5 rounded-lg bg-white border border-[#e2e8f0]">
+                    <span className="text-[10.5px] text-slate-500 font-medium block">Attendance Deduction</span>
+                    <span className={`font-bold text-xs mt-0.5 block font-mono ${liveCalculation.attendanceDeduction > 0 ? "text-rose-600" : "text-slate-700"}`}>
+                      {liveCalculation.attendanceDeduction > 0 ? `-${formatINR(liveCalculation.attendanceDeduction)}` : "₹0 (No cut)"}
+                    </span>
+                    <span className="text-[10px] text-slate-400 block mt-0.5">
+                      {liveCalculation.absentDays} absent/LOP day(s)
+                    </span>
+                  </div>
+
+                  <div className="p-2.5 rounded-lg bg-emerald-50 border border-emerald-200">
+                    <span className="text-[10.5px] text-emerald-800 font-medium block">Net Earned / Payable</span>
+                    <span className="text-emerald-800 font-bold text-sm mt-0.5 block font-mono">
+                      {formatINR(liveCalculation.netPayable || liveCalculation.earnedSalary)}
+                    </span>
+                    <span className="text-[10px] text-emerald-600 block mt-0.5">
+                      Current month estimate
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between text-[11px] text-slate-500 pt-2 border-t border-slate-100">
+                  <span>
+                    Attendance punches directly determine earned salary via daily rate:{" "}
+                    <code className="text-slate-700 font-semibold">CTC ÷ Working Days</code>.
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab("payroll")}
+                      className="text-xs font-semibold text-navy hover:underline flex items-center gap-1 cursor-pointer"
+                    >
+                      View Breakdown <ChevronRight size={13} />
+                    </button>
                   </div>
                 </div>
               </div>
@@ -579,6 +836,148 @@ export default function EmployeeProfileModal({ isOpen, employee, onClose, onEmpl
                   </table>
                 </div>
               )}
+            </div>
+          )}
+
+          {/* TAB: SALARY & PAYROLL (ATTENDANCE-CONNECTED) */}
+          {activeTab === "payroll" && (
+            <div className="space-y-4">
+              {/* Formula & Rule Card */}
+              <div className="border border-blue-200 bg-blue-50/50 rounded-xl p-3.5 text-xs text-blue-950">
+                <div className="font-bold mb-1 flex items-center gap-1.5 text-blue-900">
+                  <CreditCard size={15} />
+                  <span>How Attendance Determines {empName}&apos;s Salary:</span>
+                </div>
+                <p className="text-[11.5px] text-blue-800/90 leading-relaxed mb-2.5">
+                  Standard Monthly Agreed Salary is divided by the monthly scheduled working days to establish the daily wage. Every unapproved absent day or unpaid Loss of Pay (LOP) day is deducted at this daily rate.
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-2 font-mono text-[11px]">
+                  <div className="p-2.5 bg-white rounded-lg border border-blue-100 shadow-2xs">
+                    <span className="text-slate-500 block text-[10px] font-sans font-medium">1. Daily Wage Rate</span>
+                    <span className="text-slate-900 font-bold">Standard CTC ÷ Working Days</span>
+                  </div>
+                  <div className="p-2.5 bg-white rounded-lg border border-blue-100 shadow-2xs">
+                    <span className="text-slate-500 block text-[10px] font-sans font-medium">2. Attendance Deduction</span>
+                    <span className="text-rose-700 font-bold">Daily Rate × Absent Days</span>
+                  </div>
+                  <div className="p-2.5 bg-white rounded-lg border border-blue-100 shadow-2xs">
+                    <span className="text-slate-500 block text-[10px] font-sans font-medium">3. Net Earned Payable</span>
+                    <span className="text-emerald-700 font-bold">Earned + Extra - Deductions</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Live Calculation Matrix */}
+              <div className="border border-[#e2e8f0] rounded-xl p-4 bg-white shadow-2xs space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#e2e8f0] pb-2.5">
+                  <div>
+                    <h4 className="text-sm font-bold text-slate-900">Live Monthly Payroll Breakdown</h4>
+                    <span className="text-[11px] text-slate-500">
+                      Synchronized with {employee.department || "General"} department working days &amp; attendance logs
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-800">
+                      Status: {liveCalculation.status}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab("edit")}
+                      className="px-2.5 py-1 text-xs font-semibold rounded-lg border border-slate-300 hover:bg-slate-50 text-slate-700 transition cursor-pointer"
+                    >
+                      Update Salary
+                    </button>
+                  </div>
+                </div>
+
+                <div className="space-y-2 text-xs">
+                  <div className="flex justify-between py-1.5 border-b border-slate-100">
+                    <span className="text-slate-600">Standard Monthly Agreed Salary (CTC)</span>
+                    <span className="font-bold text-slate-900 font-mono text-sm">
+                      {formatINR(liveCalculation.standardSalary)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between py-1.5 border-b border-slate-100">
+                    <span className="text-slate-600">Department Scheduled Working Days</span>
+                    <span className="font-semibold text-slate-800">{liveCalculation.totalDays} days / month</span>
+                  </div>
+                  <div className="flex justify-between py-1.5 border-b border-slate-100">
+                    <span className="text-slate-600">Calculated Per-Day Salary Rate</span>
+                    <span className="font-semibold text-slate-800 font-mono">
+                      {formatINR(liveCalculation.perDaySalary)} / day
+                    </span>
+                  </div>
+                  <div className="flex justify-between py-1.5 border-b border-slate-100">
+                    <span className="text-slate-600">Attended Days Logged in Attendance (Present + 0.5 Half-Days)</span>
+                    <span className="font-bold text-emerald-700">{liveCalculation.attendedDays} days</span>
+                  </div>
+                  <div className="flex justify-between py-1.5 border-b border-slate-100">
+                    <span className="text-slate-600">Approved Paid Leaves (Protected with full pay)</span>
+                    <span className="font-semibold text-emerald-600">{liveCalculation.paidLeaves} days</span>
+                  </div>
+                  <div className="flex justify-between py-1.5 border-b border-slate-100">
+                    <span className="text-slate-600">Absent / Unpaid Loss of Pay (LOP) Days</span>
+                    <span className={`font-semibold ${liveCalculation.absentDays > 0 ? "text-rose-600" : "text-slate-700"}`}>
+                      {liveCalculation.absentDays} day(s)
+                    </span>
+                  </div>
+                  <div className="flex justify-between py-1.5 border-b border-slate-100">
+                    <span className="text-slate-600">Attendance Deduction (-)</span>
+                    <span className={`font-bold font-mono ${liveCalculation.attendanceDeduction > 0 ? "text-rose-600" : "text-slate-700"}`}>
+                      -{formatINR(liveCalculation.attendanceDeduction)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between py-1.5 border-b border-slate-100">
+                    <span className="text-slate-600 font-semibold text-blue-950">Earned Salary</span>
+                    <span className="font-bold text-blue-900 font-mono text-sm">
+                      {formatINR(liveCalculation.earnedSalary)}
+                    </span>
+                  </div>
+                  {Number(liveCalculation.additionalEarnings) > 0 && (
+                    <div className="flex justify-between py-1.5 border-b border-slate-100">
+                      <span className="text-slate-600">Additional Earnings (Overtime / Bonus / Allowance) (+)</span>
+                      <span className="font-semibold text-emerald-700 font-mono">
+                        +{formatINR(liveCalculation.additionalEarnings)}
+                      </span>
+                    </div>
+                  )}
+                  {Number(liveCalculation.advance) > 0 && (
+                    <div className="flex justify-between py-1.5 border-b border-slate-100">
+                      <span className="text-slate-600">Salary Advance Recovered (-)</span>
+                      <span className="font-semibold text-amber-700 font-mono">
+                        -{formatINR(liveCalculation.advance)}
+                      </span>
+                    </div>
+                  )}
+                  {Number(liveCalculation.deductions) > 0 && (
+                    <div className="flex justify-between py-1.5 border-b border-slate-100">
+                      <span className="text-slate-600">Statutory / Other Deductions (TDS, PF) (-)</span>
+                      <span className="font-semibold text-rose-700 font-mono">
+                        -{formatINR(liveCalculation.deductions)}
+                      </span>
+                    </div>
+                  )}
+                  <div className="flex justify-between py-2.5 bg-emerald-50/70 rounded-xl px-3 border border-emerald-200 mt-2">
+                    <span className="font-bold text-emerald-950 text-sm">Net Payable Salary</span>
+                    <span className="font-extrabold text-emerald-800 text-base font-mono">
+                      {formatINR(liveCalculation.netPayable || liveCalculation.earnedSalary)}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="pt-2 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100">
+                  <span className="text-[11px] text-slate-500">
+                    Live calculation updates reactively when employee punches in or logs leave.
+                  </span>
+                  <Link
+                    to="/hrms/payroll"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-navy text-white text-xs font-semibold hover:bg-navy/90 transition"
+                  >
+                    <span>Open HRMS Payroll Hub</span>
+                    <ExternalLink size={12} />
+                  </Link>
+                </div>
+              </div>
             </div>
           )}
 
@@ -791,6 +1190,51 @@ export default function EmployeeProfileModal({ isOpen, employee, onClose, onEmpl
                       </option>
                     ))}
                   </select>
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="block text-[11.5px] font-semibold text-slate-700 mb-1">
+                    Standard Monthly Salary (₹)
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 font-semibold text-xs">₹</span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="500"
+                      value={form.standardSalary}
+                      onChange={(e) => setForm({ ...form, standardSalary: e.target.value })}
+                      className="w-full h-9 pl-7 pr-3 bg-white border border-[#cbd5e1] rounded-xl text-xs text-slate-900 focus:outline-none focus:border-slate-800 font-mono font-medium"
+                      placeholder="e.g. 50000"
+                    />
+                  </div>
+                  <span className="text-[10.5px] text-slate-500 mt-1 block">
+                    Monthly base standard salary used for payroll calculations, attendance per-day deduction rates, and payslips.
+                  </span>
+                  <div className="mt-2.5 p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs space-y-1.5">
+                    <div className="flex justify-between items-center text-slate-700 font-medium">
+                      <span>Live Per-Day Salary Rate:</span>
+                      <span className="font-mono font-bold text-slate-900">
+                        {form.standardSalary && Number(form.standardSalary) > 0
+                          ? `₹${Math.round(Number(form.standardSalary) / deptScheduledDays).toLocaleString("en-IN")} / day`
+                          : "₹0 / day"}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center text-slate-600 text-[11px]">
+                      <span>Department Working Schedule:</span>
+                      <span className="font-semibold">{deptScheduledDays} days/month ({employee.department || "General"})</span>
+                    </div>
+                    <div className="flex justify-between items-center text-slate-600 text-[11px]">
+                      <span>Attendance Deduction Rate:</span>
+                      <span className="text-rose-600 font-semibold font-mono">
+                        {form.standardSalary && Number(form.standardSalary) > 0
+                          ? `-₹${Math.round(Number(form.standardSalary) / deptScheduledDays).toLocaleString("en-IN")} per absent day`
+                          : "—"}
+                      </span>
+                    </div>
+                    <p className="text-[10.5px] text-slate-500 pt-1.5 border-t border-slate-200 mt-1">
+                      Attendance punches directly determine pay via this daily rate. Saving automatically recomputes this month&apos;s open payroll.
+                    </p>
+                  </div>
                 </div>
               </div>
 

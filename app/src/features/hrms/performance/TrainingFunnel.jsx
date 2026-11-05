@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Avatar } from "../../../components/hrms/Avatar";
 import { useNavigate } from "react-router-dom";
 import {
@@ -27,6 +27,7 @@ import { Drawer } from "../../../components/hrms/Drawer";
 import { Modal } from "../../../components/hrms/Modal";
 import { Button } from "../../../components/hrms/Button";
 import PageHeader from "../../../components/ui/PageHeader";
+import AppPagination from "../../../components/ui/AppPagination";
 import { hrmsGuides } from "../../../data/hrms/hrmsGuides";
 
 const STAGE_DROP_STYLES = {
@@ -99,6 +100,18 @@ export default function TrainingFunnel({ embedded = false, onBack }) {
       return true;
     });
   }, [trainings, deptFilter, search]);
+
+  const [listPage, setListPage] = useState(1);
+  const [listPageSize, setListPageSize] = useState(10);
+
+  useEffect(() => {
+    setListPage(1);
+  }, [deptFilter, search, listPageSize]);
+
+  const paginatedTrainings = useMemo(() => {
+    const start = (listPage - 1) * listPageSize;
+    return filteredTrainings.slice(start, start + listPageSize);
+  }, [filteredTrainings, listPage, listPageSize]);
 
   // Overall totals
   const totalCount = filteredTrainings.length;
@@ -474,14 +487,8 @@ export default function TrainingFunnel({ embedded = false, onBack }) {
                             </div>
 
                             {/* Trainer info */}
-                            <div className="flex items-center gap-1 text-[10.5px] text-slate-600 mt-0.5 min-w-0">
-                              {item.avatar ? (
-                                <img src={item.avatar} alt="" className="w-3.5 h-3.5 rounded-full object-cover shrink-0" />
-                              ) : (
-                                <div className="w-3.5 h-3.5 rounded-full bg-slate-200 grid place-items-center text-[7.5px] font-bold text-slate-600 shrink-0">
-                                  {item.trainer ? item.trainer[0] : "U"}
-                                </div>
-                              )}
+                            <div className="flex items-center gap-1.5 text-[10.5px] text-slate-600 mt-0.5 min-w-0">
+                              <Avatar name={item.trainer || "Unassigned"} size="xs" className="!w-4 !h-4 !text-[8px]" />
                               <span className="truncate">{item.trainer || "Unassigned"}</span>
                             </div>
 
@@ -553,7 +560,7 @@ export default function TrainingFunnel({ embedded = false, onBack }) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-bdr/60">
-                {filteredTrainings.map((t) => {
+                {paginatedTrainings.map((t) => {
                   const stageObj =
                     TRAINING_FUNNEL_STAGES.find((s) => s.key === t.stage) ||
                     TRAINING_FUNNEL_STAGES[0];
@@ -611,6 +618,14 @@ export default function TrainingFunnel({ embedded = false, onBack }) {
                 })}
               </tbody>
             </table>
+            <AppPagination
+              total={filteredTrainings.length}
+              page={listPage}
+              pageSize={listPageSize}
+              onPageChange={setListPage}
+              onPageSizeChange={setListPageSize}
+              pageSizeOptions={[10, 25, 50]}
+            />
           </div>
         )}
 

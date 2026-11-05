@@ -217,44 +217,58 @@ export const NAV = [
   },
 
   {
-    label: 'PMS (Projects)',
-    icon: Briefcase,
+    label: 'PMS (Loom & Manufacturing)',
+    icon: Factory,
     permission: 'menu_pms',
+    defaultOpen: true,
     children: [
-      { label: 'PMS Dashboard', icon: Home, to: '/pms' },
-      { label: 'All Projects', icon: Layers, to: '/pms/projects' },
-      { label: 'My Projects', icon: UserCheck, to: '/pms/my-projects' },
-      {
-        label: 'Production',
-        icon: Factory,
-        defaultOpen: true,
-        children: [
-          { label: 'Production Dashboard', icon: BarChart3, to: '/pms/production-dashboard' },
-          { label: 'Production Instructions', icon: ClipboardList, to: '/pms/production-instructions' },
-          { label: 'Daily Production', icon: CalendarCheck, to: '/pms/daily-production' },
-          { label: 'Production Completion & Verification', icon: CheckCircle2, to: '/pms/production-completion' },
-        ],
-      },
-      {
-        label: 'Job Work / Processing',
-        icon: Wrench,
-        defaultOpen: false,
-        children: [
-          { label: 'Dyeing Service Orders', icon: Palette, to: '/job-work/service-orders' },
-          { label: 'Process Plan', icon: ClipboardList, to: '/job-work/process-plan' },
-          { label: 'Job Work Orders (JWO)', icon: FileText, to: '/job-work/orders' },
-          { label: 'Job Work Outward', icon: Send, to: '/job-work/outward' },
-          { label: 'Job Work Inward', icon: ArrowDownLeft, to: '/job-work/inward' },
-          { label: 'Pending Register', icon: Hourglass, to: '/job-work/pending-register' },
-          { label: 'Vendor Reconciliation', icon: GitCompare, to: '/job-work/vendor-reconciliation' },
-          { label: 'Processor Ledger', icon: BookOpen, to: '/job-work/processor-ledger' },
-          { label: 'Reprocess', icon: RotateCcw, to: '/job-work/reprocess' },
-          { label: 'ITC-04 Job Work', icon: FileSpreadsheet, to: '/job-work/itc-04' },
-        ],
-      },
-      { label: 'Timeline & Gantt', icon: Calendar, to: '/pms/timeline' },
+      { label: 'Command Center', icon: BarChart3, to: '/pms' },
+      { label: 'Machines & Beams', icon: Factory, to: '/pms/looms' },
+      { label: 'Daily Loom Entry', icon: CalendarCheck, to: '/pms/loom-daily' },
+      { label: 'Yarn Procurement', icon: Package, to: '/pms/yarn' },
+      { label: 'Programs (Batches)', icon: Layers, to: '/pms/programs' },
+      { label: 'Production Instructions (PI)', icon: ClipboardList, to: '/pms/production-instructions' },
+      { label: 'Completion & Auto-PO', icon: CheckCircle2, to: '/pms/production-completion' },
+      { label: 'Fabric Out (Dispatches)', icon: Send, to: '/pms/fabric-out' },
+      { label: 'Loom Masters', icon: Settings, to: '/pms/loom-masters' },
       { label: 'Delay Center', icon: AlertTriangle, to: '/pms/delays', badgeKey: 'pmsDelayedCount', badgeColor: '#ef4444' },
-      { label: 'PMS Reports', icon: PieChart, to: '/pms/reports' },
+
+      // ── [COMMENTED OUT UNWANTED & DUPLICATE SUBMODULES] ──────────────
+      // 1. Redundant generic production track (superseded by Loom PMS):
+      // {
+      //   label: 'Production (Legacy)',
+      //   icon: Factory,
+      //   children: [
+      //     { label: 'Production Dashboard', icon: BarChart3, to: '/pms/production-dashboard' },
+      //     { label: 'Production Instructions', icon: ClipboardList, to: '/pms/production-instructions' },
+      //     { label: 'Daily Production', icon: CalendarCheck, to: '/pms/daily-production' },
+      //     { label: 'Production Completion & Verification', icon: CheckCircle2, to: '/pms/production-completion' },
+      //   ],
+      // },
+      //
+      // 2. Corporate multi-stage project workflow (unwanted for loom factory):
+      // { label: 'All Projects', icon: Layers, to: '/pms/projects' },
+      // { label: 'My Projects', icon: UserCheck, to: '/pms/my-projects' },
+      // { label: 'Timeline & Gantt', icon: Calendar, to: '/pms/timeline' },
+      // { label: 'PMS Reports', icon: PieChart, to: '/pms/reports' },
+      //
+      // 3. Job Work / Processing (wet processing nested items):
+      // {
+      //   label: 'Job Work / Processing',
+      //   icon: Wrench,
+      //   children: [
+      //     { label: 'Dyeing Service Orders', icon: Palette, to: '/job-work/service-orders' },
+      //     { label: 'Process Plan', icon: ClipboardList, to: '/job-work/process-plan' },
+      //     { label: 'Job Work Orders (JWO)', icon: FileText, to: '/job-work/orders' },
+      //     { label: 'Job Work Outward', icon: Send, to: '/job-work/outward' },
+      //     { label: 'Job Work Inward', icon: ArrowDownLeft, to: '/job-work/inward' },
+      //     { label: 'Pending Register', icon: Hourglass, to: '/job-work/pending-register' },
+      //     { label: 'Vendor Reconciliation', icon: GitCompare, to: '/job-work/vendor-reconciliation' },
+      //     { label: 'Processor Ledger', icon: BookOpen, to: '/job-work/processor-ledger' },
+      //     { label: 'Reprocess', icon: RotateCcw, to: '/job-work/reprocess' },
+      //     { label: 'ITC-04 Job Work', icon: FileSpreadsheet, to: '/job-work/itc-04' },
+      //   ],
+      // },
     ],
   },
 

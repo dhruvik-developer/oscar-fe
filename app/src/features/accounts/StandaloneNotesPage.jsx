@@ -489,7 +489,7 @@ export default function StandaloneNotesPage({ embedded = false }) {
 
       {/* CREATE NOTE MODAL */}
       {showCreateModal && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-3">
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-3">
           <div className="bg-white rounded-2xl border border-slate-200 max-w-xl w-full p-5 shadow-2xl text-xs flex flex-col max-h-[90vh] overflow-hidden">
             <div className="flex items-center justify-between pb-3 border-b border-slate-200">
               <h3 className="font-bold text-base text-[#1F2E4A] flex items-center gap-2">
@@ -694,7 +694,7 @@ export default function StandaloneNotesPage({ embedded = false }) {
 
       {/* VIEW NOTE DETAIL MODAL */}
       {viewingNote && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-3">
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-3">
           <div className="bg-white rounded-2xl border border-slate-200 max-w-lg w-full p-5 shadow-2xl text-xs flex flex-col">
             <div className="flex items-center justify-between pb-3 border-b border-slate-200">
               <div className="flex items-center gap-2">
@@ -795,7 +795,7 @@ export default function StandaloneNotesPage({ embedded = false }) {
 
       {/* CANCEL MODAL */}
       {cancelTarget && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-3">
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-3">
           <div className="bg-white rounded-2xl border border-slate-200 max-w-md w-full p-5 shadow-2xl text-xs flex flex-col">
             <h3 className="font-bold text-base text-[#1F2E4A] mb-1">
               Cancel Note {cancelTarget.note_number || cancelTarget.noteNumber}?

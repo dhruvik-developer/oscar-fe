@@ -504,7 +504,7 @@ export default function ProductionCompletionVerificationPage() {
 
       {/* Verify & Approve Modal */}
       {showVerifyModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <form onSubmit={handleVerify} className="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <h3 className="text-[15px] font-extrabold text-[#17294e]">Approve & Verify Production</h3>
@@ -577,7 +577,7 @@ export default function ProductionCompletionVerificationPage() {
 
       {/* View PI modal */}
       {showPI && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setShowPI(false)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={() => setShowPI(false)}>
           <div className="w-full max-w-lg rounded-2xl bg-white p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <h3 className="text-[15px] font-extrabold text-[#17294e]">Production Instruction — {piNumber}</h3>

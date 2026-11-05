@@ -312,7 +312,7 @@ export default function Onboarding() {
       {/* Guide Modal */}
       {guideOpen && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/50 backdrop-blur-xs"
+          className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/50 backdrop-blur-sm"
           onClick={() => setGuideOpen(false)}
         >
           <div

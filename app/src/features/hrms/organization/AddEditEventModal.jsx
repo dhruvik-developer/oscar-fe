@@ -90,7 +90,7 @@ export function AddEditEventModal({
   const selectedCategoryMeta = EVENT_CATEGORIES[formData.type] || EVENT_CATEGORIES.Meeting;
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/45 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 overflow-y-auto animate-fade-in">
+    <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 overflow-y-auto animate-fade-in">
       <div className="bg-white rounded-2xl border border-bdr shadow-2xl w-full max-w-lg overflow-hidden my-2 sm:my-6">
         {/* Header */}
         <div className="flex justify-between items-center gap-2 lg:gap-0 px-4 sm:px-6 py-4 border-b border-bdr bg-slate-50/70">

@@ -654,7 +654,7 @@ export default function TrainingFunnel({ embedded = false, onBack }) {
 
       {/* Add / Edit Training Modal */}
       {modalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/45 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4">
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
           <div className="bg-white rounded-2xl border border-bdr shadow-2xl w-full max-w-lg overflow-hidden animate-fade-in">
             <div className="flex justify-between items-center gap-2 lg:gap-0 px-4 sm:px-6 py-4 border-b border-bdr bg-slate-50/80">
               <div>

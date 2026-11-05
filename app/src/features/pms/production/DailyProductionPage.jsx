@@ -719,7 +719,7 @@ export default function DailyProductionPage() {
 
       {/* Add / Edit modal */}
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-2xs">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
           <div className="w-full max-w-xl rounded-xl bg-white shadow-2xl border border-slate-200 overflow-hidden">
             <div className="bg-slate-900 text-white px-5 py-3.5 flex items-center justify-between">
               <div className="flex items-center gap-2">

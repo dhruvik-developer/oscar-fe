@@ -875,7 +875,7 @@ export function CustomerReturnTab({ project }) {
       {/* MODAL 1: CREATE RETURN REQUEST (Phase 1)                       */}
       {/* ============================================================== */}
       {modalMode === 'create' && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-3 animate-in fade-in duration-150">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-3 animate-in fade-in duration-150">
           <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-4xl w-full p-5 text-xs max-h-[92vh] flex flex-col overflow-hidden">
             <div className="flex items-center justify-between pb-3 border-b border-slate-200">
               <div className="flex items-center gap-2">
@@ -1021,7 +1021,7 @@ export function CustomerReturnTab({ project }) {
       {/* MODAL 2: RECEIVE PHYSICAL RETURN (Phase 2)                     */}
       {/* ============================================================== */}
       {modalMode === 'receive' && activeReturn && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-3 animate-in fade-in duration-150">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-3 animate-in fade-in duration-150">
           <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-2xl w-full p-5 text-xs max-h-[90vh] flex flex-col overflow-hidden">
             <div className="flex items-center justify-between pb-3 border-b border-slate-200">
               <div className="flex items-center gap-2">
@@ -1160,7 +1160,7 @@ export function CustomerReturnTab({ project }) {
       {/* MODAL 3: QC INSPECTION & DEFECT GRADING (Phase 3)              */}
       {/* ============================================================== */}
       {modalMode === 'qc' && activeReturn && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-3 animate-in fade-in duration-150">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-3 animate-in fade-in duration-150">
           <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-4xl w-full p-5 text-xs max-h-[92vh] flex flex-col overflow-hidden">
             <div className="flex items-center justify-between pb-3 border-b border-slate-200">
               <div className="flex items-center gap-2">
@@ -1422,7 +1422,7 @@ export function CustomerReturnTab({ project }) {
       {/* MODAL 4: ROUTE STOCK & ISSUE CREDIT NOTE (Phases 4 & 5)        */}
       {/* ============================================================== */}
       {modalMode === 'route' && activeReturn && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-3 animate-in fade-in duration-150">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-3 animate-in fade-in duration-150">
           <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-2xl w-full p-5 text-xs max-h-[90vh] flex flex-col overflow-hidden">
             <div className="flex items-center justify-between pb-3 border-b border-slate-200">
               <div className="flex items-center gap-2">
@@ -1578,7 +1578,7 @@ export function CustomerReturnTab({ project }) {
       {/* MODAL 5: VIEW FULL TRACEABILITY TIMELINE                       */}
       {/* ============================================================== */}
       {modalMode === 'view' && activeReturn && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-3 animate-in fade-in duration-150">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-3 animate-in fade-in duration-150">
           <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-3xl w-full p-5 text-xs max-h-[90vh] flex flex-col overflow-hidden">
             <div className="flex items-center justify-between pb-3 border-b border-slate-200">
               <div className="flex items-center gap-2">

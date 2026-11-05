@@ -16,7 +16,7 @@ export function SkeletonTable() {
 export function ConfirmModal({ open, title, desc, confirmLabel = "Confirm", onConfirm, onClose, danger = false, requireReason = false, reason, setReason }) {
   if (!open) return null;
   return <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4">
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-xs" onClick={onClose} />
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
       <div className="relative bg-card text-text border border-border rounded-xl shadow-xl w-full max-w-md p-4 sm:p-6 max-h-[95vh] overflow-y-auto flex flex-col gap-4">
         <h3 className="font-semibold text-[15px]">{title}</h3>
         <p className="text-[13px] text-muted">{desc}</p>
@@ -38,7 +38,7 @@ export function ExportModal({ open, onClose, onExport }) {
     setTimeout(() => setPhase("done"), 1200);
   }
   return <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4">
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-xs" onClick={onClose} />
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
       <div className="relative bg-card text-text border border-border rounded-xl shadow-xl w-full max-w-md p-4 sm:p-6 max-h-[95vh] overflow-y-auto flex flex-col gap-4">
         <div className="flex justify-between items-center"><h3 className="font-semibold">Export Attendance</h3><button onClick={onClose} className="w-7 h-7 rounded-full hover:bg-soft grid place-items-center"><span className="material-symbols-outlined text-[18px]">close</span></button></div>
         {phase === "idle" && <>

@@ -15,9 +15,13 @@ import PageHeader from '../../../components/ui/PageHeader';
 import { Button } from '../../../components/ui/Button';
 import { loomService } from '../../../services/loomService';
 import { formatNum } from '../utils/loomCalculations';
+import { useERP } from '../../../context/ERPContext';
+import { ConfirmModal } from '../../../components/ui/ConfirmModal';
 
 export default function YarnManagementPage() {
+  const { showToast } = useERP();
   const [loading, setLoading] = useState(true);
+  const [deleteBookingConfirmId, setDeleteBookingConfirmId] = useState(null);
   const [yarns, setYarns] = useState([]);
   const [factories, setFactories] = useState([]);
   const [bookings, setBookings] = useState([]);
@@ -90,7 +94,10 @@ export default function YarnManagementPage() {
   // Step 1: Book Yarn
   const handleAddBooking = async (e) => {
     e.preventDefault();
-    if (!bkSupplier || !bkKgs || !bkRate) return alert('Supplier, Kgs, and Rate required');
+    if (!bkSupplier || !bkKgs || !bkRate) {
+      showToast('Supplier, Kgs, and Rate are required', 'warning');
+      return;
+    }
     try {
       await loomService.createYarnBooking({
         supplier: bkSupplier,
@@ -100,25 +107,29 @@ export default function YarnManagementPage() {
         date: bkDate,
         note: bkNote,
       });
+      showToast('Yarn booking created successfully', 'success');
       setBkSupplier('');
       setBkKgs('');
       setBkRate('');
       setBkNote('');
       loadData();
     } catch (err) {
-      alert(err?.payload?.detail || 'Failed to book yarn');
+      showToast(err?.payload?.detail || 'Failed to book yarn', 'error');
     }
   };
 
   // Step 2: Schedule Delivery
   const handleAddDelivery = async (e) => {
     e.preventDefault();
-    if (!schBooking || !schFactory || !schKgs) return alert('Booking, Factory, and Kgs required');
+    if (!schBooking || !schFactory || !schKgs) {
+      showToast('Booking, Factory, and Kgs are required', 'warning');
+      return;
+    }
     const b = bookings.find((x) => x.id === schBooking);
     if (!b) return;
 
     if (Number(schKgs) > Number(b.unscheduled_kgs)) {
-      alert(`Only ${formatNum(b.unscheduled_kgs)} kg available to schedule on this booking.`);
+      showToast(`Only ${formatNum(b.unscheduled_kgs)} kg available to schedule on this booking.`, 'warning');
       return;
     }
 
@@ -131,11 +142,12 @@ export default function YarnManagementPage() {
         due: schDue,
         status: 'Scheduled',
       });
+      showToast('Delivery scheduled successfully', 'success');
       setSchKgs('');
       setSchRate('');
       loadData();
     } catch (err) {
-      alert(err?.payload?.detail || 'Failed to schedule delivery');
+      showToast(err?.payload?.detail || 'Failed to schedule delivery', 'error');
     }
   };
 
@@ -146,23 +158,26 @@ export default function YarnManagementPage() {
     const recdKgs = kgInput ? Number(kgInput.value) : defaultKgs;
     const recdDate = dtInput ? dtInput.value : new Date().toISOString().slice(0, 10);
 
-    if (recdKgs <= 0) return alert('Enter received kgs');
+    if (recdKgs <= 0) {
+      showToast('Please enter received kgs', 'warning');
+      return;
+    }
     try {
       await loomService.confirmYarnDelivery(delId, recdKgs, recdDate);
-      alert('Yarn receipt confirmed & factory stock updated!');
+      showToast('Yarn receipt confirmed & factory stock updated!', 'success');
       loadData();
     } catch (err) {
-      alert(err?.payload?.detail || 'Failed to confirm receipt');
+      showToast(err?.payload?.detail || 'Failed to confirm receipt', 'error');
     }
   };
 
   const handleDeleteBooking = async (id) => {
-    if (!confirm('Delete this booking?')) return;
     try {
       await loomService.deleteYarnBooking(id);
+      showToast('Booking deleted successfully', 'success');
       loadData();
     } catch (err) {
-      alert('Cannot delete booking with active deliveries.');
+      showToast('Cannot delete booking with active deliveries.', 'error');
     }
   };
 
@@ -472,8 +487,9 @@ export default function YarnManagementPage() {
                   <td className="py-2 px-2.5 sm:py-2.5 sm:px-3 text-right">₹{b.rate}</td>
                   <td className="py-2 px-2.5 sm:py-2.5 sm:px-3 text-center">
                     <button
-                      onClick={() => handleDeleteBooking(b.id)}
-                      className="text-red-500 hover:text-red-700 p-1 rounded"
+                      onClick={() => setDeleteBookingConfirmId(b.id)}
+                      className="text-red-500 hover:text-red-700 p-1 rounded transition-colors"
+                      title="Delete yarn booking"
                     >
                       <Trash2 size={13} />
                     </button>
@@ -529,6 +545,20 @@ export default function YarnManagementPage() {
           </table>
         </div>
       </div>
+
+      <ConfirmModal
+        isOpen={Boolean(deleteBookingConfirmId)}
+        onClose={() => setDeleteBookingConfirmId(null)}
+        onConfirm={async () => {
+          const id = deleteBookingConfirmId;
+          setDeleteBookingConfirmId(null);
+          await handleDeleteBooking(id);
+        }}
+        title="Delete Yarn Booking"
+        message="Are you sure you want to delete this yarn booking? This cannot be undone."
+        confirmText="Delete Booking"
+        variant="danger"
+      />
     </div>
   );
 }

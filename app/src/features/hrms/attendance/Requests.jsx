@@ -255,7 +255,8 @@ export default function Requests() {
   };
 
   function openRegModal(reqToEdit = null) {
-    if (reqToEdit) {
+    const isEdit = reqToEdit && typeof reqToEdit === "object" && Boolean(reqToEdit.id) && !("nativeEvent" in reqToEdit);
+    if (isEdit) {
       setEditingReq(reqToEdit);
       setRegForm({
         employeeId: reqToEdit.employeeId || "",
@@ -277,7 +278,8 @@ export default function Requests() {
   }
 
   function openEarlyModal(reqToEdit = null) {
-    if (reqToEdit) {
+    const isEdit = reqToEdit && typeof reqToEdit === "object" && Boolean(reqToEdit.id) && !("nativeEvent" in reqToEdit);
+    if (isEdit) {
       setEditingReq(reqToEdit);
       setEarlyForm({
         employeeId: reqToEdit.employeeId || "",
@@ -352,7 +354,7 @@ export default function Requests() {
       reason: `${tag}${regForm.reason.trim()}`,
     };
 
-    if (editingReq) {
+    if (editingReq && editingReq.id) {
       setSubmitting(true);
       try {
         await updateRequest(editingReq.id, payload);
@@ -417,7 +419,7 @@ export default function Requests() {
       reason: `[Early Leave] ${earlyForm.reason.trim()}`,
     };
 
-    if (editingReq) {
+    if (editingReq && editingReq.id) {
       setSubmitting(true);
       try {
         await updateRequest(editingReq.id, payload);
@@ -475,10 +477,10 @@ export default function Requests() {
         guide={hrmsGuides.attendanceRequests}
         actions={
           <>
-            <button type="button" onClick={openRegModal} className="req-btn-primary">
+            <button type="button" onClick={() => openRegModal()} className="req-btn-primary">
               Regularize Attendance
             </button>
-            <button type="button" onClick={openEarlyModal} className="req-btn-outline">
+            <button type="button" onClick={() => openEarlyModal()} className="req-btn-outline">
               Early Clock-Out Request
             </button>
           </>

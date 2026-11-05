@@ -11,17 +11,31 @@ import { useTableSort } from "../../../hooks/useTableSort";
 import SortableTh from "../../../components/ui/SortableTh";
 
 const DEPARTMENTS = ["All", "Engineering", "Design", "Marketing", "Finance", "HR", "Operations", "Sales"];
-const STATUSES = ["All", "Active", "On Leave", "Probation"];
+const STATUSES = [
+  "All",
+  "Active",
+  "Inactive",
+  "On Leave",
+  "Probation",
+  "Notice Period",
+  "Resigned",
+  "Terminated",
+];
 
 const statusStyles = {
   Active: { background: "#e6f4ea", color: "#15803d", border: "#a7f3d0" },
+  Inactive: { background: "#f1f5f9", color: "#64748b", border: "#cbd5e1" },
   "On Leave": { background: "#fef3c7", color: "#b45309", border: "#fde68a" },
   Probation: { background: "#f1f5f9", color: "#475569", border: "#cbd5e1" },
+  "Notice Period": { background: "#fff7ed", color: "#c2410c", border: "#ffedd5" },
+  Resigned: { background: "#fef2f2", color: "#b91c1c", border: "#fecaca" },
+  Terminated: { background: "#fee2e2", color: "#991b1b", border: "#fca5a5" },
 };
 
 export default function Employees() {
   const storeEmployees = useAppStore((s) => s.employees || []);
   const addStoreEmployee = useAppStore((s) => s.addEmployee);
+  const updateStoreEmployee = useAppStore((s) => s.updateEmployee);
   const deleteStoreEmployee = useAppStore((s) => s.deleteEmployee);
   const setToast = useAppStore((s) => s.setToast || s.showToast);
   const [dept, setDept] = useState("All");
@@ -271,9 +285,38 @@ export default function Employees() {
                     <td style={{ color: "#374151" }}>{row.department}</td>
                     <td style={{ color: "#374151" }}>{row.manager || row.reportingManager || "—"}</td>
                     <td>
-                      <span className="emp-status" style={{ ...statusStyles[row.status] }}>
-                        {row.status}
-                      </span>
+                      <select
+                        value={row.status || "Active"}
+                        onClick={(e) => e.stopPropagation()}
+                        onChange={async (e) => {
+                          e.stopPropagation();
+                          const nextStatus = e.target.value;
+                          try {
+                            await updateStoreEmployee(row.id, { status: nextStatus });
+                            setToast(`Status updated to ${nextStatus} for ${row.name}`);
+                          } catch (err) {
+                            setToast(`Could not update status: ${err?.message || "Error"}`);
+                          }
+                        }}
+                        className="emp-status-select"
+                        style={{
+                          ...(statusStyles[row.status] || statusStyles.Active),
+                          cursor: "pointer",
+                          fontSize: "12px",
+                          fontWeight: "600",
+                          borderRadius: "999px",
+                          padding: "3px 10px",
+                          border: "1px solid",
+                          outline: "none",
+                        }}
+                        title="Change Employee Status"
+                      >
+                        {STATUSES.filter((s) => s !== "All").map((st) => (
+                          <option key={st} value={st} style={{ background: "#fff", color: "#1f2937" }}>
+                            {st}
+                          </option>
+                        ))}
+                      </select>
                     </td>
                     <td>
                       <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
@@ -358,9 +401,38 @@ export default function Employees() {
                 </div>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 12 }}>
                   <span className="emp-id">{row.empId || row.employeeCode || row.id}</span>
-                  <span className="emp-status" style={{ ...statusStyles[row.status] }}>
-                    {row.status}
-                  </span>
+                  <select
+                    value={row.status || "Active"}
+                    onClick={(e) => e.stopPropagation()}
+                    onChange={async (e) => {
+                      e.stopPropagation();
+                      const nextStatus = e.target.value;
+                      try {
+                        await updateStoreEmployee(row.id, { status: nextStatus });
+                        setToast(`Status updated to ${nextStatus} for ${row.name}`);
+                      } catch (err) {
+                        setToast(`Could not update status: ${err?.message || "Error"}`);
+                      }
+                    }}
+                    className="emp-status-select"
+                    style={{
+                      ...(statusStyles[row.status] || statusStyles.Active),
+                      cursor: "pointer",
+                      fontSize: "12px",
+                      fontWeight: "600",
+                      borderRadius: "999px",
+                      padding: "3px 10px",
+                      border: "1px solid",
+                      outline: "none",
+                    }}
+                    title="Change Employee Status"
+                  >
+                    {STATUSES.filter((s) => s !== "All").map((st) => (
+                      <option key={st} value={st} style={{ background: "#fff", color: "#1f2937" }}>
+                        {st}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
             ))}

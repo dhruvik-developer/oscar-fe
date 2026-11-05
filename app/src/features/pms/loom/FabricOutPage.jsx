@@ -16,10 +16,14 @@ import PageHeader from '../../../components/ui/PageHeader';
 import { Button } from '../../../components/ui/Button';
 import { loomService } from '../../../services/loomService';
 import { formatNum } from '../utils/loomCalculations';
+import { useERP } from '../../../context/ERPContext';
+import { ConfirmModal } from '../../../components/ui/ConfirmModal';
 
 export default function FabricOutPage() {
   const navigate = useNavigate();
+  const { showToast } = useERP();
   const [loading, setLoading] = useState(true);
+  const [deleteConfirmId, setDeleteConfirmId] = useState(null);
   const [factories, setFactories] = useState([]);
   const [qualities, setQualities] = useState([]);
   const [selectedFactoryId, setSelectedFactoryId] = useState('');
@@ -83,13 +87,16 @@ export default function FabricOutPage() {
 
   const handleRecordDispatch = async (e) => {
     e.preventDefault();
-    if (!oMeters || Number(oMeters) <= 0) return alert('Meters required');
+    if (!oMeters || Number(oMeters) <= 0) {
+      showToast('Please enter dispatch meters', 'warning');
+      return;
+    }
 
     // Validation: Check if meters exceed available fabric at factory
     const invRow = inventorySummary?.factory_inventory?.find((x) => x.quality_id === oQuality);
     const available = invRow ? invRow.at_factory_m : 0;
     if (Number(oMeters) > available) {
-      alert(`Only ${formatNum(available)} m of this quality available at this factory!`);
+      showToast(`Only ${formatNum(available)} m of this quality available at this factory!`, 'warning');
       return;
     }
 
@@ -105,23 +112,24 @@ export default function FabricOutPage() {
         challan: oChallan,
         vehicle: oVehicle,
       });
+      showToast('Dispatch challan recorded successfully', 'success');
       setOMeters('');
       setOTaka('');
       setOChallan('');
       setOVehicle('');
       fetchFactoryDispatches();
     } catch (err) {
-      alert(err?.payload?.detail || 'Failed to record dispatch');
+      showToast(err?.payload?.detail || 'Failed to record dispatch', 'error');
     }
   };
 
   const handleDeleteDispatch = async (id) => {
-    if (!confirm('Delete dispatch record?')) return;
     try {
       await loomService.deleteFabricDispatch(id);
+      showToast('Dispatch record deleted', 'success');
       fetchFactoryDispatches();
     } catch (err) {
-      alert('Failed to delete dispatch');
+      showToast('Failed to delete dispatch', 'error');
     }
   };
 
@@ -384,8 +392,9 @@ export default function FabricOutPage() {
                   <td className="py-2 px-2.5 sm:py-2.5 sm:px-3 font-mono font-semibold text-blue-600">{d.challan || '—'}</td>
                   <td className="py-2 px-2.5 sm:py-2.5 sm:px-3 text-center">
                     <button
-                      onClick={() => handleDeleteDispatch(d.id)}
-                      className="text-red-500 hover:text-red-700 p-1 rounded"
+                      onClick={() => setDeleteConfirmId(d.id)}
+                      className="text-red-500 hover:text-red-700 p-1 rounded transition-colors"
+                      title="Delete dispatch challan"
                     >
                       <Trash2 size={13} />
                     </button>
@@ -396,6 +405,20 @@ export default function FabricOutPage() {
           </table>
         </div>
       </div>
+
+      <ConfirmModal
+        isOpen={Boolean(deleteConfirmId)}
+        onClose={() => setDeleteConfirmId(null)}
+        onConfirm={async () => {
+          const id = deleteConfirmId;
+          setDeleteConfirmId(null);
+          await handleDeleteDispatch(id);
+        }}
+        title="Delete Dispatch Challan"
+        message="Are you sure you want to delete this dispatch challan record? The dispatched fabric meters will be restored to factory inventory."
+        confirmText="Delete Dispatch"
+        variant="danger"
+      />
     </div>
   );
 }

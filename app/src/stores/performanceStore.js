@@ -48,8 +48,11 @@ const usePerformanceStoreBase = create((set, get) => ({
       pullTracked("indicators"),
       pullTracked("kpis"),
     ]);
+    const serverCycles = rows[0] || [];
+    const activeCycle = serverCycles.find((c) => c.status === "Active") || serverCycles[0];
     set((s) => ({
       cycles: rows[0] || s.cycles,
+      activeCycleId: activeCycle?.id || s.activeCycleId,
       appraisals: rows[1] || s.appraisals,
       indicators: rows[2] || s.indicators,
       kpis: rows[3] || s.kpis,
@@ -106,15 +109,21 @@ const usePerformanceStoreBase = create((set, get) => ({
 
   // ── Cycle Management ──────────────────────────────────────────
   addCycle: (cycle) => {
-    const id = cycle.id || `CYC-${Date.now()}`;
+    const start = cycle.startDate || cycle.periodStart || cycle.period_start;
+    const end = cycle.endDate || cycle.periodEnd || cycle.period_end;
     const newCycle = {
       ...cycle,
-      id,
+      startDate: start,
+      endDate: end,
+      periodStart: start,
+      periodEnd: end,
+      period_start: start,
+      period_end: end,
       status: cycle.status || "Active",
       appraisalCount: 0,
       completedCount: 0,
     };
-    set((s) => ({ cycles: [newCycle, ...s.cycles] }));
+    set((s) => ({ cycles: [newCycle, ...s.cycles], activeCycleId: newCycle.id || s.activeCycleId }));
     get().persist();
     return newCycle;
   },
@@ -211,12 +220,19 @@ const usePerformanceStoreBase = create((set, get) => ({
     const id = appraisal.id || `APR-${String(get().appraisals.length + 1).padStart(3, "0")}`;
     const initialRating = Number(appraisal.rating) || 4.0;
     const tier = getRatingScaleTier(initialRating);
+    const activeCycle = get().cycles.find((c) => c.status === "Active") || get().cycles[0];
+    const resolvedCycleId = (appraisal.cycleId && appraisal.cycleId !== "CYC-2024-Q4")
+      ? appraisal.cycleId
+      : (activeCycle?.id || appraisal.cycleId || "CYC-2024-Q4");
+    const resolvedCycleName = (appraisal.cycle && appraisal.cycle !== "Q4 2024")
+      ? appraisal.cycle
+      : (activeCycle?.name || appraisal.cycle || "Annual Review");
     const newAppr = {
       id,
       avatar: appraisal.avatar || "https://i.pravatar.cc/100?img=15",
       employee: appraisal.employee,
-      cycle: appraisal.cycle || "Q4 2024",
-      cycleId: appraisal.cycleId || "CYC-2024-Q4",
+      cycle: resolvedCycleName,
+      cycleId: resolvedCycleId,
       reviewer: appraisal.reviewer,
       department: appraisal.department || "Engineering",
       designation: appraisal.designation || "Senior Specialist",

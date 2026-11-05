@@ -16,9 +16,15 @@ import KpiCard from '../../../components/ui/KpiCard';
 import { Button } from '../../../components/ui/Button';
 import { loomService } from '../../../services/loomService';
 import { qc, formatNum } from '../utils/loomCalculations';
+import { useERP } from '../../../context/ERPContext';
+import { ConfirmModal } from '../../../components/ui/ConfirmModal';
 
 export default function MachinesAndBeamsPage() {
+  const { showToast } = useERP();
   const [loading, setLoading] = useState(true);
+  const [deleteConfirmBeamId, setDeleteConfirmBeamId] = useState(null);
+  const [cutoffConfirmBeamId, setCutoffConfirmBeamId] = useState(null);
+  const [reedConfirmModal, setReedConfirmModal] = useState(null);
   const [factories, setFactories] = useState([]);
   const [selectedFactoryId, setSelectedFactoryId] = useState(
     () => localStorage.getItem('oscar_pms_selected_factory') || ''
@@ -127,18 +133,7 @@ export default function MachinesAndBeamsPage() {
     };
   }, [bQuality, bLength, qualities, yarnMap, statusData]);
 
-  const handleAddBeam = async (e) => {
-    e.preventDefault();
-    if (!bNo || !bLength) return alert('Beam number and length required');
-    const q = qualities.find((x) => x.id === bQuality);
-    const m = statusData?.machines?.find((x) => x.machine_id === bMachine);
-
-    if (m && q && m.reed !== q.reed) {
-      if (!confirm(`Reed mismatch! Quality needs Reed ${q.reed}, but Machine ${m.no} is Reed ${m.reed}. Continue?`)) {
-        return;
-      }
-    }
-
+  const doCreateBeam = async () => {
     try {
       await loomService.createBeam({
         beam_no: bNo,
@@ -149,10 +144,42 @@ export default function MachinesAndBeamsPage() {
         status: 'Spare',
         machine: bMachine || null,
       });
+      showToast('Beam created successfully', 'success');
       setBNo('');
       fetchFactoryData();
     } catch (err) {
-      alert(err?.payload?.detail || 'Failed to add beam');
+      showToast(err?.payload?.detail || 'Failed to add beam', 'error');
+    }
+  };
+
+  const handleAddBeam = async (e) => {
+    e.preventDefault();
+    if (!bNo || !bLength) {
+      showToast('Beam number and length are required', 'warning');
+      return;
+    }
+    const q = qualities.find((x) => x.id === bQuality);
+    const m = statusData?.machines?.find((x) => x.machine_id === bMachine);
+
+    if (m && q && m.reed !== q.reed) {
+      setReedConfirmModal({
+        title: 'Reed Mismatch Warning',
+        message: `Quality needs Reed ${q.reed}, but Machine ${m.no} is Reed ${m.reed}. Do you want to proceed and assign anyway?`,
+        onProceed: doCreateBeam,
+      });
+      return;
+    }
+
+    await doCreateBeam();
+  };
+
+  const doLoadBeam = async (beamId, machineId) => {
+    try {
+      await loomService.loadBeamToLoom(beamId, machineId);
+      showToast('Beam loaded to loom successfully', 'success');
+      fetchFactoryData();
+    } catch (err) {
+      showToast(err?.payload?.detail || 'Failed to load beam on loom', 'error');
     }
   };
 
@@ -162,45 +189,44 @@ export default function MachinesAndBeamsPage() {
     const q = qualities.find((x) => x.id === beam?.quality);
 
     if (m && q && m.reed !== q.reed) {
-      if (!confirm(`Reed mismatch! Quality needs Reed ${q.reed}, but Machine ${m.no} is Reed ${m.reed}. Continue?`)) {
-        return;
-      }
+      setReedConfirmModal({
+        title: 'Reed Mismatch Warning',
+        message: `Quality needs Reed ${q.reed}, but Machine ${m.no} is Reed ${m.reed}. Do you want to load to this loom anyway?`,
+        onProceed: () => doLoadBeam(beamId, machineId),
+      });
+      return;
     }
 
-    try {
-      await loomService.loadBeamToLoom(beamId, machineId);
-      fetchFactoryData();
-    } catch (err) {
-      alert(err?.payload?.detail || 'Failed to load beam on loom');
-    }
+    await doLoadBeam(beamId, machineId);
   };
 
   const handleAssignSpare = async (beamId, machineId) => {
     try {
       await loomService.assignSpareBeam(beamId, machineId);
+      showToast('Beam parked as spare', 'success');
       fetchFactoryData();
     } catch (err) {
-      alert('Failed to park spare');
+      showToast('Failed to park spare', 'error');
     }
   };
 
   const handleCutoffBeam = async (beamId) => {
-    if (!confirm('Mark beam finished / cut off?')) return;
     try {
       await loomService.cutoffBeam(beamId);
+      showToast('Beam marked finished and cut off', 'success');
       fetchFactoryData();
     } catch (err) {
-      alert('Failed to cut off beam');
+      showToast('Failed to cut off beam', 'error');
     }
   };
 
   const handleDeleteBeam = async (beamId) => {
-    if (!confirm('Delete beam entry?')) return;
     try {
       await loomService.deleteBeam(beamId);
+      showToast('Beam entry deleted', 'success');
       fetchFactoryData();
     } catch (err) {
-      alert('Failed to delete beam');
+      showToast('Failed to delete beam', 'error');
     }
   };
 
@@ -508,7 +534,10 @@ export default function MachinesAndBeamsPage() {
                             type="button"
                             onClick={() => {
                               const el = document.getElementById(`target_m_${b.id}`);
-                              if (!el.value) return alert('Select target machine');
+                              if (!el.value) {
+                                showToast('Please select a target machine', 'warning');
+                                return;
+                              }
                               handleLoadToLoom(b.id, el.value);
                             }}
                             className="h-8 px-3 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white rounded-lg text-xs font-semibold shadow-2xs transition cursor-pointer"
@@ -529,7 +558,7 @@ export default function MachinesAndBeamsPage() {
                       ) : (
                         <button
                           type="button"
-                          onClick={() => handleCutoffBeam(b.id)}
+                          onClick={() => setCutoffConfirmBeamId(b.id)}
                           className="h-8 px-3 bg-amber-50 hover:bg-amber-100 active:bg-amber-200 text-amber-700 dark:bg-amber-950/40 dark:hover:bg-amber-900/50 dark:text-amber-300 border border-amber-200 dark:border-amber-800 rounded-lg text-xs font-semibold transition cursor-pointer"
                         >
                           Cut off
@@ -537,7 +566,7 @@ export default function MachinesAndBeamsPage() {
                       )}
                       <button
                         type="button"
-                        onClick={() => handleDeleteBeam(b.id)}
+                        onClick={() => setDeleteConfirmBeamId(b.id)}
                         className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-lg transition cursor-pointer ml-0.5"
                         title="Delete Beam"
                       >
@@ -615,6 +644,48 @@ export default function MachinesAndBeamsPage() {
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={Boolean(deleteConfirmBeamId)}
+        onClose={() => setDeleteConfirmBeamId(null)}
+        onConfirm={async () => {
+          const id = deleteConfirmBeamId;
+          setDeleteConfirmBeamId(null);
+          await handleDeleteBeam(id);
+        }}
+        title="Delete Beam Entry"
+        message="Are you sure you want to delete this beam record? This action cannot be undone."
+        confirmText="Delete Beam"
+        variant="danger"
+      />
+
+      <ConfirmModal
+        isOpen={Boolean(cutoffConfirmBeamId)}
+        onClose={() => setCutoffConfirmBeamId(null)}
+        onConfirm={async () => {
+          const id = cutoffConfirmBeamId;
+          setCutoffConfirmBeamId(null);
+          await handleCutoffBeam(id);
+        }}
+        title="Cut Off Beam"
+        message="Mark this beam as completely finished / cut off? The machine will become empty and available for a new beam."
+        confirmText="Mark Finished & Cut Off"
+        variant="warning"
+      />
+
+      <ConfirmModal
+        isOpen={Boolean(reedConfirmModal)}
+        onClose={() => setReedConfirmModal(null)}
+        onConfirm={async () => {
+          const callback = reedConfirmModal?.onProceed;
+          setReedConfirmModal(null);
+          if (callback) await callback();
+        }}
+        title={reedConfirmModal?.title || 'Reed Mismatch Warning'}
+        message={reedConfirmModal?.message || 'The reed of the machine does not match the reed required by the fabric quality. Continue?'}
+        confirmText="Proceed Anyway"
+        variant="warning"
+      />
     </div>
   );
 }

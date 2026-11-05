@@ -276,7 +276,7 @@ export const hrmsService = {
   // Attendance & regularization
   markAttendance: (data) => api.post('/hrms/attendance/', data),
   bulkMarkAttendance: (data) => api.post('/hrms/attendance/bulk/', data),
-  requestRegularization: (data) => api.post('/hrms/attendance/regularize/', data),
+  requestRegularization: (data) => api.post('/hrms/attendance/regularizations/', data),
   approveRegularization: (id, approved) => api.patch(`/hrms/attendance/regularizations/${id}/`, { approved }),
   // Leave & payroll
   requestLeave: (data) => api.post('/hrms/leave/', data),

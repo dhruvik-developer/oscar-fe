@@ -4,8 +4,12 @@ import PageHeader from '../../../components/ui/PageHeader';
 import { Button } from '../../../components/ui/Button';
 import { loomService } from '../../../services/loomService';
 import { qc, formatNum } from '../utils/loomCalculations';
+import { useERP } from '../../../context/ERPContext';
+import { ConfirmModal } from '../../../components/ui/ConfirmModal';
 
 export default function LoomMastersPage() {
+  const { showToast } = useERP();
+  const [deleteConfirmState, setDeleteConfirmState] = useState(null);
   const [activeTab, setActiveTab] = useState('qualities'); // 'qualities' | 'yarns' | 'factories' | 'coords'
   const [loading, setLoading] = useState(true);
   const [yarns, setYarns] = useState([]);
@@ -72,74 +76,90 @@ export default function LoomMastersPage() {
   // Quality actions
   const handleAddQuality = async (e) => {
     e.preventDefault();
-    if (!qForm.name || !qForm.ends || !qForm.ppi) return alert('Name, ends and PPI required');
+    if (!qForm.name || !qForm.ends || !qForm.ppi) {
+      showToast('Name, ends and PPI are required', 'warning');
+      return;
+    }
     try {
       await loomService.createQuality(qForm);
+      showToast('Fabric quality added', 'success');
       setQForm((prev) => ({ ...prev, name: '' }));
       loadData();
     } catch (err) {
-      alert(err?.payload?.detail || 'Failed to add quality');
+      showToast(err?.payload?.detail || 'Failed to add quality', 'error');
     }
   };
 
   const handleDeleteQuality = async (id) => {
-    if (!confirm('Delete this quality?')) return;
     try {
       await loomService.deleteQuality(id);
+      showToast('Fabric quality deleted', 'success');
       loadData();
     } catch (err) {
-      alert('Cannot delete quality in active use.');
+      showToast('Cannot delete quality in active use', 'error');
     }
   };
 
   // Yarn actions
   const handleAddYarn = async (e) => {
     e.preventDefault();
-    if (!yForm.name || !yForm.denier) return alert('Name and denier required');
+    if (!yForm.name || !yForm.denier) {
+      showToast('Name and denier are required', 'warning');
+      return;
+    }
     try {
       await loomService.createYarn(yForm);
+      showToast('Yarn type added', 'success');
       setYForm({ name: '', denier: '', kg_per_bag: 25, rate: 0, note: '' });
       loadData();
     } catch (err) {
-      alert(err?.payload?.detail || 'Failed to add yarn');
+      showToast(err?.payload?.detail || 'Failed to add yarn', 'error');
     }
   };
 
   const handleUpdateYarnRate = async (id, rate) => {
     try {
       await loomService.updateYarn(id, { rate: Number(rate) });
+      showToast('Yarn market rate updated', 'success');
       loadData();
     } catch (err) {
-      alert('Failed to update rate');
+      showToast('Failed to update rate', 'error');
     }
   };
 
   const handleDeleteYarn = async (id) => {
-    if (!confirm('Delete this yarn?')) return;
     try {
       await loomService.deleteYarn(id);
+      showToast('Yarn type deleted', 'success');
       loadData();
     } catch (err) {
-      alert('Cannot delete yarn with active bookings or qualities.');
+      showToast('Cannot delete yarn with active bookings or qualities', 'error');
     }
   };
 
   // Factory & Machines actions
   const handleAddFactory = async (e) => {
     e.preventDefault();
-    if (!fForm.name) return alert('Factory name required');
+    if (!fForm.name) {
+      showToast('Factory name is required', 'warning');
+      return;
+    }
     try {
       await loomService.createFactory(fForm);
+      showToast('Factory unit registered', 'success');
       setFForm({ name: '', coord: '' });
       loadData();
     } catch (err) {
-      alert('Failed to add factory');
+      showToast('Failed to add factory', 'error');
     }
   };
 
   const handleBatchCreateMachines = async (e) => {
     e.preventDefault();
-    if (!selectedFactoryId) return alert('Pick factory');
+    if (!selectedFactoryId) {
+      showToast('Please select a factory unit first', 'warning');
+      return;
+    }
     try {
       await loomService.batchCreateMachines({
         factory: selectedFactoryId,
@@ -147,41 +167,47 @@ export default function LoomMastersPage() {
         to_no: mForm.to_no,
         reed: mForm.reed,
       });
+      showToast('Machines generated successfully', 'success');
       loadData();
     } catch (err) {
-      alert('Failed to create machines');
+      showToast('Failed to create machines', 'error');
     }
   };
 
   const handleUpdateMachineReed = async (id, reed) => {
     try {
       await loomService.updateMachine(id, { reed: Number(reed) });
+      showToast('Machine reed updated', 'success');
       loadData();
     } catch (err) {
-      alert('Failed to update reed');
+      showToast('Failed to update reed', 'error');
     }
   };
 
   const handleDeleteMachine = async (id) => {
-    if (!confirm('Delete machine?')) return;
     try {
       await loomService.deleteMachine(id);
+      showToast('Machine deleted', 'success');
       loadData();
     } catch (err) {
-      alert('Failed to delete machine');
+      showToast('Failed to delete machine', 'error');
     }
   };
 
   // Coordinator actions
   const handleAddCoord = async (e) => {
     e.preventDefault();
-    if (!cForm.name) return alert('Name required');
+    if (!cForm.name) {
+      showToast('Coordinator name is required', 'warning');
+      return;
+    }
     try {
       await loomService.createCoordinator(cForm);
+      showToast('Loom coordinator added', 'success');
       setCForm({ name: '', phone: '' });
       loadData();
     } catch (err) {
-      alert('Failed to add coordinator');
+      showToast('Failed to add coordinator', 'error');
     }
   };
 
@@ -415,7 +441,7 @@ export default function LoomMastersPage() {
                       </td>
                       <td className="py-2 px-2.5 sm:py-2.5 sm:px-3 text-center">
                         <button
-                          onClick={() => handleDeleteQuality(q.id)}
+                          onClick={() => setDeleteConfirmState({ type: "quality", id: q.id, title: "Delete Fabric Quality", message: `Delete quality "${q.name}"? Cannot be deleted if used in active programs or beams.` })}
                           className="text-red-500 hover:text-red-700 p-1 rounded transition-colors"
                         >
                           <Trash2 size={13} />
@@ -537,7 +563,7 @@ export default function LoomMastersPage() {
                       <td className="py-2 px-2.5 sm:py-2.5 sm:px-3 text-slate-400">{y.note || '-'}</td>
                       <td className="py-2 px-2.5 sm:py-2.5 sm:px-3 text-center">
                         <button
-                          onClick={() => handleDeleteYarn(y.id)}
+                          onClick={() => setDeleteConfirmState({ type: "yarn", id: y.id, title: "Delete Yarn", message: `Delete yarn "${y.name}"? Cannot be deleted if used in active bookings.` })}
                           className="text-red-500 hover:text-red-700 p-1 rounded transition-colors"
                         >
                           <Trash2 size={13} />
@@ -671,7 +697,7 @@ export default function LoomMastersPage() {
                     />
                   </div>
                   <button
-                    onClick={() => handleDeleteMachine(m.id)}
+                    onClick={() => setDeleteConfirmState({ type: "machine", id: m.id, title: "Delete Machine", message: `Delete Machine ${m.no}?` })}
                     className="text-[10px] text-red-500 hover:text-red-700 block mx-auto pt-0.5"
                   >
                     Remove
@@ -753,6 +779,22 @@ export default function LoomMastersPage() {
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={Boolean(deleteConfirmState)}
+        onClose={() => setDeleteConfirmState(null)}
+        onConfirm={async () => {
+          const item = deleteConfirmState;
+          setDeleteConfirmState(null);
+          if (item?.type === 'quality') await handleDeleteQuality(item.id);
+          else if (item?.type === 'yarn') await handleDeleteYarn(item.id);
+          else if (item?.type === 'machine') await handleDeleteMachine(item.id);
+        }}
+        title={deleteConfirmState?.title || 'Delete Master Item'}
+        message={deleteConfirmState?.message || 'Are you sure you want to delete this record?'}
+        confirmText="Delete"
+        variant="danger"
+      />
     </div>
   );
 }

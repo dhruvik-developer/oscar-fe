@@ -20,10 +20,14 @@ import KpiCard from '../../../components/ui/KpiCard';
 import { Button } from '../../../components/ui/Button';
 import { loomService } from '../../../services/loomService';
 import { qc, formatNum } from '../utils/loomCalculations';
+import { useERP } from '../../../context/ERPContext';
+import { ConfirmModal } from '../../../components/ui/ConfirmModal';
 
 export default function LoomProgramsPage() {
   const navigate = useNavigate();
+  const { showToast } = useERP();
   const [loading, setLoading] = useState(true);
+  const [deleteConfirmProgId, setDeleteConfirmProgId] = useState(null);
   const [programs, setPrograms] = useState([]);
   const [factories, setFactories] = useState([]);
   const [qualities, setQualities] = useState([]);
@@ -120,7 +124,10 @@ export default function LoomProgramsPage() {
 
   const handleCreateProgram = async (e) => {
     e.preventDefault();
-    if (!pName || !pDeadline || !pTarget) return alert('Name, Deadline and Target required');
+    if (!pName || !pDeadline || !pTarget) {
+      showToast('Program Name, Target meters and Deadline are required', 'warning');
+      return;
+    }
     try {
       await loomService.createProgram({
         name: pName,
@@ -134,29 +141,31 @@ export default function LoomProgramsPage() {
         t_power: Number(pTpower),
         status: 'Planned',
       });
+      showToast('Program created successfully', 'success');
       setPName('');
       loadData();
     } catch (err) {
-      alert(err?.payload?.detail || 'Failed to create program');
+      showToast(err?.payload?.detail || 'Failed to create program', 'error');
     }
   };
 
   const handleUpdateStatus = async (id, status) => {
     try {
       await loomService.updateProgramStatus(id, status);
+      showToast('Program status updated', 'success');
       loadData();
     } catch (err) {
-      alert('Failed to update status');
+      showToast('Failed to update status', 'error');
     }
   };
 
   const handleDeleteProgram = async (id) => {
-    if (!confirm('Delete this program?')) return;
     try {
       await loomService.deleteProgram(id);
+      showToast('Program deleted successfully', 'success');
       loadData();
     } catch (err) {
-      alert('Failed to delete program');
+      showToast('Failed to delete program', 'error');
     }
   };
 
@@ -523,7 +532,7 @@ export default function LoomProgramsPage() {
                           <CheckCircle2 size={13} />
                         </button>
                         <button
-                          onClick={() => handleDeleteProgram(p.id)}
+                          onClick={() => setDeleteConfirmProgId(p.id)}
                           className="text-red-500 hover:text-red-700 p-1 rounded transition-colors"
                           title="Delete Program"
                         >
@@ -545,6 +554,20 @@ export default function LoomProgramsPage() {
           </table>
         </div>
       </div>
+
+      <ConfirmModal
+        isOpen={Boolean(deleteConfirmProgId)}
+        onClose={() => setDeleteConfirmProgId(null)}
+        onConfirm={async () => {
+          const id = deleteConfirmProgId;
+          setDeleteConfirmProgId(null);
+          await handleDeleteProgram(id);
+        }}
+        title="Delete Program"
+        message="Are you sure you want to delete this weaving program batch? This cannot be undone."
+        confirmText="Delete Program"
+        variant="danger"
+      />
     </div>
   );
 }

@@ -370,11 +370,12 @@ export const ERPProvider = ({ children, }) => {
 
     // Nothing is cached in the browser: every collection above is the server's,
     // re-read by `refreshFromBackend()` and kept current by the persist helpers.
-    const showToast = (msg) => {
-        setToastMessage(msg);
+    const showToast = (msg, tone = 'success') => {
+        const item = typeof msg === 'string' ? { text: msg, tone } : { text: msg?.text || msg?.msg || String(msg), tone: msg?.tone || tone };
+        setToastMessage(item);
         setTimeout(() => {
-            setToastMessage((prev) => (prev === msg ? null : prev));
-        }, 3500);
+            setToastMessage((prev) => (prev?.text === item.text ? null : prev));
+        }, 3800);
     };
 
     // ── Write-through persistence ───────────────────────────────────────────
@@ -4785,8 +4786,15 @@ export const ERPProvider = ({ children, }) => {
       {/* Global Toast Banner */}
       {toastMessage && (
         <div className="toast" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#10b981', display: 'inline-block' }} />
-          <span>{toastMessage}</span>
+          <span style={{
+            width: 8,
+            height: 8,
+            borderRadius: '50%',
+            background: (typeof toastMessage === 'object' && toastMessage?.tone === 'error') ? '#ef4444' : (typeof toastMessage === 'object' && toastMessage?.tone === 'warning') ? '#f59e0b' : '#10b981',
+            display: 'inline-block',
+            flexShrink: 0
+          }} />
+          <span>{typeof toastMessage === 'string' ? toastMessage : toastMessage?.text}</span>
         </div>
       )}
     </ERPContext.Provider>);

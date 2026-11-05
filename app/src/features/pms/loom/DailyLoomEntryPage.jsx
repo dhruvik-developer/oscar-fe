@@ -14,8 +14,13 @@ import PageHeader from '../../../components/ui/PageHeader';
 import { Button } from '../../../components/ui/Button';
 import { loomService } from '../../../services/loomService';
 import { formatNum } from '../utils/loomCalculations';
+import { useERP } from '../../../context/ERPContext';
+import { ConfirmModal } from '../../../components/ui/ConfirmModal';
 
 export default function DailyLoomEntryPage() {
+  const { showToast } = useERP();
+  const [deleteEntryConfirmId, setDeleteEntryConfirmId] = useState(null);
+  const [pendingSaveWarnings, setPendingSaveWarnings] = useState(null);
   const [factories, setFactories] = useState([]);
   const [selectedFactoryId, setSelectedFactoryId] = useState(
     () => localStorage.getItem('oscar_pms_selected_factory') || ''
@@ -83,25 +88,8 @@ export default function DailyLoomEntryPage() {
     );
   };
 
-  const handleSaveDay = async () => {
-    if (!selectedFactoryId) return alert('Select factory');
+  const executeSaveDay = async () => {
     setSaving(true);
-    const warnings = [];
-
-    // Client side check for beam remaining overages
-    rows.forEach((r) => {
-      if (r.meters && Number(r.meters) > Number(r.remaining_m) + 50) {
-        warnings.push(`MCN ${r.machine_no}: ${r.meters} m entered but only ${formatNum(r.remaining_m)} m remaining on beam.`);
-      }
-    });
-
-    if (warnings.length > 0) {
-      if (!confirm(`Warning on entered meters:\n\n${warnings.join('\n')}\n\nDo you want to proceed and save?`)) {
-        setSaving(false);
-        return;
-      }
-    }
-
     try {
       await loomService.bulkSaveDailyProduction({
         factory_id: selectedFactoryId,
@@ -118,24 +106,47 @@ export default function DailyLoomEntryPage() {
           damage: Number(r.damage || 0),
         })),
       });
-      alert('Day production saved successfully!');
+      showToast('Day production saved successfully!', 'success');
       fetchDayData();
     } catch (err) {
-      alert(err?.payload?.detail || 'Failed to save daily entries');
+      showToast(err?.payload?.detail || 'Failed to save daily entries', 'error');
     } finally {
       setSaving(false);
     }
   };
 
+  const handleSaveDay = async () => {
+    if (!selectedFactoryId) {
+      showToast('Please select a factory first', 'warning');
+      return;
+    }
+    const warnings = [];
+
+    // Client side check for beam remaining overages
+    rows.forEach((r) => {
+      if (r.meters && Number(r.meters) > Number(r.remaining_m) + 50) {
+        warnings.push(`MCN ${r.machine_no}: ${r.meters} m entered but only ${formatNum(r.remaining_m)} m remaining on beam.`);
+      }
+    });
+
+    if (warnings.length > 0) {
+      setPendingSaveWarnings(warnings);
+      return;
+    }
+
+    await executeSaveDay();
+  };
+
   const handleDeleteEntry = async (prodId) => {
-    if (!confirm('Delete this filed entry?')) return;
     try {
       await loomService.deleteDailyProduction(prodId);
+      showToast('Daily production entry deleted', 'success');
       fetchDayData();
     } catch (err) {
-      alert('Failed to delete entry');
+      showToast('Failed to delete entry', 'error');
     }
   };
+
 
   return (
     <div className="pms-screen w-full space-y-3 sm:space-y-3.5">
@@ -364,7 +375,7 @@ export default function DailyLoomEntryPage() {
                     <td className="py-1.5 px-3 text-center">
                       {r.done && r.prod_id && (
                         <button
-                          onClick={() => handleDeleteEntry(r.prod_id)}
+                          onClick={() => setDeleteEntryConfirmId(r.prod_id)}
                           className="text-red-500 hover:text-red-700 p-1 rounded transition-colors"
                           title="Delete filed row"
                         >
@@ -386,6 +397,44 @@ export default function DailyLoomEntryPage() {
           </table>
         </div>
       </div>
+
+      <ConfirmModal
+        isOpen={Boolean(deleteEntryConfirmId)}
+        onClose={() => setDeleteEntryConfirmId(null)}
+        onConfirm={async () => {
+          const id = deleteEntryConfirmId;
+          setDeleteEntryConfirmId(null);
+          await handleDeleteEntry(id);
+        }}
+        title="Delete Daily Production Entry"
+        message="Are you sure you want to delete this filed production entry? This will adjust the remaining beam meters."
+        confirmText="Delete Entry"
+        variant="danger"
+      />
+
+      <ConfirmModal
+        isOpen={Boolean(pendingSaveWarnings && pendingSaveWarnings.length > 0)}
+        onClose={() => setPendingSaveWarnings(null)}
+        onConfirm={async () => {
+          setPendingSaveWarnings(null);
+          await executeSaveDay();
+        }}
+        title="Production Meters Warning"
+        message={
+          <div className="space-y-2 text-xs">
+            <p className="font-semibold text-slate-700 dark:text-slate-200">The entered meters exceed remaining beam meters:</p>
+            <ul className="list-disc pl-4 space-y-1 text-amber-700 dark:text-amber-400">
+              {pendingSaveWarnings?.map((w, idx) => (
+                <li key={idx}>{w}</li>
+              ))}
+            </ul>
+            <p className="text-slate-500 pt-1">Do you want to proceed and save anyway?</p>
+          </div>
+        }
+        confirmText="Proceed & Save"
+        cancelText="Review Meters"
+        variant="warning"
+      />
     </div>
   );
 }

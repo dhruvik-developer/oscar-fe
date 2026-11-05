@@ -41,14 +41,26 @@ const DEPARTMENTS = [
   "Sales Department",
 ];
 
-const STATUS_OPTIONS = ["Active", "On Leave", "Probation"];
+const STATUS_OPTIONS = [
+  "Active",
+  "Inactive",
+  "On Leave",
+  "Probation",
+  "Notice Period",
+  "Resigned",
+  "Terminated",
+];
 const EMPLOYMENT_TYPES = ["Full Time", "Contract", "Intern", "Part Time"];
 const SHIFT_OPTIONS = ["General", "Flexible", "Night", "Morning"];
 
 const statusStyles = {
   Active: { bg: "#e6f4ea", text: "#15803d", border: "#a7f3d0" },
+  Inactive: { bg: "#f1f5f9", text: "#64748b", border: "#cbd5e1" },
   "On Leave": { bg: "#fef3c7", text: "#b45309", border: "#fde68a" },
   Probation: { bg: "#f1f5f9", text: "#475569", border: "#cbd5e1" },
+  "Notice Period": { bg: "#fff7ed", text: "#c2410c", border: "#ffedd5" },
+  Resigned: { bg: "#fef2f2", text: "#b91c1c", border: "#fecaca" },
+  Terminated: { bg: "#fee2e2", text: "#991b1b", border: "#fca5a5" },
 };
 
 export default function EmployeeProfileModal({ isOpen, employee, onClose, onEmployeeUpdated }) {
@@ -109,51 +121,64 @@ export default function EmployeeProfileModal({ isOpen, employee, onClose, onEmpl
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isOpen, onClose]);
 
-  if (!isOpen || !employee) return null;
-
-  const empId = employee.empId || employee.employeeCode || employee.id || "EMP";
-  const empName = employee.name || "Employee";
-  const statusInfo = statusStyles[employee.status] || statusStyles.Active;
-
-  // Filter attendance records for this employee
-  const employeeAttendance = attendanceList.filter((a) => {
-    const idMatch = a.employeeId && String(a.employeeId) === String(employee.id);
-    const nameMatch = a.employeeName && a.employeeName.toLowerCase() === empName.toLowerCase();
-    const codeMatch = a.employeeCode && a.employeeCode === empId;
-    return idMatch || nameMatch || codeMatch;
-  });
-
-  // Filter leaves for this employee
-  const employeeLeaves = leavesList.filter((l) => {
-    const idMatch = l.employeeId && String(l.employeeId) === String(employee.id);
-    const nameMatch = l.employeeName && l.employeeName.toLowerCase() === empName.toLowerCase();
-    return idMatch || nameMatch;
-  });
-
-  // Filter assigned assets for this employee
-  const employeeAssets = assetList.filter((ast) => {
-    const idMatch = ast.assignedToId && String(ast.assignedToId) === String(employee.id);
-    const nameMatch = ast.assignedTo && ast.assignedTo.toLowerCase() === empName.toLowerCase();
-    return idMatch || nameMatch;
-  });
-
-  // Manager details
-  const reportingManagerName =
-    employee.manager ||
-    employee.reportingManager ||
-    allEmployees.find((x) => String(x.id) === String(employee.managerId))?.name ||
-    "—";
-
   // Live Attendance & Payroll calculations
   const payrollEmployees = usePayrollStore((s) => s.employees) || [];
   const departmentWorkingDays = usePayrollStore((s) => s.departmentWorkingDays);
   const loadPayroll = usePayrollStore((s) => s.load);
 
   useEffect(() => {
-    loadPayroll?.();
-  }, [loadPayroll]);
+    if (isOpen) {
+      loadPayroll?.();
+    }
+  }, [isOpen, loadPayroll]);
 
   const currentMonthPrefix = useMemo(() => new Date().toISOString().slice(0, 7), []);
+
+  const empId = employee?.empId || employee?.employeeCode || employee?.id || "EMP";
+  const empName = employee?.name || "Employee";
+  const statusInfo = (employee && statusStyles[employee.status]) || statusStyles.Active;
+
+  // Filter attendance records for this employee
+  const employeeAttendance = useMemo(() => {
+    if (!employee) return [];
+    return attendanceList.filter((a) => {
+      const idMatch = a.employeeId && String(a.employeeId) === String(employee.id);
+      const nameMatch = a.employeeName && a.employeeName.toLowerCase() === empName.toLowerCase();
+      const codeMatch = a.employeeCode && a.employeeCode === empId;
+      return idMatch || nameMatch || codeMatch;
+    });
+  }, [attendanceList, employee, empName, empId]);
+
+  // Filter leaves for this employee
+  const employeeLeaves = useMemo(() => {
+    if (!employee) return [];
+    return leavesList.filter((l) => {
+      const idMatch = l.employeeId && String(l.employeeId) === String(employee.id);
+      const nameMatch = l.employeeName && l.employeeName.toLowerCase() === empName.toLowerCase();
+      return idMatch || nameMatch;
+    });
+  }, [leavesList, employee, empName]);
+
+  // Filter assigned assets for this employee
+  const employeeAssets = useMemo(() => {
+    if (!employee) return [];
+    return assetList.filter((ast) => {
+      const idMatch = ast.assignedToId && String(ast.assignedToId) === String(employee.id);
+      const nameMatch = ast.assignedTo && ast.assignedTo.toLowerCase() === empName.toLowerCase();
+      return idMatch || nameMatch;
+    });
+  }, [assetList, employee, empName]);
+
+  // Manager details
+  const reportingManagerName = useMemo(() => {
+    if (!employee) return "—";
+    return (
+      employee.manager ||
+      employee.reportingManager ||
+      allEmployees.find((x) => String(x.id) === String(employee.managerId))?.name ||
+      "—"
+    );
+  }, [employee, allEmployees]);
 
   const currentMonthAttendance = useMemo(() => {
     return employeeAttendance.filter((a) => {
@@ -189,19 +214,23 @@ export default function EmployeeProfileModal({ isOpen, employee, onClose, onEmpl
 
   // Find server payslip row for this employee if available
   const activePayslip = useMemo(() => {
-    return payrollEmployees.find(
-      (p) =>
-        String(p.employeeId) === String(employee.id) ||
-        String(p.empId) === String(empId) ||
-        (p.name && p.name.toLowerCase() === empName.toLowerCase())
-    ) || null;
-  }, [payrollEmployees, employee.id, empId, empName]);
+    if (!employee) return null;
+    return (
+      payrollEmployees.find(
+        (p) =>
+          String(p.employeeId) === String(employee.id) ||
+          String(p.empId) === String(empId) ||
+          (p.name && p.name.toLowerCase() === empName.toLowerCase())
+      ) || null
+    );
+  }, [payrollEmployees, employee, empId, empName]);
 
   const deptScheduledDays = useMemo(() => {
+    if (!employee) return 24;
     return getDepartmentDays(departmentWorkingDays, employee.department || employee.dept) || 24;
-  }, [departmentWorkingDays, employee.department, employee.dept]);
+  }, [departmentWorkingDays, employee]);
 
-  const baseStandardSalary = Number(employee.standardSalary || employee.standard_salary || 0);
+  const baseStandardSalary = Number(employee?.standardSalary || employee?.standard_salary || 0);
 
   // Live calculation derived from employee attendance & salary rate
   const liveCalculation = useMemo(() => {
@@ -238,6 +267,8 @@ export default function EmployeeProfileModal({ isOpen, employee, onClose, onEmpl
       isServerSlip: false,
     };
   }, [activePayslip, baseStandardSalary, deptScheduledDays, currentMonthAttendance.length, attendedDaysCount, paidLeavesCount]);
+
+  if (!isOpen || !employee) return null;
 
   const handleSave = async (e) => {
     e?.preventDefault();
@@ -300,16 +331,31 @@ export default function EmployeeProfileModal({ isOpen, employee, onClose, onEmpl
                 <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-white truncate">
                   {empName}
                 </h2>
-                <span
-                  className="px-2.5 py-0.5 rounded-full text-xs font-semibold border"
+                <select
+                  value={employee.status || "Active"}
+                  onChange={async (e) => {
+                    const nextSt = e.target.value;
+                    try {
+                      await updateStoreEmployee(employee.id, { status: nextSt });
+                      setForm((f) => ({ ...f, status: nextSt }));
+                      onEmployeeUpdated?.({ ...employee, status: nextSt });
+                      showToast?.(`Status changed to ${nextSt}`);
+                    } catch (err) {}
+                  }}
+                  className="px-2.5 py-0.5 rounded-full text-xs font-semibold border cursor-pointer outline-none transition"
                   style={{
                     backgroundColor: statusInfo.bg,
                     color: statusInfo.text,
                     borderColor: statusInfo.border,
                   }}
+                  title="Change Employment Status"
                 >
-                  {employee.status || "Active"}
-                </span>
+                  {STATUS_OPTIONS.map((st) => (
+                    <option key={st} value={st} style={{ background: "#fff", color: "#1f2937" }}>
+                      {st}
+                    </option>
+                  ))}
+                </select>
                 <span className="px-2.5 py-0.5 rounded-md bg-white/15 text-slate-200 text-xs font-mono font-medium">
                   {empId}
                 </span>

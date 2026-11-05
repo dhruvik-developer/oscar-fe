@@ -130,6 +130,7 @@ export default function HRAdminPage({ defaultTab }) {
   const { candidates, addOffer } = useRecruitmentStore();
   const updateEmployeeStatus = useAppStore((s) => s.updateEmployeeStatus);
   const addCalendarEvent = useCalendarStore((s) => s.addEvent);
+  const deleteCalendarEvent = useCalendarStore((s) => s.deleteEvent);
 
   // Leave Governance & Carry-Forward Policies
   const sandwichRuleEnabled = useAppStore((s) => s.sandwichRuleEnabled);
@@ -506,7 +507,8 @@ export default function HRAdminPage({ defaultTab }) {
       };
       setApprovalChains([...approvalChains, created]);
       if (isBackendEnabled()) {
-        hrmsSync.create('approvalChains', created).then((saved) => {
+        const { id: _tempId, ...chainPayload } = created;
+        hrmsSync.create('approvalChains', chainPayload).then((saved) => {
           if (saved?.id) {
             setApprovalChains((prev) => prev.map((c) => (c.id === created.id ? saved : c)));
           }
@@ -677,7 +679,8 @@ export default function HRAdminPage({ defaultTab }) {
     }
     setResignations([created, ...resignations]);
     if (isBackendEnabled()) {
-      hrmsSync.create('resignations', created).then((saved) => {
+      const { id: _tempId, ...resignationPayload } = created;
+      hrmsSync.create('resignations', resignationPayload).then((saved) => {
         if (saved?.id) {
           setResignations((prev) => prev.map((r) => (r.id === created.id ? saved : r)));
         }
@@ -734,7 +737,8 @@ export default function HRAdminPage({ defaultTab }) {
     };
     setComplaints([created, ...complaints]);
     if (isBackendEnabled()) {
-      hrmsSync.create('complaints', created).then((saved) => {
+      const { id: _tempId, ...complaintPayload } = created;
+      hrmsSync.create('complaints', complaintPayload).then((saved) => {
         if (saved?.id) {
           setComplaints((prev) => prev.map((c) => (c.id === created.id ? saved : c)));
         }
@@ -810,7 +814,8 @@ export default function HRAdminPage({ defaultTab }) {
       };
       setHolidays([...holidays, created]);
       if (isBackendEnabled()) {
-        hrmsSync.create('holidays', created).then((saved) => {
+        const { id: _tempId, ...payload } = created;
+        hrmsSync.create('holidays', payload).then((saved) => {
           if (saved?.id) {
             setHolidays((prev) => prev.map((h) => (h.id === created.id ? saved : h)));
           }
@@ -824,12 +829,12 @@ export default function HRAdminPage({ defaultTab }) {
         startDate: created.date,
         endDate: created.date,
         type: "Holiday",
-        category: "Company Holiday",
+        category: "Holiday",
         time: "All Day",
-        location: created.appliesTo,
+        location: created.appliesTo || "All Locations",
         dept: "All Staff",
         organizer: "HR Governance",
-        description: `${created.type} holiday applying to ${created.appliesTo}.`,
+        description: `${created.type} holiday applying to ${created.appliesTo || "All Locations"}.`,
       });
 
       showToast(`Holiday "${created.name}" added and synced to calendar`);
@@ -843,6 +848,13 @@ export default function HRAdminPage({ defaultTab }) {
       setHolidays((prev) => prev.filter((h) => h.id !== id));
       if (isBackendEnabled()) {
         hrmsSync.remove('holidays', id).catch(console.warn);
+      }
+      const calEvents = useCalendarStore.getState().events;
+      const calMatch = calEvents.find(
+        (e) => e.source_id === id || e.sourceId === id || (e.title || '').toLowerCase() === (name || '').toLowerCase()
+      );
+      if (calMatch?.id) {
+        deleteCalendarEvent?.(calMatch.id);
       }
       showToast(`Holiday "${name}" removed`);
     }

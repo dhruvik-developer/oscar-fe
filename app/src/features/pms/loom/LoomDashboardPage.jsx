@@ -20,10 +20,14 @@ import KpiCard from '../../../components/ui/KpiCard';
 import { Button } from '../../../components/ui/Button';
 import { loomService } from '../../../services/loomService';
 import { formatNum } from '../utils/loomCalculations';
+import { useERP } from '../../../context/ERPContext';
+import { ConfirmModal } from '../../../components/ui/ConfirmModal';
 
 export default function LoomDashboardPage() {
   const navigate = useNavigate();
+  const { showToast } = useERP();
   const [loading, setLoading] = useState(true);
+  const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
   const [dashboardData, setDashboardData] = useState(null);
   const [role, setRole] = useState('ceo'); // 'ceo' | 'prod' | 'coo' | 'coord'
 
@@ -44,13 +48,12 @@ export default function LoomDashboardPage() {
   }, [fetchDashboard]);
 
   const handleResetDemo = async () => {
-    if (!confirm('Reset Loom PMS to prototype demo dataset? All manual testing entries will be restored to seed state.')) return;
     try {
       await loomService.resetDemoData();
-      alert('Demo data restored successfully!');
+      showToast('Demo data restored successfully!', 'success');
       fetchDashboard();
     } catch (err) {
-      alert('Failed to reset demo data');
+      showToast('Failed to reset demo data', 'error');
     }
   };
 
@@ -107,7 +110,7 @@ export default function LoomDashboardPage() {
             </button>
             <button
               type="button"
-              onClick={handleResetDemo}
+              onClick={() => setResetConfirmOpen(true)}
               className="pms-btn-secondary text-amber-600 dark:text-amber-400"
             >
               <RotateCcw size={14} className="mr-1" /> Reset Demo
@@ -379,6 +382,19 @@ export default function LoomDashboardPage() {
           </div>
         </div>
       </div>
+
+      <ConfirmModal
+        isOpen={resetConfirmOpen}
+        onClose={() => setResetConfirmOpen(false)}
+        onConfirm={async () => {
+          setResetConfirmOpen(false);
+          await handleResetDemo();
+        }}
+        title="Reset Loom PMS Data"
+        message="Reset Loom PMS to prototype demo dataset? All manual testing entries will be restored to seed state."
+        confirmText="Reset Demo Data"
+        variant="warning"
+      />
     </div>
   );
 }

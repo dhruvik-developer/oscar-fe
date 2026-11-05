@@ -389,7 +389,21 @@ const useAttendanceStoreBase = create((set, get) => ({
   },
 
   // Refresh attendance records from API
+  refreshRequests: async () => {
+    try {
+      const reqRows = await pullTracked("attendanceRegularizations");
+      if (reqRows && Array.isArray(reqRows)) {
+        set({ requests: reqRows });
+        writeThrough("attendanceRegularizations", reqRows);
+      }
+      return reqRows;
+    } catch {
+      return null;
+    }
+  },
+
   refreshAttendance: async () => {
+
     if (!canReadAttendance()) return null;
     try {
       const recs = await pullTracked("attendance");
@@ -600,7 +614,8 @@ const useAttendanceStoreBase = create((set, get) => ({
     });
 
     get().fetchTodayPunch();
-    get().refreshAttendance();
+    get().refreshAttendance();
+    get().refreshRequests();
   },
 
   saveFlexibility: async (flexibility) => {

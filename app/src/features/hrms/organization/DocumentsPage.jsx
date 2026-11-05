@@ -96,6 +96,7 @@ export function DocumentsPage() {
   const [categoryFilter, setCategoryFilter] = useState("All");
   const [statusFilter, setStatusFilter] = useState("All");
   const [scopeFilter, setScopeFilter] = useState("All");
+  const [employeeFilter, setEmployeeFilter] = useState("All");
 
   // Employee-wise tab state
   const [selectedEmpName, setSelectedEmpName] = useState(
@@ -104,9 +105,22 @@ export function DocumentsPage() {
   const [empSearch, setEmpSearch] = useState("");
   const [empCategoryFilter, setEmpCategoryFilter] = useState("All");
 
+  // Keep selectedEmpName populated if employees loads asynchronously
+  useEffect(() => {
+    if (!selectedEmpName && employees.length > 0) {
+      setSelectedEmpName(employees[0].name);
+    }
+  }, [employees, selectedEmpName]);
+
   // My Documents user override
   const [myDocUser, setMyDocUser] = useState(currentUser?.name || "");
   const [myDocCategoryFilter, setMyDocCategoryFilter] = useState("All");
+
+  useEffect(() => {
+    if (!myDocUser && currentUser?.name) {
+      setMyDocUser(currentUser.name);
+    }
+  }, [currentUser, myDocUser]);
 
   // Modals state
   const [previewDoc, setPreviewDoc] = useState(null);
@@ -221,35 +235,123 @@ export function DocumentsPage() {
   const expiringSoon = documents.filter((d) => d.status === "Expiring Soon").length;
   const expired = documents.filter((d) => d.status === "Expired").length;
 
+  // Distinct categories available across predefined list and current documents
+  const categoriesList = useMemo(() => {
+    const standard = [
+      "All",
+      "General",
+      "Contract",
+      "Educational",
+      "Financial",
+      "Identity",
+      "Compliance",
+      "Legal",
+      "Policy",
+      "Security",
+    ];
+    const fromDocs = (documents || [])
+      .map((d) => d.category)
+      .filter(Boolean);
+    const seen = new Set();
+    const result = [];
+    [...standard, ...fromDocs].forEach((c) => {
+      const key = String(c).trim();
+      const lower = key.toLowerCase();
+      if (!seen.has(lower)) {
+        seen.add(lower);
+        result.push(key);
+      }
+    });
+    return result;
+  }, [documents]);
+
+  // Options for employee dropdown in All Documents filter
+  const employeeFilterOptions = useMemo(() => {
+    const list = [...employees];
+    if (currentUser?.name && !list.some((e) => e.name === currentUser.name)) {
+      list.unshift({ id: currentUser.employeeUuid || "current-user", name: currentUser.name });
+    }
+    (documents || []).forEach((d) => {
+      if (
+        d.employee &&
+        d.employee !== "All Staff" &&
+        !list.some((e) => String(e.name || '').toLowerCase() === String(d.employee).toLowerCase())
+      ) {
+        list.push({ id: d.employeeId || d.employee, name: d.employee });
+      }
+    });
+    return list;
+  }, [employees, currentUser, documents]);
+
+  // Active filter indicator and reset
+  const hasActiveFilters =
+    Boolean(search.trim()) ||
+    categoryFilter !== "All" ||
+    statusFilter !== "All" ||
+    scopeFilter !== "All" ||
+    employeeFilter !== "All";
+
+  function clearAllFilters() {
+    setSearch("");
+    setCategoryFilter("All");
+    setStatusFilter("All");
+    setScopeFilter("All");
+    setEmployeeFilter("All");
+  }
+
   // Filtered documents for "All Documents"
   const filteredAllDocs = useMemo(() => {
     return documents.filter((d) => {
-      const q = search.toLowerCase();
+      const q = search.trim().toLowerCase();
       const matchesSearch =
+        !q ||
         String(d.title ?? '').toLowerCase().includes(q) ||
         String(d.employee ?? '').toLowerCase().includes(q) ||
         String(d.id ?? '').toLowerCase().includes(q) ||
-        (d.tags && d.tags.some((t) => t.toLowerCase().includes(q)));
+        String(d.category ?? '').toLowerCase().includes(q) ||
+        String(d.fileName ?? '').toLowerCase().includes(q) ||
+        String(d.description ?? '').toLowerCase().includes(q) ||
+        String(d.status ?? '').toLowerCase().includes(q) ||
+        (Array.isArray(d.tags) && d.tags.some((t) => String(t).toLowerCase().includes(q)));
 
-      const matchesCat = categoryFilter === "All" || d.category === categoryFilter;
-      const matchesStatus = statusFilter === "All" || d.status === statusFilter;
+      const matchesCat =
+        categoryFilter === "All" ||
+        String(d.category ?? '').toLowerCase().trim() === categoryFilter.toLowerCase().trim();
+
+      const matchesStatus =
+        statusFilter === "All" ||
+        String(d.status ?? '').toLowerCase().trim() === statusFilter.toLowerCase().trim();
+
+      const isCompanyWide =
+        d.employee === "All Staff" ||
+        d.employeeId === "ALL" ||
+        (!d.employee && !d.employeeId);
+
       const matchesScope =
         scopeFilter === "All"
           ? true
           : scopeFilter === "Company"
-          ? d.employee === "All Staff"
-          : d.employee !== "All Staff";
+          ? isCompanyWide
+          : !isCompanyWide;
 
-      return matchesSearch && matchesCat && matchesStatus && matchesScope;
+      const matchesEmployee =
+        employeeFilter === "All"
+          ? true
+          : employeeFilter === "All Staff"
+          ? isCompanyWide
+          : (String(d.employee ?? '').toLowerCase().trim() === employeeFilter.toLowerCase().trim() ||
+             (d.employeeId && String(d.employeeId) === employeeFilter));
+
+      return matchesSearch && matchesCat && matchesStatus && matchesScope && matchesEmployee;
     });
-  }, [documents, search, categoryFilter, statusFilter, scopeFilter]);
+  }, [documents, search, categoryFilter, statusFilter, scopeFilter, employeeFilter]);
 
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
   useEffect(() => {
     setPage(1);
-  }, [search, categoryFilter, statusFilter, scopeFilter, pageSize]);
+  }, [search, categoryFilter, statusFilter, scopeFilter, employeeFilter, pageSize]);
 
   const paginatedAllDocs = useMemo(() => {
     const start = (page - 1) * pageSize;
@@ -264,7 +366,7 @@ export function DocumentsPage() {
         name: selectedEmpName,
         designation: "Team Member",
         department: "General",
-        email: `${selectedEmpName.toLowerCase().replace(/\s+/g, ".")}@company.com`,
+        email: `${(selectedEmpName || '').toLowerCase().replace(/\s+/g, ".")}@company.com`,
         joining: "Jan 15, 2023",
         status: "Active",
         avatar: null,
@@ -273,30 +375,50 @@ export function DocumentsPage() {
   }, [employees, selectedEmpName]);
 
   const employeeDocs = useMemo(() => {
-    return documents.filter((d) => d.employee === selectedEmpName);
-  }, [documents, selectedEmpName]);
+    if (!selectedEmpName) return [];
+    const selLower = selectedEmpName.toLowerCase().trim();
+    const selEmp = employees.find(
+      (e) => (e.name && e.name.toLowerCase().trim() === selLower) || (e.id && String(e.id) === selectedEmpName)
+    );
+    const selEmpId = selEmp?.id;
+    const selEmpUuid = selEmp?.employeeUuid;
+    const selEmpCode = (selEmp?.employee_code || selEmp?.employeeId || '').toLowerCase().trim();
+
+    return documents.filter((d) => {
+      const docEmp = String(d.employee || '').toLowerCase().trim();
+      if (docEmp && docEmp === selLower) return true;
+      if (selEmpCode && docEmp && docEmp === selEmpCode) return true;
+      if (selEmpId && d.employeeId && String(d.employeeId) === String(selEmpId)) return true;
+      if (selEmpUuid && d.employeeId && String(d.employeeId) === String(selEmpUuid)) return true;
+      return false;
+    });
+  }, [documents, selectedEmpName, employees]);
 
   const filteredEmployeeDocs = useMemo(() => {
     if (empCategoryFilter === "All") return employeeDocs;
-    return employeeDocs.filter((d) => d.category === empCategoryFilter);
+    const filterLower = empCategoryFilter.toLowerCase().trim();
+    return employeeDocs.filter((d) => String(d.category || '').toLowerCase().trim() === filterLower);
   }, [employeeDocs, empCategoryFilter]);
 
   // Documents for "My Documents"
   const myDocs = useMemo(() => {
     const curEmpId = currentUser?.employeeUuid || currentUser?.employee_id || currentUser?.employeeId;
+    const userName = (currentUser?.name || '').toLowerCase().trim();
+    const targetName = (myDocUser || currentUser?.name || '').toLowerCase().trim();
+
     return documents.filter((d) => {
-      if (myDocUser && d.employee && d.employee.toLowerCase() === myDocUser.toLowerCase()) return true;
-      if (curEmpId && (d.employeeId === curEmpId || d.employee_id === curEmpId)) return true;
-      if (myDocUser && currentUser?.name && myDocUser.toLowerCase() === currentUser.name.toLowerCase()) {
-        if (d.employee && d.employee.toLowerCase() === currentUser.name.toLowerCase()) return true;
-      }
+      const docEmp = String(d.employee || '').toLowerCase().trim();
+      if (targetName && docEmp && docEmp === targetName) return true;
+      if (curEmpId && (String(d.employeeId) === String(curEmpId) || String(d.employee_id) === String(curEmpId))) return true;
+      if (userName && docEmp && docEmp === userName) return true;
       return false;
     });
   }, [documents, myDocUser, currentUser]);
 
   const filteredMyDocs = useMemo(() => {
     if (myDocCategoryFilter === "All") return myDocs;
-    return myDocs.filter((d) => d.category === myDocCategoryFilter);
+    const filterLower = myDocCategoryFilter.toLowerCase().trim();
+    return myDocs.filter((d) => String(d.category || '').toLowerCase().trim() === filterLower);
   }, [myDocs, myDocCategoryFilter]);
 
   // =========================================================================
@@ -441,23 +563,26 @@ export function DocumentsPage() {
   }
 
   function getCategoryColor(cat) {
-    switch (cat) {
-      case "Policy":
+    const c = String(cat || '').toLowerCase().trim();
+    switch (c) {
+      case "policy":
         return "bg-sky-50 text-sky-700 border-sky-200";
-      case "Contract":
+      case "contract":
         return "bg-indigo-50 text-indigo-700 border-indigo-200";
-      case "Identity":
+      case "identity":
         return "bg-purple-50 text-purple-700 border-purple-200";
-      case "Compliance":
+      case "compliance":
         return "bg-amber-50 text-amber-700 border-amber-200";
-      case "Security":
+      case "security":
         return "bg-rose-50 text-rose-700 border-rose-200";
-      case "Educational":
+      case "educational":
         return "bg-emerald-50 text-emerald-700 border-emerald-200";
-      case "Financial":
+      case "financial":
         return "bg-teal-50 text-teal-700 border-teal-200";
-      case "Legal":
+      case "legal":
         return "bg-slate-100 text-slate-700 border-slate-300";
+      case "general":
+        return "bg-blue-50 text-blue-700 border-blue-200";
       default:
         return "bg-slate-50 text-slate-700 border-slate-200";
     }
@@ -622,67 +747,126 @@ export function DocumentsPage() {
       {activeTab === "all" && (
         <div className="flex flex-col gap-4">
           {/* Search & Filter Toolbar */}
-          <div className="bg-white border border-bdr rounded-2xl p-4 shadow-xs flex flex-wrap items-center justify-between gap-3">
-            <div className="flex flex-wrap items-center gap-2.5 flex-1">
-              <div className="relative w-full sm:w-80">
-                <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input
-                  type="text"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search PDF title, employee, ID, or tags..."
-                  className="w-full h-9.5 pl-9 pr-3.5 bg-off border border-bdr rounded-xl text-[13px] text-slate-900 focus:outline-none focus:border-navy"
-                />
+          <div className="bg-white border border-bdr rounded-2xl p-4 shadow-xs flex flex-col gap-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex flex-wrap items-center gap-2.5 flex-1">
+                <div className="relative w-full sm:w-72">
+                  <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="text"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder="Search title, employee, ID, category, tags..."
+                    className="w-full h-9.5 pl-9 pr-3.5 bg-off border border-bdr rounded-xl text-[13px] text-slate-900 focus:outline-none focus:border-navy"
+                  />
+                </div>
+
+                <select
+                  value={employeeFilter}
+                  onChange={(e) => setEmployeeFilter(e.target.value)}
+                  className="h-9.5 px-3 bg-off border border-bdr rounded-xl text-[12.5px] text-slate-700 focus:outline-none focus:border-navy cursor-pointer max-w-[190px]"
+                  title="Filter by Employee"
+                >
+                  <option value="All">All Staff / Scopes</option>
+                  <option value="All Staff">Company Wide (All Staff)</option>
+                  {employeeFilterOptions.map((emp) => (
+                    <option key={emp.id || emp.name} value={emp.name}>
+                      {emp.name}
+                    </option>
+                  ))}
+                </select>
+
+                <select
+                  value={categoryFilter}
+                  onChange={(e) => setCategoryFilter(e.target.value)}
+                  className="h-9.5 px-3 bg-off border border-bdr rounded-xl text-[12.5px] text-slate-700 focus:outline-none focus:border-navy cursor-pointer"
+                  title="Filter by Category"
+                >
+                  {categoriesList.map((cat) => (
+                    <option key={cat} value={cat}>
+                      {cat === "All" ? "All Categories" : cat}
+                    </option>
+                  ))}
+                </select>
+
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="h-9.5 px-3 bg-off border border-bdr rounded-xl text-[12.5px] text-slate-700 focus:outline-none focus:border-navy cursor-pointer"
+                  title="Filter by Status"
+                >
+                  <option value="All">All Statuses</option>
+                  <option value="Valid">Valid</option>
+                  <option value="Expiring Soon">Expiring Soon</option>
+                  <option value="Expired">Expired</option>
+                  <option value="Pending Verification">Pending Verification</option>
+                </select>
+
+                <select
+                  value={scopeFilter}
+                  onChange={(e) => setScopeFilter(e.target.value)}
+                  className="h-9.5 px-3 bg-off border border-bdr rounded-xl text-[12.5px] text-slate-700 focus:outline-none focus:border-navy cursor-pointer"
+                  title="Filter by Scope"
+                >
+                  <option value="All">All Scopes</option>
+                  <option value="Company">Company Wide Only</option>
+                  <option value="Employee">Individual Staff Only</option>
+                </select>
+
+                {hasActiveFilters && (
+                  <button
+                    type="button"
+                    onClick={clearAllFilters}
+                    className="h-9.5 px-3 bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded-xl text-[12.5px] font-semibold text-slate-600 hover:text-slate-900 transition flex items-center gap-1.5 cursor-pointer"
+                    title="Clear All Filters"
+                  >
+                    <X size={14} />
+                    <span>Clear Filters</span>
+                  </button>
+                )}
               </div>
 
-              <select
-                value={categoryFilter}
-                onChange={(e) => setCategoryFilter(e.target.value)}
-                className="h-9.5 px-3 bg-off border border-bdr rounded-xl text-[12.5px] text-slate-700 focus:outline-none focus:border-navy cursor-pointer"
-              >
-                <option value="All">All Categories</option>
-                <option value="Policy">Policy</option>
-                <option value="Contract">Contract</option>
-                <option value="Identity">Identity</option>
-                <option value="Compliance">Compliance</option>
-                <option value="Security">Security</option>
-                <option value="Educational">Educational</option>
-                <option value="Financial">Financial</option>
-                <option value="Legal">Legal</option>
-              </select>
-
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="h-9.5 px-3 bg-off border border-bdr rounded-xl text-[12.5px] text-slate-700 focus:outline-none focus:border-navy cursor-pointer"
-              >
-                <option value="All">All Statuses</option>
-                <option value="Valid">Valid</option>
-                <option value="Expiring Soon">Expiring Soon</option>
-                <option value="Expired">Expired</option>
-                <option value="Pending Verification">Pending Verification</option>
-              </select>
-
-              <select
-                value={scopeFilter}
-                onChange={(e) => setScopeFilter(e.target.value)}
-                className="h-9.5 px-3 bg-off border border-bdr rounded-xl text-[12.5px] text-slate-700 focus:outline-none focus:border-navy cursor-pointer"
-              >
-                <option value="All">All Scopes</option>
-                <option value="Company">Company Wide Only</option>
-                <option value="Employee">Individual Staff Only</option>
-              </select>
+              <div className="flex flex-wrap lg:flex-nowrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => openUploadModal("Contract", "All Staff")}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-navy text-white rounded-xl text-[12.5px] font-semibold hover:bg-navy/90 transition cursor-pointer shadow-xs"
+                >
+                  <Plus size={14} />
+                  <span>Upload Document</span>
+                </button>
+              </div>
             </div>
 
-            <div className="flex flex-wrap lg:flex-nowrap items-center gap-2">
-              <button
-                type="button"
-                onClick={() => openUploadModal("Contract", "All Staff")}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-navy text-white rounded-xl text-[12.5px] font-semibold hover:bg-navy/90 transition cursor-pointer shadow-xs"
-              >
-                <Plus size={14} />
-                <span>Upload Document</span>
-              </button>
+            {/* Quick Category Filter Pills */}
+            <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-bdr/60">
+              <span className="text-[11.5px] font-medium text-slate-400 mr-1 flex items-center gap-1">
+                <Filter size={12} />
+                Category:
+              </span>
+              {categoriesList.map((cat) => {
+                const count = cat === "All"
+                  ? documents.length
+                  : documents.filter((d) => String(d.category || '').toLowerCase() === cat.toLowerCase()).length;
+                const isSelected = categoryFilter.toLowerCase() === cat.toLowerCase();
+                return (
+                  <button
+                    key={cat}
+                    type="button"
+                    onClick={() => setCategoryFilter(isSelected && cat !== "All" ? "All" : cat)}
+                    className={`px-2.5 py-1 text-[11.5px] font-semibold rounded-lg transition cursor-pointer flex items-center gap-1.5 ${
+                      isSelected
+                        ? "bg-navy text-white shadow-xs"
+                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                    }`}
+                  >
+                    <span>{cat}</span>
+                    <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${isSelected ? "bg-white/20 text-white" : "bg-white text-slate-600 border border-slate-200"}`}>
+                      {count}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           </div>
 
@@ -711,7 +895,7 @@ export function DocumentsPage() {
                       </td>
                     </tr>
                   ) : (
-                    filteredAllDocs.map((d) => (
+                    paginatedAllDocs.map((d) => (
                       <tr key={d.id} className="hover:bg-slate-50/60 transition">
                         <td className="py-3.5 px-5">
                           <div className="flex items-start gap-2.5">
@@ -891,7 +1075,19 @@ export function DocumentsPage() {
                     String(e.designation ?? '').toLowerCase().includes(empSearch.toLowerCase())
                 )
                 .map((emp) => {
-                  const empDocCount = documents.filter((d) => d.employee === emp.name).length;
+                  const empNameLower = (emp.name || '').toLowerCase().trim();
+                  const empIdStr = emp.id ? String(emp.id) : null;
+                  const empUuidStr = emp.employeeUuid ? String(emp.employeeUuid) : null;
+                  const empCodeLower = (emp.employee_code || emp.employeeId || '').toLowerCase().trim();
+
+                  const empDocCount = documents.filter((d) => {
+                    const docEmp = String(d.employee || '').toLowerCase().trim();
+                    if (docEmp && docEmp === empNameLower) return true;
+                    if (empCodeLower && docEmp && docEmp === empCodeLower) return true;
+                    if (empIdStr && d.employeeId && String(d.employeeId) === empIdStr) return true;
+                    if (empUuidStr && d.employeeId && String(d.employeeId) === empUuidStr) return true;
+                    return false;
+                  }).length;
                   const isSelected = selectedEmpName === emp.name;
 
                   return (
@@ -969,19 +1165,21 @@ export function DocumentsPage() {
               <div className="flex flex-wrap items-center gap-1.5">
                 {[
                   "All",
+                  "General",
                   "Contract",
                   "Educational",
                   "Financial",
                   "Identity",
                   "Compliance",
                   "Legal",
+                  "Policy",
                 ].map((cat) => (
                   <button
                     key={cat}
                     type="button"
                     onClick={() => setEmpCategoryFilter(cat)}
                     className={`px-3 py-1.5 text-[12px] font-semibold rounded-xl transition cursor-pointer ${
-                      empCategoryFilter === cat
+                      empCategoryFilter.toLowerCase() === cat.toLowerCase()
                         ? "bg-navy text-white shadow-xs"
                         : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                     }`}
@@ -1206,22 +1404,30 @@ export function DocumentsPage() {
           {/* Category Filter Pills */}
           <div className="bg-white border border-bdr rounded-2xl p-4 shadow-xs flex flex-wrap items-center justify-between gap-3">
             <div className="flex flex-wrap items-center gap-2">
-              {["All", "Identity", "Contract", "Financial", "Compliance", "Legal", "Educational"].map(
-                (cat) => (
-                  <button
-                    key={cat}
-                    type="button"
-                    onClick={() => setMyDocCategoryFilter(cat)}
-                    className={`px-3 py-1.5 text-[12.5px] font-semibold rounded-xl transition cursor-pointer ${
-                      myDocCategoryFilter === cat
-                        ? "bg-navy text-white shadow-xs"
-                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                    }`}
-                  >
-                    {cat}
-                  </button>
-                )
-              )}
+              {[
+                "All",
+                "General",
+                "Identity",
+                "Contract",
+                "Financial",
+                "Compliance",
+                "Legal",
+                "Educational",
+                "Policy",
+              ].map((cat) => (
+                <button
+                  key={cat}
+                  type="button"
+                  onClick={() => setMyDocCategoryFilter(cat)}
+                  className={`px-3 py-1.5 text-[12.5px] font-semibold rounded-xl transition cursor-pointer ${
+                    myDocCategoryFilter.toLowerCase() === cat.toLowerCase()
+                      ? "bg-navy text-white shadow-xs"
+                      : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                  }`}
+                >
+                  {cat}
+                </button>
+              ))}
             </div>
 
             <div className="flex items-center gap-3">

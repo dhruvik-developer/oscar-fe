@@ -160,7 +160,7 @@ export function FinancialReportsPage() {
     } else if (reportType === 'ageing' && ag) {
       exportToCSV(`Ageing_${ageingType}_${stamp}`, ['Document #', 'Party', 'Date', 'Due Date', 'Total', 'Outstanding', 'Days Overdue', 'Bucket'], (ag.rows || []).map((r) => [r.documentNumber, r.partyName, r.date, r.dueDate, r.total, r.outstanding, r.daysOverdue, r.bucket]));
     } else if (reportType === 'budget') {
-      exportToCSV(`Budget_vs_Actual_${stamp}`, ['Account', 'Period start', 'Period end', 'Budget', 'Actual', 'Variance'], budgetRows.map((r) => [r.accountName, r.periodStart, r.periodEnd, r.amount, r.actual, r.variance]));
+      exportToCSV(`Budget_vs_Actual_${stamp}`, ['Account', 'Period start', 'Period end', 'Budget', 'Actual', 'Variance'], budgetRows.map((r) => [r.accountName, r.period_start || r.periodStart, r.period_end || r.periodEnd, r.amount, r.actual, r.variance]));
     }
   };
 

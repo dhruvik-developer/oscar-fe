@@ -167,14 +167,10 @@ export const HRMS_RESOURCES = {
       phone: e.phone || undefined,
       employeeCode: e.employeeCode || e.empId || undefined,
       departmentId: e.departmentId || e.department_id || undefined,
-      department: e.department || e.dept || undefined,
       designationId: e.designationId || e.designation_id || undefined,
-      designation: e.designation || e.role || undefined,
       managerId: e.managerId || e.manager_id || e.reportingManagerId || undefined,
       locationId: e.locationId || e.location_id || undefined,
-      location: typeof e.location === 'string' ? e.location : undefined,
       joiningDate: isoOut(e.joiningDate || e.joining || e.doj) || undefined,
-      joining: isoOut(e.joiningDate || e.joining || e.doj) || undefined,
       dateOfBirth: isoOut(e.dateOfBirth || e.dob),
       gender: e.gender || undefined,
       employmentType: e.employmentType || undefined,
@@ -298,15 +294,22 @@ export const HRMS_RESOURCES = {
   // ── attendance ────────────────────────────────────────────────────────────
   attendance: {
     path: '/hrms/attendance/',
-    toApi: (a) => compact({
-      employeeId: a.employeeId || undefined,
-      date: isoOut(a.date),
-      checkIn: a.checkIn || undefined,
-      checkOut: a.checkOut || undefined,
-      status: a.status || undefined,
-      workLocation: a.workLocation || undefined,
-      notes: a.notes || undefined,
-    }),
+    toApi: (a) => {
+      const date = isoOut(a.date);
+      return compact({
+        employeeId: a.employeeId || undefined,
+        date,
+        checkIn: a.checkIn && /^\d{1,2}:\d{2}/.test(String(a.checkIn))
+          ? clockToDateTime(date, a.checkIn)
+          : (a.checkIn || undefined),
+        checkOut: a.checkOut && /^\d{1,2}:\d{2}/.test(String(a.checkOut))
+          ? clockToDateTime(date, a.checkOut)
+          : (a.checkOut || undefined),
+        status: a.status || undefined,
+        workLocation: a.workLocation || undefined,
+        notes: a.notes || undefined,
+      });
+    },
     fromApi: (row) => ({
       ...asText(row, ['status', 'workLocation', 'notes', 'employeeName']),
       isoDate: row.date || '',
@@ -368,7 +371,6 @@ export const HRMS_RESOURCES = {
       additionalEarnings: p.additionalEarnings !== undefined ? num(p.additionalEarnings) : undefined,
       deductions: p.deductions !== undefined ? num(p.deductions) : undefined,
       advance: p.advance !== undefined ? num(p.advance) : undefined,
-      earnedSalary: p.earnedSalaryOverride !== undefined ? num(p.earnedSalaryOverride) : undefined,
     }),
     fromApi: (row) => ({
       ...row,

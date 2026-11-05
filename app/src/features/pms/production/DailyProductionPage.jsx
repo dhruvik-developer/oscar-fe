@@ -280,8 +280,8 @@ export default function DailyProductionPage() {
     const numQty = Number(formQty);
     if (!numQty || numQty <= 0 || isNaN(numQty)) {
       errors.qty = 'Produced quantity must be greater than 0.';
-    } else if (balanceQty > 0 && numQty > (balanceQty * 1.25)) {
-      errors.qty = `Produced quantity exceeds remaining balance (${balanceQty.toLocaleString('en-IN')} Mtr) by more than 25%.`;
+    } else if (balanceQty > 0 && numQty > balanceQty) {
+      errors.qty = `Produced quantity (${numQty.toLocaleString('en-IN')} Mtr) exceeds remaining balance (${balanceQty.toLocaleString('en-IN')} Mtr) for this instruction.`;
     }
 
     const numRej = Number(formRejected) || 0;

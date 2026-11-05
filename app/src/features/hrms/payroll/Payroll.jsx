@@ -42,7 +42,7 @@ import { hrmsGuides } from "../../../data/hrms/hrmsGuides";
 import { Avatar } from "../../../components/hrms/Avatar";
 
 /** Payslip statuses the server uses, in order. */
-const PAYSLIP_STAGES = WORKFLOW_STAGES.filter((s) => s.id !== "Ready for Review");
+const PAYSLIP_STAGES = WORKFLOW_STAGES;
 
 /** Day counts can be fractional (half days) — print `20` or `19.5`. */
 function fmtDays(n) {
@@ -135,7 +135,7 @@ function downloadPayslipPdf(p) {
   const allowances = Number(p.allowances || 0);
   const status = clean(p.status || "In Progress");
   const paidDate = clean(fmtDate(p.paymentDate) || "N/A");
-  const paidAmt = p.paidAmount !== null && p.paidAmount !== undefined ? Number(p.paidAmount) : remaining;
+  const paidAmt = p.paidAmount !== null && p.paidAmount !== undefined ? Number(p.paidAmount) : null;
   const inr = (n) => Math.round(n).toLocaleString("en-IN");
 
   const lines = [
@@ -180,7 +180,7 @@ function downloadPayslipPdf(p) {
     `(NET PAYABLE: INR ${inr(remaining)}) Tj`,
     "0 -24 Td",
     "/F1 10 Tf",
-    `(Payout Status: ${status}   |   Disbursed: INR ${status === "Paid" ? inr(paidAmt) : "0"}   |   Date: ${paidDate}) Tj`,
+    `(Payout Status: ${status}   |   Disbursed: ${status === "Paid" && paidAmt !== null ? inr(paidAmt) : "—"}   |   Date: ${paidDate}) Tj`,
     "0 -32 Td",
     "/F1 9 Tf",
     "(This is a computer-generated salary slip. Attendance and leave figures are taken from HRMS records.) Tj",

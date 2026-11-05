@@ -13,6 +13,7 @@ import {
   RotateCcw,
   ShieldCheck,
   UserCheck,
+  ArrowRight,
 } from 'lucide-react';
 import PageHeader from '../../../components/ui/PageHeader';
 import KpiCard from '../../../components/ui/KpiCard';
@@ -75,20 +76,20 @@ export default function LoomDashboardPage() {
   const totalBeamsToPrepare = factories.reduce((acc, f) => acc + (f.within7_count || 0), 0);
 
   return (
-    <div className="space-y-6">
+    <div className="pms-screen w-full space-y-3 sm:space-y-3.5">
       <PageHeader
         title="Loom Manufacturing Command Center"
-        subtitle="Executive monitoring: Loom beam runout predictions, automated yarn weft cover days, and active production orders."
+        subtitle="Executive monitoring: Beam runout forecasts, automated yarn weft cover days, and active production batches."
         actions={
-          <div className="flex flex-wrap items-center gap-2.5">
+          <div className="flex flex-wrap items-center gap-2">
             {/* Role switch */}
-            <div className="flex items-center gap-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg px-2.5 py-1 text-xs">
-              <UserCheck size={13} className="text-slate-400" />
-              <span className="text-slate-500 font-medium">Viewing as:</span>
+            <div className="h-[38px] flex items-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 shadow-2xs text-xs">
+              <UserCheck size={15} className="text-slate-400" />
+              <span className="text-slate-500 font-medium hidden sm:inline">Role:</span>
               <select
                 value={role}
                 onChange={(e) => setRole(e.target.value)}
-                className="bg-transparent font-semibold text-slate-800 dark:text-slate-200 outline-none"
+                className="bg-transparent font-semibold text-slate-800 dark:text-slate-200 outline-none cursor-pointer"
               >
                 <option value="ceo">Sharad (CEO)</option>
                 <option value="prod">Het (Production Head)</option>
@@ -97,125 +98,141 @@ export default function LoomDashboardPage() {
               </select>
             </div>
 
-            <Button variant="secondary" onClick={handleExportJson} className="h-8 text-xs">
-              <Download size={13} className="mr-1" /> Export JSON
-            </Button>
-            <Button variant="secondary" onClick={handleResetDemo} className="h-8 text-xs text-amber-600 dark:text-amber-400">
-              <RotateCcw size={13} className="mr-1" /> Reset Demo
-            </Button>
-            <Button variant="secondary" onClick={fetchDashboard} disabled={loading} className="h-8 text-xs">
-              <RefreshCw size={13} className={`mr-1 ${loading ? 'animate-spin' : ''}`} /> Refresh
-            </Button>
+            <button
+              type="button"
+              onClick={handleExportJson}
+              className="pms-btn-secondary"
+            >
+              <Download size={14} className="mr-1" /> Export
+            </button>
+            <button
+              type="button"
+              onClick={handleResetDemo}
+              className="pms-btn-secondary text-amber-600 dark:text-amber-400"
+            >
+              <RotateCcw size={14} className="mr-1" /> Reset Demo
+            </button>
+            <button
+              type="button"
+              onClick={fetchDashboard}
+              disabled={loading}
+              className="pms-btn-secondary"
+            >
+              <RefreshCw size={14} className={`mr-1 ${loading ? 'animate-spin' : ''}`} /> Refresh
+            </button>
           </div>
         }
       />
 
-      {/* KPI Cards Strip */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3.5">
+      {/* KPI Cards Strip - Responsive 5 cols on lg, 2 cols on mobile */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5 sm:gap-3">
         <KpiCard
-          title="Looms in Operation"
+          title="Looms Running"
           value={`${runningLooms} / ${totalLooms}`}
-          subtitle={`${totalLooms - runningLooms} idle looms`}
+          subtitle={totalLooms - runningLooms > 0 ? `${totalLooms - runningLooms} idle looms` : 'Full capacity'}
           icon={Factory}
           color={totalLooms - runningLooms > 0 ? 'amber' : 'green'}
         />
         <KpiCard
           title="Meters on Looms"
           value={formatNum(totalMetersOnLooms)}
-          subtitle={`+ ${formatNum(totalSpareMeters)} m in spares`}
+          subtitle={`+ ${formatNum(totalSpareMeters)} m spares`}
           icon={Layers}
           color="blue"
         />
         <KpiCard
           title="Daily Output"
           value={`${formatNum(totalDailyOutput)} m/d`}
-          subtitle="7-day factory moving average"
+          subtitle="7-day factory avg"
           icon={TrendingUp}
           color="green"
         />
         <KpiCard
           title="Avg Loom Cover"
-          value={`${totalDailyOutput > 0 ? formatNum(totalMetersOnLooms / totalDailyOutput, 1) : 0} days`}
-          subtitle="Until current beams run out"
+          value={`${totalDailyOutput > 0 ? formatNum(totalMetersOnLooms / totalDailyOutput, 1) : 0} d`}
+          subtitle="Until beams run out"
           icon={Clock}
           color="blue"
         />
         <KpiCard
           title="Beams to Prepare"
           value={totalBeamsToPrepare}
-          subtitle="Ending in ≤ 7 days without spare"
+          subtitle="Ending in ≤ 7d with no spare"
           icon={AlertTriangle}
           color={totalBeamsToPrepare > 0 ? 'rose' : 'green'}
         />
       </div>
 
       {/* Factory-Wise Beam Status Table */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm">
-        <div className="px-5 py-3.5 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center">
-          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
-            Factory-Wise Beam Status & Stoppage Forecast
-          </h3>
-          <span className="text-[11px] text-slate-400">
-            Click factory name to inspect loom machines
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-xs">
+        <div className="px-3.5 sm:px-4 py-2.5 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-slate-800/30">
+          <div className="flex items-center gap-2">
+            <Factory size={14} className="text-slate-500" />
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200">
+              Factory-Wise Beam Status & Stoppage Forecast
+            </h3>
+          </div>
+          <span className="text-[11px] text-slate-400 hidden sm:inline">
+            Click factory name to view looms
           </span>
         </div>
-        <div className="overflow-x-auto">
+        <div className="pms-table-container">
           <table className="w-full text-xs text-left">
-            <thead className="bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-semibold border-b border-slate-200 dark:border-slate-700">
+            <thead className="pms-sticky-header bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-semibold border-b border-slate-200 dark:border-slate-700">
               <tr>
-                <th className="py-2.5 px-3">Factory</th>
-                <th className="py-2.5 px-3 text-right">Running / Total</th>
-                <th className="py-2.5 px-3 text-right">Meters on Looms</th>
-                <th className="py-2.5 px-3 text-right">Spare Beams</th>
-                <th className="py-2.5 px-3 text-right">Daily Output (m)</th>
-                <th className="py-2.5 px-3 text-right">Days on Looms</th>
-                <th className="py-2.5 px-3 text-right">...With Spares</th>
-                <th className="py-2.5 px-3 text-center">Beams to Prep (≤7d)</th>
-                <th className="py-2.5 px-3">Urgent (≤2d, No Spare)</th>
+                <th className="py-2 px-3">Factory</th>
+                <th className="py-2 px-3 text-right">Running / Total</th>
+                <th className="py-2 px-3 text-right">Meters on Looms</th>
+                <th className="py-2 px-3 text-right">Spare Beams</th>
+                <th className="py-2 px-3 text-right">Daily Output (m)</th>
+                <th className="py-2 px-3 text-right">Days on Looms</th>
+                <th className="py-2 px-3 text-right">...With Spares</th>
+                <th className="py-2 px-3 text-center">Prep Needed (≤7d)</th>
+                <th className="py-2 px-3">Urgent (≤2d, No Spare)</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
               {factories.map((f) => {
                 const isUrgent = f.urgent_machines && f.urgent_machines.length > 0;
                 return (
-                  <tr key={f.factory_id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50">
+                  <tr key={f.factory_id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/50 transition-colors">
                     <td
-                      className="py-2.5 px-3 font-bold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+                      className="py-2 px-3 font-bold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
                       onClick={() => navigate('/pms/looms')}
                     >
                       {f.factory_name}
                     </td>
-                    <td className="py-2.5 px-3 text-right font-medium">
+                    <td className="py-2 px-3 text-right font-medium">
                       {f.running_machines} / {f.total_machines}
                       {f.idle_machines > 0 && (
-                        <span className="ml-1.5 px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300">
+                        <span className="ml-1.5 px-1.5 py-0.2 rounded text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300">
                           {f.idle_machines} idle
                         </span>
                       )}
                     </td>
-                    <td className="py-2.5 px-3 text-right font-mono font-medium">{formatNum(f.on_loom_m)}</td>
-                    <td className="py-2.5 px-3 text-right font-mono">
-                      {f.spares_count} <span className="text-slate-400">({formatNum(f.spares_m)} m)</span>
+                    <td className="py-2 px-3 text-right font-mono font-medium">{formatNum(f.on_loom_m)}</td>
+                    <td className="py-2 px-3 text-right font-mono">
+                      {f.spares_count} <span className="text-slate-400 text-[11px]">({formatNum(f.spares_m)} m)</span>
                     </td>
-                    <td className="py-2.5 px-3 text-right font-mono font-semibold">{formatNum(f.daily_out)}</td>
-                    <td className="py-2.5 px-3 text-right font-bold">
+                    <td className="py-2 px-3 text-right font-mono font-semibold">{formatNum(f.daily_out)}</td>
+                    <td className="py-2 px-3 text-right font-bold">
                       <span className={f.days_on_loom <= 3 ? 'text-rose-600' : f.days_on_loom <= 7 ? 'text-amber-600' : 'text-emerald-600'}>
                         {formatNum(f.days_on_loom, 1)} d
                       </span>
                     </td>
-                    <td className="py-2.5 px-3 text-right font-mono text-slate-600 dark:text-slate-400">
+                    <td className="py-2 px-3 text-right font-mono text-slate-600 dark:text-slate-400">
                       {formatNum(f.days_with_spare, 1)} d
                     </td>
-                    <td className="py-2.5 px-3 text-center">
+                    <td className="py-2 px-3 text-center">
                       {f.within7_count > 0 ? (
-                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300">
+                        <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300">
                           {f.within7_count}
                         </span>
                       ) : (
                         <span className="text-slate-400">0</span>
                       )}
                     </td>
-                    <td className="py-2.5 px-3">
+                    <td className="py-2 px-3">
                       {isUrgent ? (
                         <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-800 dark:bg-rose-950/40 dark:text-rose-300 animate-pulse">
                           MCN {f.urgent_machines.join(', ')}
@@ -232,127 +249,134 @@ export default function LoomDashboardPage() {
         </div>
       </div>
 
-      {/* Yarn Cover by Factory Table */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm">
-        <div className="px-5 py-3.5 border-b border-slate-100 dark:border-slate-800">
-          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
-            Yarn Cover Days by Factory (Weft Burn Rate)
-          </h3>
+      {/* 2-Column Responsive Matrix on Desktop: Yarn Cover & Active Programs */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-3.5">
+        {/* Yarn Cover by Factory Table */}
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-xs">
+          <div className="px-3.5 sm:px-4 py-2.5 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-slate-800/30">
+            <div className="flex items-center gap-2">
+              <Package size={14} className="text-slate-500" />
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200">
+                Yarn Cover Days (Weft Burn Rate)
+              </h3>
+            </div>
+            <Button variant="ghost" onClick={() => navigate('/pms/yarn')} className="h-6 text-[11px] px-1.5 text-blue-600">
+              Manage Yarn <ArrowRight size={11} className="ml-1" />
+            </Button>
+          </div>
+          <div className="pms-table-container max-h-[360px]">
+            <table className="w-full text-xs text-left">
+              <thead className="pms-sticky-header bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-semibold border-b border-slate-200 dark:border-slate-700">
+                <tr>
+                  <th className="py-2 px-2.5">Factory</th>
+                  <th className="py-2 px-2.5">Yarn</th>
+                  <th className="py-2 px-2.5 text-right">Balance kg</th>
+                  <th className="py-2 px-2.5 text-right">Weft kg/d</th>
+                  <th className="py-2 px-2.5 text-right font-bold">Cover Days</th>
+                  <th className="py-2 px-2.5 text-right">Pending kg</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                {factories.flatMap((f) =>
+                  (f.yarn_cover || []).map((x) => (
+                    <tr key={`${f.factory_id}-${x.yarn_id}`} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50">
+                      <td className="py-2 px-2.5 font-semibold text-slate-800 dark:text-slate-200">{f.factory_name}</td>
+                      <td className="py-2 px-2.5 font-medium text-slate-700 dark:text-slate-300">{x.yarn_name}</td>
+                      <td className="py-2 px-2.5 text-right font-mono font-semibold">
+                        <span className={x.bal < 0 ? 'text-rose-600 font-bold' : ''}>{formatNum(x.bal)}</span>
+                      </td>
+                      <td className="py-2 px-2.5 text-right font-mono text-slate-500">
+                        {x.daily > 0 ? formatNum(x.daily, 1) : <span className="text-slate-400">warp</span>}
+                      </td>
+                      <td className="py-2 px-2.5 text-right font-bold">
+                        {x.days === null ? (
+                          <span className="text-slate-400">—</span>
+                        ) : x.days <= 5 ? (
+                          <span className="px-1.5 py-0.5 rounded text-[10px] bg-rose-100 text-rose-800 dark:bg-rose-950/40 dark:text-rose-300 font-bold">
+                            {formatNum(x.days, 1)} d
+                          </span>
+                        ) : x.days <= 10 ? (
+                          <span className="px-1.5 py-0.5 rounded text-[10px] bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300 font-bold">
+                            {formatNum(x.days, 1)} d
+                          </span>
+                        ) : (
+                          <span className="text-emerald-600 font-semibold">{formatNum(x.days, 1)} d</span>
+                        )}
+                      </td>
+                      <td className="py-2 px-2.5 text-right font-mono text-blue-600 font-medium">
+                        {formatNum(x.pending)}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-xs text-left">
-            <thead className="bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-semibold border-b border-slate-200 dark:border-slate-700">
-              <tr>
-                <th className="py-2.5 px-3">Factory</th>
-                <th className="py-2.5 px-3">Yarn</th>
-                <th className="py-2.5 px-3 text-right">Balance kg</th>
-                <th className="py-2.5 px-3 text-right">Bags</th>
-                <th className="py-2.5 px-3 text-right">Weft Use / Day (kg)</th>
-                <th className="py-2.5 px-3 text-right font-bold">Days of Weft Cover</th>
-                <th className="py-2.5 px-3 text-right">Pending Delivery (kg)</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-              {factories.flatMap((f) =>
-                (f.yarn_cover || []).map((x) => (
-                  <tr key={`${f.factory_id}-${x.yarn_id}`} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50">
-                    <td className="py-2.5 px-3 font-semibold text-slate-800 dark:text-slate-200">{f.factory_name}</td>
-                    <td className="py-2.5 px-3 font-medium text-slate-700 dark:text-slate-300">{x.yarn_name}</td>
-                    <td className="py-2.5 px-3 text-right font-mono font-semibold">
-                      <span className={x.bal < 0 ? 'text-rose-600 font-bold' : ''}>{formatNum(x.bal)}</span>
-                    </td>
-                    <td className="py-2.5 px-3 text-right font-mono text-slate-500">{formatNum(x.bags, 1)}</td>
-                    <td className="py-2.5 px-3 text-right font-mono">
-                      {x.daily > 0 ? formatNum(x.daily, 1) : <span className="text-slate-400">warp only</span>}
-                    </td>
-                    <td className="py-2.5 px-3 text-right font-bold">
-                      {x.days === null ? (
-                        <span className="text-slate-400">—</span>
-                      ) : x.days <= 5 ? (
-                        <span className="px-2 py-0.5 rounded text-[10px] bg-rose-100 text-rose-800 dark:bg-rose-950/40 dark:text-rose-300 font-bold">
-                          {formatNum(x.days, 1)} days
-                        </span>
-                      ) : x.days <= 10 ? (
-                        <span className="px-2 py-0.5 rounded text-[10px] bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300 font-bold">
-                          {formatNum(x.days, 1)} days
-                        </span>
-                      ) : (
-                        <span className="text-emerald-600 font-semibold">{formatNum(x.days, 1)} days</span>
-                      )}
-                    </td>
-                    <td className="py-2.5 px-3 text-right font-mono text-blue-600 font-medium">
-                      {formatNum(x.pending)}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
 
-      {/* Programs Overview Table */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm">
-        <div className="px-5 py-3.5 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center">
-          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
-            Active Programs Target vs Actuals
-          </h3>
-          <Button variant="secondary" onClick={() => navigate('/pms/programs')} className="h-7 text-xs">
-            Manage Programs
-          </Button>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-xs text-left">
-            <thead className="bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-semibold border-b border-slate-200 dark:border-slate-700">
-              <tr>
-                <th className="py-2.5 px-3">Program</th>
-                <th className="py-2.5 px-3">Factory</th>
-                <th className="py-2.5 px-3 text-right">Done / Target (m)</th>
-                <th className="py-2.5 px-3 text-right">Expected by Today</th>
-                <th className="py-2.5 px-3 text-right">Days Used</th>
-                <th className="py-2.5 px-3 text-right">Looms on It</th>
-                <th className="py-2.5 px-3 text-right">Loom Eff %</th>
-                <th className="py-2.5 px-3 text-right">Warp kg Needed</th>
-                <th className="py-2.5 px-3 text-right">Weft kg Needed</th>
-                <th className="py-2.5 px-3 text-right font-bold text-slate-900 dark:text-slate-100">At Factory (m)</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-              {programs.map((p) => {
-                const s = p.stats || {};
-                const onTrack = (s.meters || 0) >= (s.expected || 0);
-                return (
-                  <tr key={p.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50">
-                    <td
-                      className="py-2.5 px-3 font-bold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
-                      onClick={() => navigate('/pms/programs')}
-                    >
-                      {p.name}
-                    </td>
-                    <td className="py-2.5 px-3 font-semibold text-slate-700 dark:text-slate-300">{p.factory_name}</td>
-                    <td className="py-2.5 px-3 text-right font-mono font-bold">
-                      <span className={onTrack ? 'text-emerald-600' : 'text-amber-600'}>
-                        {formatNum(s.meters)} / {formatNum(p.target)}
-                      </span>
-                    </td>
-                    <td className="py-2.5 px-3 text-right font-mono text-slate-500">{formatNum(s.expected)}</td>
-                    <td className="py-2.5 px-3 text-right font-mono">{s.days_used} / {s.total_days}</td>
-                    <td className="py-2.5 px-3 text-right font-mono">{s.machines}</td>
-                    <td className="py-2.5 px-3 text-right font-mono font-semibold">
-                      <span className={(s.eff_pct || 0) >= p.t_eff ? 'text-emerald-600' : 'text-rose-600'}>
-                        {formatNum(s.eff_pct, 1)}%
-                      </span>
-                    </td>
-                    <td className="py-2.5 px-3 text-right font-mono text-slate-500">{formatNum(s.warp_need, 1)}</td>
-                    <td className="py-2.5 px-3 text-right font-mono text-slate-500">{formatNum(s.weft_need, 1)}</td>
-                    <td className="py-2.5 px-3 text-right font-mono font-bold text-indigo-600">
-                      {formatNum(s.at_factory)}
+        {/* Active Programs Summary Table */}
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-xs">
+          <div className="px-3.5 sm:px-4 py-2.5 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-slate-800/30">
+            <div className="flex items-center gap-2">
+              <Layers size={14} className="text-slate-500" />
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200">
+                Active Programs Progress
+              </h3>
+            </div>
+            <Button variant="ghost" onClick={() => navigate('/pms/programs')} className="h-6 text-[11px] px-1.5 text-blue-600">
+              All Programs <ArrowRight size={11} className="ml-1" />
+            </Button>
+          </div>
+          <div className="pms-table-container max-h-[360px]">
+            <table className="w-full text-xs text-left">
+              <thead className="pms-sticky-header bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-semibold border-b border-slate-200 dark:border-slate-700">
+                <tr>
+                  <th className="py-2 px-2.5">Program</th>
+                  <th className="py-2 px-2.5">Factory</th>
+                  <th className="py-2 px-2.5 text-right">Done / Target</th>
+                  <th className="py-2 px-2.5 text-right">Loom Eff %</th>
+                  <th className="py-2 px-2.5 text-right font-bold">At Factory</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                {programs.map((p) => {
+                  const s = p.stats || {};
+                  const onTrack = (s.meters || 0) >= (s.expected || 0);
+                  return (
+                    <tr key={p.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50">
+                      <td
+                        className="py-2 px-2.5 font-bold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+                        onClick={() => navigate('/pms/programs')}
+                      >
+                        {p.name}
+                      </td>
+                      <td className="py-2 px-2.5 font-medium text-slate-700 dark:text-slate-300">{p.factory_name}</td>
+                      <td className="py-2 px-2.5 text-right font-mono font-bold">
+                        <span className={onTrack ? 'text-emerald-600' : 'text-amber-600'}>
+                          {formatNum(s.meters)} / {formatNum(p.target)}
+                        </span>
+                      </td>
+                      <td className="py-2 px-2.5 text-right font-mono font-semibold">
+                        <span className={(s.eff_pct || 0) >= p.t_eff ? 'text-emerald-600' : 'text-rose-600'}>
+                          {formatNum(s.eff_pct, 1)}%
+                        </span>
+                      </td>
+                      <td className="py-2 px-2.5 text-right font-mono font-bold text-indigo-600">
+                        {formatNum(s.at_factory)} m
+                      </td>
+                    </tr>
+                  );
+                })}
+                {!programs.length && (
+                  <tr>
+                    <td colSpan={5} className="py-6 text-center text-slate-400">
+                      No active production programs.
                     </td>
                   </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>

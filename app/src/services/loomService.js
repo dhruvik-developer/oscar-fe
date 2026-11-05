@@ -16,7 +16,7 @@ export const loomService = {
   getFactoryYarnStock: (id) => api.get(`${BASE}/factories/${id}/yarn_stock/`),
 
   // Machines
-  getMachines: (params) => api.get(`${BASE}/machines/`, params),
+  getMachines: (params) => api.get(`${BASE}/machines/`, { params }),
   batchCreateMachines: (data) => api.post(`${BASE}/machines/batch_create/`, data),
   updateMachine: (id, data) => api.patch(`${BASE}/machines/${id}/`, data),
   deleteMachine: (id) => api.delete(`${BASE}/machines/${id}/`),
@@ -33,7 +33,7 @@ export const loomService = {
   deleteQuality: (id) => api.delete(`${BASE}/qualities/${id}/`),
 
   // Beams
-  getBeams: (params) => api.get(`${BASE}/beams/`, params),
+  getBeams: (params) => api.get(`${BASE}/beams/`, { params }),
   createBeam: (data) => api.post(`${BASE}/beams/`, data),
   loadBeamToLoom: (id, machineId) => api.post(`${BASE}/beams/${id}/load_to_loom/`, { machine_id: machineId }),
   assignSpareBeam: (id, machineId) => api.post(`${BASE}/beams/${id}/assign_spare/`, { machine_id: machineId }),
@@ -41,7 +41,7 @@ export const loomService = {
   deleteBeam: (id) => api.delete(`${BASE}/beams/${id}/`),
 
   // Daily Production
-  getFactoryDayProduction: (factoryId, dateStr) => api.get(`${BASE}/daily-production/factory_day/`, { factory: factoryId, date: dateStr }),
+  getFactoryDayProduction: (factoryId, dateStr) => api.get(`${BASE}/daily-production/factory_day/`, { params: { factory: factoryId, date: dateStr } }),
   bulkSaveDailyProduction: (data) => api.post(`${BASE}/daily-production/bulk_save/`, data),
   deleteDailyProduction: (id) => api.delete(`${BASE}/daily-production/${id}/`),
 
@@ -61,8 +61,8 @@ export const loomService = {
   deleteProgram: (id) => api.delete(`${BASE}/programs/${id}/`),
 
   // Fabric Dispatches (Fabric Out)
-  getFabricDispatches: (params) => api.get(`${BASE}/fabric-dispatches/`, params),
+  getFabricDispatches: (params) => api.get(`${BASE}/fabric-dispatches/`, { params }),
   createFabricDispatch: (data) => api.post(`${BASE}/fabric-dispatches/`, data),
-  getFabricInventorySummary: (factoryId) => api.get(`${BASE}/fabric-dispatches/inventory_summary/`, { factory: factoryId }),
+  getFabricInventorySummary: (factoryId) => api.get(`${BASE}/fabric-dispatches/inventory_summary/`, { params: { factory: factoryId } }),
   deleteFabricDispatch: (id) => api.delete(`${BASE}/fabric-dispatches/${id}/`),
 };

@@ -226,6 +226,8 @@ export const NAV = [
       { label: 'Daily Loom Entry', icon: CalendarCheck, to: '/pms/loom-daily' },
       { label: 'Yarn Procurement', icon: Package, to: '/pms/yarn' },
       { label: 'Programs (Batches)', icon: Layers, to: '/pms/programs' },
+      { label: 'Production Instructions (PI)', icon: ClipboardList, to: '/pms/production-instructions' },
+      { label: 'Completion & Auto-PO', icon: CheckCircle2, to: '/pms/production-completion' },
       { label: 'Fabric Out (Dispatches)', icon: Send, to: '/pms/fabric-out' },
       { label: 'Loom Masters', icon: Settings, to: '/pms/loom-masters' },
       { label: 'Delay Center', icon: AlertTriangle, to: '/pms/delays', badgeKey: 'pmsDelayedCount', badgeColor: '#ef4444' },

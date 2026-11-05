@@ -17,7 +17,9 @@ import { formatNum } from '../utils/loomCalculations';
 
 export default function DailyLoomEntryPage() {
   const [factories, setFactories] = useState([]);
-  const [selectedFactoryId, setSelectedFactoryId] = useState('');
+  const [selectedFactoryId, setSelectedFactoryId] = useState(
+    () => localStorage.getItem('oscar_pms_selected_factory') || ''
+  );
   const [dateStr, setDateStr] = useState(() => new Date().toISOString().slice(0, 10));
   const [powerCut, setPowerCut] = useState(0);
   const [rows, setRows] = useState([]);
@@ -30,8 +32,18 @@ export default function DailyLoomEntryPage() {
       const res = await loomService.getFactories();
       const list = Array.isArray(res) ? res : res?.results || [];
       setFactories(list);
-      if (list.length && !selectedFactoryId) {
-        setSelectedFactoryId(list[0].id);
+      if (list.length) {
+        const saved = localStorage.getItem('oscar_pms_selected_factory');
+        const exists = list.some((f) => f.id === saved);
+        if (saved && exists) {
+          setSelectedFactoryId(saved);
+        } else {
+          const activeF =
+            list.find((f) => f.name?.toLowerCase().includes('shree laxmi') || f.machines_count > 0) ||
+            list[0];
+          setSelectedFactoryId(activeF.id);
+          localStorage.setItem('oscar_pms_selected_factory', activeF.id);
+        }
       }
     } catch (err) {
       console.error('Failed to load factories:', err);
@@ -126,157 +138,173 @@ export default function DailyLoomEntryPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="pms-screen w-full space-y-3 sm:space-y-3.5">
       <PageHeader
         title="Daily Loom Production Entry"
-        subtitle="Rapid coordinator matrix: Enter daily meters, power outages and stop reasons across active looms."
+        subtitle="Single-click coordinator matrix: Log daily machine output, stops, and power cuts across active looms."
         actions={
-          <div className="flex items-center gap-3">
-            <Button variant="secondary" onClick={fetchDayData} disabled={loading}>
-              <RefreshCw size={14} className={`mr-1.5 ${loading ? 'animate-spin' : ''}`} />
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={fetchDayData}
+              disabled={loading}
+              className="pms-btn-secondary"
+            >
+              <RefreshCw size={14} className={`mr-1 ${loading ? 'animate-spin' : ''}`} />
               Refresh
-            </Button>
-            <Button variant="primary" onClick={handleSaveDay} disabled={saving || loading}>
-              <Save size={14} className="mr-1.5" />
+            </button>
+            <button
+              type="button"
+              onClick={handleSaveDay}
+              disabled={saving || loading}
+              className="pms-btn-emerald"
+            >
+              <Save size={15} className="mr-1.5" />
               {saving ? 'Saving...' : 'Save Day Entries'}
-            </Button>
+            </button>
           </div>
         }
       />
 
-      {/* Control Bar */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div className="flex flex-wrap items-center gap-4">
+      {/* Control Bar - Canonical Project Section Heights and Colors */}
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3.5 sm:p-4 shadow-2xs">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-2.5 sm:gap-3">
             {/* Factory select */}
-            <div>
-              <label className="text-[11px] font-semibold text-slate-500 uppercase block mb-1">Factory</label>
-              <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 h-9">
-                <Factory size={14} className="text-slate-400" />
-                <select
-                  value={selectedFactoryId}
-                  onChange={(e) => setSelectedFactoryId(e.target.value)}
-                  className="bg-transparent text-xs font-semibold text-slate-800 dark:text-slate-200 outline-none"
-                >
-                  {factories.map((f) => (
-                    <option key={f.id} value={f.id}>{f.name}</option>
-                  ))}
-                </select>
-              </div>
+            <div className="h-[38px] flex items-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 shadow-2xs">
+              <Factory size={15} className="text-slate-400 shrink-0" />
+              <select
+                value={selectedFactoryId}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setSelectedFactoryId(val);
+                  localStorage.setItem('oscar_pms_selected_factory', val);
+                }}
+                className="bg-transparent text-xs font-semibold text-slate-800 dark:text-slate-200 outline-none cursor-pointer"
+              >
+                {factories.map((f) => (
+                  <option key={f.id} value={f.id}>{f.name}</option>
+                ))}
+              </select>
             </div>
 
             {/* Date Picker */}
-            <div>
-              <label className="text-[11px] font-semibold text-slate-500 uppercase block mb-1">Entry Date</label>
-              <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 h-9">
-                <Calendar size={14} className="text-slate-400" />
-                <input
-                  type="date"
-                  value={dateStr}
-                  onChange={(e) => setDateStr(e.target.value)}
-                  className="bg-transparent text-xs font-semibold text-slate-800 dark:text-slate-200 outline-none"
-                />
-              </div>
+            <div className="h-[38px] flex items-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 shadow-2xs">
+              <Calendar size={15} className="text-slate-400 shrink-0" />
+              <input
+                type="date"
+                value={dateStr}
+                onChange={(e) => setDateStr(e.target.value)}
+                className="bg-transparent text-xs font-semibold text-slate-800 dark:text-slate-200 outline-none cursor-pointer"
+              />
             </div>
 
             {/* Power cut */}
-            <div>
-              <label className="text-[11px] font-semibold text-slate-500 uppercase block mb-1">Power Cut (hrs today)</label>
-              <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 h-9 w-32">
-                <Zap size={14} className="text-amber-500" />
-                <input
-                  type="number"
-                  step="0.5"
-                  value={powerCut}
-                  onChange={(e) => setPowerCut(e.target.value)}
-                  className="w-full bg-transparent text-xs font-semibold text-slate-800 dark:text-slate-200 outline-none"
-                />
-              </div>
+            <div className="h-[38px] flex items-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 shadow-2xs">
+              <Zap size={15} className="text-amber-500 shrink-0" />
+              <span className="text-xs font-medium text-slate-600 dark:text-slate-400 whitespace-nowrap">Power Cut:</span>
+              <input
+                type="number"
+                step="0.5"
+                value={powerCut}
+                onChange={(e) => setPowerCut(e.target.value)}
+                className="w-12 bg-transparent text-xs font-bold text-slate-800 dark:text-slate-200 outline-none text-right"
+              />
+              <span className="text-xs text-slate-400">hrs</span>
             </div>
           </div>
 
-          <div>
-            <label className="text-[11px] font-semibold text-slate-500 uppercase block mb-1">&nbsp;</label>
-            <Button
-              variant="secondary"
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
               onClick={() => setShowMore(!showMore)}
-              className="text-xs h-9 flex items-center gap-1.5"
+              className="pms-btn-secondary"
             >
-              <Sliders size={13} />
-              {showMore ? 'Hide RPM & Hours' : 'Show RPM & Hours'}
-            </Button>
+              <Sliders size={14} />
+              {showMore ? 'Simple View' : 'Show RPM / Hours'}
+            </button>
+            <button
+              type="button"
+              onClick={handleSaveDay}
+              disabled={saving || loading}
+              className="pms-btn-emerald sm:hidden"
+            >
+              <Save size={14} className="mr-1" /> Save
+            </button>
           </div>
         </div>
       </div>
 
-      {/* Grid Entry Table */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm">
-        <div className="overflow-x-auto">
+      {/* Grid Entry Table - Fit to screen with sticky headers & horizontal scroll protection */}
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-xs">
+        <div className="pms-table-container max-h-[calc(100vh-250px)]">
           <table className="w-full text-xs text-left">
-            <thead className="bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-semibold border-b border-slate-200 dark:border-slate-700">
+            <thead className="pms-sticky-header bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-semibold border-b border-slate-200 dark:border-slate-700">
               <tr>
-                <th className="py-2.5 px-3">MCN</th>
-                <th className="py-2.5 px-3">Quality</th>
-                <th className="py-2.5 px-3 text-right">On Loom (m)</th>
-                <th className="py-2.5 px-3">Meters Today</th>
-                <th className="py-2.5 px-3">Stop Reason</th>
-                <th className="py-2.5 px-3">Damage (m)</th>
+                <th className="py-2 px-3 sticky left-0 bg-slate-50 dark:bg-slate-800 z-20">MCN</th>
+                <th className="py-2 px-3">Quality</th>
+                <th className="py-2 px-3 text-right">On Loom (m)</th>
+                <th className="py-2 px-3">Meters Today</th>
+                <th className="py-2 px-3">Stop Reason</th>
+                <th className="py-2 px-3 text-right">Damage (m)</th>
                 {showMore && (
                   <>
-                    <th className="py-2.5 px-3">RPM</th>
-                    <th className="py-2.5 px-3">Hours</th>
-                    <th className="py-2.5 px-3">Stop (hrs)</th>
+                    <th className="py-2 px-3 text-right">RPM</th>
+                    <th className="py-2 px-3 text-right">Hours</th>
+                    <th className="py-2 px-3 text-right">Stop (hrs)</th>
                   </>
                 )}
-                <th className="py-2.5 px-3 text-center">Status</th>
-                <th className="py-2.5 px-3 text-center">Action</th>
+                <th className="py-2 px-3 text-center">Status</th>
+                <th className="py-2 px-3 text-center">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
               {rows.map((r) => {
                 if (!r.has_beam) {
                   return (
-                    <tr key={r.machine_id} className="bg-slate-50/30 dark:bg-slate-800/20 text-slate-400">
-                      <td className="py-2.5 px-3 font-bold text-slate-500">MCN {r.machine_no}</td>
-                      <td colSpan={showMore ? 8 : 5} className="py-2.5 px-3 italic">
-                        No beam on loom (Idle — park a beam to record daily output)
+                    <tr key={r.machine_id} className="bg-slate-50/40 dark:bg-slate-800/20 text-slate-400">
+                      <td className="py-1.5 px-3 font-bold text-slate-500 sticky left-0 bg-slate-50/90 dark:bg-slate-800/90">
+                        MCN {r.machine_no}
                       </td>
-                      <td className="py-2.5 px-3 text-center">
-                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-500">Idle</span>
+                      <td colSpan={showMore ? 8 : 5} className="py-1.5 px-3 italic text-[11px]">
+                        No beam on loom (Idle — park/load a beam to log output)
                       </td>
-                      <td className="py-2.5 px-3 text-center">—</td>
+                      <td className="py-1.5 px-3 text-center">
+                        <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-slate-100 text-slate-500">Idle</span>
+                      </td>
+                      <td className="py-1.5 px-3 text-center">—</td>
                     </tr>
                   );
                 }
 
                 return (
-                  <tr key={r.machine_id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50">
-                    <td className="py-2.5 px-3 font-bold text-slate-900 dark:text-slate-100">
+                  <tr key={r.machine_id} className="hover:bg-blue-50/30 dark:hover:bg-slate-800/50 transition-colors">
+                    <td className="py-1.5 px-3 font-bold text-slate-900 dark:text-slate-100 sticky left-0 bg-white dark:bg-slate-900 z-10 shadow-xs">
                       MCN {r.machine_no}
                     </td>
-                    <td className="py-2.5 px-3 font-medium text-slate-700 dark:text-slate-300">
+                    <td className="py-1.5 px-3 font-medium text-slate-700 dark:text-slate-300 whitespace-nowrap">
                       {r.quality_name}
                       <span className="text-slate-400 font-mono text-[10px] ml-1.5">({r.beam_no})</span>
                     </td>
-                    <td className="py-2.5 px-3 text-right font-medium text-slate-500">
+                    <td className="py-1.5 px-3 text-right font-mono text-slate-500">
                       {formatNum(r.remaining_m)}
                     </td>
-                    <td className="py-2 px-3">
+                    <td className="py-1 px-3">
                       <input
                         type="number"
                         placeholder="0"
                         value={r.meters}
                         onChange={(e) => handleRowChange(r.machine_id, 'meters', e.target.value)}
-                        className="w-24 px-2 py-1 text-xs font-semibold rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-right focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
+                        className="w-20 sm:w-24 px-2 py-1 text-xs font-mono font-bold rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-right focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
                       />
                     </td>
-                    <td className="py-2 px-3">
+                    <td className="py-1 px-3">
                       <select
                         value={r.reason || ''}
                         onChange={(e) => handleRowChange(r.machine_id, 'reason', e.target.value)}
-                        className="h-7 text-xs rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-1.5 font-medium outline-none"
+                        className="h-7 text-xs rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-1.5 font-medium outline-none cursor-pointer"
                       >
-                        <option value="">Normal (no stoppage)</option>
+                        <option value="">Normal</option>
                         <option value="Yarn short">Yarn short</option>
                         <option value="Breakdown">Breakdown</option>
                         <option value="Beam change">Beam change</option>
@@ -285,44 +313,44 @@ export default function DailyLoomEntryPage() {
                         <option value="Other">Other</option>
                       </select>
                     </td>
-                    <td className="py-2 px-3">
+                    <td className="py-1 px-3 text-right">
                       <input
                         type="number"
                         placeholder="0"
                         value={r.damage}
                         onChange={(e) => handleRowChange(r.machine_id, 'damage', e.target.value)}
-                        className="w-16 px-2 py-1 text-xs rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-right outline-none"
+                        className="w-14 px-1.5 py-1 text-xs font-mono rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-right outline-none"
                       />
                     </td>
                     {showMore && (
                       <>
-                        <td className="py-2 px-3">
+                        <td className="py-1 px-3 text-right">
                           <input
                             type="number"
                             value={r.rpm}
                             onChange={(e) => handleRowChange(r.machine_id, 'rpm', e.target.value)}
-                            className="w-16 px-2 py-1 text-xs rounded border border-slate-200 dark:border-slate-700 text-right outline-none"
+                            className="w-16 px-1.5 py-1 text-xs font-mono rounded border border-slate-200 dark:border-slate-700 text-right outline-none"
                           />
                         </td>
-                        <td className="py-2 px-3">
+                        <td className="py-1 px-3 text-right">
                           <input
                             type="number"
                             value={r.hours}
                             onChange={(e) => handleRowChange(r.machine_id, 'hours', e.target.value)}
-                            className="w-14 px-2 py-1 text-xs rounded border border-slate-200 dark:border-slate-700 text-right outline-none"
+                            className="w-14 px-1.5 py-1 text-xs font-mono rounded border border-slate-200 dark:border-slate-700 text-right outline-none"
                           />
                         </td>
-                        <td className="py-2 px-3">
+                        <td className="py-1 px-3 text-right">
                           <input
                             type="number"
                             value={r.stop}
                             onChange={(e) => handleRowChange(r.machine_id, 'stop', e.target.value)}
-                            className="w-14 px-2 py-1 text-xs rounded border border-slate-200 dark:border-slate-700 text-right outline-none"
+                            className="w-14 px-1.5 py-1 text-xs font-mono rounded border border-slate-200 dark:border-slate-700 text-right outline-none"
                           />
                         </td>
                       </>
                     )}
-                    <td className="py-2.5 px-3 text-center">
+                    <td className="py-1.5 px-3 text-center">
                       {r.done ? (
                         <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300">
                           Filed
@@ -333,11 +361,11 @@ export default function DailyLoomEntryPage() {
                         </span>
                       )}
                     </td>
-                    <td className="py-2.5 px-3 text-center">
+                    <td className="py-1.5 px-3 text-center">
                       {r.done && r.prod_id && (
                         <button
                           onClick={() => handleDeleteEntry(r.prod_id)}
-                          className="text-red-500 hover:text-red-700 p-1 rounded"
+                          className="text-red-500 hover:text-red-700 p-1 rounded transition-colors"
                           title="Delete filed row"
                         >
                           <Trash2 size={13} />

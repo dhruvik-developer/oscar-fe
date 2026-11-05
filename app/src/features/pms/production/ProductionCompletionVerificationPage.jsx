@@ -213,7 +213,7 @@ export default function ProductionCompletionVerificationPage() {
   };
 
   return (
-    <div className="min-h-[calc(100vh-62px)] bg-[#eef3fb] p-3 md:p-4 space-y-3">
+    <div className="pms-screen w-full space-y-3 sm:space-y-3.5">
       {/* Title */}
       <PageHeader
         title="Production Completion & Verification"
@@ -384,8 +384,8 @@ export default function ProductionCompletionVerificationPage() {
           <span className="grid h-5 w-5 place-items-center rounded-full bg-[#2563eb] text-[11px] font-extrabold text-white">2</span>
           <h2 className="text-[13px] font-extrabold text-[#2563eb]">Daily Production Summary (Auto from Daily Production)</h2>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[860px] text-center text-[12px]">
+        <div className="pms-table-container">
+          <table className="w-full min-w-[860px] text-center text-[12px] pms-sticky-header">
             <thead>
               <tr className="border-b border-slate-100 text-slate-500">
                 {['#', 'Date', 'Produced Qty (M)', 'Cumulative Qty (M)', 'Balance Qty (M)', 'Entered By', 'Remarks'].map((h) => (

@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useERP } from '../../context/ERPContext';
 import { StatusBadge } from '../../components/ui/StatusBadge';
@@ -76,6 +76,8 @@ export const VendorBillsPage = () => {
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [selectedId, setSelectedId] = useState(null);
+  const [closing, setClosing] = useState(false);
+  const closeTimerRef = useRef(null);
   const [formError, setFormError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -156,6 +158,15 @@ export const VendorBillsPage = () => {
       );
     });
   }, [eligiblePOs, poSearch]);
+
+  const handleCloseBill = () => {
+    if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
+    setClosing(true);
+    closeTimerRef.current = setTimeout(() => {
+      setClosing(false);
+      setSelectedId(null);
+    }, 250);
+  };
 
   const selectedPOObj = useMemo(() => {
     return purchaseOrders.find((p) => p.id === fPoId) || null;
@@ -957,14 +968,14 @@ export const VendorBillsPage = () => {
       )}
 
       {selected && (
-        <div className="fixed inset-0 z-40 bg-black/40" onClick={() => setSelectedId(null)}>
-          <div onClick={(ev) => ev.stopPropagation()} className="absolute inset-y-0 right-0 w-full max-w-lg bg-white shadow-2xl border-l border-slate-200 flex flex-col overflow-hidden">
+        <div className="fixed inset-0 z-40 flex items-center justify-center p-4 sm:p-6" onClick={handleCloseBill} style={{ background: 'rgba(15, 23, 42, 0.45)', opacity: closing ? 0 : 1, transition: 'opacity 0.25s ease', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}>
+          <div onClick={(ev) => ev.stopPropagation()} className={`relative w-full max-w-3xl max-h-[90vh] bg-white rounded-2xl border border-slate-200 shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in duration-200 ${closing ? 'opacity-0 scale-95' : ''}`} style={{ transition: 'opacity 0.25s ease, transform 0.25s cubic-bezier(0.16, 1, 0.3, 1)' }}>
             <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between gap-2">
               <div className="flex items-center gap-2 min-w-0">
                 <h3 className="font-bold text-base text-[#1F2E4A] font-mono truncate">{selected.vendorBillNumber || selected.billNumber}</h3>
                 <StatusBadge status={selected.matchStatus || 'Pending Matching'} />
               </div>
-              <button onClick={() => setSelectedId(null)} className="text-slate-400 hover:text-slate-600 cursor-pointer">
+              <button onClick={handleCloseBill} className="text-slate-400 hover:text-slate-600 cursor-pointer">
                 <X size={18} />
               </button>
             </div>

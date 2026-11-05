@@ -1695,7 +1695,7 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
                             </Button>
                             <button
                                 type="button"
-                                onClick={handleConfirmFinalize}
+                                onClick={() => handleConfirmFinalize(finalizeErrorCode === 'CREDIT_LIMIT_EXCEEDED' && canOverrideCredit ? { overrideCreditLimit: true } : undefined)}
                                 disabled={finalizingInvoiceId === finalizeModalTarget.id || creditApprovalRequest?.status === 'Pending'}
                                 className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 disabled:cursor-wait text-white rounded-lg font-bold shadow-sm cursor-pointer"
                             >

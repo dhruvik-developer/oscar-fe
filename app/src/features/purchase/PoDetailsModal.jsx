@@ -1,3 +1,5 @@
+import { ColourChip } from './DyeingColourField';
+import { FABRIC_FLOW_B, flowLabel } from './FabricFlowForm';
 import React, { useState } from 'react';
 import {
   X,
@@ -258,7 +260,8 @@ export function PoDetailsModal({
               <div className="mt-1 space-y-1 text-slate-700">
                 <div>Expected Date: <strong>{formatDateDDMMYYYY(po.expectedDate)}</strong></div>
                 <div>Project Reference: <strong>{po.projectCode || po.projectName || 'General Stock'}</strong></div>
-                {po.fabricFlow && <div>Fabric Flow: <strong>{po.fabricFlow}</strong></div>}
+                {po.fabricFlow && <div>Delivery Type: <strong>{flowLabel(po.fabricFlow)}</strong></div>}
+                {po.fabricFlow === FABRIC_FLOW_B && po.dyeingColourName && <div className="flex items-center gap-1.5">Dyeing Colour: <ColourChip name={po.dyeingColourName} hex={po.dyeingColourHex} /></div>}
               </div>
             </div>
             <div className="p-3 bg-slate-50 border border-slate-200/80 rounded-xl">
@@ -272,16 +275,7 @@ export function PoDetailsModal({
 
         {/* Footer */}
         <div className="flex items-center justify-between pt-3 border-t border-slate-200 mt-3">
-          <button
-            type="button"
-            onClick={() => {
-              onClose();
-              onOpenBatchRegistry?.(po);
-            }}
-            className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg font-semibold flex items-center gap-1.5 text-xs shadow-2xs transition cursor-pointer"
-          >
-            <Package size={13} /> Open in Batch Registry <ArrowRight size={12} />
-          </button>
+<div></div>
           <button
             type="button"
             onClick={onClose}

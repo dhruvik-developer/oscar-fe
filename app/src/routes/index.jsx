@@ -545,9 +545,9 @@ const router = createBrowserRouter([
       { path: 'inventory/qc/reinspection', element: <RedirectWith to="/inventory/qc/advanced" set={{ step: 'recheck' }} /> },
       { path: 'inventory/qc/dashboard', element: <Page component={QCDashboardHubPage} title="QC Dashboard" /> },
       { path: 'job-work/service-orders', element: <Page component={ServiceOrdersPage} title="Dyeing Service Orders" /> },
-      { path: 'inventory/lot-register', element: <Page component={LotTakaRegisterPage} title="Lot / Taka Register" /> },
-      { path: 'inventory/lots-takas', element: <Navigate to="/inventory/lot-register" replace /> },
-      { path: 'inventory/taka-tags', element: <Page component={TakaTagPrintPage} title="Taka Tag Print" /> },
+      { path: 'inventory/lot-register', element: <Navigate to="/inventory/batches" replace /> },
+      { path: 'inventory/lots-takas', element: <Navigate to="/inventory/batches" replace /> },
+      { path: 'inventory/taka-tags', element: <Navigate to="/inventory/batches" replace /> },
       { path: 'inventory/batches', element: <Page component={BatchRegistryPage} title="Batch Registry" /> },
       { path: 'inventory/production-runs', element: <Page component={ProductionRunsPage} title="Production Runs" /> },
       // A batch QR tag opens this (signed in; cost shown only with ledger access).

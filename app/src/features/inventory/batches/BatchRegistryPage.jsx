@@ -4,7 +4,7 @@ import {
   Search, Printer, ScanLine, IndianRupee, Eye, SlidersHorizontal, X, Plus, Users, Layers, PackageOpen,
   Boxes, CheckCircle2, Bookmark, ClipboardCheck, RefreshCcw, XCircle, Truck, UserRound, ShoppingCart,
   Factory, GitMerge, PenLine, ArrowLeft, ShieldCheck, History, Wallet, ExternalLink, PackageCheck,
-  AlertCircle, Droplets, ChevronRight, Package, FileText, Ban, Receipt, Check,
+  AlertCircle, Droplets, ChevronRight, Package, FileText, Ban, Receipt, Check, RefreshCw,
 } from 'lucide-react';
 import PageHeader from '../../../components/ui/PageHeader';
 import AppPagination from '../../../components/ui/AppPagination';
@@ -16,6 +16,8 @@ import { PhysicalStockSummary } from './CustomerMaterialPanels';
 import AddBatchModal, { useTextileMasters } from './AddBatchModal';
 import { useERP } from '../../../context/ERPContext';
 import { GoodsReceiptInlineSlide } from '../../purchase/GoodsReceiptInlineSlide';
+import { ColourChip } from '../../purchase/DyeingColourField';
+import SendForReprocessModal from './SendForReprocessModal';
 import { SupplierDeliveryInlineSlide } from '../../purchase/SupplierDeliveryInlineSlide';
 import { GreyQcInlineSlide } from '../../purchase/GreyQcInlineSlide';
 import { VendorBillInlineSlide } from '../../purchase/VendorBillInlineSlide';
@@ -216,6 +218,7 @@ function BatchGroupCard({
                     {group.fabricFlowLabel}
                   </span>
                 )}
+                {isPo && <ColourChip name={group.dyeingColourName} hex={group.dyeingColourHex} />}
               </div>
               <div className="mt-1 text-xs text-slate-500 flex flex-wrap items-center gap-x-2">
                 {isPo ? (
@@ -806,6 +809,7 @@ export default function BatchRegistryPage() {
   const [expandedGroups, setExpandedGroups] = useState({});
   // Batch profitability report: cost / revenue / profit columns (ledger access only).
   const [withCost, setWithCost] = useState(false);
+  const [reprocessBatch, setReprocessBatch] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [scan, setScan] = useState('');
@@ -1031,6 +1035,14 @@ export default function BatchRegistryPage() {
     }
   }, [load, selectedPoGroup?.poId, reloadPoDetails]);
 
+  const reprocessModal = reprocessBatch && (
+    <SendForReprocessModal
+      batch={reprocessBatch}
+      onClose={() => setReprocessBatch(null)}
+      onDone={async () => { setReprocessBatch(null); await handleActionSaved(); }}
+    />
+  );
+
   // Allocate costs action
   const handleAllocateCosts = async () => {
     if (!selectedPoGroup?.poId) return;
@@ -1122,6 +1134,8 @@ export default function BatchRegistryPage() {
       partyName: selectedPoGroup.vendorName,
       status: selectedPoGroup.status,
       fabricFlow: selectedPoGroup.fabricFlow,
+      dyeingColourName: selectedPoGroup.dyeingColourName,
+      dyeingColourHex: selectedPoGroup.dyeingColourHex,
       items: fallbackLines,
       lineItems: fallbackLines,
       qcReprocessQty: Number(selectedPoGroup.qcReprocessQty || flowData?.quantities?.reprocessAtQc || 0),
@@ -1224,6 +1238,7 @@ export default function BatchRegistryPage() {
                     {selectedPoGroup.fabricFlowLabel || (selectedPoGroup.fabricFlow === 'FACTORY_TO_MILL' ? 'Factory → Dyeing Mill → OSCAR' : 'Factory → OSCAR Warehouse')}
                   </span>
                 )}
+                <ColourChip name={selectedPoGroup.dyeingColourName} hex={selectedPoGroup.dyeingColourHex} />
               </div>
               <h2 className="mt-1 text-xl font-extrabold text-slate-900 font-mono tracking-tight">{selectedPoGroup.poNumber}</h2>
               <div className="mt-1 text-xs text-slate-600 flex flex-wrap items-center gap-x-2">
@@ -1462,6 +1477,7 @@ export default function BatchRegistryPage() {
       )}
 
       {showPhysical && <PhysicalStockSummary />}
+      {reprocessModal}
       {adding && (
         <AddBatchModal
           onClose={() => setAdding(false)}
@@ -1802,15 +1818,19 @@ export default function BatchRegistryPage() {
             ) : (
               /* TABLE OF BATCHES */
               <div className="overflow-x-auto border border-slate-200 rounded-xl">
-                <table className="w-full min-w-[760px] text-xs">
+                <table className="w-full min-w-[1080px] text-xs">
                   <thead className="bg-slate-50 text-[10.5px] uppercase tracking-wide text-slate-500 border-b border-slate-200">
                     <tr>
                       <th className="px-4 py-3 text-left">Batch No.</th>
                       <th className="px-4 py-3 text-left">Receipt / GRN</th>
+                      {selectedPoGroup.dyeingColourName && <th className="px-4 py-3 text-left">Dyeing Colour</th>}
                       <th className="px-4 py-3 text-right">Batch Qty</th>
+                      <th className="px-4 py-3 text-right">Rate / Amount</th>
                       <th className="px-4 py-3 text-left">QC Status</th>
+                      <th className="px-4 py-3 text-right">Accepted</th>
                       <th className="px-4 py-3 text-right">Available (Passed)</th>
                       <th className="px-4 py-3 text-left">Stock Status</th>
+                      <th className="px-4 py-3 text-left">Location</th>
                       <th className="px-4 py-3 text-right">Actions</th>
                     </tr>
                   </thead>
@@ -1822,14 +1842,21 @@ export default function BatchRegistryPage() {
                             <Package size={13} /> {batch.batchCode}
                           </span>
                           <div className="text-[10px] text-slate-500 mt-0.5">
-                            {batch.item || '—'} · {batch.fabricType === 'DYED' ? 'Dyed' : 'Grey'}
+                            {batch.item || '—'} · {batch.fabricType === 'DYED' ? 'Dyed' : 'Grey'}{batch.supplierName ? ` · ${batch.supplierName}` : ''}
                           </div>
                         </td>
                         <td className="px-4 py-3 text-slate-600 font-mono text-[11px]">
                           {(batch.receiptNumbers || []).join(', ') || batch.sourceDocumentNumber || '—'}
                         </td>
+                        {selectedPoGroup.dyeingColourName && (
+                          <td className="px-4 py-3"><ColourChip name={batch.dyeingColourName} hex={batch.dyeingColourHex} /></td>
+                        )}
                         <td className="px-4 py-3 text-right tabular-nums font-semibold text-slate-800">
                           {formatNumberIN(batch.batchQty)} {batch.uom}
+                        </td>
+                        <td className="px-4 py-3 text-right tabular-nums">
+                          <div className="font-semibold text-slate-800">{formatINR(batch.batchAmount)}</div>
+                          <div className="text-[10px] text-slate-500">@ {formatINR(batch.actualRate)}</div>
                         </td>
                         <td className="px-4 py-3">
                           <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
@@ -1841,6 +1868,9 @@ export default function BatchRegistryPage() {
                           }`}>
                             {batch.qcStatus === 'Mixed' ? 'Partially Approved' : batch.qcStatus}
                           </span>
+                        </td>
+                        <td className="px-4 py-3 text-right tabular-nums font-semibold text-slate-800">
+                          {formatNumberIN(batch.acceptedQty)} {batch.uom}
                         </td>
                         <td className="px-4 py-3 text-right tabular-nums">
                           <div className="font-bold text-emerald-700">
@@ -1863,7 +1893,19 @@ export default function BatchRegistryPage() {
                             {batch.status}
                           </span>
                         </td>
+                        <td className="px-4 py-3 text-slate-600">{(batch.locationNames || []).join(', ') || '—'}</td>
                         <td className="px-4 py-3 text-right whitespace-nowrap space-x-1.5" onClick={(e) => e.stopPropagation()}>
+                          {(batch.qcStatus === 'Rejected' || Number(batch.rejectedQty || 0) > 0) && (
+                            <button
+                              type="button"
+                              onClick={() => setReprocessBatch(batch)}
+                              className="px-2 py-1 rounded-md border border-indigo-200 bg-indigo-50/70 text-indigo-700 hover:bg-indigo-100 text-xs font-semibold cursor-pointer inline-flex items-center gap-1"
+                              title="Send rejected fabric for reprocessing"
+                            >
+                              <RefreshCw size={11} />
+                              <span>Reprocess</span>
+                            </button>
+                          )}
                           <button
                             type="button"
                             onClick={() => open(batch.batchCode)}
@@ -1951,6 +1993,7 @@ export default function BatchRegistryPage() {
                             </td>
                             <td className="px-3 py-3">
                               <span className="font-mono font-bold text-blue-700 hover:underline">{b.batchCode}</span>
+                              <ColourChip name={b.dyeingColourName} hex={b.dyeingColourHex} className="ml-1.5" />
                               <div className="text-[10px] text-slate-500 mt-0.5">{b.designName || '—'} {b.shadeName ? `· ${b.shadeName}` : ''}</div>
                             </td>
                             <td className="px-3 py-3">
@@ -1975,6 +2018,16 @@ export default function BatchRegistryPage() {
                               <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-[10px] font-semibold whitespace-nowrap ${STATUS_STYLE[b.status] || STATUS_STYLE.Closed}`}><span className={`w-1.5 h-1.5 rounded-full ${STATUS_DOT[b.status] || STATUS_DOT.Closed}`} />{b.status}</span>
                             </td>
                             <td className="px-3 py-3 text-right whitespace-nowrap space-x-1" onClick={(e) => e.stopPropagation()}>
+                              {(b.qcStatus === 'Rejected' || Number(b.rejectedQty || 0) > 0) && (
+                                <button
+                                  type="button"
+                                  onClick={() => setReprocessBatch(b)}
+                                  className="p-1.5 rounded-md border border-indigo-200 bg-indigo-50/70 text-indigo-700 hover:bg-indigo-100 text-xs font-semibold cursor-pointer"
+                                  title="Send rejected fabric for reprocessing"
+                                >
+                                  <RefreshCw size={12} />
+                                </button>
+                              )}
                               <button type="button" onClick={() => open(b.batchCode)} title="Open Batch 360°" aria-label={`Open ${b.batchCode}`} className="p-1.5 rounded-md border border-slate-200 text-blue-700 hover:bg-blue-50 cursor-pointer">
                                 <Eye size={13} />
                               </button>

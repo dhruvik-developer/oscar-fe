@@ -58,11 +58,14 @@ export function PoMovementHistoryModal({
   const hasReceipts = grns.length > 0 || receivedQty > 0;
   const isApproved = !['Draft', 'Pending Approval'].includes(po.status);
   const isFullyReceived = po.status === 'Fully Received' || (orderedQty > 0 && receivedQty >= orderedQty);
+  // Factory -> OSCAR goes straight to GRN; dispatch is a step only on a mill PO,
+  // or where one was already recorded.
+  const showDispatch = po.fabricFlow === 'FACTORY_TO_MILL' || hasDispatches;
 
   const steps = [
     {
       id: 'po',
-      title: '1. Purchase Order Issued',
+      title: 'Purchase Order Issued',
       desc: `Contract issued to ${po.vendor} for ${orderedQty.toLocaleString('en-IN')} ${uom}.`,
       date: formatDateDDMMYYYY(po.date),
       icon: ClipboardList,
@@ -71,7 +74,7 @@ export function PoMovementHistoryModal({
     },
     {
       id: 'dispatch',
-      title: '2. Supplier Shipment & Dispatch',
+      title: 'Supplier Shipment & Dispatch',
       desc: hasDispatches
         ? `${deliveries.length} shipment(s) logged. Latest challan: ${deliveries[0]?.supplierChallanNo || 'Challan logged'}.`
         : isApproved
@@ -84,18 +87,18 @@ export function PoMovementHistoryModal({
     },
     {
       id: 'grn',
-      title: '3. Warehouse Intake & Goods Receipt (GRN)',
+      title: 'Warehouse Intake & Goods Receipt (GRN)',
       desc: hasReceipts
         ? `Goods received into warehouse dock. Received: ${receivedQty.toLocaleString('en-IN')} ${uom} across ${Math.max(1, grns.length)} GRN(s).`
         : 'Goods not yet intaked at the dock.',
       date: grns[0]?.receiptDate ? formatDateDDMMYYYY(grns[0].receiptDate) : null,
       icon: PackageCheck,
-      status: isFullyReceived ? 'complete' : hasReceipts ? 'in_progress' : 'pending',
+      status: isFullyReceived ? 'complete' : hasReceipts || (isApproved && !showDispatch) ? 'in_progress' : 'pending',
       badge: isFullyReceived ? 'Fully Received' : hasReceipts ? 'Partially Received' : 'Pending Intake',
     },
     {
       id: 'qc',
-      title: '4. Quality Inspection & Taka Segregation',
+      title: 'Quality Inspection & Taka Segregation',
       desc: hasReceipts
         ? 'Rolls / Takas assigned to inspection batches with grade allocation.'
         : 'Inspection starts after initial dock receipt.',
@@ -106,7 +109,7 @@ export function PoMovementHistoryModal({
     },
     {
       id: 'billing',
-      title: '5. Vendor Bill Matching & Accounts Payable',
+      title: 'Vendor Bill Matching & Accounts Payable',
       desc: po.billedQty || po.bills?.length
         ? 'Vendor invoice matched and inventory value committed to stock ledger.'
         : 'Pending invoice intake and 3-way reconciliation.',
@@ -115,7 +118,7 @@ export function PoMovementHistoryModal({
       status: po.status === 'Billed' ? 'complete' : 'pending',
       badge: po.status === 'Billed' ? 'Billed' : 'Pending Bill',
     },
-  ];
+  ].filter((step) => step.id !== 'dispatch' || showDispatch);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-3 sm:p-4">
@@ -145,7 +148,7 @@ export function PoMovementHistoryModal({
         {/* Timeline Body */}
         <div className="space-y-4 mt-4 overflow-y-auto pr-1 flex-1">
           <div className="relative pl-6 space-y-6 before:absolute before:left-2.5 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-200">
-            {steps.map((st) => {
+            {steps.map((st, index) => {
               const Icon = st.icon;
               const isDone = st.status === 'complete';
               const isInProg = st.status === 'in_progress';
@@ -167,7 +170,7 @@ export function PoMovementHistoryModal({
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-2">
                         <Icon size={14} className={isDone ? 'text-emerald-700' : isInProg ? 'text-blue-700' : 'text-slate-400'} />
-                        <h4 className="font-bold text-slate-900 text-xs">{st.title}</h4>
+                        <h4 className="font-bold text-slate-900 text-xs">{index + 1}. {st.title}</h4>
                       </div>
                       <span
                         className={`px-2 py-0.5 rounded text-[10px] font-bold border ${

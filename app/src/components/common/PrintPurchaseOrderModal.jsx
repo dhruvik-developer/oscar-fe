@@ -177,11 +177,11 @@ export const PrintPurchaseOrderModal = ({ isOpen, onClose, po }) => {
                                             <p className="font-bold text-slate-900">Industrial Hardware Intake Batch</p>
                                         </td>
                                         <td className="py-2.5 px-3 text-center font-mono">1</td>
-                                        <td className="py-2.5 px-3 text-right font-mono">${(totalAmount || 0).toFixed(2)}</td>
+                                        <td className="py-2.5 px-3 text-right font-mono">₹{(totalAmount || 0).toFixed(2)}</td>
                                         <td className="py-2.5 px-3 text-center text-slate-500">0%</td>
                                         <td className="py-2.5 px-3 text-center text-slate-500">18%</td>
                                         <td className="py-2.5 px-3 text-right font-mono font-bold text-slate-900">
-                                            ${(totalAmount || 0).toFixed(2)}
+                                            ₹{(totalAmount || 0).toFixed(2)}
                                         </td>
                                     </tr>
                                 ) : (

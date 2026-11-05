@@ -319,6 +319,11 @@ export const inventoryService = {
   createQCReinspection: (data) => api.post('/inventory/qc/reinspection/', data),
   saveQCReinspectionDisposition: (data) => api.post('/inventory/qc/reinspection/', { ...data, actionType: 'disposition' }),
   getQCReports: (query) => api.get('/inventory/qc/reports/', { query: qcStage(query) }),
+  // Reprocess Workflow
+  getReprocessRecords: (query) => api.get('/inventory/reprocess/', { query }),
+  getReprocessRecord: (id) => api.get(`/inventory/reprocess/${id}/`),
+  sendBatchForReprocess: (data) => api.post('/inventory/reprocess/send/', data),
+  receiveReprocessReturn: (id, data) => api.post(`/inventory/reprocess/${id}/receive-return/`, data),
   // Lot / Taka Register
   getLotRegister: (query) => api.get('/inventory/lot-register/', { query }),
   createLotTaka: (data) => api.post('/inventory/lot-register/', data),

@@ -189,7 +189,7 @@ export default function Jobs() {
         description: form.description,
         responsibilities: form.responsibilities,
         requiredSkills: form.requiredSkills,
-        salaryRange: "$80k",
+        salaryRange: "₹80k",
         location: form.location,
       });
       showToast(publish ? "Job opening created successfully." : "Draft saved");

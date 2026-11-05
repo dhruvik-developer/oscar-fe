@@ -20,7 +20,7 @@ export default function GenerateOfferModal({
     position: "",
     jobType: "Full-time",
     dept: "Engineering",
-    salary: "$95,000 / annum",
+    salary: "₹95,000 / annum",
     location: "New York HQ",
     workMode: "Hybrid",
     joiningDate: new Date(Date.now() + 21 * 86400000).toISOString().split("T")[0],
@@ -212,7 +212,7 @@ export default function GenerateOfferModal({
               <input
                 type="text"
                 required
-                placeholder="e.g. $95,000 / yr or ₹50,000 / mo"
+                placeholder="e.g. ₹95,000 / yr or ₹50,000 / mo"
                 value={formData.salary}
                 onChange={(e) =>
                   setFormData({ ...formData, salary: e.target.value })

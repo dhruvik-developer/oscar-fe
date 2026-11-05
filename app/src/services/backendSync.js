@@ -556,6 +556,8 @@ export const RESOURCES = {
         const payload = base.toApi(doc, opts);
         if (doc.fabricFlow !== undefined) payload.fabricFlow = doc.fabricFlow || null;
         if (doc.dyeingMillId !== undefined) payload.dyeingMillId = doc.dyeingMillId || null;
+        if (doc.dyeingColourName !== undefined) payload.dyeingColourName = doc.dyeingColourName || null;
+        if (doc.dyeingColourHex !== undefined) payload.dyeingColourHex = doc.dyeingColourHex || null;
         if (Array.isArray(doc.yarnLines)) payload.yarnLines = doc.yarnLines;
         if (Array.isArray(doc.expenses)) payload.expenses = doc.expenses;
         return payload;

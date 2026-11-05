@@ -12,8 +12,8 @@ import {
   Ban,
   Layers,
   Sparkles,
-  QrCode,
   Info,
+  RotateCcw,
 } from 'lucide-react';
 import { api } from '../../services/api';
 import { useERP } from '../../context/ERPContext';
@@ -28,16 +28,17 @@ export function GreyQcInlineSlide({ po, initialReceiptId, onClose, onQcSaved, on
 
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [allLots, setAllLots] = useState([]);
   const [grnList, setGrnList] = useState([]);
   const [selectedGrnId, setSelectedGrnId] = useState('');
-  const [takas, setTakas] = useState([]);
+  const [batches, setBatches] = useState([]);
   const [inspectorName, setInspectorName] = useState('Quality Manager');
   const [inspectionDate, setInspectionDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [remarks, setRemarks] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
-  const [activeInspectTaka, setActiveInspectTaka] = useState(null);
+
+  // Active Inspect Batch Modal state
+  const [activeInspectBatch, setActiveInspectBatch] = useState(null);
   const [inspectValues, setInspectValues] = useState({ good: 0, reprocess: 0, reject: 0, sample: 0 });
   const [inspectValidationError, setInspectValidationError] = useState('');
 
@@ -45,39 +46,59 @@ export function GreyQcInlineSlide({ po, initialReceiptId, onClose, onQcSaved, on
   const poNumber = po?.poNumber || po?.code || po?.orderNumber || 'PO';
 
   const loadData = async () => {
-    if (!poId) return;
+    const targetReceiptId = initialReceiptId || po?.initialReceiptId;
+    if (!poId && !targetReceiptId) return;
     try {
       setLoading(true);
       setErrorMsg('');
 
-      const [grnRes, lotRes] = await Promise.allSettled([
-        api.get('/purchase/receipts/', {
-          params: { purchaseOrderId: poId, limit: 50 },
-        }),
-        api.get('/inventory/lot-register/', {
-          params: { po: poId, limit: 200 },
-        }),
-      ]);
-
       let loadedGrns = [];
-      if (grnRes.status === 'fulfilled' && grnRes.value) {
-        const raw = Array.isArray(grnRes.value) ? grnRes.value : (grnRes.value.results || grnRes.value.rows || grnRes.value.data || []);
-        loadedGrns = raw.filter(
-          (g) => String(g.purchase_order || g.purchaseOrderId || g.purchaseOrder || g.poId || '') === String(poId) ||
-                 (poNumber && (g.poNumber === poNumber || g.po_number === poNumber))
-        );
+      if (poId) {
+        const grnRes = await api.get('/purchase/receipts/', {
+          params: { purchaseOrderId: poId, limit: 50 },
+        });
+
+        if (grnRes) {
+          const raw = Array.isArray(grnRes) ? grnRes : (grnRes.results || grnRes.rows || grnRes.data || []);
+          loadedGrns = raw.filter(
+            (g) => String(g.purchase_order || g.purchaseOrderId || g.purchaseOrder || g.poId || '') === String(poId) ||
+                   (poNumber && (g.poNumber === poNumber || g.po_number === poNumber)) ||
+                   (targetReceiptId && (String(g.id) === String(targetReceiptId) || String(g.receiptNumber || g.grn_number || '').toLowerCase() === String(targetReceiptId).toLowerCase()))
+          );
+        }
       }
+
+      // If a specific targetReceiptId was requested and is not yet in loadedGrns, fetch it directly
+      if (targetReceiptId && !loadedGrns.some((g) => String(g.id) === String(targetReceiptId) || String(g.receiptNumber || g.grn_number || '').toLowerCase() === String(targetReceiptId).toLowerCase())) {
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(targetReceiptId));
+        try {
+          if (isUuid) {
+            const directRes = await api.get(`/purchase/receipts/${targetReceiptId}/`);
+            const single = directRes?.data || directRes;
+            if (single && single.id) {
+              loadedGrns = [single, ...loadedGrns];
+            }
+          } else {
+            const searchRes = await api.get('/purchase/receipts/', { params: { search: targetReceiptId, limit: 10 } });
+            const list = Array.isArray(searchRes) ? searchRes : (searchRes.results || searchRes.rows || searchRes.data || []);
+            const match = list.find((g) => String(g.id) === String(targetReceiptId) || String(g.receiptNumber || g.grn_number || '').toLowerCase() === String(targetReceiptId).toLowerCase());
+            if (match) loadedGrns = [match, ...loadedGrns];
+          }
+        } catch {
+          try {
+            const searchRes = await api.get('/purchase/receipts/', { params: { search: targetReceiptId, limit: 10 } });
+            const list = Array.isArray(searchRes) ? searchRes : (searchRes.results || searchRes.rows || searchRes.data || []);
+            const match = list.find((g) => String(g.id) === String(targetReceiptId) || String(g.receiptNumber || g.grn_number || '').toLowerCase() === String(targetReceiptId).toLowerCase());
+            if (match) loadedGrns = [match, ...loadedGrns];
+          } catch {
+            // fallback
+          }
+        }
+      }
+
       setGrnList(loadedGrns);
 
-      let lots = [];
-      if (lotRes.status === 'fulfilled' && lotRes.value) {
-        const rawLots = Array.isArray(lotRes.value) ? lotRes.value : (lotRes.value.records || lotRes.value.rows || lotRes.value.data || lotRes.value.results || []);
-        lots = rawLots;
-      }
-      setAllLots(lots);
-
       if (loadedGrns.length > 0) {
-        const targetReceiptId = initialReceiptId || po?.initialReceiptId;
         setSelectedGrnId((prev) => {
           if (targetReceiptId) {
             const match = loadedGrns.find(
@@ -98,7 +119,7 @@ export function GreyQcInlineSlide({ po, initialReceiptId, onClose, onQcSaved, on
 
   useEffect(() => {
     loadData();
-  }, [poId]);
+  }, [poId, initialReceiptId]);
 
   const currentGrn = useMemo(() => {
     if (!grnList.length) return null;
@@ -113,56 +134,110 @@ export function GreyQcInlineSlide({ po, initialReceiptId, onClose, onQcSaved, on
     return Number(currentGrn.total_received_qty || currentGrn.receivedQty || 0);
   }, [currentGrn]);
 
+  const currentGrnQcStatus = currentGrn?.qc_status || currentGrn?.qcStatus || 'Pending';
+  const currentGrnMeta = useMemo(() => {
+    try {
+      const raw = currentGrn?.qc_note || currentGrn?.qcNote;
+      return typeof raw === 'string' ? JSON.parse(raw || '{}') : (raw || {});
+    } catch {
+      return {};
+    }
+  }, [currentGrn]);
+
+  const reprocessPendingMtr = useMemo(() => {
+    const rp = Number(currentGrnMeta.reprocessQty || currentGrnMeta.cumulative?.reprocess || 0);
+    return rp > 0 ? rp : (po?.isReprocess || po?.reprocessQty ? Number(po.reprocessQty || 10) : 0);
+  }, [currentGrnMeta, po]);
+
+  const effectiveGrnStatus = useMemo(() => {
+    if (['Approved', 'Passed'].includes(currentGrnQcStatus)) return 'Passed';
+    if (currentGrnQcStatus === 'Rejected') return 'Rejected';
+    if (currentGrnQcStatus === 'Partially Approved') {
+      return reprocessPendingMtr > 0 ? 'In Reprocess' : 'Passed';
+    }
+    return currentGrnQcStatus || 'Pending';
+  }, [currentGrnQcStatus, reprocessPendingMtr]);
+
+  const isReprocessMode = Boolean(
+    po?.isReprocess ||
+    (currentGrnQcStatus === 'Partially Approved' && reprocessPendingMtr > 0) ||
+    ['Reprocess', 'Rework'].includes(currentGrnQcStatus)
+  );
+
+  // Transform current GRN lines into pure Batch-Wise QC items
   useEffect(() => {
     if (!currentGrn) {
-      setTakas([]);
+      setBatches([]);
       return;
     }
 
-    const grnIdStr = String(currentGrn.id);
-    const grnNum = (currentGrn.grn_number || currentGrn.grnNumber || '').toLowerCase();
+    const isGrnCompleted = !isReprocessMode && effectiveGrnStatus && effectiveGrnStatus !== 'Pending';
+    const lines = currentGrn.lines || [];
 
-    const seenIds = new Set();
-    const grnTakas = allLots.filter((lt) => {
-      const docId = String(lt.sourceDocumentId || lt.source_document_id || lt.grnId || lt.grn_id || '');
-      const docNo = String(lt.grnNo || lt.grnNumber || lt.source_document_number || '').toLowerCase();
-      const matches = (docId && docId === grnIdStr) || (docNo && docNo === grnNum);
-      if (!matches) return false;
+    const recordedGoodTotal = Number(currentGrnMeta.goodQty ?? currentGrnMeta.cumulative?.good ?? (['Approved', 'Passed'].includes(effectiveGrnStatus) ? grnReceivedMeters : 0)) - Number(currentGrnMeta.sampleQty || 0);
+    const recordedRejectTotal = Number(currentGrnMeta.rejectedQty ?? currentGrnMeta.rejectQty ?? currentGrnMeta.cumulative?.reject ?? (effectiveGrnStatus === 'Rejected' ? grnReceivedMeters : 0));
+    const recordedReprocessTotal = Number(currentGrnMeta.reprocessQty ?? currentGrnMeta.cumulative?.reprocess ?? 0);
+    const recordedSampleTotal = Number(currentGrnMeta.sampleQty || currentGrnMeta.secondQualityQty || currentGrnMeta.secondQty || currentGrnMeta.cumulative?.second || 0);
 
-      const tKey = String(lt.id || lt.takaId || lt.barcode);
-      if (seenIds.has(tKey)) return false;
-      seenIds.add(tKey);
-      return true;
+    const batchRows = lines.map((line, idx) => {
+      const fullQty = Number(line.received_qty || line.receivedQty || 0);
+      const inspectQty = isReprocessMode ? (reprocessPendingMtr > 0 ? reprocessPendingMtr : fullQty) : fullQty;
+      const isApproved = !isReprocessMode && ['Approved', 'Passed'].includes(effectiveGrnStatus);
+      const isRejected = !isReprocessMode && effectiveGrnStatus === 'Rejected';
+      const batchCode = line.batchCode || po?.batchCode || (line.batch_number ? `BAT-${line.batch_number}` : `BAT-${currentGrn.grn_number || 'GRN'}-${idx + 1}`);
+      const lotNumber = line.batch_number || line.lot_number || `LOT-${idx + 1}`;
+      const location = isReprocessMode
+        ? 'SYS-REPROCESS (Reprocess Stock)'
+        : line.currentLocation || (isApproved ? 'WH-MAIN (Godown)' : isRejected ? 'SYS-REJECT' : 'SYS-QC-HOLD');
+      const status = isReprocessMode
+        ? 'Reprocess Pending'
+        : (isApproved ? 'Passed' : isRejected ? 'Rejected' : (line.qcStatus === 'Partially Approved' ? (reprocessPendingMtr > 0 ? 'Reprocess' : 'Passed') : line.qcStatus || effectiveGrnStatus || 'Pending'));
+
+      const lineFraction = grnReceivedMeters > 0 ? (fullQty / grnReceivedMeters) : 1;
+      const actualGood = isGrnCompleted
+        ? (lines.length === 1 ? recordedGoodTotal : Math.round(recordedGoodTotal * lineFraction * 100) / 100)
+        : (isReprocessMode ? inspectQty : fullQty);
+      const actualReject = isGrnCompleted
+        ? (lines.length === 1 ? recordedRejectTotal : Math.round(recordedRejectTotal * lineFraction * 100) / 100)
+        : 0;
+      const actualReprocess = isGrnCompleted
+        ? (lines.length === 1 ? recordedReprocessTotal : Math.round(recordedReprocessTotal * lineFraction * 100) / 100)
+        : 0;
+      const actualSample = isGrnCompleted
+        ? (lines.length === 1 ? recordedSampleTotal : Math.round(recordedSampleTotal * lineFraction * 100) / 100)
+        : 0;
+
+      return {
+        id: line.id || `line-${idx}`,
+        lineId: line.id,
+        batchCode,
+        lotNumber,
+        itemName: line.itemName || line.item || 'Grey Fabric',
+        quantity: inspectQty,
+        currentLocation: location,
+        qcStatus: status,
+        disposition: isReprocessMode ? 'Passed' : (isApproved ? 'Passed' : isRejected ? 'Rejected' : 'Passed'),
+        inspection: {
+          good: actualGood,
+          reprocess: actualReprocess,
+          reject: actualReject,
+          sample: actualSample,
+          isInspected: isReprocessMode || isGrnCompleted,
+        },
+      };
     });
 
-    setTakas(
-      grnTakas.map((t) => {
-        const len = Number(t.receivedQty || t.received_quantity || t.availableQty || 0);
-        const isPassed = t.qcStatus === 'Passed';
-        const isRejected = t.qcStatus === 'Rejected';
-        return {
-          ...t,
-          disposition: isPassed ? 'Passed' : isRejected ? 'Rejected' : (t.disposition || 'Passed'),
-          inspection: t.inspection || {
-            good: isRejected ? 0 : len,
-            reprocess: 0,
-            reject: isRejected ? len : 0,
-            sample: 0,
-            isInspected: isPassed || isRejected,
-          },
-        };
-      })
-    );
-  }, [currentGrn, allLots]);
+    setBatches(batchRows);
+  }, [currentGrn, isReprocessMode, reprocessPendingMtr, currentGrnQcStatus, effectiveGrnStatus, currentGrnMeta, grnReceivedMeters, po]);
 
-  const takaTotalMeters = useMemo(() => {
-    return takas.reduce((s, t) => s + Number(t.receivedQty || t.received_quantity || t.availableQty || 0), 0);
-  }, [takas]);
+  const batchTotalMeters = useMemo(() => {
+    return batches.reduce((s, b) => s + Number(b.quantity || 0), 0);
+  }, [batches]);
 
   const inspectEligibleQty = useMemo(() => {
-    if (!activeInspectTaka) return 0;
-    return Number(activeInspectTaka.receivedQty || activeInspectTaka.received_quantity || activeInspectTaka.availableQty || 0);
-  }, [activeInspectTaka]);
+    if (!activeInspectBatch) return 0;
+    return Number(activeInspectBatch.quantity || 0);
+  }, [activeInspectBatch]);
 
   const inspectTotalAllocated = useMemo(() => {
     const g = parseFloat(inspectValues.good) || 0;
@@ -203,22 +278,21 @@ export function GreyQcInlineSlide({ po, initialReceiptId, onClose, onQcSaved, on
     });
   };
 
-  const handleOpenInspectModal = (taka) => {
-    const len = Number(taka.receivedQty || taka.received_quantity || taka.availableQty || 0);
-    setActiveInspectTaka(taka);
-    if (taka.inspection?.isInspected) {
+  const handleOpenInspectModal = (batch) => {
+    setActiveInspectBatch(batch);
+    if (batch.inspection?.isInspected) {
       setInspectValues({
-        good: taka.inspection.good ?? 0,
-        reprocess: taka.inspection.reprocess ?? 0,
-        reject: taka.inspection.reject ?? 0,
-        sample: taka.inspection.sample ?? 0,
+        good: batch.inspection.good ?? 0,
+        reprocess: batch.inspection.reprocess ?? 0,
+        reject: batch.inspection.reject ?? 0,
+        sample: batch.inspection.sample ?? 0,
       });
     } else {
-      const isRej = taka.disposition === 'Rejected';
+      const isRej = batch.disposition === 'Rejected';
       setInspectValues({
-        good: isRej ? 0 : len,
+        good: isRej ? 0 : batch.quantity,
         reprocess: 0,
-        reject: isRej ? len : 0,
+        reject: isRej ? batch.quantity : 0,
         sample: 0,
       });
     }
@@ -226,7 +300,7 @@ export function GreyQcInlineSlide({ po, initialReceiptId, onClose, onQcSaved, on
   };
 
   const handleSaveInspectAllocation = () => {
-    if (!activeInspectTaka) return;
+    if (!activeInspectBatch) return;
     const g = parseFloat(inspectValues.good) || 0;
     const rp = parseFloat(inspectValues.reprocess) || 0;
     const rj = parseFloat(inspectValues.reject) || 0;
@@ -240,24 +314,35 @@ export function GreyQcInlineSlide({ po, initialReceiptId, onClose, onQcSaved, on
     const total = Math.round((g + rp + rj + sm) * 10000) / 10000;
     if (total > inspectEligibleQty + 0.001) {
       setInspectValidationError(
-        `Total allocated (${numIN(total)} m) exceeds eligible length (${numIN(inspectEligibleQty)} m).`
+        `Total allocated (${numIN(total)} m) exceeds batch quantity (${numIN(inspectEligibleQty)} m).`
       );
       return;
     }
 
-    setTakas((prev) =>
-      prev.map((t) => {
-        if (t.id === activeInspectTaka.id) {
-          const len = Number(t.receivedQty || t.received_quantity || t.availableQty || 0);
+    setBatches((prev) =>
+      prev.map((b) => {
+        if (b.id === activeInspectBatch.id) {
+          const len = Number(b.quantity || 0);
           let disp = 'Passed';
-          if (rj === len) disp = 'Rejected';
-          else if (g === len) disp = 'Passed';
-          else if (rp === len) disp = 'Reprocess';
-          else disp = 'Inspected';
+          let st = 'Passed';
+          if (rj === len) {
+            disp = 'Rejected';
+            st = 'Rejected';
+          } else if (g === len) {
+            disp = 'Passed';
+            st = 'Passed';
+          } else if (rp === len) {
+            disp = 'Reprocess';
+            st = 'Reprocess';
+          } else {
+            disp = 'Partially Passed';
+            st = 'Partially Passed';
+          }
 
           return {
-            ...t,
+            ...b,
             disposition: disp,
+            qcStatus: st,
             inspection: {
               good: g,
               reprocess: rp,
@@ -267,92 +352,55 @@ export function GreyQcInlineSlide({ po, initialReceiptId, onClose, onQcSaved, on
             },
           };
         }
-        return t;
+        return b;
       })
     );
 
-    setActiveInspectTaka(null);
+    setActiveInspectBatch(null);
   };
 
-  const duplicateRollNumbers = useMemo(() => {
-    const counts = {};
-    const duplicates = [];
-    takas.forEach((t, idx) => {
-      const rollNum = String(t.takaRoll || t.taka_number || idx + 1).trim();
-      counts[rollNum] = (counts[rollNum] || 0) + 1;
-      if (counts[rollNum] === 2) {
-        duplicates.push(rollNum);
-      }
-    });
-    return duplicates;
-  }, [takas]);
-
-  const quantityDiscrepancy = useMemo(() => {
-    if (!currentGrn) return 0;
-    return Math.round((grnReceivedMeters - takaTotalMeters) * 10000) / 10000;
-  }, [grnReceivedMeters, takaTotalMeters]);
-
-  const isQuantityMismatch = Math.abs(quantityDiscrepancy) > 0.01;
-  const isDuplicateDetected = duplicateRollNumbers.length > 0;
-  const isGrnAlreadyCompleted = currentGrn && currentGrn.qc_status && currentGrn.qc_status !== 'Pending';
+  const isGrnAlreadyCompleted = !isReprocessMode && Boolean(currentGrn && currentGrnQcStatus && currentGrnQcStatus !== 'Pending');
 
   const stats = useMemo(() => {
-    const totalTakas = takas.length;
+    const totalBatches = batches.length;
     let passedMeters = 0;
     let rejectedMeters = 0;
     let reprocessMeters = 0;
     let sampleMeters = 0;
-    let passedCount = 0;
-    let rejectedCount = 0;
 
-    takas.forEach((t) => {
-      const len = Number(t.receivedQty || t.received_quantity || t.availableQty || 0);
-      if (t.inspection?.isInspected) {
-        const g = Number(t.inspection.good || 0);
-        const rp = Number(t.inspection.reprocess || 0);
-        const rj = Number(t.inspection.reject || 0);
-        const sm = Number(t.inspection.sample || 0);
-        passedMeters += g;
-        reprocessMeters += rp;
-        rejectedMeters += rj;
-        sampleMeters += sm;
-        if (g > 0 || sm > 0) passedCount += 1;
-        if (rj > 0) rejectedCount += 1;
-      } else if (t.disposition === 'Rejected') {
+    batches.forEach((b) => {
+      const len = Number(b.quantity || 0);
+      if (b.inspection?.isInspected) {
+        passedMeters += Number(b.inspection.good || 0);
+        reprocessMeters += Number(b.inspection.reprocess || 0);
+        rejectedMeters += Number(b.inspection.reject || 0);
+        sampleMeters += Number(b.inspection.sample || 0);
+      } else if (b.disposition === 'Rejected') {
         rejectedMeters += len;
-        rejectedCount += 1;
       } else {
         passedMeters += len;
-        passedCount += 1;
       }
     });
 
-    const isAllQcDone =
-      totalTakas > 0 &&
-      takas.every((t) => t.qcStatus === 'Passed' || t.qcStatus === 'Rejected' || t.inspection?.isInspected);
-
     return {
-      totalTakas,
-      totalMeters: takaTotalMeters,
-      passedCount,
-      passedMeters: Math.round(passedMeters * 10000) / 10000,
-      rejectedCount,
+      totalBatches,
+      totalMeters: batchTotalMeters,
+      goodMeters: Math.round(passedMeters * 10000) / 10000,
       rejectedMeters: Math.round(rejectedMeters * 10000) / 10000,
       reprocessMeters: Math.round(reprocessMeters * 10000) / 10000,
       sampleMeters: Math.round(sampleMeters * 10000) / 10000,
-      goodMeters: Math.round(passedMeters * 10000) / 10000,
-      isAllQcDone,
     };
-  }, [takas, takaTotalMeters]);
+  }, [batches, batchTotalMeters]);
 
   const handleSetAllDisposition = (verdict) => {
-    setTakas((prev) =>
-      prev.map((t) => {
-        const len = Number(t.receivedQty || t.received_quantity || t.availableQty || 0);
+    setBatches((prev) =>
+      prev.map((b) => {
+        const len = Number(b.quantity || 0);
         const isRej = verdict === 'Rejected';
         return {
-          ...t,
+          ...b,
           disposition: verdict,
+          qcStatus: verdict,
           inspection: {
             good: isRej ? 0 : len,
             reprocess: 0,
@@ -361,29 +409,6 @@ export function GreyQcInlineSlide({ po, initialReceiptId, onClose, onQcSaved, on
             isInspected: true,
           },
         };
-      })
-    );
-  };
-
-  const handleUpdateDisposition = (takaId, verdict) => {
-    setTakas((prev) =>
-      prev.map((t) => {
-        if (t.id === takaId) {
-          const len = Number(t.receivedQty || t.received_quantity || t.availableQty || 0);
-          const isRej = verdict === 'Rejected';
-          return {
-            ...t,
-            disposition: verdict,
-            inspection: {
-              good: isRej ? 0 : len,
-              reprocess: 0,
-              reject: isRej ? len : 0,
-              sample: 0,
-              isInspected: true,
-            },
-          };
-        }
-        return t;
       })
     );
   };
@@ -403,20 +428,8 @@ export function GreyQcInlineSlide({ po, initialReceiptId, onClose, onQcSaved, on
       return;
     }
 
-    if (takas.length === 0) {
-      setErrorMsg('No takas found for the selected GRN. Please create takas first.');
-      return;
-    }
-
-    if (isQuantityMismatch) {
-      setErrorMsg(
-        `Quantity discrepancy detected: GRN received quantity is ${numIN(grnReceivedMeters)} m, but allocated takas total ${numIN(takaTotalMeters)} m (Discrepancy: ${numIN(Math.abs(quantityDiscrepancy))} m). Final QC submission is blocked until corrected.`
-      );
-      return;
-    }
-
-    if (isDuplicateDetected) {
-      setErrorMsg(`Duplicate taka roll numbers detected: ${duplicateRollNumbers.join(', ')}. Final QC submission is blocked.`);
+    if (batches.length === 0) {
+      setErrorMsg('No batches found for the selected GRN.');
       return;
     }
 
@@ -425,31 +438,27 @@ export function GreyQcInlineSlide({ po, initialReceiptId, onClose, onQcSaved, on
 
       const payload = {
         receiptId: currentGrn.id,
+        isReprocess: isReprocessMode,
         goodQty: stats.goodMeters,
-        secondQty: stats.sampleMeters,
         sampleQty: stats.sampleMeters,
         reprocessQty: stats.reprocessMeters,
         rejectQty: stats.rejectedMeters,
         holdQty: 0,
         remarks:
           remarks ||
-          `QC inspection completed by ${inspectorName} for ${currentGrn.grn_number}. Good: ${numIN(stats.goodMeters)} m, Reprocess: ${numIN(stats.reprocessMeters)} m, Reject: ${numIN(stats.rejectedMeters)} m, Sample: ${numIN(stats.sampleMeters)} m.`,
-        takas: takas.map((t) => {
-          const len = Number(t.receivedQty || t.received_quantity || 0);
-          const insp = t.inspection?.isInspected ? t.inspection : null;
+          (isReprocessMode
+            ? `Reprocess QC inspection completed by ${inspectorName} for ${currentGrn.grn_number}. Accepted: ${numIN(stats.goodMeters)} m, Reject: ${numIN(stats.rejectedMeters)} m.`
+            : `Batch QC inspection completed by ${inspectorName} for ${currentGrn.grn_number}. Accepted: ${numIN(stats.goodMeters)} m, Reprocess: ${numIN(stats.reprocessMeters)} m, Reject: ${numIN(stats.rejectedMeters)} m.`),
+        lines: batches.map((b) => {
+          const len = Number(b.quantity || 0);
+          const insp = b.inspection?.isInspected ? b.inspection : null;
           return {
-            id: t.id,
-            takaId: t.takaId || t.id,
-            barcode: t.barcode,
-            takaRoll: t.takaRoll || t.taka_number,
-            receivedQty: len,
-            disposition: t.disposition,
-            goodQty: insp ? Number(insp.good || 0) : (t.disposition === 'Rejected' ? 0 : len),
+            lineId: b.lineId,
+            goodQty: insp ? Number(insp.good || 0) : (b.disposition === 'Rejected' ? 0 : len),
             reprocessQty: insp ? Number(insp.reprocess || 0) : 0,
-            rejectQty: insp ? Number(insp.reject || 0) : (t.disposition === 'Rejected' ? len : 0),
-            secondQty: insp ? Number(insp.sample || 0) : 0,
+            rejectQty: insp ? Number(insp.reject || 0) : (b.disposition === 'Rejected' ? len : 0),
             sampleQty: insp ? Number(insp.sample || 0) : 0,
-            inspection: insp,
+            holdQty: 0,
           };
         }),
       };
@@ -457,27 +466,22 @@ export function GreyQcInlineSlide({ po, initialReceiptId, onClose, onQcSaved, on
       const res = await api.post('/inventory/qc/complete/', payload);
 
       setSuccessMsg(
-        `QC inspection completed successfully! Good: ${numIN(stats.goodMeters)} m posted to warehouse stock. Reprocess: ${numIN(stats.reprocessMeters)} m, Quarantined/Reject: ${numIN(stats.rejectedMeters)} m, Sample: ${numIN(stats.sampleMeters)} m.`
+        `Batch QC completed successfully! Accepted: ${numIN(stats.goodMeters)} m posted to warehouse stock. Sample: ${numIN(stats.sampleMeters)} m, Reprocess: ${numIN(stats.reprocessMeters)} m, Quarantined/Reject: ${numIN(stats.rejectedMeters)} m.`
       );
-      if (showToast) {
-        showToast(`QC completed for ${currentGrn.grn_number}: ${stats.passedCount} accepted, ${stats.rejectedCount} rejected.`, 'success');
-      }
-      if (refreshCollections) {
-        refreshCollections(['purchaseOrders', 'inventory']);
-      }
-      if (onQcSaved) {
-        onQcSaved();
+
+      if (typeof showToast === 'function') {
+        showToast(`QC completed for ${currentGrn.grn_number}!`, 'success');
       }
 
+      if (typeof refreshCollections === 'function') {
+        refreshCollections(['purchaseOrders', 'inventoryStock', 'batches']);
+      }
+
+      onQcSaved?.(res);
       await loadData();
     } catch (err) {
       console.error('Failed to submit QC:', err);
-      const data = err.response?.data;
-      const msg =
-        data?.detail ||
-        (data?.field_errors && Object.values(data.field_errors).flat().join(' ')) ||
-        err.message ||
-        'Failed to complete QC inspection.';
+      const msg = err?.data?.message || err?.message || 'Failed to complete QC inspection.';
       setErrorMsg(msg);
     } finally {
       setSubmitting(false);
@@ -485,20 +489,24 @@ export function GreyQcInlineSlide({ po, initialReceiptId, onClose, onQcSaved, on
   };
 
   return (
-    <div className="rounded-2xl border-2 border-indigo-400/80 bg-gradient-to-b from-indigo-50/60 via-white to-white p-4 sm:p-5 shadow-md space-y-4 animate-in fade-in slide-in-from-top-3 duration-300">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-indigo-100">
+    <div className="flex flex-col gap-4 text-xs font-sans text-slate-800">
+      {/* ── Slide Header ── */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-indigo-200/80 gap-2">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-600 text-white flex items-center justify-center shadow-xs">
-            <ShieldCheck size={18} />
+          <div className="p-2 bg-indigo-50 border border-indigo-200 text-indigo-700 rounded-xl shadow-2xs">
+            <ShieldCheck size={20} />
           </div>
           <div>
             <div className="flex items-center gap-2">
+              <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 bg-indigo-100/70 text-indigo-800 rounded-md">
+                Stage 4 • Inward Quality Control
+              </span>
               <h3 className="text-sm font-extrabold text-slate-900">
-                Grey Fabric Quality Control (QC Inspection)
+                {isReprocessMode ? 'Reprocess Quality Control (QC Inspection)' : 'Batch Quality Control (QC Inspection)'}
               </h3>
             </div>
             <p className="text-[11px] text-slate-500 font-medium mt-0.5">
-              Inspect unique takas for the selected GRN, assign Grade A or Reject, and post approved stock to warehouse.
+              Inspect fabric batches for the selected GRN, assign Accepted, Reprocess or Reject quantities, and post approved stock to warehouse.
             </p>
           </div>
         </div>
@@ -509,7 +517,7 @@ export function GreyQcInlineSlide({ po, initialReceiptId, onClose, onQcSaved, on
             onClick={loadData}
             disabled={loading}
             className="p-1.5 text-slate-500 hover:text-slate-800 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 shadow-2xs cursor-pointer"
-            title="Refresh takas"
+            title="Refresh batches"
           >
             <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
           </button>
@@ -525,6 +533,7 @@ export function GreyQcInlineSlide({ po, initialReceiptId, onClose, onQcSaved, on
         </div>
       </div>
 
+      {/* ── Multiple GRN Picker (if PO has multiple receipts) ── */}
       {grnList.length > 1 && (
         <div className="flex flex-wrap items-center gap-2 p-2.5 bg-indigo-50/50 border border-indigo-200 rounded-xl">
           <span className="text-[11px] font-extrabold text-indigo-900 flex items-center gap-1.5">
@@ -534,6 +543,12 @@ export function GreyQcInlineSlide({ po, initialReceiptId, onClose, onQcSaved, on
             {grnList.map((g) => {
               const isSelected = String(g.id) === String(selectedGrnId);
               const gStatus = g.qc_status || g.qcStatus || 'Pending';
+              let gMeta = {};
+              try {
+                gMeta = typeof g.qc_note === 'string' ? JSON.parse(g.qc_note || '{}') : (g.qc_note || {});
+              } catch {}
+              const gRp = Number(gMeta.reprocessQty || gMeta.cumulative?.reprocess || 0);
+              const effectiveGStatus = (gStatus === 'Approved' || gStatus === 'Passed') ? 'Passed' : (gStatus === 'Partially Approved' && gRp <= 0 ? 'Passed' : gStatus === 'Partially Approved' ? 'Reprocess' : gStatus);
               return (
                 <button
                   key={g.id}
@@ -547,13 +562,13 @@ export function GreyQcInlineSlide({ po, initialReceiptId, onClose, onQcSaved, on
                 >
                   <span>{g.grn_number || g.grnNumber}</span>
                   <span className={`text-[9.5px] px-1.5 py-0.2 rounded font-semibold ${
-                    gStatus === 'Approved'
+                    effectiveGStatus === 'Approved' || effectiveGStatus === 'Passed'
                       ? 'bg-emerald-100 text-emerald-800'
-                      : gStatus === 'Rejected'
+                      : effectiveGStatus === 'Rejected'
                       ? 'bg-rose-100 text-rose-800'
                       : 'bg-amber-100 text-amber-800'
                   }`}>
-                    {gStatus}
+                    {effectiveGStatus}
                   </span>
                 </button>
               );
@@ -562,38 +577,34 @@ export function GreyQcInlineSlide({ po, initialReceiptId, onClose, onQcSaved, on
         </div>
       )}
 
-      <div className="grid grid-cols-2 sm:grid-cols-6 gap-2">
+      {/* ── Metric KPI Cards ── */}
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
         <div className="p-2.5 bg-white border border-slate-200 rounded-xl shadow-2xs">
-          <span className="text-[9.5px] font-bold text-slate-400 uppercase tracking-wider block">GRN Received</span>
+          <span className="text-[9.5px] font-bold text-slate-400 uppercase tracking-wider block">Received Quantity</span>
           <p className="text-sm font-extrabold font-mono text-slate-800 mt-0.5">{numIN(grnReceivedMeters)} m</p>
           <span className="text-[10px] text-slate-500">{currentGrn?.grn_number || 'GRN'}</span>
         </div>
-        <div className="p-2.5 bg-white border border-slate-200 rounded-xl shadow-2xs">
-          <span className="text-[9.5px] font-bold text-slate-400 uppercase tracking-wider block">Allocated Takas</span>
-          <p className="text-sm font-extrabold font-mono text-indigo-700 mt-0.5">{numIN(takaTotalMeters)} m</p>
-          <span className="text-[10px] text-slate-500">{stats.totalTakas} unique rolls</span>
-        </div>
         <div className="p-2.5 bg-emerald-50/70 border border-emerald-200 rounded-xl shadow-2xs">
-          <span className="text-[9.5px] font-bold text-emerald-700 uppercase tracking-wider block">QC-Accepted</span>
-          <p className="text-sm font-extrabold font-mono text-emerald-800 mt-0.5">{numIN(stats.passedMeters)} m</p>
-          <span className="text-[10px] text-emerald-600 font-semibold">{stats.passedCount} rolls passed</span>
+          <span className="text-[9.5px] font-bold text-emerald-700 uppercase tracking-wider block">QC Accepted</span>
+          <p className="text-sm font-extrabold font-mono text-emerald-800 mt-0.5">{numIN(stats.goodMeters)} m</p>
+          <span className="text-[10px] text-emerald-600 font-semibold">Available for Stock</span>
         </div>
         <div className="p-2.5 bg-rose-50/70 border border-rose-200 rounded-xl shadow-2xs">
-          <span className="text-[9.5px] font-bold text-rose-700 uppercase tracking-wider block">QC-Rejected</span>
+          <span className="text-[9.5px] font-bold text-rose-700 uppercase tracking-wider block">QC Rejected</span>
           <p className="text-sm font-extrabold font-mono text-rose-800 mt-0.5">{numIN(stats.rejectedMeters)} m</p>
-          <span className="text-[10px] text-rose-600 font-semibold">{stats.rejectedCount} rolls rejected</span>
+          <span className="text-[10px] text-rose-600 font-semibold">Quarantined / Defect</span>
         </div>
-        <div className="p-2.5 bg-teal-50/70 border border-teal-200 rounded-xl shadow-2xs">
-          <span className="text-[9.5px] font-bold text-teal-700 uppercase tracking-wider block">Posted to Stock</span>
-          <p className="text-sm font-extrabold font-mono text-teal-800 mt-0.5">{numIN(stats.passedMeters)} m</p>
-          <span className="text-[10px] text-teal-600 font-semibold">Accepted only</span>
+        <div className="p-2.5 bg-amber-50/70 border border-amber-200 rounded-xl shadow-2xs">
+          <span className="text-[9.5px] font-bold text-amber-700 uppercase tracking-wider block">Reprocess Qty</span>
+          <p className="text-sm font-extrabold font-mono text-amber-800 mt-0.5">{numIN(stats.reprocessMeters)} m</p>
+          <span className="text-[10px] text-amber-600 font-semibold">Rework Eligible</span>
         </div>
         <div className="p-2.5 bg-purple-50/70 border border-purple-200 rounded-xl shadow-2xs">
-          <span className="text-[9.5px] font-bold text-purple-700 uppercase tracking-wider block">GRN QC State</span>
+          <span className="text-[9.5px] font-bold text-purple-700 uppercase tracking-wider block">GRN QC Status</span>
           <p className="text-xs font-black text-purple-900 mt-1 flex items-center gap-1">
             {isGrnAlreadyCompleted ? (
               <span className="text-emerald-700 flex items-center gap-1">
-                <CheckCircle2 size={12} /> {currentGrn.qc_status}
+                <CheckCircle2 size={12} /> {effectiveGrnStatus}
               </span>
             ) : (
               <span className="text-amber-700 flex items-center gap-1">
@@ -601,48 +612,39 @@ export function GreyQcInlineSlide({ po, initialReceiptId, onClose, onQcSaved, on
               </span>
             )}
           </p>
-          <span className="text-[9.5px] text-purple-600 truncate block">WH Destination</span>
+          <span className="text-[9.5px] text-purple-600 truncate block">
+            {isGrnAlreadyCompleted ? 'Inspection Completed' : 'Ready for Inspection'}
+          </span>
         </div>
       </div>
 
-      {isQuantityMismatch && (
-        <div className="p-3 bg-amber-50 border border-amber-300 text-amber-900 rounded-xl text-xs flex items-start gap-2 shadow-2xs">
-          <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+      {isReprocessMode ? (
+        <div className="p-3 bg-amber-50 border border-amber-200 text-amber-900 rounded-xl text-xs flex items-start gap-2 shadow-2xs">
+          <RefreshCw className="w-4 h-4 text-amber-600 shrink-0 mt-0.5 animate-spin" style={{ animationDuration: '6s' }} />
           <div>
-            <span className="font-extrabold block">Reconciliation Discrepancy Detected:</span>
+            <span className="font-extrabold block text-amber-950">Reprocess Quality Inspection:</span>
             <span>
-              GRN received quantity is <strong>{numIN(grnReceivedMeters)} m</strong>, but allocated takas total <strong>{numIN(takaTotalMeters)} m</strong> (difference: <strong>{numIN(Math.abs(quantityDiscrepancy))} m</strong>).
-              Final QC submission is blocked until taka allocations reconcile exactly with the received GRN quantity.
+              Inspecting <strong>{numIN(reprocessPendingMtr || stats.totalMeters)} m</strong> of fabric held in <strong>SYS-REPROCESS (Reprocess Stock)</strong>.
+              {currentGrnMeta.goodQty ? ` (${numIN(currentGrnMeta.goodQty)} m previously approved and released to godown). ` : ' '}
+              Passed quantity will be moved directly to warehouse godown stock.
             </span>
           </div>
         </div>
-      )}
-
-      {isDuplicateDetected && (
-        <div className="p-3 bg-rose-50 border border-rose-300 text-rose-900 rounded-xl text-xs flex items-start gap-2 shadow-2xs">
-          <Ban className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
-          <div>
-            <span className="font-extrabold block">Duplicate Taka Roll Numbers Detected:</span>
-            <span>
-              Duplicate rolls: <strong>{duplicateRollNumbers.join(', ')}</strong>. Every roll within a lot must have a unique identifier. Final QC submission is blocked.
-            </span>
-          </div>
-        </div>
-      )}
-
-      {isGrnAlreadyCompleted && (
+      ) : isGrnAlreadyCompleted ? (
         <div className="p-3 bg-blue-50 border border-blue-200 text-blue-900 rounded-xl text-xs flex items-start gap-2 shadow-2xs">
           <Info className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
           <div>
             <span className="font-extrabold block">QC Inspection Already Completed:</span>
             <span>
-              {currentGrn.grn_number} was already inspected with verdict <strong>{currentGrn.qc_status}</strong>. Takas have already been posted to inventory and duplicate QC submissions are prevented.
+              {currentGrn.grn_number} has already been inspected with verdict <strong>{effectiveGrnStatus === 'Approved' ? 'QC Passed' : effectiveGrnStatus === 'Passed' ? 'QC Passed' : effectiveGrnStatus}</strong>. Material has been posted to inventory stock.
             </span>
           </div>
         </div>
-      )}
+      ) : null}
 
+      {/* ── Main QC Inspection Form & Table ── */}
       <form onSubmit={handleCompleteQc} className="space-y-4">
+        {/* Quick Toolbar */}
         <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 flex flex-wrap items-center justify-between gap-3 text-xs">
           <div className="flex flex-wrap items-center gap-3">
             <div>
@@ -667,7 +669,7 @@ export function GreyQcInlineSlide({ po, initialReceiptId, onClose, onQcSaved, on
               <label className="block text-[10px] font-bold text-slate-500 uppercase">Inspection Notes</label>
               <input
                 type="text"
-                placeholder="4-Point inspection passed, zero major defects"
+                placeholder="Fabric inspection notes / defect observations"
                 value={remarks}
                 onChange={(e) => setRemarks(e.target.value)}
                 className="px-2 py-1 bg-white border border-slate-300 rounded text-slate-800 text-xs w-64"
@@ -698,97 +700,69 @@ export function GreyQcInlineSlide({ po, initialReceiptId, onClose, onQcSaved, on
           </div>
         </div>
 
-        <div className="border border-slate-200 rounded-xl overflow-hidden max-h-64 overflow-y-auto">
+        {/* ── Strict Batch-Wise QC Table ── */}
+        {/* Format required: Batch Number | Lot Number | Quantity | Current Location | QC Status | Action */}
+        <div className="border border-slate-200 rounded-xl overflow-hidden shadow-2xs">
           <table className="w-full text-left text-xs">
             <thead className="bg-slate-50 font-bold text-slate-600 border-b border-slate-200 uppercase text-[10px] sticky top-0 z-10">
               <tr>
-                <th className="py-2 px-3">Barcode / Taka ID</th>
-                <th className="py-2 px-3">Lot #</th>
-                <th className="py-2 px-3">Roll #</th>
-                <th className="py-2 px-3 text-right">Length (m)</th>
-                <th className="py-2 px-3">Current Location</th>
-                <th className="py-2 px-3 text-center">QC Disposition</th>
-                <th className="py-2 px-3 text-right">Action</th>
+                <th className="py-2.5 px-3">Batch Number</th>
+                <th className="py-2.5 px-3">Lot Number</th>
+                <th className="py-2.5 px-3 text-right">Quantity (m)</th>
+                <th className="py-2.5 px-3">Current Location</th>
+                <th className="py-2.5 px-3 text-center">QC Status</th>
+                <th className="py-2.5 px-3 text-right">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-slate-700">
-              {takas.map((t, idx) => {
-                const len = Number(t.receivedQty || t.received_quantity || t.availableQty || 0);
-                const isInspected = Boolean(t.inspection?.isInspected);
-                const isPassed = t.disposition === 'Passed' && (!isInspected || t.inspection?.good === len);
-                const isRejected = t.disposition === 'Rejected' && (!isInspected || t.inspection?.reject === len);
+              {batches.map((b) => {
+                const isInspected = Boolean(b.inspection?.isInspected);
+                const hasRejected = Number(b.inspection?.reject || 0) > 0;
+                const hasReprocess = Number(b.inspection?.reprocess || 0) > 0;
+                const hasGood = Number(b.inspection?.good || 0) > 0;
 
                 return (
-                  <tr key={t.id || idx} className="hover:bg-slate-50/70 font-mono text-[11px]">
-                    <td className="py-1.5 px-3 font-bold text-indigo-700 flex items-center gap-1">
-                      <QrCode size={12} className="text-indigo-500" />
-                      {t.takaId || t.barcode || t.id}
+                  <tr key={b.id} className="hover:bg-slate-50/70 font-mono text-[11px]">
+                    <td className="py-2 px-3 font-bold text-blue-700">
+                      {b.batchCode}
                     </td>
-                    <td className="py-1.5 px-3 font-semibold text-slate-800">{t.lotNo || t.lot_number || '-'}</td>
-                    <td className="py-1.5 px-3 font-bold">#{t.takaRoll || t.taka_number || idx + 1}</td>
-                    <td className="py-1.5 px-3 text-right font-extrabold text-blue-700">{numIN(len)} m</td>
-                    <td className="py-1.5 px-3 text-slate-500 font-sans text-[10.5px]">
-                      {t.qcStatus === 'Passed' ? 'WH-MAIN (Godown)' : t.qcStatus === 'Rejected' ? 'SYS-REJECT' : (t.location || 'SYS-QC-HOLD')}
+                    <td className="py-2 px-3 font-semibold text-slate-800">
+                      {b.lotNumber}
                     </td>
-                    <td className="py-1.5 px-3 text-center">
-                      {isInspected && !isPassed && !isRejected ? (
-                        <div className="inline-flex flex-wrap items-center justify-center gap-1 font-sans text-[10px]">
-                          {Number(t.inspection.good) > 0 && (
-                            <span className="px-1.5 py-0.5 rounded font-bold bg-emerald-100 text-emerald-800">
-                              Good: {numIN(t.inspection.good)}m
-                            </span>
-                          )}
-                          {Number(t.inspection.reprocess) > 0 && (
-                            <span className="px-1.5 py-0.5 rounded font-bold bg-amber-100 text-amber-800">
-                              Reprocess: {numIN(t.inspection.reprocess)}m
-                            </span>
-                          )}
-                          {Number(t.inspection.reject) > 0 && (
-                            <span className="px-1.5 py-0.5 rounded font-bold bg-rose-100 text-rose-800">
-                              Reject: {numIN(t.inspection.reject)}m
-                            </span>
-                          )}
-                          {Number(t.inspection.sample) > 0 && (
-                            <span className="px-1.5 py-0.5 rounded font-bold bg-blue-100 text-blue-800">
-                              Sample: {numIN(t.inspection.sample)}m
-                            </span>
-                          )}
-                        </div>
-                      ) : (
-                        <div className="inline-flex rounded-lg border border-slate-200 p-0.5 bg-white">
-                          <button
-                            type="button"
-                            disabled={isGrnAlreadyCompleted}
-                            onClick={() => handleUpdateDisposition(t.id, 'Passed')}
-                            className={`px-2.5 py-0.5 text-[10.5px] font-bold rounded-md transition-colors cursor-pointer ${
-                              isPassed
-                                ? 'bg-emerald-600 text-white shadow-2xs'
-                                : 'text-slate-600 hover:text-emerald-700'
-                            }`}
-                          >
-                            Pass (Grade A)
-                          </button>
-                          <button
-                            type="button"
-                            disabled={isGrnAlreadyCompleted}
-                            onClick={() => handleUpdateDisposition(t.id, 'Rejected')}
-                            className={`px-2.5 py-0.5 text-[10.5px] font-bold rounded-md transition-colors cursor-pointer ${
-                              isRejected
-                                ? 'bg-rose-600 text-white shadow-2xs'
-                                : 'text-slate-600 hover:text-rose-700'
-                            }`}
-                          >
-                            Reject
-                          </button>
+                    <td className="py-2 px-3 text-right font-extrabold text-slate-900">
+                      {numIN(b.quantity)} m
+                    </td>
+                    <td className="py-2 px-3 text-slate-600 font-sans text-[10.5px]">
+                      {b.currentLocation}
+                    </td>
+                    <td className="py-2 px-3 text-center">
+                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-bold text-[10px] ${
+                        b.qcStatus === 'Passed'
+                          ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                          : b.qcStatus === 'Rejected'
+                          ? 'bg-rose-100 text-rose-800 border border-rose-200'
+                          : b.qcStatus === 'Reprocess'
+                          ? 'bg-amber-100 text-amber-800 border border-amber-200'
+                          : b.qcStatus === 'Partially Passed'
+                          ? 'bg-indigo-100 text-indigo-800 border border-indigo-200'
+                          : 'bg-amber-50 text-amber-700 border border-amber-200'
+                      }`}>
+                        {b.qcStatus}
+                      </span>
+                      {isInspected && (hasRejected || hasReprocess) && (
+                        <div className="text-[9.5px] font-sans text-slate-500 mt-0.5">
+                          {hasGood && <span className="text-emerald-700 font-bold">{numIN(b.inspection.good)}m Good </span>}
+                          {hasRejected && <span className="text-rose-700 font-bold">{numIN(b.inspection.reject)}m Rej </span>}
+                          {hasReprocess && <span className="text-amber-700 font-bold">{numIN(b.inspection.reprocess)}m Reprocess</span>}
                         </div>
                       )}
                     </td>
-                    <td className="py-1.5 px-3 text-right">
+                    <td className="py-2 px-3 text-right">
                       <button
                         type="button"
                         disabled={isGrnAlreadyCompleted}
-                        onClick={() => handleOpenInspectModal(t)}
-                        className="px-2.5 py-1 text-[11px] font-bold rounded-lg bg-blue-600 hover:bg-blue-700 text-white shadow-2xs transition-colors cursor-pointer disabled:opacity-50"
+                        onClick={() => handleOpenInspectModal(b)}
+                        className="px-3 py-1 text-[11px] font-bold rounded-lg bg-blue-600 hover:bg-blue-700 text-white shadow-2xs transition-colors cursor-pointer disabled:opacity-50"
                       >
                         {isInspected ? 'Edit Inspection' : 'Inspect'}
                       </button>
@@ -796,10 +770,10 @@ export function GreyQcInlineSlide({ po, initialReceiptId, onClose, onQcSaved, on
                   </tr>
                 );
               })}
-              {takas.length === 0 && !loading && (
+              {batches.length === 0 && !loading && (
                 <tr>
-                  <td colSpan={7} className="py-6 text-center text-slate-400 font-sans">
-                    No lot/taka rolls created for this GRN yet. Please create takas first.
+                  <td colSpan={6} className="py-8 text-center text-slate-400 font-sans">
+                    No fabric batches found for this goods receipt.
                   </td>
                 </tr>
               )}
@@ -820,18 +794,22 @@ export function GreyQcInlineSlide({ po, initialReceiptId, onClose, onQcSaved, on
           </div>
         )}
 
+        {/* ── Slide Footer Actions ── */}
         <div className="pt-3 border-t border-indigo-200/80 flex flex-wrap sm:flex-nowrap items-center justify-between gap-2 bg-indigo-50/60 -mx-4 -mb-4 sm:-mx-5 sm:-mb-5 p-3 sm:px-5 rounded-b-2xl">
           <div className="flex items-center gap-2">
             {onPrevStep && (
               <button
                 type="button"
-                onClick={() => onPrevStep('lot_taka_creation')}
+                onClick={() => onPrevStep('grn_inward')}
                 className="px-3.5 py-1.5 border border-slate-300 text-slate-700 bg-white hover:bg-slate-100 rounded-lg text-xs font-semibold flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
               >
                 <ArrowLeft size={13} />
-                <span>Previous: Lot / Taka Creation</span>
+                <span>Previous: GRN / Inward</span>
               </button>
             )}
+            <span className="text-[11px] text-slate-500 font-medium hidden md:inline">
+              Batch-Wise QC Inspection
+            </span>
           </div>
 
           <div className="flex items-center gap-2 ml-auto">
@@ -846,8 +824,12 @@ export function GreyQcInlineSlide({ po, initialReceiptId, onClose, onQcSaved, on
             )}
             <button
               type="submit"
-              disabled={submitting || takas.length === 0 || isQuantityMismatch || isDuplicateDetected || isGrnAlreadyCompleted}
-              className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-xs cursor-pointer transition-colors"
+              disabled={submitting || batches.length === 0 || isGrnAlreadyCompleted}
+              className={`px-4 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-xs cursor-pointer transition-colors ${
+                isReprocessMode
+                  ? 'bg-gradient-to-r from-blue-600 via-indigo-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white'
+                  : 'bg-indigo-600 hover:bg-indigo-700 text-white'
+              } disabled:opacity-40 disabled:cursor-not-allowed`}
             >
               {submitting ? (
                 <>
@@ -855,7 +837,7 @@ export function GreyQcInlineSlide({ po, initialReceiptId, onClose, onQcSaved, on
                 </>
               ) : (
                 <>
-                  <FileCheck size={14} /> Submit QC & Post to Stock
+                  <FileCheck size={14} /> {isReprocessMode ? 'Submit Reprocess QC & Release to Stock' : 'Submit QC & Post to Stock'}
                 </>
               )}
             </button>
@@ -873,11 +855,11 @@ export function GreyQcInlineSlide({ po, initialReceiptId, onClose, onQcSaved, on
         </div>
       </form>
 
-      {/* ── Compact Inspect Modal (Good, Reprocess, Bad/Reject, Sample ONLY) ── */}
-      {activeInspectTaka && (
+      {/* ── Direct Batch Inspect Modal ── */}
+      {activeInspectBatch && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-[2px] p-4"
-          onClick={() => setActiveInspectTaka(null)}
+          onClick={() => setActiveInspectBatch(null)}
         >
           <div
             className="w-full max-w-lg rounded-2xl bg-white p-5 shadow-2xl border border-slate-200"
@@ -887,28 +869,28 @@ export function GreyQcInlineSlide({ po, initialReceiptId, onClose, onQcSaved, on
             <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
               <div>
                 <h3 className="text-sm font-bold text-slate-800">
-                  Inspect Taka Roll #{activeInspectTaka.takaRoll || activeInspectTaka.taka_number || 1}
+                  Inspect Batch: {activeInspectBatch.batchCode}
                 </h3>
                 <p className="text-[11px] text-slate-500 mt-0.5">
-                  Eligible Inspection Quantity:{' '}
+                  Lot: <span className="font-semibold text-slate-700">{activeInspectBatch.lotNumber}</span> • Total Quantity:{' '}
                   <span className="font-bold font-mono text-blue-700">{numIN(inspectEligibleQty)} m</span>
                 </p>
               </div>
               <button
                 type="button"
-                onClick={() => setActiveInspectTaka(null)}
+                onClick={() => setActiveInspectBatch(null)}
                 className="text-slate-400 hover:text-slate-600 rounded-lg p-1 transition-colors cursor-pointer"
               >
                 <X size={16} />
               </button>
             </div>
 
-            {/* 4 Category Boxes: Good (Pass), Reprocess, Bad / Reject, Sample */}
+            {/* 4 Category Allocation Boxes */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              {/* Good (Pass) - Subtle Green */}
+              {/* Accepted (Good / Grade A) */}
               <div className="p-3 rounded-xl border border-emerald-200 bg-emerald-50/40 flex flex-col justify-between">
                 <label className="block text-[11px] font-bold text-emerald-800 mb-1.5">
-                  Good (Pass)
+                  Usable Fabric Stock
                 </label>
                 <div className="relative flex items-center">
                   <input
@@ -925,10 +907,10 @@ export function GreyQcInlineSlide({ po, initialReceiptId, onClose, onQcSaved, on
                 </div>
               </div>
 
-              {/* Reprocess - Subtle Orange */}
+              {/* Reprocess */}
               <div className="p-3 rounded-xl border border-amber-200 bg-amber-50/40 flex flex-col justify-between">
                 <label className="block text-[11px] font-bold text-amber-800 mb-1.5">
-                  Reprocess
+                  Reprocess Stock
                 </label>
                 <div className="relative flex items-center">
                   <input
@@ -945,10 +927,10 @@ export function GreyQcInlineSlide({ po, initialReceiptId, onClose, onQcSaved, on
                 </div>
               </div>
 
-              {/* Bad / Reject - Subtle Red */}
+              {/* Rejected */}
               <div className="p-3 rounded-xl border border-rose-200 bg-rose-50/40 flex flex-col justify-between">
                 <label className="block text-[11px] font-bold text-rose-800 mb-1.5">
-                  Bad / Reject
+                  Short Stock Fabric
                 </label>
                 <div className="relative flex items-center">
                   <input
@@ -965,10 +947,10 @@ export function GreyQcInlineSlide({ po, initialReceiptId, onClose, onQcSaved, on
                 </div>
               </div>
 
-              {/* Sample - Subtle Blue */}
+              {/* Sample */}
               <div className="p-3 rounded-xl border border-blue-200 bg-blue-50/40 flex flex-col justify-between">
                 <label className="block text-[11px] font-bold text-blue-800 mb-1.5">
-                  Sample
+                  Sample Fabric Stock
                 </label>
                 <div className="relative flex items-center">
                   <input
@@ -986,7 +968,7 @@ export function GreyQcInlineSlide({ po, initialReceiptId, onClose, onQcSaved, on
               </div>
             </div>
 
-            {/* Validation Feedback & Metres Tracking */}
+            {/* Allocation Feedback */}
             <div className="mt-3 text-[11px] flex items-center justify-between">
               <span
                 className={
@@ -1004,22 +986,47 @@ export function GreyQcInlineSlide({ po, initialReceiptId, onClose, onQcSaved, on
               )}
             </div>
 
-            {/* Bottom Buttons: Cancel and Save ONLY */}
-            <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setActiveInspectTaka(null)}
-                className="px-3.5 py-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold transition-colors cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleSaveInspectAllocation}
-                className="px-4 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-colors shadow-xs cursor-pointer"
-              >
-                Save
-              </button>
+            {/* Quick Actions & Modal Footer */}
+            <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setInspectValues({ good: inspectEligibleQty, reprocess: 0, reject: 0, sample: 0 });
+                    setInspectValidationError('');
+                  }}
+                  className="px-2 py-1 text-[10px] font-bold rounded bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 cursor-pointer"
+                >
+                  Accept All
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setInspectValues({ good: 0, reprocess: 0, reject: inspectEligibleQty, sample: 0 });
+                    setInspectValidationError('');
+                  }}
+                  className="px-2 py-1 text-[10px] font-bold rounded bg-rose-50 text-rose-800 border border-rose-200 hover:bg-rose-100 cursor-pointer"
+                >
+                  Reject All
+                </button>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setActiveInspectBatch(null)}
+                  className="px-3.5 py-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveInspectAllocation}
+                  className="px-4 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-colors shadow-xs cursor-pointer"
+                >
+                  Save
+                </button>
+              </div>
             </div>
           </div>
         </div>

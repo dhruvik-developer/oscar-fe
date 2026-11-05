@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Layers, Plus, Trash2, Edit2, Check, RefreshCw, Cpu, Package, Factory, Users } from 'lucide-react';
 import PageHeader from '../../../components/ui/PageHeader';
 import { Button } from '../../../components/ui/Button';
+import TablePagination from '../../../components/ui/TablePagination';
 import { loomService } from '../../../services/loomService';
 import { qc, formatNum, preventNegativeInput } from '../utils/loomCalculations';
 import { useERP } from '../../../context/ERPContext';
@@ -17,6 +18,30 @@ export default function LoomMastersPage() {
   const [factories, setFactories] = useState([]);
   const [coords, setCoords] = useState([]);
   const [selectedFactoryId, setSelectedFactoryId] = useState('');
+
+  const [qualPage, setQualPage] = useState(1);
+  const [qualPageSize, setQualPageSize] = useState(10);
+
+  const [yarnPage, setYarnPage] = useState(1);
+  const [yarnPageSize, setYarnPageSize] = useState(10);
+
+  const [coordPage, setCoordPage] = useState(1);
+  const [coordPageSize, setCoordPageSize] = useState(10);
+
+  const paginatedQualities = useMemo(() => {
+    const start = (qualPage - 1) * qualPageSize;
+    return qualities.slice(start, start + qualPageSize);
+  }, [qualities, qualPage, qualPageSize]);
+
+  const paginatedYarns = useMemo(() => {
+    const start = (yarnPage - 1) * yarnPageSize;
+    return yarns.slice(start, start + yarnPageSize);
+  }, [yarns, yarnPage, yarnPageSize]);
+
+  const paginatedCoords = useMemo(() => {
+    const start = (coordPage - 1) * coordPageSize;
+    return coords.slice(start, start + coordPageSize);
+  }, [coords, coordPage, coordPageSize]);
 
   // Form states
   const [qForm, setQForm] = useState({
@@ -445,7 +470,7 @@ export default function LoomMastersPage() {
                 Registered Qualities & Automated Costing
               </h3>
             </div>
-            <div className="pms-table-container">
+            <div className="pms-table-container overflow-x-auto">
               <table className="w-full text-xs text-left pms-sticky-header">
                 <thead className="bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-semibold border-b border-slate-200 dark:border-slate-700">
                   <tr>
@@ -466,7 +491,7 @@ export default function LoomMastersPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                  {qualities.map((q) => (
+                  {paginatedQualities.map((q) => (
                     <tr key={q.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50">
                       <td className="py-2 px-2.5 sm:py-2.5 sm:px-3 font-bold text-slate-800 dark:text-slate-200 sticky left-0 bg-white dark:bg-slate-900 z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">
                         {q.name}
@@ -505,6 +530,18 @@ export default function LoomMastersPage() {
                 </tbody>
               </table>
             </div>
+
+            <TablePagination
+              total={qualities.length}
+              page={qualPage}
+              pageSize={qualPageSize}
+              onPageChange={setQualPage}
+              onPageSizeChange={(newSize) => {
+                setQualPageSize(newSize);
+                setQualPage(1);
+              }}
+              pageSizeOptions={[10, 20, 50]}
+            />
           </div>
         </div>
       )}
@@ -587,7 +624,7 @@ export default function LoomMastersPage() {
                 Yarn Master (Rates Directly Update Quality Costings)
               </h3>
             </div>
-            <div className="pms-table-container">
+            <div className="pms-table-container overflow-x-auto">
               <table className="w-full text-xs text-left pms-sticky-header">
                 <thead className="bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-semibold border-b border-slate-200 dark:border-slate-700">
                   <tr>
@@ -600,7 +637,7 @@ export default function LoomMastersPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                  {yarns.map((y) => (
+                  {paginatedYarns.map((y) => (
                     <tr key={y.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50">
                       <td className="py-2 px-2.5 sm:py-2.5 sm:px-3 font-bold text-slate-800 dark:text-slate-200">{y.name}</td>
                       <td className="py-2 px-2.5 sm:py-2.5 sm:px-3 text-right font-mono">{y.denier}</td>
@@ -630,9 +667,28 @@ export default function LoomMastersPage() {
                       </td>
                     </tr>
                   ))}
+                  {!yarns.length && (
+                    <tr>
+                      <td colSpan={6} className="py-8 text-center text-slate-400">
+                        No yarns registered yet.
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
+
+            <TablePagination
+              total={yarns.length}
+              page={yarnPage}
+              pageSize={yarnPageSize}
+              onPageChange={setYarnPage}
+              onPageSizeChange={(newSize) => {
+                setYarnPageSize(newSize);
+                setYarnPage(1);
+              }}
+              pageSizeOptions={[10, 20, 50]}
+            />
           </div>
         </div>
       )}
@@ -823,7 +879,7 @@ export default function LoomMastersPage() {
                 Registered Coordinators
               </h3>
             </div>
-            <div className="pms-table-container">
+            <div className="pms-table-container overflow-x-auto">
               <table className="w-full text-xs text-left pms-sticky-header">
                 <thead className="bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-semibold border-b border-slate-200 dark:border-slate-700">
                   <tr>
@@ -833,7 +889,7 @@ export default function LoomMastersPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                  {coords.map((c) => {
+                  {paginatedCoords.map((c) => {
                     const assigned = factories.filter((f) => f.coord === c.id).map((f) => f.name).join(', ') || 'None';
                     return (
                       <tr key={c.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50">
@@ -843,9 +899,28 @@ export default function LoomMastersPage() {
                       </tr>
                     );
                   })}
+                  {!coords.length && (
+                    <tr>
+                      <td colSpan={3} className="py-8 text-center text-slate-400">
+                        No coordinators registered yet.
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
+
+            <TablePagination
+              total={coords.length}
+              page={coordPage}
+              pageSize={coordPageSize}
+              onPageChange={setCoordPage}
+              onPageSizeChange={(newSize) => {
+                setCoordPageSize(newSize);
+                setCoordPage(1);
+              }}
+              pageSizeOptions={[10, 20, 50]}
+            />
           </div>
         </div>
       )}

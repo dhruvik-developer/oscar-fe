@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Truck,
@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import PageHeader from '../../../components/ui/PageHeader';
 import { Button } from '../../../components/ui/Button';
+import TablePagination from '../../../components/ui/TablePagination';
 import { loomService } from '../../../services/loomService';
 import { formatNum, preventNegativeInput } from '../utils/loomCalculations';
 import { useERP } from '../../../context/ERPContext';
@@ -29,7 +30,14 @@ export default function FabricOutPage() {
   const [qualities, setQualities] = useState([]);
   const [selectedFactoryId, setSelectedFactoryId] = useState('');
   const [dispatches, setDispatches] = useState([]);
+  const [dispatchPage, setDispatchPage] = useState(1);
+  const [dispatchPageSize, setDispatchPageSize] = useState(10);
   const [inventorySummary, setInventorySummary] = useState(null);
+
+  const paginatedDispatches = useMemo(() => {
+    const start = (dispatchPage - 1) * dispatchPageSize;
+    return dispatches.slice(start, start + dispatchPageSize);
+  }, [dispatches, dispatchPage, dispatchPageSize]);
   const [activeTab, setActiveTab] = useState(
     () => localStorage.getItem('oscar_pms_fabric_out_tab') || 'dispatch'
   );
@@ -156,13 +164,11 @@ export default function FabricOutPage() {
       id: 'stock',
       label: 'Fabric Stock & Mills',
       icon: Layers,
-      badge: (inventorySummary?.factory_inventory || []).length,
     },
     {
       id: 'history',
       label: 'Dispatch Challans Log',
       icon: Truck,
-      badge: dispatches.length,
     },
     {
       id: 'all',
@@ -226,17 +232,6 @@ export default function FabricOutPage() {
               >
                 <Icon size={14} className={isActive ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400'} />
                 <span>{tab.label}</span>
-                {tab.badge !== undefined && (
-                  <span
-                    className={`text-[11px] font-bold px-1.5 py-0.2 rounded-full ${
-                      isActive
-                        ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300'
-                        : 'bg-slate-200/80 text-slate-600 dark:bg-slate-700 dark:text-slate-300'
-                    }`}
-                  >
-                    {tab.badge}
-                  </span>
-                )}
               </button>
             );
           })}
@@ -355,7 +350,7 @@ export default function FabricOutPage() {
                 Grey Fabric at Factory by Quality
               </h3>
             </div>
-            <div className={`pms-table-container overflow-y-auto ${activeTab === 'all' ? 'max-h-[340px]' : 'max-h-[calc(100vh-320px)] min-h-[300px]'}`}>
+            <div className="pms-table-container overflow-x-auto">
             <table className="w-full text-xs text-left pms-sticky-header">
               <thead className="bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-semibold border-b border-slate-200 dark:border-slate-700">
                 <tr>
@@ -397,7 +392,7 @@ export default function FabricOutPage() {
               Grey Fabric Lying at Dyeing Mills
             </h3>
           </div>
-          <div className={`pms-table-container overflow-y-auto ${activeTab === 'all' ? 'max-h-[340px]' : 'max-h-[calc(100vh-320px)] min-h-[300px]'}`}>
+          <div className="pms-table-container overflow-x-auto">
             <table className="w-full text-xs text-left pms-sticky-header">
               <thead className="bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-semibold border-b border-slate-200 dark:border-slate-700">
                 <tr>
@@ -457,7 +452,7 @@ export default function FabricOutPage() {
             Dispatch Challans Log
           </h3>
         </div>
-        <div className={`pms-table-container overflow-y-auto ${activeTab === 'all' ? 'max-h-[380px]' : 'max-h-[calc(100vh-275px)] min-h-[380px]'}`}>
+        <div className="pms-table-container overflow-x-auto">
           <table className="w-full text-xs text-left pms-sticky-header">
             <thead className="bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-semibold border-b border-slate-200 dark:border-slate-700">
               <tr>
@@ -472,7 +467,7 @@ export default function FabricOutPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-              {dispatches.map((d) => (
+              {paginatedDispatches.map((d) => (
                 <tr key={d.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50">
                   <td className="py-2 px-2.5 sm:py-2.5 sm:px-3 text-slate-500">{d.date}</td>
                   <td className="py-2 px-2.5 sm:py-2.5 sm:px-3 font-semibold text-slate-800 dark:text-slate-200">{d.quality_name}</td>
@@ -492,9 +487,28 @@ export default function FabricOutPage() {
                   </td>
                 </tr>
               ))}
+              {!dispatches.length && (
+                <tr>
+                  <td colSpan={8} className="py-8 text-center text-slate-400">
+                    No dispatches logged yet.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
+
+        <TablePagination
+          total={dispatches.length}
+          page={dispatchPage}
+          pageSize={dispatchPageSize}
+          onPageChange={setDispatchPage}
+          onPageSizeChange={(newSize) => {
+            setDispatchPageSize(newSize);
+            setDispatchPage(1);
+          }}
+          pageSizeOptions={[10, 20, 50]}
+        />
       </div>
       )}
 

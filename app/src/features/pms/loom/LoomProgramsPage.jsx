@@ -19,6 +19,7 @@ import {
 import PageHeader from '../../../components/ui/PageHeader';
 import KpiCard from '../../../components/ui/KpiCard';
 import { Button } from '../../../components/ui/Button';
+import TablePagination from '../../../components/ui/TablePagination';
 import { loomService } from '../../../services/loomService';
 import { qc, formatNum, preventNegativeInput } from '../utils/loomCalculations';
 import { useERP } from '../../../context/ERPContext';
@@ -30,7 +31,14 @@ export default function LoomProgramsPage() {
   const [loading, setLoading] = useState(true);
   const [deleteConfirmProgId, setDeleteConfirmProgId] = useState(null);
   const [programs, setPrograms] = useState([]);
+  const [progPage, setProgPage] = useState(1);
+  const [progPageSize, setProgPageSize] = useState(10);
   const [factories, setFactories] = useState([]);
+
+  const paginatedPrograms = useMemo(() => {
+    const start = (progPage - 1) * progPageSize;
+    return programs.slice(start, start + progPageSize);
+  }, [programs, progPage, progPageSize]);
   const [qualities, setQualities] = useState([]);
   const [yarns, setYarns] = useState([]);
   const [openProgId, setOpenProgId] = useState(null);
@@ -355,7 +363,6 @@ export default function LoomProgramsPage() {
       id: 'list',
       label: 'Active Programs & Progress',
       icon: Layers,
-      badge: programs.length,
     },
     {
       id: 'create',
@@ -401,17 +408,6 @@ export default function LoomProgramsPage() {
               >
                 <Icon size={14} className={isActive ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400'} />
                 <span>{tab.label}</span>
-                {tab.badge !== undefined && (
-                  <span
-                    className={`text-[11px] font-bold px-1.5 py-0.2 rounded-full ${
-                      isActive
-                        ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300'
-                        : 'bg-slate-200/80 text-slate-600 dark:bg-slate-700 dark:text-slate-300'
-                    }`}
-                  >
-                    {tab.badge}
-                  </span>
-                )}
               </button>
             );
           })}
@@ -551,7 +547,7 @@ export default function LoomProgramsPage() {
             Active Programs & Progress
           </h3>
         </div>
-        <div className={`pms-table-container overflow-y-auto ${activeTab === 'all' ? 'max-h-[380px]' : 'max-h-[calc(100vh-275px)] min-h-[380px]'}`}>
+        <div className="pms-table-container overflow-x-auto">
           <table className="w-full text-xs text-left pms-sticky-header">
             <thead className="bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-semibold border-b border-slate-200 dark:border-slate-700">
               <tr>
@@ -569,7 +565,7 @@ export default function LoomProgramsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-              {programs.map((p) => {
+              {paginatedPrograms.map((p) => {
                 const s = p.stats || {};
                 const isLate = (s.meters || 0) < (s.expected || 0);
 
@@ -640,6 +636,18 @@ export default function LoomProgramsPage() {
             </tbody>
           </table>
         </div>
+
+        <TablePagination
+          total={programs.length}
+          page={progPage}
+          pageSize={progPageSize}
+          onPageChange={setProgPage}
+          onPageSizeChange={(newSize) => {
+            setProgPageSize(newSize);
+            setProgPage(1);
+          }}
+          pageSizeOptions={[10, 20, 50]}
+        />
       </div>
       )}
 

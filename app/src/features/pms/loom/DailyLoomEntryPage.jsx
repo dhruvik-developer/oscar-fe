@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Calendar,
   Save,
@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import PageHeader from '../../../components/ui/PageHeader';
 import { Button } from '../../../components/ui/Button';
+import TablePagination from '../../../components/ui/TablePagination';
 import { loomService } from '../../../services/loomService';
 import { formatNum, preventNegativeInput, clampNonNegative } from '../utils/loomCalculations';
 import { useERP } from '../../../context/ERPContext';
@@ -28,9 +29,16 @@ export default function DailyLoomEntryPage() {
   const [dateStr, setDateStr] = useState(() => new Date().toISOString().slice(0, 10));
   const [powerCut, setPowerCut] = useState(0);
   const [rows, setRows] = useState([]);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [showMore, setShowMore] = useState(false);
+
+  const paginatedRows = useMemo(() => {
+    const start = (page - 1) * pageSize;
+    return rows.slice(start, start + pageSize);
+  }, [rows, page, pageSize]);
 
   const loadFactories = async () => {
     try {
@@ -58,6 +66,7 @@ export default function DailyLoomEntryPage() {
   const fetchDayData = useCallback(async () => {
     if (!selectedFactoryId || !dateStr) return;
     setLoading(true);
+    setPage(1);
     try {
       const res = await loomService.getFactoryDayProduction(selectedFactoryId, dateStr);
       setPowerCut(res?.power || 0);
@@ -280,31 +289,31 @@ export default function DailyLoomEntryPage() {
         </div>
       </div>
 
-      {/* Grid Entry Table - Fit to screen with sticky headers & horizontal scroll protection */}
+      {/* Grid Entry Table - Full view according to pagination (no internal vertical scroll bar) */}
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-xs">
-        <div className="pms-table-container max-h-[calc(100vh-250px)]">
+        <div className="pms-table-container overflow-x-auto">
           <table className="w-full text-xs text-left">
             <thead className="pms-sticky-header bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-semibold border-b border-slate-200 dark:border-slate-700">
               <tr>
-                <th className="py-2 px-3 sticky left-0 bg-slate-50 dark:bg-slate-800 z-20">MCN</th>
-                <th className="py-2 px-3">Quality</th>
-                <th className="py-2 px-3 text-right">On Loom (m)</th>
-                <th className="py-2 px-3">Meters Today</th>
-                <th className="py-2 px-3">Stop Reason</th>
-                <th className="py-2 px-3 text-right">Damage (m)</th>
+                <th className="py-2.5 px-3 sticky left-0 bg-slate-50 dark:bg-slate-800 z-20">MCN</th>
+                <th className="py-2.5 px-3">Quality</th>
+                <th className="py-2.5 px-3 text-right">On Loom (m)</th>
+                <th className="py-2.5 px-3">Meters Today</th>
+                <th className="py-2.5 px-3">Stop Reason</th>
+                <th className="py-2.5 px-3 text-right">Damage (m)</th>
                 {showMore && (
                   <>
-                    <th className="py-2 px-3 text-right">RPM</th>
-                    <th className="py-2 px-3 text-right">Hours</th>
-                    <th className="py-2 px-3 text-right">Stop (hrs)</th>
+                    <th className="py-2.5 px-3 text-right">RPM</th>
+                    <th className="py-2.5 px-3 text-right">Hours</th>
+                    <th className="py-2.5 px-3 text-right">Stop (hrs)</th>
                   </>
                 )}
-                <th className="py-2 px-3 text-center">Status</th>
-                <th className="py-2 px-3 text-center">Action</th>
+                <th className="py-2.5 px-3 text-center">Status</th>
+                <th className="py-2.5 px-3 text-center">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-              {rows.map((r) => {
+              {paginatedRows.map((r) => {
                 if (!r.has_beam) {
                   return (
                     <tr key={r.machine_id} className="bg-slate-50/40 dark:bg-slate-800/20 text-slate-400">
@@ -433,7 +442,7 @@ export default function DailyLoomEntryPage() {
               })}
               {!rows.length && (
                 <tr>
-                  <td colSpan={10} className="py-8 text-center text-slate-400">
+                  <td colSpan={showMore ? 11 : 8} className="py-8 text-center text-slate-400">
                     No machines configured for this factory.
                   </td>
                 </tr>
@@ -441,6 +450,18 @@ export default function DailyLoomEntryPage() {
             </tbody>
           </table>
         </div>
+
+        <TablePagination
+          total={rows.length}
+          page={page}
+          pageSize={pageSize}
+          onPageChange={setPage}
+          onPageSizeChange={(newSize) => {
+            setPageSize(newSize);
+            setPage(1);
+          }}
+          pageSizeOptions={[10, 20, 25, 50, 100]}
+        />
       </div>
 
       <ConfirmModal

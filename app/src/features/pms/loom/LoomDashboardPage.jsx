@@ -92,20 +92,16 @@ export default function LoomDashboardPage() {
       id: 'looms',
       label: 'Loom Stoppage Forecast',
       icon: Factory,
-      badge: factories.length,
-      badgeColor: totalBeamsToPrepare > 0 ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300' : undefined,
     },
     {
       id: 'yarn',
       label: 'Yarn Weft Cover',
       icon: Package,
-      badge: factories.reduce((acc, f) => acc + (f.yarn_cover?.length || 0), 0),
     },
     {
       id: 'programs',
       label: 'Active Programs',
       icon: Layers,
-      badge: programs.length,
     },
     {
       id: 'all',
@@ -221,18 +217,6 @@ export default function LoomDashboardPage() {
               >
                 <Icon size={14} className={isActive ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400'} />
                 <span>{tab.label}</span>
-                {tab.badge !== undefined && (
-                  <span
-                    className={`text-[11px] font-bold px-1.5 py-0.2 rounded-full ${
-                      tab.badgeColor ||
-                      (isActive
-                        ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300'
-                        : 'bg-slate-200/80 text-slate-600 dark:bg-slate-700 dark:text-slate-300')
-                    }`}
-                  >
-                    {tab.badge}
-                  </span>
-                )}
               </button>
             );
           })}
@@ -257,7 +241,7 @@ export default function LoomDashboardPage() {
             Click factory name to view looms
           </span>
         </div>
-        <div className={`pms-table-container overflow-y-auto ${activeTab === 'all' ? 'max-h-[380px]' : 'max-h-[calc(100vh-275px)] min-h-[380px]'}`}>
+        <div className="pms-table-container overflow-x-auto">
           <table className="w-full text-xs text-left">
             <thead className="pms-sticky-header bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-semibold border-b border-slate-200 dark:border-slate-700">
               <tr>
@@ -348,7 +332,7 @@ export default function LoomDashboardPage() {
                   Manage Yarn <ArrowRight size={11} className="ml-1" />
                 </Button>
               </div>
-              <div className={`pms-table-container overflow-y-auto ${activeTab === 'all' ? 'max-h-[360px]' : 'max-h-[calc(100vh-275px)] min-h-[380px]'}`}>
+              <div className="pms-table-container overflow-x-auto">
             <table className="w-full text-xs text-left">
               <thead className="pms-sticky-header bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-semibold border-b border-slate-200 dark:border-slate-700">
                 <tr>
@@ -413,7 +397,7 @@ export default function LoomDashboardPage() {
                 All Programs <ArrowRight size={11} className="ml-1" />
               </Button>
             </div>
-            <div className={`pms-table-container overflow-y-auto ${activeTab === 'all' ? 'max-h-[360px]' : 'max-h-[calc(100vh-275px)] min-h-[380px]'}`}>
+            <div className="pms-table-container overflow-x-auto">
             <table className="w-full text-xs text-left">
               <thead className="pms-sticky-header bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-semibold border-b border-slate-200 dark:border-slate-700">
                 <tr>

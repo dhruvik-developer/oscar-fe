@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import PageHeader from '../../../components/ui/PageHeader';
 import KpiCard from '../../../components/ui/KpiCard';
+import TablePagination from '../../../components/ui/TablePagination';
 import { api } from '../../../services/api';
 import {
   statusPill, canMarkComplete, canVerify, canGeneratePo, errorText, fmtNum, listOf,
@@ -152,6 +153,14 @@ export default function ProductionCompletionVerificationPage() {
     });
   }, [completionData]);
 
+  const [summaryPage, setSummaryPage] = useState(1);
+  const [summaryPageSize, setSummaryPageSize] = useState(10);
+
+  const paginatedRows = useMemo(() => {
+    const start = (summaryPage - 1) * summaryPageSize;
+    return rows.slice(start, start + summaryPageSize);
+  }, [rows, summaryPage, summaryPageSize]);
+
   const hasData = Boolean(completionData);
   const statusLabel = status || '—';
   const jobRateLabel = jobRate > 0 ? `₹ ${jobRate.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} / M` : '—';
@@ -237,7 +246,6 @@ export default function ProductionCompletionVerificationPage() {
       id: 'daily',
       label: 'Daily Production Register',
       icon: ListChecks,
-      badge: rows.length,
     },
     {
       id: 'all',
@@ -314,17 +322,6 @@ export default function ProductionCompletionVerificationPage() {
               >
                 <Icon size={14} className={isActive ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400'} />
                 <span>{tab.label}</span>
-                {tab.badge !== undefined && (
-                  <span
-                    className={`text-[11px] font-bold px-1.5 py-0.2 rounded-full ${
-                      isActive
-                        ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300'
-                        : 'bg-slate-200/80 text-slate-600 dark:bg-slate-700 dark:text-slate-300'
-                    }`}
-                  >
-                    {tab.badge}
-                  </span>
-                )}
               </button>
             );
           })}
@@ -461,7 +458,7 @@ export default function ProductionCompletionVerificationPage() {
           <span className="grid h-5 w-5 place-items-center rounded-full bg-[#2563eb] text-[11px] font-extrabold text-white">2</span>
           <h2 className="text-[13px] font-extrabold text-[#2563eb]">Daily Production Summary (Auto from Daily Production)</h2>
         </div>
-        <div className={`pms-table-container overflow-y-auto ${activeTab === 'all' ? 'max-h-[380px]' : 'max-h-[calc(100vh-275px)] min-h-[380px]'}`}>
+        <div className="pms-table-container overflow-x-auto">
           <table className="w-full min-w-[860px] text-center text-[12px] pms-sticky-header">
             <thead>
               <tr className="border-b border-slate-100 text-slate-500">
@@ -476,12 +473,12 @@ export default function ProductionCompletionVerificationPage() {
                   <td colSpan={7} className="px-4 py-8 text-slate-400">Loading production summary...</td>
                 </tr>
               )}
-              {!loading && rows.map((r, idx) => (
+              {!loading && paginatedRows.map((r, idx) => (
                 <tr
                   key={idx}
-                  className={`border-b border-slate-50 text-slate-600 ${idx === rows.length - 1 ? 'bg-[#f2f7ff]' : ''}`}
+                  className={`border-b border-slate-50 text-slate-600 ${idx === paginatedRows.length - 1 ? 'bg-[#f2f7ff]' : ''}`}
                 >
-                  <td className="px-4 py-2.5 font-semibold text-slate-400">{idx + 1}</td>
+                  <td className="px-4 py-2.5 font-semibold text-slate-400">{(summaryPage - 1) * summaryPageSize + idx + 1}</td>
                   <td className="px-4 py-2.5">{r.displayDate}</td>
                   <td className="px-4 py-2.5 font-semibold">{fmtNum(r.produced)}</td>
                   <td className="px-4 py-2.5">{fmtNum(r.cumulative)}</td>
@@ -499,6 +496,18 @@ export default function ProductionCompletionVerificationPage() {
             </tbody>
           </table>
         </div>
+
+        <TablePagination
+          total={rows.length}
+          page={summaryPage}
+          pageSize={summaryPageSize}
+          onPageChange={setSummaryPage}
+          onPageSizeChange={(newSize) => {
+            setSummaryPageSize(newSize);
+            setSummaryPage(1);
+          }}
+          pageSizeOptions={[10, 20, 50]}
+        />
       </div>
       )}
 

@@ -16,6 +16,7 @@ import {
 import PageHeader from '../../../components/ui/PageHeader';
 import KpiCard from '../../../components/ui/KpiCard';
 import { Button } from '../../../components/ui/Button';
+import TablePagination from '../../../components/ui/TablePagination';
 import { loomService } from '../../../services/loomService';
 import { qc, formatNum, preventNegativeInput } from '../utils/loomCalculations';
 import { useERP } from '../../../context/ERPContext';
@@ -96,6 +97,9 @@ export default function MachinesAndBeamsPage() {
   const fetchFactoryData = useCallback(async () => {
     if (!selectedFactoryId) return;
     setLoading(true);
+    setMachinePage(1);
+    setBeamPage(1);
+    setYarnPage(1);
     try {
       const [stRes, bRes] = await Promise.all([
         loomService.getFactoryStatus(selectedFactoryId),
@@ -246,6 +250,35 @@ export default function MachinesAndBeamsPage() {
 
   const machines = statusData?.machines || [];
   const activeBeams = beams.filter((b) => b.status !== 'Finished');
+  const yarnCoverList = statusData?.yarn_cover || [];
+
+  const [machinePage, setMachinePage] = useState(1);
+  const [machinePageSize, setMachinePageSize] = useState(20);
+
+  const [beamPage, setBeamPage] = useState(1);
+  const [beamPageSize, setBeamPageSize] = useState(10);
+
+  const [yarnPage, setYarnPage] = useState(1);
+  const [yarnPageSize, setYarnPageSize] = useState(10);
+
+  const sortedMachines = useMemo(() => {
+    return [...machines].sort((a, b) => (a.beam ? a.days_left : -1) - (b.beam ? b.days_left : -1));
+  }, [machines]);
+
+  const paginatedMachines = useMemo(() => {
+    const start = (machinePage - 1) * machinePageSize;
+    return sortedMachines.slice(start, start + machinePageSize);
+  }, [sortedMachines, machinePage, machinePageSize]);
+
+  const paginatedBeams = useMemo(() => {
+    const start = (beamPage - 1) * beamPageSize;
+    return activeBeams.slice(start, start + beamPageSize);
+  }, [activeBeams, beamPage, beamPageSize]);
+
+  const paginatedYarnCover = useMemo(() => {
+    const start = (yarnPage - 1) * yarnPageSize;
+    return yarnCoverList.slice(start, start + yarnPageSize);
+  }, [yarnCoverList, yarnPage, yarnPageSize]);
 
   const tabs = [
     {
@@ -406,7 +439,7 @@ export default function MachinesAndBeamsPage() {
             Ordered by beam runout urgency
           </span>
         </div>
-        <div className={`pms-table-container overflow-y-auto ${activeTab === 'all' ? 'max-h-[420px]' : 'max-h-[calc(100vh-275px)] min-h-[440px]'}`}>
+        <div className="pms-table-container overflow-x-auto">
           <table className="w-full text-xs text-left">
             <thead className="pms-sticky-header bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-semibold border-b border-slate-200 dark:border-slate-700">
               <tr>
@@ -429,50 +462,60 @@ export default function MachinesAndBeamsPage() {
                   </td>
                 </tr>
               ) : (
-                [...machines]
-                  .sort((a, b) => (a.beam ? a.days_left : -1) - (b.beam ? b.days_left : -1))
-                  .map((m) => {
-                    let alertBadge = null;
-                    if (!m.beam) {
-                      alertBadge = <span className="px-2.5 py-1 rounded-md text-[11px] font-bold bg-rose-100 text-rose-800 dark:bg-rose-950/40 dark:text-rose-300">Idle — load beam</span>;
-                    } else if (m.days_left <= 2 && !m.spare) {
-                      alertBadge = <span className="px-2.5 py-1 rounded-md text-[11px] font-bold bg-rose-100 text-rose-800 dark:bg-rose-950/40 dark:text-rose-300 animate-pulse">Prepare beam now</span>;
-                    } else if (m.days_left <= 7 && !m.spare) {
-                      alertBadge = <span className="px-2.5 py-1 rounded-md text-[11px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300">Prepare this week</span>;
-                    } else if (m.spare) {
-                      alertBadge = <span className="px-2.5 py-1 rounded-md text-[11px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300">Spare ready</span>;
-                    } else {
-                      alertBadge = <span className="px-2.5 py-1 rounded-md text-[11px] font-medium text-slate-500">Normal</span>;
-                    }
+                paginatedMachines.map((m) => {
+                  let alertBadge = null;
+                  if (!m.beam) {
+                    alertBadge = <span className="px-2.5 py-1 rounded-md text-[11px] font-bold bg-rose-100 text-rose-800 dark:bg-rose-950/40 dark:text-rose-300">Idle — load beam</span>;
+                  } else if (m.days_left <= 2 && !m.spare) {
+                    alertBadge = <span className="px-2.5 py-1 rounded-md text-[11px] font-bold bg-rose-100 text-rose-800 dark:bg-rose-950/40 dark:text-rose-300 animate-pulse">Prepare beam now</span>;
+                  } else if (m.days_left <= 7 && !m.spare) {
+                    alertBadge = <span className="px-2.5 py-1 rounded-md text-[11px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300">Prepare this week</span>;
+                  } else if (m.spare) {
+                    alertBadge = <span className="px-2.5 py-1 rounded-md text-[11px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300">Spare ready</span>;
+                  } else {
+                    alertBadge = <span className="px-2.5 py-1 rounded-md text-[11px] font-medium text-slate-500">Normal</span>;
+                  }
 
-                    return (
-                      <tr key={m.machine_id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/50 transition-colors">
-                        <td className="py-2.5 px-3 font-bold text-slate-900 dark:text-slate-100 whitespace-nowrap">MCN {m.no}</td>
-                        <td className="py-2.5 px-3 font-medium text-slate-700 dark:text-slate-300 whitespace-nowrap">{m.quality?.name || '—'}</td>
-                        <td className="py-2.5 px-3 text-slate-600 dark:text-slate-400 font-mono text-xs whitespace-nowrap">{m.beam?.no || '—'}</td>
-                        <td className="py-2.5 px-3 text-right font-medium whitespace-nowrap">{m.beam ? formatNum(m.rem) : '—'}</td>
-                        <td className="py-2.5 px-3 text-right text-slate-500 whitespace-nowrap">{formatNum(m.avg)}</td>
-                        <td className="py-2.5 px-3 text-right font-bold text-slate-800 dark:text-slate-200 whitespace-nowrap">
-                          {m.beam ? (isFinite(m.days_left) ? formatNum(m.days_left, 1) : '—') : '—'}
-                        </td>
-                        <td className="py-2.5 px-3 whitespace-nowrap">
-                          {m.spare ? (
-                            <span className="text-emerald-600 font-medium text-xs">
-                              {m.spare.quality_name} <span className="text-slate-400 font-mono text-[11px]">({m.spare.no})</span>
-                            </span>
-                          ) : (
-                            <span className="text-slate-400">—</span>
-                          )}
-                        </td>
-                        <td className="py-2.5 px-3 text-right text-slate-500 whitespace-nowrap">{m.reed}</td>
-                        <td className="py-2.5 px-3 text-center whitespace-nowrap">{alertBadge}</td>
-                      </tr>
-                    );
-                  })
+                  return (
+                    <tr key={m.machine_id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/50 transition-colors">
+                      <td className="py-2.5 px-3 font-bold text-slate-900 dark:text-slate-100 whitespace-nowrap">MCN {m.no}</td>
+                      <td className="py-2.5 px-3 font-medium text-slate-700 dark:text-slate-300 whitespace-nowrap">{m.quality?.name || '—'}</td>
+                      <td className="py-2.5 px-3 text-slate-600 dark:text-slate-400 font-mono text-xs whitespace-nowrap">{m.beam?.no || '—'}</td>
+                      <td className="py-2.5 px-3 text-right font-medium whitespace-nowrap">{m.beam ? formatNum(m.rem) : '—'}</td>
+                      <td className="py-2.5 px-3 text-right text-slate-500 whitespace-nowrap">{formatNum(m.avg)}</td>
+                      <td className="py-2.5 px-3 text-right font-bold text-slate-800 dark:text-slate-200 whitespace-nowrap">
+                        {m.beam ? (isFinite(m.days_left) ? formatNum(m.days_left, 1) : '—') : '—'}
+                      </td>
+                      <td className="py-2.5 px-3 whitespace-nowrap">
+                        {m.spare ? (
+                          <span className="text-emerald-600 font-medium text-xs">
+                            {m.spare.quality_name} <span className="text-slate-400 font-mono text-[11px]">({m.spare.no})</span>
+                          </span>
+                        ) : (
+                          <span className="text-slate-400">—</span>
+                        )}
+                      </td>
+                      <td className="py-2.5 px-3 text-right text-slate-500 whitespace-nowrap">{m.reed}</td>
+                      <td className="py-2.5 px-3 text-center whitespace-nowrap">{alertBadge}</td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
         </div>
+
+        <TablePagination
+          total={sortedMachines.length}
+          page={machinePage}
+          pageSize={machinePageSize}
+          onPageChange={setMachinePage}
+          onPageSizeChange={(newSize) => {
+            setMachinePageSize(newSize);
+            setMachinePage(1);
+          }}
+          pageSizeOptions={[10, 20, 25, 50, 100]}
+        />
       </div>
       )}
 
@@ -570,7 +613,7 @@ export default function MachinesAndBeamsPage() {
         )}
 
         {/* Beams Table */}
-        <div className={`pms-table-container overflow-y-auto ${activeTab === 'all' ? 'max-h-[360px]' : 'max-h-[calc(100vh-420px)] min-h-[360px]'}`}>
+        <div className="pms-table-container overflow-x-auto">
           <table className="w-full text-xs text-left">
             <thead className="pms-sticky-header bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-semibold border-b border-slate-200 dark:border-slate-700">
               <tr>
@@ -585,7 +628,7 @@ export default function MachinesAndBeamsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-              {activeBeams.map((b) => (
+              {paginatedBeams.map((b) => (
                 <tr key={b.id} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/50 transition-colors">
                   <td className="py-2 px-3 font-mono font-bold text-slate-900 dark:text-slate-100 whitespace-nowrap">{b.beam_no}</td>
                   <td className="py-2 px-3 font-medium text-slate-700 dark:text-slate-300 whitespace-nowrap">{b.quality_name}</td>
@@ -677,6 +720,18 @@ export default function MachinesAndBeamsPage() {
             </tbody>
           </table>
         </div>
+
+        <TablePagination
+          total={activeBeams.length}
+          page={beamPage}
+          pageSize={beamPageSize}
+          onPageChange={setBeamPage}
+          onPageSizeChange={(newSize) => {
+            setBeamPageSize(newSize);
+            setBeamPage(1);
+          }}
+          pageSizeOptions={[10, 20, 50]}
+        />
       </div>
       )}
 
@@ -688,7 +743,7 @@ export default function MachinesAndBeamsPage() {
               Yarn Stock & Weft Cover Days at this Factory
             </h3>
           </div>
-          <div className={`pms-table-container overflow-y-auto ${activeTab === 'all' ? 'max-h-[300px]' : 'max-h-[calc(100vh-280px)] min-h-[300px]'}`}>
+          <div className="pms-table-container overflow-x-auto">
             <table className="w-full text-xs text-left">
               <thead className="pms-sticky-header bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-semibold border-b border-slate-200 dark:border-slate-700">
                 <tr>
@@ -708,7 +763,7 @@ export default function MachinesAndBeamsPage() {
                     </td>
                   </tr>
                 ) : (
-                  statusData.yarn_cover.map((y) => (
+                  paginatedYarnCover.map((y) => (
                     <tr key={y.yarn_id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition-colors">
                       <td className="py-2 px-3 font-bold text-slate-800 dark:text-slate-200 whitespace-nowrap">{y.yarn_name}</td>
                       <td className="py-2 px-3 text-right font-mono font-semibold whitespace-nowrap">
@@ -734,6 +789,18 @@ export default function MachinesAndBeamsPage() {
               </tbody>
             </table>
           </div>
+
+          <TablePagination
+            total={yarnCoverList.length}
+            page={yarnPage}
+            pageSize={yarnPageSize}
+            onPageChange={setYarnPage}
+            onPageSizeChange={(newSize) => {
+              setYarnPageSize(newSize);
+              setYarnPage(1);
+            }}
+            pageSizeOptions={[10, 20, 50]}
+          />
         </div>
       )}
 

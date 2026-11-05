@@ -5528,7 +5528,7 @@ textarea:focus::placeholder {
   width: 100%;
   max-width: 100%;
   overflow-x: auto;
-  overflow-y: auto;
+  overflow-y: visible;
   position: relative;
   border-radius: 0.75rem;
   scrollbar-width: thin;
@@ -5536,7 +5536,7 @@ textarea:focus::placeholder {
 
 .pms-table-container::-webkit-scrollbar {
   height: 6px;
-  width: 6px;
+  width: 0px;
 }
 
 .pms-table-container::-webkit-scrollbar-thumb {

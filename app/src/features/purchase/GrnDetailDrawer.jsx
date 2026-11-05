@@ -26,7 +26,8 @@ function parseQcNote(raw) {
       return {
         remarks: meta.remarks || '',
         split: {
-          Good: num(c.good ?? meta.goodQty),
+          Good: num(c.good ?? meta.goodQty) - num(meta.sampleQty),
+          Sample: num(meta.sampleQty),
           'Second Quality': num(c.second ?? meta.secondQualityQty),
           Reprocess: num(c.reprocess ?? meta.reprocessQty),
           Rejected: num(c.reject ?? meta.rejectedQty),
@@ -41,7 +42,7 @@ function parseQcNote(raw) {
 }
 
 const SPLIT_TONE = {
-  Good: 'text-emerald-700', 'Second Quality': 'text-sky-700', Reprocess: 'text-violet-700', Rejected: 'text-rose-700', Hold: 'text-amber-700',
+  Good: 'text-emerald-700', Sample: 'text-blue-700', 'Second Quality': 'text-sky-700', Reprocess: 'text-violet-700', Rejected: 'text-rose-700', Hold: 'text-amber-700',
 };
 
 function InfoRow({ label, children }) {

@@ -14,6 +14,7 @@ export function DesignationsPage() {
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingDesig, setEditingDesig] = useState(null);
   const [newDesig, setNewDesig] = useState({ title: '', level: 'L4', department: 'Engineering' });
 
   useEffect(() => {
@@ -44,21 +45,53 @@ export function DesignationsPage() {
   async function handleCreate(e) {
     e.preventDefault();
     if (!newDesig.title.trim()) return;
-    const created = { id: `DSG-0${designations.length + 1}`, ...newDesig, count: 0 };
-    setDesignations([created, ...designations]);
-    try {
-      if (isBackendEnabled()) {
-        const saved = await hrmsSync.create('designations', created);
-        if (saved?.id) {
-          setDesignations((prev) => prev.map((d) => (d.id === created.id ? saved : d)));
+
+    if (editingDesig) {
+      setDesignations((prev) =>
+        prev.map((d) => (d.id === editingDesig.id ? { ...d, ...newDesig } : d))
+      );
+      try {
+        if (isBackendEnabled()) {
+          await hrmsSync.update('designations', editingDesig.id, newDesig);
         }
+      } catch (err) {
+        console.warn('[DesignationsPage] Failed to update designation on server:', err);
       }
-    } catch (err) {
-      console.warn('[DesignationsPage] Failed to create designation on server:', err);
+      showToast(`Designation "${newDesig.title}" updated successfully`);
+    } else {
+      const created = { id: `DSG-0${designations.length + 1}`, ...newDesig, count: 0 };
+      setDesignations([created, ...designations]);
+      try {
+        if (isBackendEnabled()) {
+          const saved = await hrmsSync.create('designations', created);
+          if (saved?.id) {
+            setDesignations((prev) => prev.map((d) => (d.id === created.id ? saved : d)));
+          }
+        }
+      } catch (err) {
+        console.warn('[DesignationsPage] Failed to create designation on server:', err);
+      }
+      showToast(`Designation "${newDesig.title}" created successfully`);
     }
-    showToast(`Designation "${newDesig.title}" created successfully`);
     setIsModalOpen(false);
+    setEditingDesig(null);
     setNewDesig({ title: '', level: 'L4', department: 'Engineering' });
+  }
+
+  function handleOpenEdit(desig) {
+    setEditingDesig(desig);
+    setNewDesig({
+      title: desig.title || '',
+      level: desig.level || 'L4',
+      department: desig.department || 'Engineering',
+    });
+    setIsModalOpen(true);
+  }
+
+  function handleOpenCreate() {
+    setEditingDesig(null);
+    setNewDesig({ title: '', level: 'L4', department: 'Engineering' });
+    setIsModalOpen(true);
   }
 
   async function handleDelete(id, title) {
@@ -82,7 +115,7 @@ export function DesignationsPage() {
         actions={
           <button
             type="button"
-            onClick={() => setIsModalOpen(true)}
+            onClick={handleOpenCreate}
             className="px-5 py-2.5 bg-navy hover:bg-navy/90 text-white rounded-xl text-[13.5px] font-medium flex items-center gap-2 shadow-xs transition-colors cursor-pointer"
           >
             <Plus size={16} /> Add Designation
@@ -151,8 +184,8 @@ export function DesignationsPage() {
                       <div className="flex justify-end gap-1">
                         <button
                           type="button"
-                          onClick={() => showToast(`Edit ${r.title}`)}
-                          className="w-8 h-8 rounded-lg hover:bg-off grid place-items-center text-muted transition-colors cursor-pointer"
+                          onClick={() => handleOpenEdit(r)}
+                          className="w-8 h-8 rounded-lg hover:bg-off grid place-items-center text-muted hover:text-navy transition-colors cursor-pointer"
                           title="Edit"
                         >
                           <Edit2 size={14} />
@@ -175,8 +208,8 @@ export function DesignationsPage() {
         </div>
       )}
 
-      {/* Modal: Create Designation */}
-      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Create Designation">
+      {/* Modal: Create or Edit Designation */}
+      <Modal isOpen={isModalOpen} onClose={() => { setIsModalOpen(false); setEditingDesig(null); }} title={editingDesig ? "Edit Designation" : "Create Designation"}>
         <form onSubmit={handleCreate} className="flex flex-col gap-4">
           <div>
             <label className="block text-[12.5px] font-semibold text-slate-700 mb-1.5">

@@ -17,7 +17,7 @@ import {
   ArrowRight,
   Maximize2,
   Minimize2,
-  DollarSign,
+  IndianRupee,
   Clock,
   Send,
   AlertCircle,
@@ -558,7 +558,7 @@ export const ProformaInvoicesPage = () => {
         <StatCard
           label="Active Proforma Pipeline"
           value={formatCurrency(activePipelineValue)}
-          icon={DollarSign}
+          icon={IndianRupee}
           trend={{ positive: true, text: `${sentCount} active in negotiation` }}
           highlight={activePipelineValue > 0}
         />
@@ -869,7 +869,7 @@ export const ProformaInvoicesPage = () => {
                 {/* Financial Totals Breakdown Card */}
                 <div className="p-4 rounded-xl border border-slate-200 bg-slate-50 space-y-2 text-xs">
                   <h4 className="font-bold text-slate-800 text-xs flex items-center gap-1.5 pb-1 border-b border-slate-200">
-                    <DollarSign size={14} className="text-emerald-600" /> Commercial Price & Tax Summary
+                    <IndianRupee size={14} className="text-emerald-600" /> Commercial Price & Tax Summary
                   </h4>
 
                   <div className="flex justify-between py-0.5 text-slate-600">

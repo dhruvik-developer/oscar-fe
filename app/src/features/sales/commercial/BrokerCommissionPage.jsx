@@ -3,7 +3,7 @@ import {
   Users,
   Search,
   Filter,
-  DollarSign,
+  IndianRupee,
   CheckCircle2,
   AlertCircle,
   Clock,
@@ -25,7 +25,7 @@ import {
   RefreshCw,
   ExternalLink,
 } from 'lucide-react';
-import { salesService, crmService } from '../../../services/domainServices';
+import { salesService, crmService, accountingService } from '../../../services/domainServices';
 import PageInfoButton from '../../../components/ui/PageInfoButton';
 import TablePagination from '../../../components/ui/TablePagination';
 import MasterSourceLink from '../../../components/common/MasterSourceLink';
@@ -47,6 +47,8 @@ export default function BrokerCommissionPage() {
   const [commissions, setCommissions] = useState([]);
   const [statementData, setStatementData] = useState([]);
   const [statementMeta, setStatementMeta] = useState(null);
+  const [statementLoading, setStatementLoading] = useState(false);
+  const [statementError, setStatementError] = useState('');
   const [analyticsData, setAnalyticsData] = useState(null);
 
   // Pagination states
@@ -67,10 +69,13 @@ export default function BrokerCommissionPage() {
   // Pay modal fields
   const [payAmount, setPayAmount] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('Bank Transfer');
-  const [bankAccount, setBankAccount] = useState('HDFC Bank - 50200012345678');
+  const [bankAccount, setBankAccount] = useState('');
+  const [bankAccountsList, setBankAccountsList] = useState([]);
   const [paymentReference, setPaymentReference] = useState('');
   const [remarks, setRemarks] = useState('');
   const [paySubmitting, setPaySubmitting] = useState(false);
+  // The commission an approve / make-payable request is in flight for.
+  const [actionBusyId, setActionBusyId] = useState(null);
 
   // Create Lead Form fields
   const [leadFormData, setLeadFormData] = useState({
@@ -111,11 +116,35 @@ export default function BrokerCommissionPage() {
     return [];
   };
 
+  // The API camelizes every key; this screen reads snake_case, so mirror the
+  // fields it uses (amounts read as 0 and numbers/dates as blank otherwise).
+  const normalizeCommission = (c) => ({
+    ...c,
+    commission_number: c.commissionNumber ?? c.commission_number,
+    invoice_number: c.invoiceNumber ?? c.invoice_number,
+    invoice_date: c.invoiceDate ?? c.invoice_date,
+    invoice_amount: c.invoiceAmount ?? c.invoice_amount,
+    commission_basis: c.commissionBasis ?? c.commission_basis,
+    commission_type: c.commissionType ?? c.commission_type,
+    commission_amount: c.commissionAmount ?? c.commission_amount,
+    paid_amount: c.paidAmount ?? c.paid_amount,
+    party_name: c.partyName ?? c.party_name,
+    broker_name: c.brokerName ?? c.broker_name,
+    broker_code: c.brokerCode ?? c.broker_code,
+    broker_id: typeof c.broker === 'object' && c.broker ? c.broker.id : (c.brokerId ?? c.broker_id ?? c.broker),
+  });
+  const normalizeBroker = (b) => ({
+    ...b,
+    default_value: b.defaultValue ?? b.default_value,
+    commission_type: b.commissionType ?? b.commission_type,
+    contact_person: b.contactPerson ?? b.contact_person,
+  });
+
   // 1. Fetch Master Brokers
   const fetchBrokers = useCallback(async () => {
     try {
       const res = await salesService.getBrokersList();
-      setBrokersList(extractRows(res));
+      setBrokersList(extractRows(res).map(normalizeBroker));
     } catch (err) {
       console.error('Failed to load brokers:', err);
     }
@@ -146,7 +175,7 @@ export default function BrokerCommissionPage() {
         brokerId: selectedBrokerId || undefined,
         status: statusFilter || undefined,
       });
-      setCommissions(extractRows(res));
+      setCommissions(extractRows(res).map(normalizeCommission));
     } catch (err) {
       console.error('Failed to load broker commissions:', err);
     } finally {
@@ -159,23 +188,43 @@ export default function BrokerCommissionPage() {
     if (!selectedBrokerId) {
       setStatementData([]);
       setStatementMeta(null);
+      setStatementError('');
       return;
     }
+    // Clear the previous broker's figures so they never show under this one.
+    setStatementData([]);
+    setStatementMeta(null);
+    setStatementError('');
+    setStatementLoading(true);
     try {
-      setLoading(true);
       const res = await salesService.getBrokerStatement({ brokerId: selectedBrokerId });
       const data = res?.data || res || {};
       setStatementMeta(data);
       const rows = data?.commissions || [];
-      setStatementData(Array.isArray(rows) ? rows : []);
+      setStatementData(Array.isArray(rows) ? rows.map(normalizeCommission) : []);
     } catch (err) {
       console.error('Failed to load broker statement:', err);
+      setStatementError(err?.message || 'Could not load this broker\'s statement.');
     } finally {
-      setLoading(false);
+      setStatementLoading(false);
     }
   }, [selectedBrokerId]);
 
-  // 5. Fetch Analytics
+  // 5. Fetch Analytics & Bank Accounts
+  const fetchBankAccounts = useCallback(async () => {
+    try {
+      const res = await accountingService.getBankAccounts({ page_size: 100 });
+      const rows = Array.isArray(res) ? res : res?.results || res?.data || [];
+      setBankAccountsList(rows);
+      if (rows.length > 0) {
+        const def = rows.find((b) => b.is_default || b.isDefault) || rows[0];
+        if (def) setBankAccount(def.id);
+      }
+    } catch (err) {
+      console.error('Failed to load bank accounts:', err);
+    }
+  }, []);
+
   const fetchAnalytics = useCallback(async () => {
     try {
       const res = await salesService.getBrokerAnalytics();
@@ -187,8 +236,9 @@ export default function BrokerCommissionPage() {
 
   useEffect(() => {
     fetchBrokers();
+    fetchBankAccounts();
     fetchAnalytics();
-  }, [fetchBrokers, fetchAnalytics]);
+  }, [fetchBrokers, fetchBankAccounts, fetchAnalytics]);
 
   useEffect(() => {
     if (activeTab === 'leads') {
@@ -326,22 +376,32 @@ export default function BrokerCommissionPage() {
 
   // Commission Lifecycle Actions
   const handleApprove = async (id) => {
+    if (actionBusyId) return;
+    setActionBusyId(id);
     try {
       await salesService.approveBrokerCommission(id);
       fetchCommissions();
+      fetchStatement();
       fetchAnalytics();
     } catch (err) {
       alert(err?.response?.data?.message || err?.message || 'Approval failed.');
+    } finally {
+      setActionBusyId(null);
     }
   };
 
   const handleMakePayable = async (id) => {
+    if (actionBusyId) return;
+    setActionBusyId(id);
     try {
       await salesService.makeBrokerPayable(id);
       fetchCommissions();
+      fetchStatement();
       fetchAnalytics();
     } catch (err) {
       alert(err?.response?.data?.message || err?.message || 'Status change failed.');
+    } finally {
+      setActionBusyId(null);
     }
   };
 
@@ -351,12 +411,16 @@ export default function BrokerCommissionPage() {
     setPayAmount(String(outstanding.toFixed(2)));
     setPaymentReference('');
     setRemarks('');
+    if (bankAccountsList.length > 0) {
+      const def = bankAccountsList.find((b) => b.is_default || b.isDefault) || bankAccountsList[0];
+      if (def) setBankAccount(def.id);
+    }
     setShowPayModal(true);
   };
 
   const handlePaySubmit = async (e) => {
     e.preventDefault();
-    if (!selectedComm) return;
+    if (!selectedComm || paySubmitting) return;
     const amountNum = parseFloat(payAmount);
     const outstanding = Math.max(0, (Number(selectedComm.commission_amount) || 0) - (Number(selectedComm.paid_amount) || 0));
     if (isNaN(amountNum) || amountNum <= 0) {
@@ -383,7 +447,7 @@ export default function BrokerCommissionPage() {
       fetchStatement();
       fetchAnalytics();
     } catch (err) {
-      alert(err?.response?.data?.message || err?.message || 'Payment recording failed.');
+      alert(err?.payload?.message || err?.response?.data?.message || err?.message || 'Payment recording failed.');
     } finally {
       setPaySubmitting(false);
     }
@@ -418,7 +482,8 @@ export default function BrokerCommissionPage() {
         (c.invoice_number || c.invoiceNumber || '').toLowerCase().includes(q) ||
         (c.party_name || c.partyName || '').toLowerCase().includes(q) ||
         (c.commission_number || '').toLowerCase().includes(q);
-      const matchBroker = selectedBrokerId ? String(c.broker) === String(selectedBrokerId) || String(c.broker_id) === String(selectedBrokerId) : true;
+      const bId = c.broker_id || (typeof c.broker === 'object' ? c.broker?.id : c.broker) || c.brokerId;
+      const matchBroker = selectedBrokerId ? String(bId) === String(selectedBrokerId) : true;
       const matchStatus = statusFilter ? String(c.status).toLowerCase() === statusFilter.toLowerCase() : true;
       return matchText && matchBroker && matchStatus;
     });
@@ -429,11 +494,23 @@ export default function BrokerCommissionPage() {
     return filteredCommissions.slice(start, start + registerPageSize);
   }, [filteredCommissions, registerPage, registerPageSize]);
 
-  // Filtered Statement
+  // Filtered Statement (summary cards stay the broker's full totals)
+  const filteredStatement = useMemo(() => {
+    const q = search.toLowerCase();
+    return statementData.filter((row) => {
+      const matchText = !q ||
+        (row.invoice_number || '').toLowerCase().includes(q) ||
+        (row.party_name || '').toLowerCase().includes(q) ||
+        (row.commission_number || '').toLowerCase().includes(q);
+      const matchStatus = statusFilter ? String(row.status).toLowerCase() === statusFilter.toLowerCase() : true;
+      return matchText && matchStatus;
+    });
+  }, [statementData, search, statusFilter]);
+
   const pagedStatement = useMemo(() => {
     const start = (statementPage - 1) * statementPageSize;
-    return statementData.slice(start, start + statementPageSize);
-  }, [statementData, statementPage, statementPageSize]);
+    return filteredStatement.slice(start, start + statementPageSize);
+  }, [filteredStatement, statementPage, statementPageSize]);
 
   // Compute live summary stats
   const summaryStats = useMemo(() => {
@@ -504,6 +581,18 @@ export default function BrokerCommissionPage() {
     if (s === 'approved') {
       return <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-800 border border-indigo-200">Approved</span>;
     }
+    if (s === 'awaiting collection') {
+      return <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">Awaiting Collection</span>;
+    }
+    if (s === 'cancelled') {
+      return <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-rose-100 text-rose-800 border border-rose-200">Cancelled</span>;
+    }
+    if (s === 'hold') {
+      return <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 border border-amber-200">On Hold</span>;
+    }
+    if (s === 'accrued') {
+      return <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">Accrued</span>;
+    }
     if (s === 'lost deal (no commission)' || s.includes('lost')) {
       return <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-rose-100 text-rose-800 border border-rose-200">Lost (₹0)</span>;
     }
@@ -541,7 +630,7 @@ export default function BrokerCommissionPage() {
             className="px-4 py-2 text-xs font-semibold text-white bg-indigo-600 rounded-lg shadow hover:bg-indigo-700 transition-colors flex items-center gap-1.5"
           >
             <Plus size={15} />
-            + Create Lead with Broker
+            Create Lead with Broker
           </button>
         </div>
       </div>
@@ -558,8 +647,8 @@ export default function BrokerCommissionPage() {
         <KpiCard
           label="Accrued Brokerage"
           value={`₹${summaryStats.accrued.toLocaleString()}`}
-          sub="From linked invoices"
-          icon={DollarSign}
+          sub="Earned from customer collections"
+          icon={IndianRupee}
           tone="blue"
         />
         <KpiCard
@@ -617,9 +706,9 @@ export default function BrokerCommissionPage() {
           }`}
         >
           <FileText size={16} />
-          Commission Register (Invoice Accruals)
+          Commission Register (Customer Collections)
           <span className="ml-1 px-2 py-0.5 rounded-full text-xs bg-slate-100 text-slate-700">
-            {commissions.length}
+            {filteredCommissions.length}
           </span>
         </button>
         <button
@@ -630,7 +719,7 @@ export default function BrokerCommissionPage() {
               : 'border-transparent text-slate-500 hover:text-slate-800'
           }`}
         >
-          <DollarSign size={16} />
+          <IndianRupee size={16} />
           Broker Balances & Statement
         </button>
         <button
@@ -697,11 +786,14 @@ export default function BrokerCommissionPage() {
                 className="px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium text-slate-700"
               >
                 <option value="">All Commission Statuses</option>
+                <option value="Awaiting Collection">Awaiting Collection</option>
                 <option value="Accrued">Accrued</option>
                 <option value="Approved">Approved</option>
                 <option value="Payable">Payable</option>
                 <option value="Partially Paid">Partially Paid</option>
                 <option value="Paid">Paid</option>
+                <option value="Hold">On Hold</option>
+                <option value="Cancelled">Cancelled</option>
               </select>
             )}
 
@@ -872,7 +964,7 @@ export default function BrokerCommissionPage() {
                   <tr>
                     <td colSpan="11" className="text-center py-12 text-slate-400">
                       <AlertCircle className="w-8 h-8 text-slate-300 mx-auto mb-2" />
-                      No commissions recorded. Commissions accrue automatically when sales invoices with brokers are approved.
+                      No commissions recorded. Commission is earned as customer payments are received.
                     </td>
                   </tr>
                 ) : (
@@ -894,7 +986,14 @@ export default function BrokerCommissionPage() {
                           <div className="font-semibold text-slate-800">{c.broker_name || c.brokerName || c.broker?.name}</div>
                           <div className="text-xs text-slate-400">{c.brokerCode || ''}</div>
                         </td>
-                        <td className="py-3 px-4 text-slate-800">{c.party_name || c.partyName || '-'}</td>
+                        <td className="py-3 px-4 text-slate-800">
+                          <div>{c.party_name || c.partyName || '-'}</div>
+                          {c.leadNumber && (
+                            <div className="text-xs text-slate-400">
+                              Lead {c.leadNumber}{c.leadName ? ` · ${c.leadName}` : ''}
+                            </div>
+                          )}
+                        </td>
                         <td className="py-3 px-4 text-center">
                           {renderBasisBadge(c.commission_type || c.commission_basis, c.rate)}
                         </td>
@@ -918,6 +1017,7 @@ export default function BrokerCommissionPage() {
                             {c.status === 'Accrued' && (
                               <button
                                 onClick={() => handleApprove(c.id)}
+                                disabled={actionBusyId === c.id}
                                 className="px-2 py-1 text-xs font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded border border-indigo-200 transition-colors"
                               >
                                 Approve
@@ -926,6 +1026,7 @@ export default function BrokerCommissionPage() {
                             {c.status === 'Approved' && (
                               <button
                                 onClick={() => handleMakePayable(c.id)}
+                                disabled={actionBusyId === c.id}
                                 className="px-2 py-1 text-xs font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 rounded border border-blue-200 transition-colors"
                               >
                                 Make Payable
@@ -1038,10 +1139,25 @@ export default function BrokerCommissionPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {pagedStatement.length === 0 ? (
+                      {statementLoading ? (
                         <tr>
                           <td colSpan="8" className="p-8 text-center text-slate-400">
-                            No ledger entries found for this broker.
+                            Loading ledger…
+                          </td>
+                        </tr>
+                      ) : statementError ? (
+                        <tr>
+                          <td colSpan="8" className="p-8 text-center text-red-600">
+                            {statementError}{' '}
+                            <button onClick={fetchStatement} className="font-semibold underline">Retry</button>
+                          </td>
+                        </tr>
+                      ) : pagedStatement.length === 0 ? (
+                        <tr>
+                          <td colSpan="8" className="p-8 text-center text-slate-400">
+                            {statementData.length === 0
+                              ? 'No ledger entries found for this broker.'
+                              : 'No ledger entries match the current search or status filter.'}
                           </td>
                         </tr>
                       ) : (
@@ -1053,8 +1169,10 @@ export default function BrokerCommissionPage() {
                           return (
                             <tr key={row.id} className="hover:bg-slate-50/75">
                               <td className="p-3 font-semibold text-slate-800">
-                                {row.commission_number || row.invoice_number || 'Direct'}
-                                <div className="text-xs text-slate-400 font-normal">{row.invoice_date || '-'}</div>
+                                {row.invoice_number || row.commission_number || 'Direct'}
+                                <div className="text-xs text-slate-400 font-normal">
+                                  {row.invoice_number && row.commission_number ? `${row.commission_number} · ` : ''}{row.invoice_date || '-'}
+                                </div>
                               </td>
                               <td className="p-3 text-slate-700">{row.party_name || row.partyName || '-'}</td>
                               <td className="p-3">{renderBasisBadge(row.commission_type || row.commission_basis, row.rate)}</td>
@@ -1073,7 +1191,7 @@ export default function BrokerCommissionPage() {
                 <TablePagination
                   page={statementPage}
                   pageSize={statementPageSize}
-                  totalItems={statementData.length}
+                  totalItems={filteredStatement.length}
                   onPageChange={setStatementPage}
                   onPageSizeChange={(sz) => { setStatementPageSize(sz); setStatementPage(1); }}
                 />
@@ -1100,7 +1218,7 @@ export default function BrokerCommissionPage() {
             <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-semibold text-slate-400 uppercase">Invoiced Revenue via Brokers</span>
-                <DollarSign className="w-5 h-5 text-emerald-500" />
+                <IndianRupee className="w-5 h-5 text-emerald-500" />
               </div>
               <div className="text-2xl font-bold text-emerald-700 mt-2">
                 ₹{Number(analyticsData?.totalInvoicedBroker || 0).toLocaleString()}
@@ -1581,7 +1699,7 @@ export default function BrokerCommissionPage() {
           <div className="bg-white rounded-xl shadow-2xl border border-slate-200 w-full max-w-lg">
             <div className="p-5 border-b border-slate-200 flex items-center justify-between bg-slate-50/50">
               <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                <DollarSign size={20} className="text-emerald-600" />
+                <IndianRupee size={20} className="text-emerald-600" />
                 Issue Brokerage Payout Voucher
               </h2>
               <button
@@ -1656,10 +1774,21 @@ export default function BrokerCommissionPage() {
                     onChange={(e) => setBankAccount(e.target.value)}
                     className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg bg-white focus:ring-2 focus:ring-emerald-500 focus:outline-none text-xs"
                   >
-                    <option value="HDFC Bank - 50200012345678">HDFC Bank (Operating A/c)</option>
-                    <option value="State Bank of India - 3001298492">SBI Current A/c</option>
-                    <option value="ICICI Bank - 001205012345">ICICI Cash Credit</option>
-                    <option value="Cash in Hand">Petty Cash</option>
+                    {bankAccountsList.length > 0 ? (
+                      bankAccountsList.map((b) => (
+                        <option key={b.id} value={b.id}>
+                          {b.name || b.bank_name || b.bankName} {b.account_number ? `(${b.account_number})` : ''}
+                        </option>
+                      ))
+                    ) : (
+                      <>
+                        <option value="">Primary Operating Bank Account</option>
+                        <option value="HDFC Bank">HDFC Bank (Operating A/c)</option>
+                        <option value="State Bank of India">SBI Current A/c</option>
+                        <option value="ICICI Bank">ICICI Cash Credit</option>
+                        <option value="Cash">Cash in Hand</option>
+                      </>
+                    )}
                   </select>
                 </div>
               </div>

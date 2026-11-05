@@ -14,7 +14,7 @@
  * With no auth token the module is inert: every push resolves to `null` and the
  * app keeps behaving exactly as it did before it had a backend.
  */
-import { api, ApiError, getAllPages } from './api';
+import { api, ApiError } from './api';
 import { mapWithLimit } from './resourceSync';
 import { getStoredToken } from '../utils/authUtils';
 import { formatDateDDMMYYYY, toISODate } from '../utils/dateUtils';
@@ -85,9 +85,6 @@ function lineToApi(line, index) {
     // Lot/taka items: [{ lotTakaId, qty }] -- empty means FIFO on dispatch.
     takaAllocations: Array.isArray(line.takaAllocations) && line.takaAllocations.length
       ? line.takaAllocations : undefined,
-    // On a sales order the picked takas are the reservation (Available -> Reserved).
-    reservedTakas: Array.isArray(line.takaAllocations) && line.takaAllocations.length
-      ? line.takaAllocations : undefined,
   });
 }
 
@@ -146,7 +143,10 @@ function documentToApi(doc, { partyField = 'partyId', partyKeys = [] } = {}, { p
     // the HRMS employee id or the name to `salesperson_fk` (incentive basis).
     salesperson: doc.salesperson || doc.salesPerson || undefined,
     salespersonId: link(doc.salespersonId),
-    broker: doc.broker || undefined,
+    broker: doc.broker !== undefined ? (doc.broker || '') : undefined,
+    brokerId: doc.brokerId !== undefined
+      ? (doc.brokerId ? link(doc.brokerId) : null)
+      : undefined,
     paymentTerms: doc.paymentTerms || undefined,
     creditDays: doc.creditDays !== undefined ? num(doc.creditDays) : undefined,
     vehicleNo: doc.vehicleNo || doc.vehicleNumber || undefined,
@@ -155,18 +155,7 @@ function documentToApi(doc, { partyField = 'partyId', partyKeys = [] } = {}, { p
     freightCharges: !partial || doc.freightCharges !== undefined ? (doc.freightCharges !== undefined ? num(doc.freightCharges) : undefined) : undefined,
     otherCharges: !partial || doc.otherCharges !== undefined ? (doc.otherCharges !== undefined ? num(doc.otherCharges) : undefined) : undefined,
     roundOff: !partial || doc.roundOff !== undefined ? (doc.roundOff !== undefined ? num(doc.roundOff) : undefined) : undefined,
-    // A quotation addressed by hand (no customer or lead row): the name and
-    // details typed on the form. Only quotations accept a typed name.
-    ...(doc.manualParty ? {
-      partyName: doc.manualParty.name,
-      partyGstin: doc.manualParty.gstin || null,
-      placeOfSupply: doc.manualParty.state || null,
-      billingAddress: doc.manualParty.billingAddress || {},
-    } : {}),
-    // null clears an earlier override (the server then sums the line discounts).
-    discountOverride: doc.discountTotal === null
-      ? null
-      : (!partial || doc.discountTotal !== undefined ? (doc.discountTotal !== undefined ? num(doc.discountTotal) : undefined) : undefined),
+    discountOverride: !partial || doc.discountTotal !== undefined ? (doc.discountTotal !== undefined ? num(doc.discountTotal) : undefined) : undefined,
     lineItems: !partial || doc.lineItems !== undefined || doc.items !== undefined ? lines.map(lineToApi) : undefined,
   });
 }
@@ -191,6 +180,9 @@ function documentFromApi(row, { numberField, partyLabel = 'customer' } = {}) {
     salesPerson: row.salesperson || '',
     salespersonId: row.salespersonId || '',
     broker: row.broker || '',
+    brokerId: row.brokerId || '',
+    brokerName: row.brokerName || row.broker || '',
+    brokerCode: row.brokerCode || '',
     paymentTerms: row.paymentTerms || '',
     creditDays: row.creditDays !== undefined ? num(row.creditDays) : 0,
     vehicleNo: row.vehicleNo || row.vehicleNumber || '',
@@ -212,6 +204,11 @@ function documentFromApi(row, { numberField, partyLabel = 'customer' } = {}) {
     balanceDue: num(row.balanceDue),
     status: row.displayStatus || row.status,
     finalized: Boolean(row.postedAt),
+    salesOrderId: row.salesOrderId || row.sales_order || row.salesOrder || undefined,
+    salesOrderNumber: row.salesOrderNumber || row.sales_order_number || row.salesOrderRef || undefined,
+    deliveryChallanId: row.deliveryChallanId || row.delivery_challan || row.deliveryChallan || undefined,
+    challanId: row.challanId || row.delivery_challan || row.deliveryChallan || undefined,
+    challanNumber: row.challanNumber || row.challan_number || undefined,
     ...(numberField ? { [numberField]: serverNumber } : {}),
     ...(numberAlias ? { [numberAlias]: serverNumber || row[numberAlias] } : {}),
     // Server links arrive camelized (`crmDeal`/`crmLead`); the screens read
@@ -415,13 +412,24 @@ export const RESOURCES = {
     toApi: (loc) => compact({
       name: loc.name,
       code: loc.code || undefined,
-      type: loc.type || undefined,
+      type: loc.type || 'Warehouse',
+      city: loc.city || undefined,
+      state: loc.state || undefined,
+      pin_code: loc.pin_code || loc.pincode || undefined,
+      manager: loc.manager || undefined,
+      contact_number: loc.contact_number || loc.phone || undefined,
+      description: loc.description || undefined,
+      is_active: loc.is_active !== undefined ? loc.is_active : (loc.isActive !== undefined ? loc.isActive : undefined),
       address: loc.address || undefined,
     }),
     fromApi: (row) => ({
       ...row,
       manager: row.manager || 'Operations Lead',
       capacityPct: row.capacityPct ?? 0,
+      city: row.city || '',
+      state: row.state || '',
+      pin_code: row.pin_code || row.pincode || '',
+      contact_number: row.contact_number || row.phone || '',
       _synced: true,
     }),
   },
@@ -495,7 +503,25 @@ export const RESOURCES = {
 
   // Sales pipeline (api.md §5)
   quotations: documentResource('/sales/quotations/', { numberField: 'quotationNumber' }),
-  salesOrders: documentResource('/sales/orders/', { numberField: 'orderNumber' }),
+  salesOrders: (() => {
+    const base = documentResource('/sales/orders/', { numberField: 'orderNumber' });
+    return {
+      ...base,
+      fromApi: (row) => ({
+        ...base.fromApi(row),
+        // Carry the server's invoice-lifecycle fields so the register can
+        // determine "has invoice" from the SO row itself after a refresh,
+        // without waiting for the full `invoices` collection to load.
+        invoiceStatus: row.invoiceStatus || row.invoice_status || undefined,
+        hasInvoice: row.hasInvoice ?? row.has_invoice ?? undefined,
+        linkedInvoiceId: row.linkedInvoiceId || row.linked_invoice_id || undefined,
+        linkedInvoiceNumber: row.linkedInvoiceNumber || row.linked_invoice_number || undefined,
+        hasChallan: row.hasChallan ?? row.has_challan ?? undefined,
+        linkedChallanId: row.linkedChallanId || row.linked_challan_id || undefined,
+        linkedChallanNumber: row.linkedChallanNumber || row.linked_challan_number || undefined,
+      }),
+    };
+  })(),
   proformaInvoices: documentResource('/sales/proforma-invoices/', { numberField: 'piNumber' }),
   deliveryChallans: documentResource('/sales/challans/', { numberField: 'challanNumber' }),
   invoices: (() => {
@@ -530,6 +556,8 @@ export const RESOURCES = {
         const payload = base.toApi(doc, opts);
         if (doc.fabricFlow !== undefined) payload.fabricFlow = doc.fabricFlow || null;
         if (doc.dyeingMillId !== undefined) payload.dyeingMillId = doc.dyeingMillId || null;
+        if (doc.dyeingColourName !== undefined) payload.dyeingColourName = doc.dyeingColourName || null;
+        if (doc.dyeingColourHex !== undefined) payload.dyeingColourHex = doc.dyeingColourHex || null;
         if (Array.isArray(doc.yarnLines)) payload.yarnLines = doc.yarnLines;
         if (Array.isArray(doc.expenses)) payload.expenses = doc.expenses;
         return payload;
@@ -623,18 +651,19 @@ export const RESOURCES = {
   paymentIns: {
     path: '/sales/payments/',
     toApi: (p) => compact({
-      customerId: p.customerId || p.partyId,
+      customerId: p.customerId || p.partyId || p.party,
       date: isoOut(p.date) || isoOut('Today'),
       amount: num(p.amount),
-      mode: p.mode || 'Bank Transfer',
+      mode: p.mode || 'Bank Wire Direct',
       bankAccountId: p.bankAccountId || undefined,
       referenceNumber: p.reference || p.referenceNumber || undefined,
-      transactionReference: p.transactionReference || undefined,
+      reference_number: p.reference || p.referenceNumber || undefined,
       notes: p.notes || undefined,
       invoiceId: p.invoiceId || p.linkedInvoiceId || undefined,
     }),
     fromApi: (row) => ({
       ...row,
+      receiptNumber: row.payment_number || row.receiptNumber,
       date: displayIn(row.date),
       customer: row.customerName,
       reference: row.referenceNumber,
@@ -928,8 +957,7 @@ export const RESOURCES = {
 export const PULL_ORDER = [
   'categories', 'units', 'locations', 'fabrics', 'items',
   'parties', 'customers', 'vendors',
-  // [Quotation & Proforma Invoice modules are commented out] — 'quotations' and 'proformaInvoices' are not pulled.
-  /* 'quotations', */ 'salesOrders', /* 'proformaInvoices', */
+  'quotations', 'salesOrders', 'proformaInvoices',
   'deliveryChallans', 'invoices', 'paymentIns', 'salesReturns',
   'purchaseOrders', 'purchaseBills', 'vendorBills', 'paymentOuts', 'purchaseReturns', 'expenses',
   'transfers', 'serviceUsages', 'valuationItems', 'monthEndAudits',
@@ -938,6 +966,8 @@ export const PULL_ORDER = [
 ];
 
 // ── transport ───────────────────────────────────────────────────────────────
+
+const PAGE_SIZE = 200;
 
 /** One key per create attempt; `randomUUID` needs a secure context. */
 function newIdempotencyKey() {
@@ -954,8 +984,10 @@ export async function pullResource(key) {
   const resource = RESOURCES[key];
   if (!resource) return null;
   try {
-    // Every page: one 200-row read used to leave the rest of the collection behind.
-    const rows = await getAllPages(resource.pullPath || resource.path);
+    const body = await api.get(resource.pullPath || resource.path, {
+      query: { limit: PAGE_SIZE },
+    });
+    const rows = Array.isArray(body) ? body : (body?.results || []);
     return rows.map(resource.fromApi || ((r) => r));
   } catch (err) {
     console.warn(`[backendSync] pull ${key} failed:`, err?.message || err);

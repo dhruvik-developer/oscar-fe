@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Receipt,
   FileText,
@@ -16,6 +16,8 @@ import {
   Lock,
 } from 'lucide-react';
 import { api } from '../../services/api';
+import { uploadFileToBackend } from '../../services/fileUploadService';
+import { newIdempotencyKey } from '../../services/resourceSync';
 import { useERP } from '../../context/ERPContext';
 
 function numIN(val) {
@@ -23,7 +25,15 @@ function numIN(val) {
   return n.toLocaleString('en-IN', { maximumFractionDigits: 2 });
 }
 
-export function VendorBillInlineSlide({ po, instruction, onClose, onBillSaved, onNextStep, onPrevStep }) {
+/**
+ * `createOnly` is the Pay Vendor Bill workspace's manual entry: always a new
+ * bill, nothing assumed from the PO, and matching left for after it is saved.
+ * `billableLines`, `poSummary` and `vendor` then come from the po-details API.
+ */
+export function VendorBillInlineSlide({
+  po, instruction, onClose, onBillSaved, onNextStep, onPrevStep,
+  createOnly = false, billableLines = [], poSummary = null, vendor = null,
+}) {
   const {
     formatDateDDMMYYYY,
     getPoBilledStatus,
@@ -39,13 +49,15 @@ export function VendorBillInlineSlide({ po, instruction, onClose, onBillSaved, o
   const [poDetails, setPoDetails] = useState(null);
 
   const [vendorBillNumber, setVendorBillNumber] = useState('');
-  const [billDate, setBillDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [billDate, setBillDate] = useState(() => (createOnly ? '' : new Date().toISOString().split('T')[0]));
   const [dueDate, setDueDate] = useState(() => {
     const d = new Date();
     d.setDate(d.getDate() + 30);
     return d.toISOString().split('T')[0];
   });
-  const [gstPct, setGstPct] = useState(5);
+  const [gstPct, setGstPct] = useState(createOnly ? '' : 5);
+  const [otherCharges, setOtherCharges] = useState('');
+  const [attachment, setAttachment] = useState(null);
   const [remarks, setRemarks] = useState('');
   const [approvalRemarks, setApprovalRemarks] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
@@ -54,9 +66,13 @@ export function VendorBillInlineSlide({ po, instruction, onClose, onBillSaved, o
   const poId = po?.id;
   const poNumber = po?.poNumber || poId;
   const poInfo = getPoBilledStatus ? getPoBilledStatus(poId) : { activeBills: [], totalBilledQty: 0 };
+  // One key per form: a retried save replays the first bill, and an uploaded
+  // invoice is not uploaded again when the save has to be corrected.
+  const saveKeyRef = useRef(newIdempotencyKey());
+  const uploadedRef = useRef({ file: null, fileId: null });
 
   const loadData = async () => {
-    if (!poId) return;
+    if (!poId || createOnly) return;
     try {
       setLoading(true);
       setErrorMsg('');
@@ -185,23 +201,35 @@ export function VendorBillInlineSlide({ po, instruction, onClose, onBillSaved, o
     });
   }, [rawItems, expectedBillableQty, expectedRate, instruction]);
 
-  const [formLines, setFormLines] = useState(defaultLines);
+  // Qty and rate stay empty in createOnly: they come from the vendor's invoice.
+  const [formLines, setFormLines] = useState(() => (createOnly
+    ? billableLines
+      .filter((row) => Number(row.remainingBillableQty) > 0)
+      .map((row) => ({
+        ...row,
+        id: row.batchId || `${row.grnId || 'po'}-${row.itemId}`,
+        poRate: Number(row.originalPoRate) || 0,
+        billingQty: '',
+        rate: '',
+        amount: 0,
+      }))
+    : defaultLines));
 
   useEffect(() => {
-    if (defaultLines.length > 0) {
+    if (!createOnly && defaultLines.length > 0) {
       setFormLines(defaultLines);
     }
-  }, [defaultLines]);
+  }, [createOnly, defaultLines]);
 
   const handleLineQtyChange = (idx, newQty) => {
-    const qty = Number(newQty) || 0;
+    const qty = newQty === '' ? '' : Number(newQty) || 0;
     setFormLines((prev) =>
       prev.map((l, i) => (i === idx ? { ...l, billingQty: qty, amount: round2(qty * l.rate) } : l))
     );
   };
 
   const handleLineRateChange = (idx, newRate) => {
-    const rate = Number(newRate) || 0;
+    const rate = newRate === '' ? '' : Number(newRate) || 0;
     setFormLines((prev) =>
       prev.map((l, i) => (i === idx ? { ...l, rate, amount: round2(l.billingQty * rate) } : l))
     );
@@ -337,6 +365,66 @@ export function VendorBillInlineSlide({ po, instruction, onClose, onBillSaved, o
     }
   };
 
+  // ── Save a new bill from the vendor's invoice (Pay Vendor Bill workspace) ──
+  const handleCreateBill = async (e) => {
+    e.preventDefault();
+    if (submitting) return;
+    setErrorMsg('');
+
+    const entered = formLines.filter((l) => Number(l.billingQty) > 0);
+    if (!vendorBillNumber.trim()) return setErrorMsg('Enter the vendor invoice number.');
+    if (!billDate) return setErrorMsg('Enter the invoice date.');
+    if (gstPct === '') return setErrorMsg('Select the GST on this invoice.');
+    if (entered.length === 0) return setErrorMsg('Enter the billed quantity on at least one line.');
+    if (entered.some((l) => !(Number(l.rate) > 0))) {
+      return setErrorMsg('Enter the actual vendor rate for every billed line.');
+    }
+
+    const grnIds = [...new Set(entered.map((l) => l.grnId).filter(Boolean))];
+    setSubmitting(true);
+    try {
+      if (attachment && uploadedRef.current.file !== attachment) {
+        const fileId = await uploadFileToBackend(attachment, attachment.name, 'other');
+        uploadedRef.current = { file: attachment, fileId };
+      }
+      const savedVb = await api.post('/purchase/vendor-bills/', {
+        vendorBillNumber: vendorBillNumber.trim(),
+        billDate,
+        vendorId: vendor?.vendorId || undefined,
+        purchaseOrderId: poId,
+        grnId: grnIds.length === 1 ? grnIds[0] : undefined,
+        gstPct: Number(gstPct),
+        otherCharges: Number(otherCharges) || 0,
+        attachmentFileId: attachment ? uploadedRef.current.fileId : undefined,
+        remarks: remarks.trim() || undefined,
+        lineItems: entered.map((l, index) => ({
+          lineNo: index + 1,
+          batchId: l.batchId || undefined,
+          batchNumber: l.batchCode || undefined,
+          grnId: l.grnId || undefined,
+          itemId: l.itemId || undefined,
+          uom: l.uom || undefined,
+          qty: Number(l.billingQty),
+          rate: Number(l.rate),
+        })),
+      }, { idempotencyKey: saveKeyRef.current });
+      showToast?.(`Vendor bill ${vendorBillNumber.trim()} saved.`);
+      if (onBillSaved) await onBillSaved(savedVb?.data || savedVb);
+    } catch (err) {
+      console.error('Failed to save vendor bill:', err);
+      const fieldErrors = err?.payload?.field_errors;
+      const firstField = fieldErrors && Object.values(fieldErrors)[0];
+      setErrorMsg(
+        (Array.isArray(firstField) ? firstField[0] : firstField)
+        || err?.payload?.message || err?.message || 'Failed to save vendor bill.',
+      );
+      // The key of a refused save is spent: the corrected form is a new request.
+      saveKeyRef.current = newIdempotencyKey();
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   // ── Route to Approval / Approve with Variance ──
   const handleApproveMismatch = async () => {
     if (!activeVendorBill?.id) return;
@@ -400,6 +488,189 @@ export function VendorBillInlineSlide({ po, instruction, onClose, onBillSaved, o
     return Math.round((Number(v) || 0) * 100) / 100;
   }
 
+  if (createOnly) {
+    const enteredSubtotal = round2(formSubtotal);
+    const enteredGst = round2(enteredSubtotal * (Number(gstPct) / 100));
+    const enteredTotal = round2(enteredSubtotal + enteredGst + (Number(otherCharges) || 0));
+    const inputCls = 'w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500';
+
+    return (
+      <form onSubmit={handleCreateBill} className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 shadow-sm space-y-4">
+        <div className="flex items-center justify-between gap-3 pb-3 border-b border-slate-100">
+          <div>
+            <h3 className="text-sm font-extrabold text-slate-900 flex items-center gap-2">
+              <Receipt size={16} className="text-indigo-600" />
+              Create Vendor Bill
+            </h3>
+            <p className="text-[11px] text-slate-500 mt-0.5">
+              Enter the vendor's invoice as received. Matching runs after the bill is saved.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-3 py-1.5 text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
+          >
+            &larr; Back to Workspace
+          </button>
+        </div>
+
+        {/* From the selected PO: shown, not asked for */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs">
+          <div>
+            <span className="text-[10px] uppercase font-bold text-slate-500 block">Purchase Order</span>
+            <strong className="font-mono text-slate-900">{poSummary?.poNumber || poNumber}</strong>
+          </div>
+          <div>
+            <span className="text-[10px] uppercase font-bold text-slate-500 block">Vendor</span>
+            <strong className="text-slate-900 flex items-center gap-1"><Building2 size={12} />{vendor?.vendorName || poSummary?.vendorName}</strong>
+          </div>
+          <div>
+            <span className="text-[10px] uppercase font-bold text-slate-500 block">Fabric</span>
+            <strong className="text-slate-900">{poSummary?.fabricQuality}</strong>
+          </div>
+          <div>
+            <span className="text-[10px] uppercase font-bold text-slate-500 block">Available to Bill</span>
+            <strong className="font-mono text-slate-900">{numIN(poSummary?.remainingBillableQty)} of {numIN(poSummary?.receivedQty)} received</strong>
+          </div>
+        </div>
+
+        {errorMsg && (
+          <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-800 flex items-center gap-2">
+            <AlertTriangle size={15} className="shrink-0 text-rose-600" />
+            <span>{errorMsg}</span>
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+          <div>
+            <label className="text-[11px] font-bold text-slate-600 block mb-1">Vendor Invoice Number *</label>
+            <input
+              type="text"
+              required
+              value={vendorBillNumber}
+              onChange={(e) => setVendorBillNumber(e.target.value)}
+              className={`${inputCls} font-mono`}
+            />
+          </div>
+          <div>
+            <label className="text-[11px] font-bold text-slate-600 block mb-1">Invoice Date *</label>
+            <input type="date" required value={billDate} onChange={(e) => setBillDate(e.target.value)} className={inputCls} />
+          </div>
+          <div>
+            <label className="text-[11px] font-bold text-slate-600 block mb-1">GST (%) *</label>
+            <select
+              required
+              value={gstPct}
+              onChange={(e) => setGstPct(e.target.value === '' ? '' : Number(e.target.value))}
+              className={`${inputCls} font-semibold`}
+            >
+              <option value="">Select GST</option>
+              <option value={0}>0% (Tax Exempt)</option>
+              <option value={5}>5%</option>
+              <option value={12}>12%</option>
+              <option value={18}>18%</option>
+            </select>
+          </div>
+          <div>
+            <label className="text-[11px] font-bold text-slate-600 block mb-1">Other Invoice Charges (₹)</label>
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              value={otherCharges}
+              onChange={(e) => setOtherCharges(e.target.value)}
+              className={inputCls}
+            />
+          </div>
+        </div>
+
+        <div className="border border-slate-200 rounded-xl overflow-x-auto">
+          <table className="w-full text-left text-xs">
+            <thead className="bg-slate-50 font-bold text-slate-600 border-b border-slate-200 uppercase text-[10px]">
+              <tr>
+                <th className="py-2.5 px-3">Batch / GRN</th>
+                <th className="py-2.5 px-3">Fabric</th>
+                <th className="py-2.5 px-3 text-right">Received</th>
+                <th className="py-2.5 px-3 text-right">Available</th>
+                <th className="py-2.5 px-3 text-right">PO Rate</th>
+                <th className="py-2.5 px-3">Billed Qty</th>
+                <th className="py-2.5 px-3">Vendor Rate (₹)</th>
+                <th className="py-2.5 px-3 text-right">Amount</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 text-slate-700">
+              {formLines.map((l, idx) => (
+                <tr key={l.id}>
+                  <td className="py-2 px-3 font-mono font-medium text-slate-900">
+                    {[l.batchCode, l.grnNumber].filter(Boolean).join(' / ') || '—'}
+                  </td>
+                  <td className="py-2 px-3">{l.itemName}</td>
+                  <td className="py-2 px-3 text-right font-mono">{numIN(l.receivedQty)}</td>
+                  <td className="py-2 px-3 text-right font-mono font-bold">{numIN(l.remainingBillableQty)}</td>
+                  <td className="py-2 px-3 text-right font-mono text-slate-500">₹{numIN(l.poRate)}</td>
+                  <td className="py-2 px-3">
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={l.billingQty}
+                      onChange={(e) => handleLineQtyChange(idx, e.target.value)}
+                      className="w-24 px-2 py-1 text-xs border border-slate-300 rounded bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 font-bold"
+                    />
+                  </td>
+                  <td className="py-2 px-3">
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={l.rate}
+                      onChange={(e) => handleLineRateChange(idx, e.target.value)}
+                      className="w-24 px-2 py-1 text-xs border border-slate-300 rounded bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 font-bold"
+                    />
+                  </td>
+                  <td className="py-2 px-3 text-right font-mono font-bold text-slate-900">₹{numIN(l.amount)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label className="text-[11px] font-bold text-slate-600 block mb-1">Invoice Attachment</label>
+            <input
+              type="file"
+              accept=".pdf,.png,.jpg,.jpeg"
+              onChange={(e) => setAttachment(e.target.files?.[0] || null)}
+              className={inputCls}
+            />
+          </div>
+          <div>
+            <label className="text-[11px] font-bold text-slate-600 block mb-1">Remarks</label>
+            <input type="text" value={remarks} onChange={(e) => setRemarks(e.target.value)} className={inputCls} />
+          </div>
+        </div>
+
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-3 border-t border-slate-100">
+          <div className="flex items-center gap-3 text-xs text-slate-600">
+            <span>Subtotal: <strong className="font-mono">₹{numIN(enteredSubtotal)}</strong></span>
+            <span>GST: <strong className="font-mono">₹{numIN(enteredGst)}</strong></span>
+            <span>Total: <strong className="font-mono text-indigo-700">₹{numIN(enteredTotal)}</strong></span>
+          </div>
+          <button
+            type="submit"
+            disabled={submitting}
+            className="w-full sm:w-auto px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm transition-colors disabled:opacity-50"
+          >
+            {submitting ? <RefreshCw size={13} className="animate-spin" /> : <Check size={14} />}
+            <span>{submitting ? 'Saving...' : 'Save Vendor Bill'}</span>
+          </button>
+        </div>
+      </form>
+    );
+  }
+
   return (
     <div className="rounded-2xl border-2 border-indigo-500/80 bg-gradient-to-b from-indigo-50/50 via-white to-white p-4 sm:p-5 shadow-md space-y-4 animate-in fade-in slide-in-from-top-3 duration-300">
       {/* ── Slide Header ── */}
@@ -410,9 +681,6 @@ export function VendorBillInlineSlide({ po, instruction, onClose, onBillSaved, o
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="px-2 py-0.5 rounded text-[10px] font-black bg-indigo-100 text-indigo-800 uppercase tracking-wider">
-                Stage 8 Reconciliation
-              </span>
               <h3 className="text-sm font-extrabold text-slate-900">
                 Vendor Bill Matching & 3-Way Reconciliation
               </h3>
@@ -940,9 +1208,6 @@ export function VendorBillInlineSlide({ po, instruction, onClose, onBillSaved, o
               <span>Previous: Grey Stock Updated</span>
             </button>
           )}
-          <span className="text-[11px] text-slate-500 font-medium hidden md:inline">
-            Stage 8 • Vendor Bill Matching & 3-Way Reconciliation
-          </span>
         </div>
 
         <div className="flex items-center gap-2">

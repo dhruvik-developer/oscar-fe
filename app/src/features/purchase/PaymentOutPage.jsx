@@ -33,7 +33,7 @@ const paymentOutGuide = {
         'Always verify the vendor bill reference number before disbursing funds to prevent duplicate payment vouchers.',
     ],
 };
-export const PaymentOutPage = () => {
+export const PaymentOutPage = ({ embedded = false }) => {
     const { paymentOuts, purchaseBills, purchaseOrders, vendors, bankAccounts, addPaymentOut, applyVendorAdvanceToBill, getVendorAdvanceBalance, getBillOutstanding, formatCurrency, formatDateDDMMYYYY, getCurrentISODate } = useERP();
     const [showAddModal, setShowAddModal] = useState(false);
     const [selectedBillId, setSelectedBillId] = useState('');
@@ -57,7 +57,7 @@ export const PaymentOutPage = () => {
     };
 
     const handleOpenModal = () => {
-        const defaultBill = purchaseBills.find(b => b.status !== 'Cancelled' && getBillOutstanding(b.id).balanceDue > 0);
+        const defaultBill = purchaseBills.find(b => !['Cancelled', 'Draft'].includes(b.status) && getBillOutstanding(b.id).balanceDue > 0);
         handleBillSelect(defaultBill?.id || '');
         setPaymentType('Final');
         setSelectedPoId('');
@@ -205,9 +205,21 @@ export const PaymentOutPage = () => {
     const electronicCount = activePayments.filter((p) => p.mode && p.mode !== 'Cash' && p.mode !== 'Cheque').length;
 
     return (<div className="space-y-6">
-      <PageHeader title="Payment Out Vouchers" subtitle="Vendor disbursements, ACH/Wire payment authorizations, automatic bank debit, and Accounts Payable liability reduction." guide={paymentOutGuide} actions={<Button icon={Plus} onClick={handleOpenModal}>
+      {!embedded ? (
+        <PageHeader title="Payment Out Vouchers" subtitle="Vendor disbursements, ACH/Wire payment authorizations, automatic bank debit, and Accounts Payable liability reduction." guide={paymentOutGuide} actions={<Button icon={Plus} onClick={handleOpenModal}>
+              New Payment Voucher
+            </Button>}/>
+      ) : (
+        <div className="flex flex-wrap items-center justify-between gap-3 pb-1">
+          <div>
+            <h2 className="text-base font-bold text-slate-900">Payments & Disbursements</h2>
+            <p className="text-xs text-slate-500">Vendor disbursements, ACH/Wire authorizations, and Accounts Payable settlements.</p>
+          </div>
+          <Button icon={Plus} onClick={handleOpenModal}>
             New Payment Voucher
-          </Button>}/>
+          </Button>
+        </div>
+      )}
 
       {/* Payment Out KPI Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -349,7 +361,7 @@ export const PaymentOutPage = () => {
                     <label className="block font-semibold text-slate-700 mb-1">Target Vendor Bill *</label>
                     <select required value={selectedBillId} onChange={(e) => handleBillSelect(e.target.value)} className="w-full border border-slate-300 rounded-lg p-2 bg-white text-slate-800 font-medium">
                       <option value="">Select bill</option>
-                      {purchaseBills.map((b) => {
+                      {purchaseBills.filter((b) => b.status !== 'Draft').map((b) => {
                         const outstanding = getBillOutstanding(b.id);
                         const tag = b.status === 'Cancelled' ? ' [Cancelled]' : outstanding.balanceDue <= 0.01 ? ' [Settled]' : ` [Due: ${formatCurrency(outstanding.balanceDue)}]`;
                         return (

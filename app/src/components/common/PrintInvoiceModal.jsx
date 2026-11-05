@@ -5,7 +5,7 @@ import { useERP } from '../../context/ERPContext';
 import { fmtAddress } from './printDocUtils';
 export const PrintInvoiceModal = ({ isOpen, onClose, invoice, balanceDue = 0, }) => {
   const docSigs = useDocumentSignatures('SalesInvoice', invoice?.id, `Invoice ${invoice?.invoiceNumber || invoice?.number || ""}`);
-    const { companyProfile, currency } = useERP(); // [PHASE-2E.1] profile-driven letterhead (was hardcoded US strings)
+    const { companyProfile } = useERP(); // [PHASE-2E.1] profile-driven letterhead (was hardcoded US strings)
     // ── [PHASE-2E.1] GST compliance helpers (Sweven: MH → intra CGST+SGST, out-of-state → IGST) ──
     const companyName = companyProfile?.name || 'HORIZON ENTERPRISE LOGISTICS';
     const companyShort = (companyName || 'H').trim().charAt(0).toUpperCase() || 'H';
@@ -22,7 +22,8 @@ export const PrintInvoiceModal = ({ isOpen, onClose, invoice, balanceDue = 0, })
     const posStateCode = posMatch ? posMatch[1] : posRaw.slice(0, 2).toUpperCase();
     const hasStates = Boolean(companyStateCode && posStateCode);
     const isIntraState = hasStates && companyStateCode === posStateCode;
-    const moneySymbol = (currency || '').includes('INR') ? '₹' : '$';
+    // GST tax invoices are always in rupees, whatever the display currency.
+    const moneySymbol = '₹';
     const money = (v) => `${moneySymbol}${(Number(v) || 0).toFixed(2)}`;
     // Split every line's GST into CGST+SGST (intra-state) or IGST (inter-state)
     const lineTaxBreakdown = (it) => {

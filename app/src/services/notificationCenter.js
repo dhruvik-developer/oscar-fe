@@ -59,8 +59,14 @@ const ALERT_TYPES = new Set(['system_alert', 'pms.delay_logged']);
  */
 export function routeForNotification(entry) {
   if (!entry) return null;
-  if (entry.path) return entry.path;
-  if (entry.payload?.path) return entry.payload.path;
+  const path = entry.path || entry.payload?.path;
+  if (path) {
+    const pathname = path.split(/[?#]/, 1)[0].replace(/\/+$/, '');
+    if (['/administration/alerts', '/admin/alerts', '/alerts'].includes(pathname)) {
+      return '/notifications';
+    }
+    return path;
+  }
   const type = entry.type || '';
   switch (entry.entityType) {
     case 'CrmTask':
@@ -79,7 +85,7 @@ export function routeForNotification(entry) {
     default:
       break;
   }
-  if (type === 'system_alert') return '/administration/alerts';
+  if (type === 'system_alert') return '/notifications';
   return null;
 }
 
@@ -147,7 +153,7 @@ export function buildNotificationRows({ events = [], incidents = [], erpAlerts =
       at: toDate(incident.created_at),
       live: false,
       unread: linked ? linked.unread : true,
-      path: '/administration/alerts',
+      path: '/notifications',
       eventId: linked?.eventId,
       incidentId: incident.id,
     });

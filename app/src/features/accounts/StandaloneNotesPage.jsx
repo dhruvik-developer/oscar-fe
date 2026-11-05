@@ -48,7 +48,7 @@ const DOC_TYPE_LABELS = {
   MANUAL: 'Manual / Direct',
 };
 
-export default function StandaloneNotesPage() {
+export default function StandaloneNotesPage({ embedded = false }) {
   const [notes, setNotes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -260,15 +260,27 @@ export default function StandaloneNotesPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        title="Debit / Credit Notes"
-        subtitle="Manage standalone commercial adjustments against sales invoices, purchase bills, job work orders, or manual adjustments."
-        actions={
+      {!embedded ? (
+        <PageHeader
+          title="Debit / Credit Notes"
+          subtitle="Manage standalone commercial adjustments against sales invoices, purchase bills, job work orders, or manual adjustments."
+          actions={
+            <Button icon={Plus} onClick={handleOpenCreate} className="!rounded-lg !bg-blue-600 hover:!bg-blue-700">
+              Create Note
+            </Button>
+          }
+        />
+      ) : (
+        <div className="flex flex-wrap items-center justify-between gap-3 pb-1">
+          <div>
+            <h2 className="text-base font-bold text-slate-900">Debit / Credit Notes</h2>
+            <p className="text-xs text-slate-500">Standalone commercial adjustments against sales invoices, purchase bills, job work orders, or manual adjustments.</p>
+          </div>
           <Button icon={Plus} onClick={handleOpenCreate} className="!rounded-lg !bg-blue-600 hover:!bg-blue-700">
             Create Note
           </Button>
-        }
-      />
+        </div>
+      )}
 
       {error && (
         <div className="bg-rose-50 border border-rose-200 text-rose-700 rounded-xl px-4 py-3 text-sm flex items-center gap-2">

@@ -11,6 +11,8 @@ import { formatDateDDMMYYYY } from '../../utils/dateUtils';
 import { SendChallanModal } from '../../components/common/SendChallanModal';
 import { PrintDeliveryChallanModal } from '../../components/common/PrintDeliveryChallanModal';
 import { SignatureSlot, useDocumentSignatures } from '../../components/common/SignatureSlot';
+import MasterSourceLink from '../../components/common/MasterSourceLink';
+import BatchAllocationModal from '../../components/common/BatchAllocationModal';
 const challanGuide = {
     title: 'Delivery Challans & Waybills',
     subtitle: 'Warehouse logistics dispatch, non-commercial shipping waybills, and proof of delivery (POD).',
@@ -24,6 +26,7 @@ const challanGuide = {
     tips: [
         'Delivery Challans never show commercial unit prices or taxes, matching standard international shipping practices.',
         'Click "Confirm POD" once the customer signs the physical or digital receiving slip to mark delivery complete.',
+        'Only one active Delivery Challan is allowed per Sales Order. Create another after the current challan is delivered or cancelled.',
     ],
     workflow: ['Sales Order Confirmed', 'Delivery Challan Generated', 'Carrier In-Transit', 'Consignee Receives Goods', 'POD Verified & Invoice Issued'],
 };
@@ -66,6 +69,7 @@ export const DeliveryChallansPage = () => {
     const [printChallanTarget, setPrintChallanTarget] = useState(null);
     const [cancelModalTarget, setCancelModalTarget] = useState(null);
     const [sendModalChallan, setSendModalChallan] = useState(null);
+    const [podSavingIds, setPodSavingIds] = useState(new Set());
     const [selectedSoId, setSelectedSoId] = useState(salesOrders[0]?.id || '');
     const [transporter, setTransporter] = useState('');
     const [vehicleNo, setVehicleNo] = useState('');
@@ -74,6 +78,41 @@ export const DeliveryChallansPage = () => {
     const [dispatchNote, setDispatchNote] = useState('');
     const [lineItems, setLineItems] = useState([]);
     const [validationError, setValidationError] = useState('');
+    const [batchModalTarget, setBatchModalTarget] = useState(null);
+
+    const hasActiveChallanForOrder = (order, exceptChallanId) => (deliveryChallans || []).some((challan) => {
+        if (challan.id === exceptChallanId || ['Delivered', 'Cancelled'].includes(challan.status)) return false;
+        const matchesId = order.id && [challan.salesOrderId, challan.sourceSalesOrderId].some(
+            (id) => id && String(id) === String(order.id)
+        );
+        const matchesNumber = order.orderNumber && [
+            challan.salesOrderNumber,
+            challan.sourceSalesOrderNumber,
+            challan.linkedSo,
+        ].some((number) => number && number === order.orderNumber);
+        return matchesId || matchesNumber;
+    });
+
+    const seenActiveOrderKeys = new Set();
+    const visibleDeliveryChallans = (deliveryChallans || []).filter((challan) => {
+        if (['Delivered', 'Cancelled'].includes(challan.status)) return true;
+        const linkedOrder = salesOrders.find((order) =>
+            (challan.salesOrderId && String(challan.salesOrderId) === String(order.id)) ||
+            (challan.sourceSalesOrderId && String(challan.sourceSalesOrderId) === String(order.id)) ||
+            (challan.salesOrderNumber && challan.salesOrderNumber === order.orderNumber) ||
+            (challan.sourceSalesOrderNumber && challan.sourceSalesOrderNumber === order.orderNumber) ||
+            (challan.linkedSo && challan.linkedSo === order.orderNumber)
+        );
+        const orderKey = linkedOrder
+            ? `order:${linkedOrder.id}`
+            : challan.salesOrderId || challan.sourceSalesOrderId
+                ? `id:${challan.salesOrderId || challan.sourceSalesOrderId}`
+                : challan.salesOrderNumber || challan.sourceSalesOrderNumber || challan.linkedSo;
+        if (!orderKey) return true;
+        if (seenActiveOrderKeys.has(orderKey)) return false;
+        seenActiveOrderKeys.add(orderKey);
+        return true;
+    });
 
     const prepareOrderLines = (order) => {
         if (!order || !order.items) return [];
@@ -94,6 +133,8 @@ export const DeliveryChallansPage = () => {
                 isSerial,
                 availableSerials,
                 selectedSerials: availableSerials.slice(0, defaultDispatchQty),
+                takaAllocations: it.takaAllocations || it.taka_allocations || [],
+                batchAllocations: it.batchAllocations || [],
             };
         });
     };
@@ -108,12 +149,13 @@ export const DeliveryChallansPage = () => {
     const openAddModal = () => {
         setDraftChallan(null);
         // Only orders with quantity still to dispatch can be picked.
-        const defaultSo = salesOrders.find((o) => o.stage === 'Confirmed' || o.stage === 'Partially Dispatched');
-        if (defaultSo) {
-            setSelectedSoId(defaultSo.id);
-            setLineItems(prepareOrderLines(defaultSo));
-        }
-        setValidationError('');
+        const defaultSo = salesOrders.find((o) =>
+            (o.stage === 'Confirmed' || o.stage === 'Partially Dispatched') &&
+            !hasActiveChallanForOrder(o)
+        );
+        setSelectedSoId(defaultSo?.id || '');
+        setLineItems(defaultSo ? prepareOrderLines(defaultSo) : []);
+        setValidationError(defaultSo ? '' : 'No eligible Sales Order is available. An active Delivery Challan may already exist for each order.');
         setShowAddModal(true);
     };
 
@@ -173,6 +215,10 @@ export const DeliveryChallansPage = () => {
             setValidationError('Select the sales order to dispatch against.');
             return;
         }
+        if (hasActiveChallanForOrder(order, draftChallan?.id)) {
+            setValidationError(`Sales Order ${order.orderNumber || ''} already has an active Delivery Challan. Complete or cancel it before creating another.`);
+            return;
+        }
         
         // Over-delivery validation
         for (const item of lineItems) {
@@ -215,10 +261,22 @@ export const DeliveryChallansPage = () => {
         });
         if (created) { setShowAddModal(false); setSelectedChallan(created); setDraftChallan(null); }
     };
-    const markDelivered = (id) => {
-        updateDeliveryChallanStatus(id, 'Delivered');
-        if (selectedChallan && selectedChallan.id === id) {
-            setSelectedChallan({ ...selectedChallan, status: 'Delivered' });
+    const markDelivered = async (id) => {
+        if (podSavingIds.has(id)) return;
+        setPodSavingIds((prev) => new Set(prev).add(id));
+        try {
+            const updated = await updateDeliveryChallanStatus(id, 'Delivered');
+            if (updated && selectedChallan?.id === id) {
+                setSelectedChallan({ ...selectedChallan, ...updated, status: 'Delivered' });
+            }
+        } catch {
+            // The context reports the server error; leave the challan unchanged.
+        } finally {
+            setPodSavingIds((prev) => {
+                const next = new Set(prev);
+                next.delete(id);
+                return next;
+            });
         }
     };
     const getChallanRelatedDocs = (challan) => {
@@ -397,9 +455,10 @@ export const DeliveryChallansPage = () => {
                 {c.status !== 'Draft' && c.status !== 'Delivered' && c.status !== 'Cancelled' && (
                   <button
                     onClick={() => markDelivered(c.id)}
-                    className="px-2 py-0.5 bg-primary hover:bg-primary-hover text-white rounded text-[11px] font-semibold cursor-pointer flex items-center gap-1 shadow-2xs transition-colors"
+                    disabled={podSavingIds.has(c.id)}
+                    className="px-2 py-0.5 bg-primary hover:bg-primary-hover text-white rounded text-[11px] font-semibold cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-1 shadow-2xs transition-colors"
                   >
-                    <CheckCircle2 size={11}/> POD
+                    <CheckCircle2 size={11}/> {podSavingIds.has(c.id) ? 'Saving...' : 'POD'}
                   </button>
                 )}
                 {c.status === 'Delivered' && (
@@ -432,7 +491,7 @@ export const DeliveryChallansPage = () => {
             Issue Delivery Challan
           </Button>}/>
 
-      <DataTable title="Active Dispatch Consignments" columns={columns} data={deliveryChallans} keyExtractor={(c) => c.id} searchPlaceholder="Search challan #, sales order, or carrier..." searchFilter={(c, term) => String(c.challanNumber ?? '').toLowerCase().includes(term) ||
+      <DataTable title="Active Dispatch Consignments" columns={columns} data={visibleDeliveryChallans} keyExtractor={(c) => c.id} searchPlaceholder="Search challan #, sales order, or carrier..." searchFilter={(c, term) => String(c.challanNumber ?? '').toLowerCase().includes(term) ||
             (c.salesOrderNumber && String(c.salesOrderNumber ?? '').toLowerCase().includes(term)) ||
             String(c.customer ?? '').toLowerCase().includes(term) ||
             (c.transporter && String(c.transporter ?? '').toLowerCase().includes(term))}/>
@@ -463,24 +522,33 @@ export const DeliveryChallansPage = () => {
                     ) : (
                       <option value="">-- Select Source Sales Order --</option>
                     )}
-                    {salesOrders.map((so) => (<option key={so.id} value={so.id}>
+                    {salesOrders.filter((so) => !hasActiveChallanForOrder(so, draftChallan?.id)).map((so) => (<option key={so.id} value={so.id}>
                         {so.orderNumber} - {so.customer} ({so.items?.length || 0} items)
                       </option>))}
                   </select>
                 </div>
                 <div>
-                  <label className="font-semibold text-slate-700 block mb-1">Carrier / Transporter</label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="font-semibold text-slate-700 block">Carrier / Transporter</label>
+                    <MasterSourceLink source="transporters" />
+                  </div>
                   <input type="text" value={transporter} onChange={(e) => setTransporter(e.target.value)} className="w-full p-2 border border-slate-300 rounded bg-white text-slate-800" placeholder="e.g. Transporter / Carrier name"/>
                 </div>
                 <div>
-                  <label className="font-semibold text-slate-700 block mb-1">Vehicle / Truck Plate #</label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="font-semibold text-slate-700 block">Vehicle / Truck Plate #</label>
+                    <MasterSourceLink source="vehicles" />
+                  </div>
                   <input type="text" value={vehicleNo} onChange={(e) => setVehicleNo(e.target.value)} className="w-full p-2 border border-slate-300 rounded bg-white text-slate-800" placeholder="e.g. MH-12-AB-9041"/>
                 </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="font-semibold text-slate-700 block mb-1">Driver Contact / Phone</label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="font-semibold text-slate-700 block">Driver Contact / Phone</label>
+                    <MasterSourceLink source="drivers" />
+                  </div>
                   <input type="text" value={driverContact} onChange={(e) => setDriverContact(e.target.value)} className="w-full p-2 border border-slate-300 rounded bg-white text-slate-800"/>
                 </div>
                 <div>
@@ -577,6 +645,32 @@ export const DeliveryChallansPage = () => {
                               </div>
                             </td>
                             <td className="p-2.5">
+                              {/* Multi-Batch & Taka Allocation Trigger */}
+                              <div className="mb-1.5 flex items-center gap-1">
+                                {Array.isArray(item.takaAllocations) && item.takaAllocations.length > 0 ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => setBatchModalTarget({ lineIndex: idx, item })}
+                                    className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold rounded bg-emerald-50 text-emerald-700 border border-emerald-300 hover:bg-emerald-100 transition cursor-pointer"
+                                    title="Click to view or adjust allocated batches"
+                                  >
+                                    <Package size={10} className="text-emerald-600" />
+                                    <span>
+                                      Allocated: {item.takaAllocations.reduce((sum, a) => sum + Number(a.qty || 0), 0)} ({[...new Set(item.takaAllocations.map(a => a.lotNo).filter(Boolean))].length} Batches)
+                                    </span>
+                                  </button>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => setBatchModalTarget({ lineIndex: idx, item })}
+                                    className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold rounded bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100 transition cursor-pointer"
+                                    title="Pick specific inventory batches and rolls"
+                                  >
+                                    <Package size={10} className="text-indigo-600" />
+                                    <span>+ Pick Batches</span>
+                                  </button>
+                                )}
+                              </div>
                               {item.isSerial ? (
                                 <div className="space-y-1">
                                   <span className="text-[10px] font-bold text-slate-500 block">Select Serials ({item.selectedSerials?.length || 0}/{item.qty}):</span>
@@ -742,9 +836,13 @@ export const DeliveryChallansPage = () => {
                 if (currentStatus === 'Delivered') progressPct = 100;
                 if (isCancelled) progressPct = 0;
 
-                const advanceStage = (nextStatus) => {
-                  updateDeliveryChallanStatus(selectedChallan.id, nextStatus);
-                  setSelectedChallan({ ...selectedChallan, status: nextStatus });
+                const advanceStage = async (nextStatus) => {
+                  try {
+                    const updated = await updateDeliveryChallanStatus(selectedChallan.id, nextStatus);
+                    if (updated) setSelectedChallan({ ...selectedChallan, ...updated, status: nextStatus });
+                  } catch {
+                    // The context reports the server error; leave the status unchanged.
+                  }
                 };
 
                 return (
@@ -880,7 +978,18 @@ export const DeliveryChallansPage = () => {
                       {(selectedChallan.items || []).map((it, idx) => (
                         <tr key={it.id || idx} className="hover:bg-slate-50/60">
                           <td className="p-2.5 text-center font-mono text-slate-400">{idx + 1}</td>
-                          <td className="p-2.5 font-semibold text-slate-800">{it.description || it.name}</td>
+                          <td className="p-2.5 font-semibold text-slate-800">
+                            <div>{it.description || it.name}</div>
+                            {Array.isArray(it.takaAllocations || it.taka_allocations) && (it.takaAllocations || it.taka_allocations).length > 0 && (
+                              <div className="mt-1 flex flex-wrap gap-1 font-normal">
+                                {(it.takaAllocations || it.taka_allocations).map((a, aidx) => (
+                                  <span key={aidx} className="inline-flex items-center gap-1 text-[9px] font-mono px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200">
+                                    Batch {a.lotNo || a.lot_number || '-'}: {a.qty} {it.uom || 'Mtr'}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </td>
                           <td className="p-2.5 font-mono text-slate-500 text-[11px]">{it.itemSku || it.sku || 'SKU-LOG-01'}</td>
                           <td className="p-2.5 text-center font-bold text-slate-900">{it.qty}</td>
                           <td className="p-2.5">
@@ -935,8 +1044,8 @@ export const DeliveryChallansPage = () => {
               <div className="flex flex-wrap lg:flex-nowrap items-center gap-2">
                 {selectedChallan.status === 'Draft' && <Button onClick={() => prepareDraftDispatch(selectedChallan)}>Prepare Dispatch</Button>}
                 {selectedChallan.status !== 'Draft' && selectedChallan.status !== 'Delivered' && selectedChallan.status !== 'Cancelled' && (
-                  <Button onClick={() => markDelivered(selectedChallan.id)}>
-                    Confirm Proof of Delivery (POD)
+                  <Button disabled={podSavingIds.has(selectedChallan.id)} onClick={() => markDelivered(selectedChallan.id)}>
+                    {podSavingIds.has(selectedChallan.id) ? 'Saving POD...' : 'Confirm Proof of Delivery (POD)'}
                   </Button>
                 )}
                 {selectedChallan.status !== 'Cancelled' && (
@@ -1029,5 +1138,29 @@ export const DeliveryChallansPage = () => {
         onClose={() => setPrintChallanTarget(null)}
         challan={printChallanTarget}
       />
-    </div>);
+    
+      {/* Multi-Batch & Taka Allocation Modal for Delivery Challans */}
+      {batchModalTarget && (
+        <BatchAllocationModal
+          isOpen={Boolean(batchModalTarget)}
+          onClose={() => setBatchModalTarget(null)}
+          item={batchModalTarget?.item || {}}
+          currentAllocations={lineItems[batchModalTarget.lineIndex]?.takaAllocations || []}
+          onSave={(allocations, summary) => {
+            const updated = [...lineItems];
+            const line = updated[batchModalTarget.lineIndex];
+            if (line) {
+              updated[batchModalTarget.lineIndex] = {
+                ...line,
+                qty: summary.totalQty > 0 ? summary.totalQty : line.qty,
+                takaAllocations: allocations,
+                batchAllocations: summary.batches,
+              };
+              setLineItems(updated);
+            }
+            setBatchModalTarget(null);
+          }}
+        />
+      )}
+</div>);
 };

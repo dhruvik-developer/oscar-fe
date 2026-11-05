@@ -213,9 +213,6 @@ export function SupplierPaymentInlineSlide({ po, instruction, onClose, onPayment
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="px-2 py-0.5 rounded text-[10px] font-black bg-emerald-100 text-emerald-800 uppercase tracking-wider">
-                Stage 9 Slide (Final Stage)
-              </span>
               <h3 className="text-sm font-extrabold text-slate-900">
                 Disbursement Payment & Accounts Payable Settlement
               </h3>
@@ -478,9 +475,6 @@ export function SupplierPaymentInlineSlide({ po, instruction, onClose, onPayment
               <span>Previous: Bill Matching</span>
             </button>
           )}
-          <span className="text-[11px] text-slate-500 font-medium hidden md:inline">
-            Stage 9 of 9 • Supplier Disbursement
-          </span>
         </div>
 
         <div className="flex items-center gap-2 ml-auto">

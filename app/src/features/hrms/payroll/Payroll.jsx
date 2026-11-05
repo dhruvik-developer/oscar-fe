@@ -1877,6 +1877,25 @@ export default function Payroll() {
                   -{formatINR(selectedPayslip.deductions)}
                 </span>
               </div>
+
+              {/* Itemized Components (Working hours shortfall, penalties, etc.) */}
+              {Array.isArray(selectedPayslip.components) && selectedPayslip.components.length > 0 && (
+                <div className="bg-rose-50/50 border border-rose-100/80 rounded-xl p-2.5 my-1 space-y-1.5">
+                  <span className="text-[11px] font-bold text-rose-900 uppercase tracking-wider block">
+                    Components & Shortfall Deductions
+                  </span>
+                  {selectedPayslip.components.map((c, idx) => (
+                    <div key={c.id || idx} className="flex justify-between text-[12px]">
+                      <span className={c.kind === "deduction" ? "text-rose-700 font-medium" : "text-emerald-700 font-medium"}>
+                        {c.name}
+                      </span>
+                      <span className={c.kind === "deduction" ? "font-semibold text-rose-700" : "font-semibold text-emerald-700"}>
+                        {c.kind === "deduction" ? "-" : "+"}{formatINR(c.amount)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
               <div className="flex justify-between py-1 border-b border-slate-100">
                 <span className="text-slate-500">Salary Advance Recovered (-)</span>
                 <span className="font-bold text-amber-800">

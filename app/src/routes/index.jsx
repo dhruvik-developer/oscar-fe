@@ -149,7 +149,8 @@ const PurchaseReturnsPage = lazy(() => import('../features/purchase/PurchaseRetu
 const PaymentOutPage = lazy(() => import('../features/purchase/PaymentOutPage').then(m => ({ default: m.PaymentOutPage })));
 const ExpensesPage = lazy(() => import('../features/purchase/ExpensesPage').then(m => ({ default: m.ExpensesPage })));
 const GoodsReceiptPage = lazy(() => import('../features/purchase/GoodsReceiptPage').then(m => ({ default: m.GoodsReceiptPage })));
-const SupplierReconciliationPage = lazy(() => import('../features/purchase/SupplierReconciliationPage'));
+// [DISABLED] Supplier Reconciliation concept commented out
+// const SupplierReconciliationPage = lazy(() => import('../features/purchase/SupplierReconciliationPage'));
 const SupplierLedgerPage = lazy(() => import('../features/purchase/SupplierLedgerPage'));
 const TextileMastersPage = lazy(() => import('../features/masters/TextileMastersPage'));
 
@@ -213,7 +214,6 @@ const UsersPage = lazy(() => import('../features/administration/UsersPage'));
 const RolesPage = lazy(() => import('../features/administration/RolesPage'));
 const ClientsPage = lazy(() => import('../features/administration/ClientsPage'));
 const ApprovalsInboxPage = lazy(() => import('../features/administration/ApprovalsInboxPage'));
-const AlertCenterPage = lazy(() => import('../features/administration/AlertCenterPage'));
 const AccountingLogPage = lazy(() => import('../features/accounts/AccountingLogPage'));
 const ChartOfAccountsPage = lazy(() => import('../features/accounts/ChartOfAccountsPage'));
 const ExpenseCategoriesPage = lazy(() => import('../features/accounts/ExpenseCategoriesPage'));
@@ -448,21 +448,26 @@ const router = createBrowserRouter([
       { path: 'job-work/itc-04', element: <Page component={ITC04ReportPage} title="ITC-04 Job Work Report" /> },
 
       // ── Sales ─────────────────────────────────────────────
-      // [Quotation & Proforma Invoice modules are commented out] — Sales opens on Sales Orders.
-      { path: 'sales', element: <Navigate to="/sales/orders" replace /> },
-      // { path: 'sales/quotations/create', element: <Page component={QuotationComposerPage} /> },
-      // { path: 'sales/quotations/:id', element: <Page component={QuotationDetailPage} /> },
-      // { path: 'sales/quotations', element: <Page component={QuotationsPage} /> },
-      { path: 'sales/orders', element: <Page component={SalesOrdersPage} /> },
-      // { path: 'sales/proforma', element: <Page component={ProformaInvoicesPage} /> },
-      { path: 'sales/invoices', element: <Page component={SalesInvoicesPage} /> },
-      { path: 'sales/returns', element: <Page component={SalesReturnsPage} /> },
-      { path: 'sales/payments', element: <Page component={PaymentInPage} /> },
-      { path: 'sales/receivables', element: <Page component={CustomerPaymentsPage} /> },
-      { path: 'sales/delivery', element: <Page component={DeliveryChallansPage} /> },
-      { path: 'sales/broker-commissions', element: <Page component={BrokerCommissionPage} title="Broker Commissions" /> },
-      // [REMOVED] Customer Warranty concept removed product-wide
-      { path: 'sales/warranty', element: <Navigate to="/sales/delivery" replace /> },
+      // Sales Orders is the module root, not a fallback for other Sales routes.
+      {
+        path: 'sales',
+        children: [
+          { index: true, element: <Navigate to="/sales/orders" replace /> },
+          // { path: 'quotations/create', element: <Page component={QuotationComposerPage} /> },
+          // { path: 'quotations/:id', element: <Page component={QuotationDetailPage} /> },
+          // { path: 'quotations', element: <Page component={QuotationsPage} /> },
+          { path: 'orders', element: <Page component={SalesOrdersPage} /> },
+          // { path: 'proforma', element: <Page component={ProformaInvoicesPage} /> },
+          { path: 'invoices', element: <Page component={SalesInvoicesPage} /> },
+          { path: 'returns', element: <Page component={SalesReturnsPage} /> },
+          { path: 'payments', element: <Page component={PaymentInPage} /> },
+          { path: 'receivables', element: <Page component={CustomerPaymentsPage} /> },
+          { path: 'delivery', element: <Page component={DeliveryChallansPage} /> },
+          { path: 'broker-commissions', element: <Page component={BrokerCommissionPage} title="Broker Commissions" /> },
+          // [REMOVED] Customer Warranty concept removed product-wide
+          { path: 'warranty', element: <Navigate to="/sales/delivery" replace /> },
+        ],
+      },
       { path: 'warranty', element: <Navigate to="/sales/delivery" replace /> },
 
       // ── Purchase ──────────────────────────────────────────
@@ -477,8 +482,12 @@ const router = createBrowserRouter([
       // { path: 'purchase/final-job-work-pos', element: <Page component={FinalJobWorkPOsPage} /> },
       { path: 'purchase/final-job-work-pos', element: <Navigate to="/purchase/orders" replace /> },
       { path: 'purchase/receipts', element: <Page component={GoodsReceiptPage} /> },
-      { path: 'purchase/reconciliation', element: <Page component={SupplierReconciliationPage} /> },
-      { path: 'purchase/supplier-ledger', element: <Page component={SupplierLedgerPage} /> },
+      // [DISABLED] Supplier Reconciliation concept commented out
+      // { path: 'purchase/reconciliation', element: <Page component={SupplierReconciliationPage} /> },
+      { path: 'purchase/reconciliation', element: <Navigate to="/purchase/orders" replace /> },
+      // [MOVED to Accounts] Supplier Ledger moved to Accounts module
+      // { path: 'purchase/supplier-ledger', element: <Page component={SupplierLedgerPage} /> },
+      { path: 'purchase/supplier-ledger', element: <Navigate to="/accounts/supplier-ledger" replace /> },
       { path: 'purchase/bills', element: <Page component={PurchaseBillsPage} /> },
       { path: 'purchase/vendor-bills', element: <Page component={VendorBillsPage} /> },
       { path: 'purchase/bill-matching', element: <Page component={BillMatchingPage} /> },
@@ -517,9 +526,9 @@ const router = createBrowserRouter([
       { path: 'inventory/qc/reinspection', element: <RedirectWith to="/inventory/qc/advanced" set={{ step: 'recheck' }} /> },
       { path: 'inventory/qc/dashboard', element: <Page component={QCDashboardHubPage} title="QC Dashboard" /> },
       { path: 'job-work/service-orders', element: <Page component={ServiceOrdersPage} title="Dyeing Service Orders" /> },
-      { path: 'inventory/lot-register', element: <Page component={LotTakaRegisterPage} title="Lot / Taka Register" /> },
-      { path: 'inventory/lots-takas', element: <Navigate to="/inventory/lot-register" replace /> },
-      { path: 'inventory/taka-tags', element: <Page component={TakaTagPrintPage} title="Taka Tag Print" /> },
+      { path: 'inventory/lot-register', element: <Navigate to="/inventory/batches" replace /> },
+      { path: 'inventory/lots-takas', element: <Navigate to="/inventory/batches" replace /> },
+      { path: 'inventory/taka-tags', element: <Navigate to="/inventory/batches" replace /> },
       { path: 'inventory/batches', element: <Page component={BatchRegistryPage} title="Batch Registry" /> },
       { path: 'inventory/production-runs', element: <Page component={ProductionRunsPage} title="Production Runs" /> },
       // A batch QR tag opens this (signed in; cost shown only with ledger access).
@@ -575,11 +584,13 @@ const router = createBrowserRouter([
       { path: 'accounts/day-book', element: <Page component={DayBookPage} title="Day Book & Position" /> },
       { path: 'accounts/cash-bank', element: <Page component={CashBankPage} /> },
       { path: 'accounts/general-ledger', element: <Page component={GeneralLedgerPage} /> },
-      { path: 'accounts/notes', element: <Page component={StandaloneNotesPage} title="Debit / Credit Notes" /> },
+      { path: 'accounts/supplier-ledger', element: <Page component={SupplierLedgerPage} title="Supplier Ledger" /> },
+      { path: 'accounts/customer-ledger', element: <Navigate to="/accounts/supplier-ledger?type=customer" replace /> },
+      { path: 'accounts/notes', element: <Navigate to="/accounts/general-ledger?tab=notes" replace /> },
       { path: 'accounts/reports', element: <Page component={FinancialReportsPage} /> },
-      { path: 'accounts/accounting-log', element: <Page component={AccountingLogPage} title="Accounting Log" /> },
+      { path: 'accounts/accounting-log', element: <Navigate to="/accounts/chart-of-accounts?tab=accounting-log" replace /> },
       { path: 'accounts/chart-of-accounts', element: <Page component={ChartOfAccountsPage} title="Chart of Accounts" /> },
-      { path: 'accounts/expense-categories', element: <Page component={ExpenseCategoriesPage} title="Expense Categories" /> },
+      { path: 'accounts/expense-categories', element: <Navigate to="/accounts/chart-of-accounts?tab=expense-categories" replace /> },
 
       // ── HRMS ──────────────────────────────────────────────
       { path: 'hrms', element: <Navigate to="/hrms/dashboard" replace /> },
@@ -663,7 +674,7 @@ const router = createBrowserRouter([
       // ── Administration ────────────────────────────────────
       { path: 'administration', element: <Navigate to="/administration/settings" replace /> },
       { path: 'administration/approvals', element: <Page component={ApprovalsInboxPage} title="Approvals Inbox" /> },
-      { path: 'administration/alerts', element: <Page component={AlertCenterPage} title="Alert Center & Exceptions" /> },
+      { path: 'administration/alerts', element: <Navigate to="/administration/settings" replace /> },
       { path: 'administration/accounting-log', element: <Navigate to="/accounts/accounting-log" replace /> },
       { path: 'administration/users', element: <Page component={UsersPage} /> },
       { path: 'administration/roles', element: <Page component={RolesPage} /> },
@@ -671,9 +682,9 @@ const router = createBrowserRouter([
       { path: 'administration/client', element: <Navigate to="/administration/clients" replace /> },
       { path: 'administration/settings', element: <Page component={SettingsPage} /> },
       { path: 'admin/approvals', element: <Navigate to="/administration/approvals" replace /> },
-      { path: 'admin/alerts', element: <Navigate to="/administration/alerts" replace /> },
+      { path: 'admin/alerts', element: <Navigate to="/administration/settings" replace /> },
       { path: 'approvals', element: <Navigate to="/administration/approvals" replace /> },
-      { path: 'alerts', element: <Navigate to="/administration/alerts" replace /> },
+      { path: 'alerts', element: <Navigate to="/administration/settings" replace /> },
 
       // ── Catch-all ─────────────────────────────────────────
       { path: '*', element: <Navigate to="/dashboard" replace /> },

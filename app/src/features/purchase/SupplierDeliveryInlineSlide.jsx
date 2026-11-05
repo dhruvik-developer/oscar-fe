@@ -304,9 +304,6 @@ export function SupplierDeliveryInlineSlide({ po, onClose, onDeliverySaved, onNe
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="px-2 py-0.5 rounded text-[10px] font-black bg-blue-100 text-blue-700 uppercase tracking-wider">
-                Stage 2 Slide
-              </span>
               <h3 className="text-sm font-extrabold text-slate-900">
                 Supplier Delivery & Dispatch Tracking
               </h3>
@@ -794,7 +791,7 @@ export function SupplierDeliveryInlineSlide({ po, onClose, onDeliverySaved, onNe
       {/* ── Slide Lifecycle Navigation Bar ── */}
       <div className="pt-3 border-t border-blue-200/80 flex flex-wrap sm:flex-nowrap items-center justify-between gap-2 bg-blue-50/60 -mx-4 -mb-4 sm:-mx-5 sm:-mb-5 p-3 sm:px-5 rounded-b-2xl">
         <div className="text-[11px] text-slate-500 font-medium">
-          Stage 2 of 8: <strong className="text-slate-800">Supplier Delivery</strong> • Dispatch tracking & transporter LR
+          <strong className="text-slate-800">Supplier Delivery</strong> • Dispatch tracking & transporter LR
         </div>
         <div className="flex items-center gap-2 ml-auto">
           {onClose && (

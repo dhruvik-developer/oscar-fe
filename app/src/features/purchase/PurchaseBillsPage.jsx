@@ -538,7 +538,7 @@ export const PurchaseBillsPage = () => {
                   <div>
                     <span className="text-slate-400 block text-[10px]">3. Vendor Invoiced Amount</span>
                     <strong className="text-slate-800 font-mono">
-                      ${(selectedBill.total || selectedBill.amount).toFixed(2)}
+                      {formatCurrency(selectedBill.total || selectedBill.amount)}
                     </strong>
                   </div>
                 </div>
@@ -557,7 +557,7 @@ export const PurchaseBillsPage = () => {
 
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 lg:gap-0 pt-4 border-t border-slate-200 bg-slate-50 -mx-4 -mb-4 px-4 sm:-mx-6 sm:-mb-6 sm:px-6 py-3">
               <div className="font-mono text-xs">
-                Total: <strong className="text-slate-900">${(selectedBill.total || selectedBill.amount).toFixed(2)}</strong> | Due: <strong className="text-amber-700">${getBillOutstanding(selectedBill.id).balanceDue.toFixed(2)}</strong>
+                Total: <strong className="text-slate-900">{formatCurrency(selectedBill.total || selectedBill.amount)}</strong> | Due: <strong className="text-amber-700">{formatCurrency(getBillOutstanding(selectedBill.id).balanceDue)}</strong>
               </div>
               <div className="flex flex-wrap lg:flex-nowrap items-center gap-2">
                 {selectedBill.status === 'Cancelled' ? (
@@ -619,7 +619,7 @@ export const PurchaseBillsPage = () => {
                 </div>
                 <div className="flex justify-between text-amber-700 font-semibold border-t border-slate-200 pt-1">
                   <span>Balance Due:</span>
-                  <span className="font-mono">${getBillOutstanding(showPayModal.id).balanceDue.toFixed(2)}</span>
+                  <span className="font-mono">{formatCurrency(getBillOutstanding(showPayModal.id).balanceDue)}</span>
                 </div>
               </div>
 

@@ -279,9 +279,6 @@ export function CompletionVerificationInlineSlide({
           <div>
             <h3 className="font-extrabold text-sm text-slate-900 tracking-tight flex items-center gap-2">
               Completion Verification
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 uppercase tracking-wider">
-                Stage 4
-              </span>
             </h3>
             <p className="text-[11px] text-slate-500">
               Physical quantity verification & grey fabric production reconciliation

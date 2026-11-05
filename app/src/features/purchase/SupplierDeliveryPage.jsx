@@ -377,9 +377,6 @@ export default function SupplierDeliveryPage() {
           </button>
           <div>
             <div className="flex items-center gap-2">
-              <span className="px-2.5 py-0.5 rounded-md text-[11px] font-black bg-blue-100 text-blue-700 uppercase tracking-wider">
-                Stage 2
-              </span>
               <h1 className="text-xl sm:text-2xl font-extrabold text-[#17294e]">
                 Supplier Delivery & Dispatch Tracking
               </h1>

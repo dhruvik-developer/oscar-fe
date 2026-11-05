@@ -37,6 +37,7 @@ import { useERP } from '../../context/ERPContext';
 import PageInfoButton from '../../components/ui/PageInfoButton';
 import AppPagination from '../../components/ui/AppPagination';
 import MasterSourceLink from '../../components/common/MasterSourceLink';
+import GreyQcInlineSlide from '../purchase/GreyQcInlineSlide';
 
 // Indian Currency Helper
 function formatINR(val) {
@@ -1312,13 +1313,6 @@ export function StockPositionPage() {
               <strong>Combined Grey Stock Alert:</strong> Available grey fabric ({formatQty(data.combinedGreyStock.availableGrey, data.combinedGreyStock.uom)}) has fallen below safety threshold ({formatQty(data.combinedGreyStock.threshold, data.combinedGreyStock.uom)}) by {formatQty(data.combinedGreyStock.shortage, data.combinedGreyStock.uom)}.
             </span>
           </div>
-          <button
-            type="button"
-            onClick={() => navigate('/administration/alerts')}
-            className="text-[11px] font-semibold text-rose-700 hover:text-rose-900 underline shrink-0 cursor-pointer text-left"
-          >
-            View Alert Center &rarr;
-          </button>
         </div>
       )}
 
@@ -1692,13 +1686,14 @@ export function StockPositionPage() {
                       <th className="py-3 px-3">Quality</th>
                       <th className="py-3 px-3">Design</th>
                       <th className="py-3 px-3">Shade</th>
-                      <th className="py-3 px-3">Lot / Taka</th>
+                      <th className="py-3 px-3">Batch / Lot</th>
                       <th className="py-3 px-3 text-right">Sent Qty</th>
                       <th className="py-3 px-3 text-right">Received Qty</th>
                       <th className="py-3 px-3 text-right">Pending Qty</th>
                       <th className="py-3 px-3">Process</th>
                       <th className="py-3 px-3">Vendor / Processor</th>
                       <th className="py-3 px-3 text-center">Status</th>
+                      <th className="py-3 px-3 text-right">Action</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 text-[11px]">
@@ -1728,11 +1723,30 @@ export function StockPositionPage() {
                             {row.status}
                           </span>
                         </td>
+                        <td className="py-2 px-3 text-right whitespace-nowrap">
+                          {Number(row.receivedQty || 0) > 0 || row.status === 'Received' || row.qcStatus === 'Pending' ? (
+                            <button
+                              type="button"
+                              onClick={() => setReprocessQcModal({
+                                po: { id: row.poId, poNumber: row.poNumber, vendorName: row.vendor },
+                                initialReceiptId: row.receiptId || row.grnNumber || row.inwardNo || row.lotNo,
+                                batchCode: row.lotNo || row.itemCode,
+                              })}
+                              className="inline-flex items-center gap-1.5 rounded-md bg-gradient-to-r from-blue-600 via-indigo-600 to-indigo-700 px-2.5 py-1 text-[10px] font-bold text-white shadow-xs transition-all duration-150 hover:from-blue-700 hover:via-indigo-700 hover:to-indigo-800 hover:shadow-md active:scale-95 group cursor-pointer"
+                              title={`Perform Reprocess Quality Inspection for ${row.lotNo || row.itemCode}`}
+                            >
+                              <ShieldCheck size={12} className="stroke-[2.5] text-indigo-100 group-hover:scale-110 transition-transform" />
+                              <span>Reprocess QC</span>
+                            </button>
+                          ) : (
+                            <span className="text-slate-400 text-[10.5px]">—</span>
+                          )}
+                        </td>
                       </tr>
                     ))}
                     {paginatedData.length === 0 && (
                       <tr>
-                        <td colSpan={12} className="py-10 text-center text-slate-400 font-sans text-xs">
+                        <td colSpan={13} className="py-10 text-center text-slate-400 font-sans text-xs">
                           No fabric currently out for reprocessing.
                         </td>
                       </tr>
@@ -1751,7 +1765,7 @@ export function StockPositionPage() {
                       <th className="py-3 px-3">Quality</th>
                       <th className="py-3 px-3">Design</th>
                       <th className="py-3 px-3">Shade</th>
-                      <th className="py-3 px-3">Lot / Taka</th>
+                      <th className="py-3 px-3">Batch / Lot</th>
                       <th className="py-3 px-3 text-right">Return Qty</th>
                       <th className="py-3 px-3">UOM</th>
                       <th className="py-3 px-3">Reason</th>
@@ -2653,7 +2667,7 @@ export function StockPositionPage() {
                 <div>
                   <span className="font-semibold text-slate-800 block">Enable Low-Stock Alert</span>
                   <span className="text-[11px] text-slate-500">
-                    Triggers Alert Center incident and topbar notification when breached.
+                    Triggers a system alert and topbar notification when breached.
                   </span>
                 </div>
                 <input
@@ -2695,4 +2709,3 @@ export function StockPositionPage() {
 }
 
 export default StockPositionPage;
-

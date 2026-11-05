@@ -1,5 +1,17 @@
 import React from 'react';
+import { useSearchParams } from 'react-router-dom';
 import SimpleMasterPage from '../../components/common/SimpleMasterPage';
+import ExpenseCategoriesPage from './ExpenseCategoriesPage';
+import AccountingLogPage from './AccountingLogPage';
+import { PageHeader } from '../../components/common/PageHeader';
+import { TabBar } from './accountingShared';
+
+const COA_TABS = [
+  { id: 'accounts', label: 'Chart of Accounts' },
+  { id: 'expense-categories', label: 'Expense Categories' },
+  { id: 'accounting-log', label: 'Accounting Log' },
+];
+
 
 // Ledger accounts (/accounts/chart-of-accounts/). System accounts back the
 // auto-posting matrix, so their code and type are shown but not editable here.
@@ -70,15 +82,45 @@ const COLUMNS = [
 const SEARCH_KEYS = ['code', 'name', 'type', 'subtype'];
 
 export default function ChartOfAccountsPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const currentTab = searchParams.get('tab') || 'accounts';
+  const setTab = (t) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set('tab', t);
+      return next;
+    });
+  };
+
   return (
-    <SimpleMasterPage
-      title="Chart of Accounts"
-      subtitle="Ledger accounts used by journals, bank accounts, budgets and expense categories."
-      entityLabel="Ledger Account"
-      endpoint="/accounts/chart-of-accounts/"
-      fields={FIELDS}
-      columns={COLUMNS}
-      searchKeys={SEARCH_KEYS}
-    />
+    <div className="space-y-6">
+      <PageHeader
+        title="Chart of Accounts"
+        subtitle="Ledger account hierarchy, operating expense categories, and system accounting logs."
+      />
+
+      <TabBar tabs={COA_TABS} active={currentTab} onChange={setTab} />
+
+      {currentTab === 'accounts' && (
+        <SimpleMasterPage
+          title="Chart of Accounts Register"
+          subtitle="Ledger accounts used by journals, bank accounts, budgets and expense categories."
+          entityLabel="Ledger Account"
+          endpoint="/accounts/chart-of-accounts/"
+          fields={FIELDS}
+          columns={COLUMNS}
+          searchKeys={SEARCH_KEYS}
+          embedded
+        />
+      )}
+
+      {currentTab === 'expense-categories' && (
+        <ExpenseCategoriesPage embedded />
+      )}
+
+      {currentTab === 'accounting-log' && (
+        <AccountingLogPage embedded />
+      )}
+    </div>
   );
 }

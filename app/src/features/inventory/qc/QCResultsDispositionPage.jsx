@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 
-import { useNavigate, Link, useSearchParams } from 'react-router-dom';
+import { useNavigate, Link, useLocation, useSearchParams } from 'react-router-dom';
 
 import {
   CheckCircle2,
@@ -43,6 +43,7 @@ import QCPageHeader from './QCPageHeader';
 
 export default function QCResultsDispositionPage() {
   const navigate = useNavigate();
+  const location = useLocation();
 
   const [searchParams] = useSearchParams();
 
@@ -728,6 +729,10 @@ export default function QCResultsDispositionPage() {
       });
 
       await fetchInspections(selectedInspectionId);
+      if (location.state?.qcReturnTo) {
+        navigate(location.state.qcReturnTo, { replace: true });
+        return;
+      }
 
     } catch (err) {
       showToast('Could not approve QC disposition: ' + (err.response?.data?.detail || err.message), 'error');

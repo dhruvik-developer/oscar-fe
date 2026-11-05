@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, useRef } from "react";
-import { pushHrmsSettings, pullHrmsSettings } from "../../../services/hrmsSync";
+import { pushHrmsSettings, pullHrmsSettings, pullHrmsDashboard } from "../../../services/hrmsSync";
 import { pullAuditTrail } from "../../../services/auditTrail";
 import {
   UserCheck,
@@ -123,6 +123,20 @@ const ACTIVITY = [];
 
 export default function HRMSDashboard() {
   const setToast = useAppStore((s) => s.setToast);
+  const [serverStats, setServerStats] = useState(null);
+
+  useEffect(() => {
+    pullHrmsDashboard()
+      .then((res) => {
+        const data = res?.data || res;
+        if (data && typeof data === "object") {
+          setServerStats(data);
+        }
+      })
+      .catch((err) => {
+        console.warn("[HRMS] Live dashboard stats fetch failed:", err?.message || err);
+      });
+  }, []);
 
   const [showNotice, setShowNotice] = useState(true);
 
@@ -422,6 +436,32 @@ export default function HRMSDashboard() {
           >
             <X size={17} />
           </button>
+        </div>
+      )}
+
+      {/* Live Server Stats KPI Summary */}
+      {serverStats && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12, marginBottom: 16 }}>
+          <div className="hrms-card" style={{ padding: "12px 16px" }}>
+            <div style={{ fontSize: 12, color: "#64748b", fontWeight: 500 }}>Active Headcount</div>
+            <div style={{ fontSize: 20, fontWeight: 700, color: "#0f172a", marginTop: 4 }}>{serverStats.headcount ?? "--"}</div>
+          </div>
+          <div className="hrms-card" style={{ padding: "12px 16px" }}>
+            <div style={{ fontSize: 12, color: "#64748b", fontWeight: 500 }}>On Leave Today</div>
+            <div style={{ fontSize: 20, fontWeight: 700, color: "#d97706", marginTop: 4 }}>{serverStats.onLeaveToday ?? 0}</div>
+          </div>
+          <div className="hrms-card" style={{ padding: "12px 16px" }}>
+            <div style={{ fontSize: 12, color: "#64748b", fontWeight: 500 }}>Pending Leaves</div>
+            <div style={{ fontSize: 20, fontWeight: 700, color: "#3b82f6", marginTop: 4 }}>{serverStats.pendingLeaveRequests ?? 0}</div>
+          </div>
+          <div className="hrms-card" style={{ padding: "12px 16px" }}>
+            <div style={{ fontSize: 12, color: "#64748b", fontWeight: 500 }}>Open Positions</div>
+            <div style={{ fontSize: 20, fontWeight: 700, color: "#10b981", marginTop: 4 }}>{serverStats.openPositions ?? 0}</div>
+          </div>
+          <div className="hrms-card" style={{ padding: "12px 16px" }}>
+            <div style={{ fontSize: 12, color: "#64748b", fontWeight: 500 }}>Attrition Rate</div>
+            <div style={{ fontSize: 20, fontWeight: 700, color: "#ef4444", marginTop: 4 }}>{serverStats.attritionRatePct != null ? `${serverStats.attritionRatePct}%` : "--"}</div>
+          </div>
         </div>
       )}
 

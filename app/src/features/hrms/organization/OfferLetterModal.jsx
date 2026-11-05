@@ -50,7 +50,7 @@ export default function OfferLetterModal({
         position: offer.position || "",
         jobType: existing?.jobType || offer.jobType || "Full-time",
         dept: offer.dept || "Engineering",
-        salary: existing?.salary || offer.salary || "$95,000 / annum",
+        salary: existing?.salary || offer.salary || "₹95,000 / annum",
         location: existing?.location || offer.location || "New York HQ",
         workMode: existing?.workMode || offer.workMode || "Hybrid",
         joiningDate: offer.joiningDate || "2024-11-01",
@@ -321,7 +321,7 @@ export default function OfferLetterModal({
                   </label>
                   <input
                     type="text"
-                    placeholder="e.g. ₹60,000 / month or $95,000 / yr"
+                    placeholder="e.g. ₹60,000 / month or ₹95,000 / yr"
                     value={formData.salary}
                     onChange={(e) =>
                       setFormData({ ...formData, salary: e.target.value })

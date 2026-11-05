@@ -1604,11 +1604,14 @@ export default function Leave() {
                 const daysNum = Number(encashForm.days) || 1;
                 const dailyRate = 2083; // Standard rate on ₹50k CTC / 24 working days
                 const totalAmt = daysNum * dailyRate;
+                const matchedEmp = employees.find((emp) => emp.name === encashForm.employeeName || emp.id === encashForm.employeeName);
                 requestEncashment({
                   employee: encashForm.employeeName,
+                  employeeId: matchedEmp?.id || encashForm.employeeName,
+                  perDayRate: dailyRate,
+                  ratePerDay: dailyRate,
                   avatar: null,
                   days: daysNum,
-                  ratePerDay: dailyRate,
                   amount: totalAmt,
                   reason: encashForm.reason,
                   processedMonth: new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" }),

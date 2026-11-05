@@ -240,7 +240,14 @@ export function OpeningCostsEditor({ rows, onChange, flow, formatCurrency }) {
 }
 
 /** Rows of the form -> the API payload; returns an error message or the payload. */
-export function fabricFlowPayload({ flow, dyeingMillId, yarnRows, costRows }) {
+export function fabricFlowPayload({ flow, dyeingMillId, dyeingColourName, dyeingColourHex, yarnRows, costRows }) {
+  const colourName = String(dyeingColourName || '').trim();
+  const colourHex = String(dyeingColourHex || '').trim();
+  if (flow === FABRIC_FLOW_B && !dyeingMillId) return { error: 'Select the Dyeing Vendor (Mill) for this order.' };
+  if (flow === FABRIC_FLOW_B && !colourName) return { error: 'Select the Dyeing Colour for this order.' };
+  if (flow === FABRIC_FLOW_B && colourHex && !/^#[0-9A-Fa-f]{6}$/.test(colourHex)) {
+    return { error: 'The dyeing colour code must look like #1F3A5F.' };
+  }
   const yarnLines = yarnRows.filter((r) => r.itemId || r.yarnQuality || Number(r.requiredQty) > 0);
   if (yarnLines.some((r) => !r.itemId && !String(r.yarnQuality || '').trim())) {
     return { error: 'Every yarn line needs a yarn item or a typed yarn quality.' };
@@ -254,6 +261,8 @@ export function fabricFlowPayload({ flow, dyeingMillId, yarnRows, costRows }) {
     payload: {
       fabricFlow: flow,
       dyeingMillId: flow === FABRIC_FLOW_B ? (dyeingMillId || undefined) : undefined,
+      dyeingColourName: flow === FABRIC_FLOW_B ? colourName : null,
+      dyeingColourHex: flow === FABRIC_FLOW_B ? (colourHex.toUpperCase() || null) : null,
       yarnLines: yarnLines.map(({ key, ...r }) => ({
         ...r,
         itemId: r.itemId || undefined,

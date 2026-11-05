@@ -66,14 +66,6 @@ try {
 } catch (e) {}
 
 // ── Base currency ────────────────────────────────────────────────────────────
-//
-// The rate tables below are quoted against USD, which was right while every
-// amount came from USD-denominated mock data. Amounts now come from the API,
-// and api.md §1.6 is explicit that money arrives as a plain number already in
-// the tenant's own currency — so converting it against USD would multiply every
-// figure on screen by the USD→INR rate. `baseCurrency` is that tenant currency;
-// conversions are `target / base`, which makes the common case (display the
-// tenant's own currency) exactly 1.
 let baseCurrency = 'INR';
 
 /** Set from `companyProfile.currency` once the profile loads. */
@@ -92,12 +84,13 @@ function rateFor(code, customRates) {
 }
 
 export function getCurrencyConfig(currencyStr = 'INR (₹)', customRates = null) {
-  const str = String(currencyStr || baseCurrency).toUpperCase();
-  let config = CURRENCY_CONFIGS.USD;
+  const str = String(currencyStr || baseCurrency || 'INR').toUpperCase();
+  // Always default to Indian Rupee (INR / ₹)
+  let config = { ...CURRENCY_CONFIGS.INR };
 
-  if (str.includes('INR') || str.includes('₹') || str.includes('RUPEE')) {
-    config = { ...CURRENCY_CONFIGS.INR };
-    if (customRates?.INR) config.rate = customRates.INR;
+  if (str.includes('USD') || str === '$') {
+    config = { ...CURRENCY_CONFIGS.USD };
+    if (customRates?.USD) config.rate = customRates.USD;
   } else if (str.includes('EUR') || str.includes('€') || str.includes('EURO')) {
     config = { ...CURRENCY_CONFIGS.EUR };
     if (customRates?.EUR) config.rate = customRates.EUR;
@@ -107,6 +100,9 @@ export function getCurrencyConfig(currencyStr = 'INR (₹)', customRates = null)
   } else if (str.includes('CAD')) {
     config = { ...CURRENCY_CONFIGS.CAD };
     if (customRates?.CAD) config.rate = customRates.CAD;
+  } else {
+    config = { ...CURRENCY_CONFIGS.INR };
+    if (customRates?.INR) config.rate = customRates.INR;
   }
 
   // Re-base: the stored amount is in `baseCurrency`, not USD.
@@ -128,7 +124,7 @@ export function formatCurrency(amount, currencyStr = 'INR (₹)', options = {}) 
   const isNegative = converted < 0;
   const absVal = Math.abs(converted);
 
-  const formattedNumber = absVal.toLocaleString(config.locale, {
+  const formattedNumber = absVal.toLocaleString('en-IN', {
     minimumFractionDigits: minDecimals,
     maximumFractionDigits: maxDecimals
   });

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Search, CheckCircle2, Receipt, Eye, DollarSign, X, Zap, Printer, Clock, AlertCircle, FileText, Plus, Ban, Check, Edit, Lock, ShieldAlert, MapPin, Truck } from 'lucide-react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { Search, CheckCircle2, Receipt, Eye, IndianRupee, X, Zap, Printer, Clock, AlertCircle, FileText, Plus, Ban, Check, Edit, Lock, ShieldAlert, MapPin, Truck } from 'lucide-react';
 import { useERP } from '../../context/ERPContext';
 import { salesService } from '../../services/domainServices';
 import { StatCard } from '../../components/ui/StatCard';
@@ -15,6 +15,7 @@ import { PageHeader } from '../../components/common/PageHeader';
 import TablePagination from '../../components/ui/TablePagination';
 import SalespersonSelect from '../../components/common/SalespersonSelect';
 import MasterSourceLink from '../../components/common/MasterSourceLink';
+import { useAppStore } from '../../stores/appStore';
 
 const invoiceGuide = {
     title: 'Sales Invoices & Receivables',
@@ -65,13 +66,26 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
         getCurrentDateFormatted,
         getCurrentISODate,
         addDaysISO,
+        refreshCollections,
+        showToast,
     } = useERP();
+
+    const currentUser = useAppStore((s) => s.currentUser);
+    const permissions = useAppStore((s) => s.permissions) || [];
+    const canOverrideCredit = Boolean(
+        currentUser?.isSuperuser ||
+        currentUser?.is_superuser ||
+        currentUser?.role?.toLowerCase()?.includes('admin') ||
+        currentUser?.role?.toLowerCase()?.includes('owner') ||
+        permissions.includes('override_credit_limit')
+    );
 
     const [filterText, setFilterText] = useState('');
     const [statusFilter, setStatusFilter] = useState('All');
     const [currentPage, setCurrentPage] = useState(1);
     const [pageSize, setPageSize] = useState(10);
     const navigate = useNavigate();
+    const location = useLocation();
 
     const handleConvertToChallan = async (inv) => {
         if (!inv) return;
@@ -109,8 +123,55 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
     // Cancellation & Finalize modals
     const [cancelModalTarget, setCancelModalTarget] = useState(null);
     const [finalizeModalTarget, setFinalizeModalTarget] = useState(null);
+    const [finalizeError, setFinalizeError] = useState('');
+    const [finalizeErrorCode, setFinalizeErrorCode] = useState('');
+    const [finalizingInvoiceId, setFinalizingInvoiceId] = useState(null);
+    const [creditExposure, setCreditExposure] = useState(null);
+    const [creditOverrideReason, setCreditOverrideReason] = useState('');
+    const [creditApprovalRequest, setCreditApprovalRequest] = useState(null);
+    const [requestingCreditApproval, setRequestingCreditApproval] = useState(false);
     // E-Invoice & E-Way Bill States (P9)
     const [einvoiceLoading, setEinvoiceLoading] = useState(false);
+
+    useEffect(() => {
+        const invoiceId = location.state?.invoiceId;
+        if (!invoiceId) return;
+        const invoice = invoices.find((row) => String(row.id) === String(invoiceId));
+        if (!invoice) return;
+        setSelectedInvoice(invoice);
+        navigate(`${location.pathname}${location.search}`, { replace: true, state: null });
+    }, [location.pathname, location.search, location.state, invoices, navigate]);
+
+    useEffect(() => {
+        if (!creditApprovalRequest?.id || creditApprovalRequest.status !== 'Pending') return undefined;
+        const timer = window.setInterval(async () => {
+            try {
+                const request = await salesService.getApprovalRequest(creditApprovalRequest.id);
+                if (request?.status && request.status !== 'Pending') {
+                    setCreditApprovalRequest((current) => ({ ...current, status: request.status }));
+                    if (request.status !== 'Approved') {
+                        showToast(`Credit-limit approval was ${request.status.toLowerCase()}.`);
+                    }
+                }
+                if (request?.status === 'Approved') {
+                    await refreshCollections(['invoices', 'salesOrders']);
+                }
+            } catch (error) {
+                console.error('Unable to refresh credit approval status:', error);
+            }
+        }, 10000);
+        return () => window.clearInterval(timer);
+    }, [creditApprovalRequest, refreshCollections, showToast]);
+
+    useEffect(() => {
+        if (creditApprovalRequest?.status !== 'Approved') return;
+        const updated = invoices.find((row) => String(row.id) === String(creditApprovalRequest.invoiceId));
+        if (!updated || updated.status === 'Draft') return;
+        setSelectedInvoice(updated);
+        setFinalizeModalTarget(null);
+        setCreditApprovalRequest(null);
+        showToast(`Credit approval finalized invoice ${updated.invoiceNumber}.`);
+    }, [creditApprovalRequest, invoices, showToast]);
     const [einvoiceFeedback, setEinvoiceFeedback] = useState(null);
     const [showCancelIrnModal, setShowCancelIrnModal] = useState(false);
     const [cancelIrnRemarks, setCancelIrnRemarks] = useState('Data Entry Error');
@@ -476,11 +537,10 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
         setShowCreateModal(false);
     };
 
-    const handleQuickSettleAndReceipt = (inv) => {
+    const handleQuickSettleAndReceipt = async (inv) => {
         const outstanding = getInvoiceOutstanding(inv.id);
         const amountToPay = outstanding.balanceDue > 0 ? outstanding.balanceDue : inv.total;
-        const receiptNum = `RCPT-2026-${Date.now().toString().slice(-4)}`;
-        addPaymentIn({
+        const payment = await addPaymentIn({
             customerId: inv.customerId,
             customer: inv.customer,
             invoiceId: inv.id,
@@ -489,18 +549,20 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
             mode: 'Bank Wire Direct',
             reference: `AUTO-SETTLE-${inv.invoiceNumber}`,
         });
+        if (!payment) return;
         setActiveReceipt({
-            receiptNumber: receiptNum,
+            id: payment.id,
+            receiptNumber: payment.receiptNumber || payment.payment_number,
             invoiceNumber: inv.invoiceNumber,
             customer: inv.customer,
-            amount: amountToPay,
-            date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-            paymentMode: 'Bank Wire Direct',
-            reference: `WIRE-${Date.now().toString().slice(-6)}`,
+            amount: payment.amount,
+            date: payment.date,
+            paymentMode: payment.mode,
+            reference: payment.reference || payment.referenceNumber,
         });
     };
 
-    const handleRecordPaymentSubmit = (e) => {
+    const handleRecordPaymentSubmit = async (e) => {
         e.preventDefault();
         if (!showPaymentModal || isSubmittingPayment) return;
         const outstanding = getInvoiceOutstanding(showPaymentModal.id);
@@ -512,7 +574,7 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
         }
         setIsSubmittingPayment(true);
         try {
-            addPaymentIn({
+            const payment = await addPaymentIn({
                 customerId: showPaymentModal.customerId,
                 customer: showPaymentModal.customer,
                 invoiceId: showPaymentModal.id,
@@ -521,15 +583,16 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
                 mode: payMode,
                 reference: payRef || `WIRE-${Date.now()}`,
             });
-            const receiptNum = `RCPT-2026-${Date.now().toString().slice(-4)}`;
+            if (!payment) return;
             setActiveReceipt({
-                receiptNumber: receiptNum,
+                id: payment.id,
+                receiptNumber: payment.receiptNumber || payment.payment_number,
                 invoiceNumber: showPaymentModal.invoiceNumber,
                 customer: showPaymentModal.customer,
-                amount: payAmount,
-                date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-                paymentMode: payMode,
-                reference: payRef || `WIRE-${Date.now()}`,
+                amount: payment.amount,
+                date: payment.date,
+                paymentMode: payment.mode,
+                reference: payment.reference || payment.referenceNumber,
             });
             setShowPaymentModal(null);
             setPayAmount(0);
@@ -538,12 +601,63 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
         }
     };
 
-    const handleConfirmFinalize = () => {
+    const handleConfirmFinalize = async (opts) => {
         if (!finalizeModalTarget) return;
-        finalizeInvoice(finalizeModalTarget.id);
-        setFinalizeModalTarget(null);
-        if (selectedInvoice && selectedInvoice.id === finalizeModalTarget.id) {
-            setSelectedInvoice((prev) => ({ ...prev, finalized: true, status: 'Unpaid' }));
+        const invoice = finalizeModalTarget;
+        if (finalizingInvoiceId === invoice.id) return;
+        const overrideOptions = (opts && typeof opts === 'object' && !opts.nativeEvent) ? opts : {};
+        setFinalizingInvoiceId(invoice.id);
+        setFinalizeError('');
+        try {
+            const saved = await finalizeInvoice(invoice.id, {
+                autoDispatchChallan: true,
+                ...overrideOptions,
+            });
+            if (!saved) return;
+            if (selectedInvoice && selectedInvoice.id === invoice.id) {
+                setSelectedInvoice(saved);
+            }
+            setFinalizeModalTarget(null);
+            setCreditExposure(null);
+            setFinalizeErrorCode('');
+        } catch (error) {
+            const errPayload = error?.payload || {};
+            const code = errPayload?.code || errPayload?.payload?.code || error?.code || '';
+            const msg = error?.message || errPayload?.message || 'Invoice could not be finalized. Check stock and invoice details, then try again.';
+            setFinalizeError(msg);
+            setFinalizeErrorCode(code);
+            setCreditExposure(
+                code === 'CREDIT_LIMIT_EXCEEDED'
+                    ? (errPayload?.payload || errPayload)
+                    : null
+            );
+        } finally {
+            setFinalizingInvoiceId(null);
+        }
+    };
+
+    const handleRequestCreditOverride = async () => {
+        if (!finalizeModalTarget || requestingCreditApproval) return;
+        const reason = creditOverrideReason.trim();
+        if (!reason) {
+            setFinalizeError('Enter a business reason before requesting credit-limit approval.');
+            return;
+        }
+        setRequestingCreditApproval(true);
+        setFinalizeError('');
+        try {
+            const result = await salesService.requestInvoiceCreditOverride(finalizeModalTarget.id, reason);
+            setCreditApprovalRequest({
+                id: result.approvalRequestId,
+                invoiceId: finalizeModalTarget.id,
+                status: result.status || 'Pending',
+            });
+            setCreditOverrideReason('');
+            showToast('Credit-limit approval request sent to an Owner.');
+        } catch (error) {
+            setFinalizeError(error?.message || 'Unable to request credit-limit approval.');
+        } finally {
+            setRequestingCreditApproval(false);
         }
     };
 
@@ -563,11 +677,18 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
 
     // Filtering & Tab state
     const effectiveFilter = (filterText || globalSearch).toLowerCase().trim();
+    const linkedSalesOrderNumber = (invoice) => {
+        if (invoice.linkedSo || invoice.salesOrderNumber || invoice.sales_order_number) {
+            return invoice.linkedSo || invoice.salesOrderNumber || invoice.sales_order_number;
+        }
+        const salesOrderId = invoice.salesOrderId || invoice.salesOrder || invoice.sales_order;
+        return salesOrders.find((order) => String(order.id) === String(salesOrderId))?.orderNumber || '';
+    };
     const filteredInvoices = invoices.filter((inv) => {
         const matchesSearch = !effectiveFilter || (
             String(inv.invoiceNumber ?? '').toLowerCase().includes(effectiveFilter) ||
             String(inv.customer ?? '').toLowerCase().includes(effectiveFilter) ||
-            (inv.linkedSo && String(inv.linkedSo ?? '').toLowerCase().includes(effectiveFilter)) ||
+            linkedSalesOrderNumber(inv).toLowerCase().includes(effectiveFilter) ||
             (inv.status && String(inv.status ?? '').toLowerCase().includes(effectiveFilter))
         );
 
@@ -704,7 +825,7 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
 
             {/* Sales Invoices KPI Stat Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <StatCard label="Total Invoiced Value" value={formatCurrency(totalInvoiced)} icon={DollarSign} />
+                <StatCard label="Total Invoiced Value" value={formatCurrency(totalInvoiced)} icon={IndianRupee} />
                 <StatCard label="AR Outstanding Due" value={formatCurrency(totalBalanceDue)} icon={Clock} trend={{ positive: totalBalanceDue === 0, text: totalBalanceDue > 0 ? `${unpaidCount} unpaid/partial` : 'All settled' }} highlight={totalBalanceDue > 0} />
                 <StatCard label="Total Collected" value={formatCurrency(totalCollected)} icon={CheckCircle2} trend={{ positive: true, text: 'Receipts synchronized' }} />
                 <StatCard label="Total Invoices" value={`${invoices.length} Invoices`} icon={FileText} subtext={`${unpaidCount} requiring payment`} />
@@ -781,7 +902,7 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
                                                 {inv.customer}
                                             </td>
                                             <td className="py-2.5 px-6 text-slate-500 font-mono text-[11px]">
-                                                {inv.linkedSo || '-'}
+                                                {linkedSalesOrderNumber(inv) || '-'}
                                             </td>
                                             <td className="py-2.5 px-6 text-slate-600 font-mono text-[11px]">
                                                 {formatDateDDMMYYYY(inv.date)}
@@ -817,7 +938,14 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
                                                             <button onClick={() => handleOpenEditDraft(inv)} className="p-1 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded transition-colors cursor-pointer" title="Edit Draft Items/Rates">
                                                                 <Edit className="w-4 h-4"/>
                                                             </button>
-                                                            <button onClick={() => setFinalizeModalTarget(inv)} className="px-2 py-0.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-[10px] font-bold cursor-pointer transition-colors shadow-2xs">
+                                                            <button onClick={() => {
+                                                                setFinalizeError('');
+                                                                setFinalizeErrorCode('');
+                                                                setCreditExposure(null);
+                                                                setCreditApprovalRequest(null);
+                                                                setCreditOverrideReason('');
+                                                                setFinalizeModalTarget(inv);
+                                                            }} className="px-2 py-0.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-[10px] font-bold cursor-pointer transition-colors shadow-2xs">
                                                                 Finalize
                                                             </button>
                                                         </>
@@ -1364,6 +1492,11 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
                                         </button>
                                         <button
                                             onClick={() => {
+                                                setFinalizeError('');
+                                                setFinalizeErrorCode('');
+                                                setCreditExposure(null);
+                                                setCreditApprovalRequest(null);
+                                                setCreditOverrideReason('');
                                                 setFinalizeModalTarget(selectedInvoice);
                                             }}
                                             className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-xs shadow-xs flex items-center gap-1 cursor-pointer"
@@ -1387,7 +1520,7 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
                                         setShowPaymentModal(selectedInvoice);
                                         setPayAmount(getInvoiceOutstanding(selectedInvoice.id).balanceDue);
                                     }} className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-semibold text-xs shadow-sm flex items-center gap-1.5 cursor-pointer">
-                                        <DollarSign className="w-3.5 h-3.5"/> Settle Payment
+                                        <IndianRupee className="w-3.5 h-3.5"/> Settle Payment
                                     </button>
                                 )}
 
@@ -1467,16 +1600,106 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
                             </ul>
                         </div>
 
+                        {finalizeError && (
+                            <div role="alert" className="mb-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-rose-700">
+                                <p>{finalizeError}</p>
+                                {finalizeErrorCode === 'NO_LOCATION' && (
+                                    <button
+                                        type="button"
+                                        className="mt-2 font-semibold underline underline-offset-2"
+                                        onClick={() => {
+                                            setFinalizeModalTarget(null);
+                                            setFinalizeError('');
+                                            setFinalizeErrorCode('');
+                                            navigate('/inventory/warehouses?tab=warehouses');
+                                        }}
+                                    >
+                                        Open Warehouse Setup
+                                    </button>
+                                )}
+                            </div>
+                        )}
+
+                        {finalizeErrorCode === 'CREDIT_LIMIT_EXCEEDED' && creditExposure && (
+                            <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-slate-700">
+                                <p className="mb-2 font-bold text-amber-900">Credit-limit review — {creditExposure.customerName}</p>
+                                <dl className="space-y-1">
+                                    <div className="flex justify-between gap-3"><dt>Credit Limit</dt><dd className="font-semibold">{formatCurrency(creditExposure.creditLimit)}</dd></div>
+                                    <div className="flex justify-between gap-3"><dt>Current Outstanding</dt><dd className="font-semibold">{formatCurrency(creditExposure.currentOutstanding)}</dd></div>
+                                    <div className="flex justify-between gap-3"><dt>Existing Credit Exposure</dt><dd className="font-semibold">{formatCurrency(creditExposure.currentExposure)}</dd></div>
+                                    <div className="flex justify-between gap-3"><dt>Current Invoice Amount</dt><dd className="font-semibold">{formatCurrency(creditExposure.currentInvoiceAmount)}</dd></div>
+                                    <div className="flex justify-between gap-3 border-t border-amber-200 pt-1"><dt>Projected Total Exposure</dt><dd className="font-bold">{formatCurrency(creditExposure.projectedExposure)}</dd></div>
+                                    <div className="flex justify-between gap-3 text-rose-700"><dt>Excess Amount</dt><dd className="font-bold">{formatCurrency(creditExposure.excess)}</dd></div>
+                                </dl>
+                                {canOverrideCredit ? (
+                                    <div className="mt-3 p-3 bg-amber-100/80 border border-amber-300 rounded-lg space-y-2">
+                                        <p className="text-xs font-semibold text-amber-950">
+                                            Authorized as Administrator / Owner to override this credit limit.
+                                        </p>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleConfirmFinalize({ overrideCreditLimit: true })}
+                                            disabled={finalizingInvoiceId === finalizeModalTarget.id}
+                                            className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-lg font-bold text-xs shadow-sm cursor-pointer transition-colors"
+                                        >
+                                            {finalizingInvoiceId === finalizeModalTarget.id ? 'Overriding & Finalizing…' : 'Approve & Finalize (Override Credit Limit)'}
+                                        </button>
+                                    </div>
+                                ) : creditApprovalRequest?.status === 'Pending' ? (
+                                    <p className="mt-3 rounded-md border border-blue-200 bg-blue-50 px-2.5 py-2 text-blue-800">
+                                        Approval request {creditApprovalRequest.id} is pending with an Owner. This Draft is preserved and locked until a decision.
+                                    </p>
+                                ) : (
+                                    <div className="mt-3 space-y-2">
+                                        {creditApprovalRequest && (
+                                            <p className="text-xs font-semibold text-slate-600">
+                                                Previous request: {creditApprovalRequest.status}
+                                            </p>
+                                        )}
+                                        <label className="block font-semibold text-slate-700" htmlFor="credit-override-reason">
+                                            Business reason for approval
+                                        </label>
+                                        <textarea
+                                            id="credit-override-reason"
+                                            value={creditOverrideReason}
+                                            onChange={(event) => setCreditOverrideReason(event.target.value)}
+                                            maxLength={1000}
+                                            rows={2}
+                                            className="w-full rounded-md border border-amber-300 bg-white p-2 text-xs text-slate-800"
+                                            placeholder="Explain why this invoice should be approved over the credit limit."
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={handleRequestCreditOverride}
+                                            disabled={requestingCreditApproval || !creditOverrideReason.trim()}
+                                            className="rounded-md bg-amber-700 px-3 py-1.5 font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
+                                        >
+                                            {requestingCreditApproval ? 'Requesting…' : 'Request Owner Approval'}
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
                         <div className="flex justify-end gap-2 pt-3 border-t border-slate-200">
-                            <Button variant="outline" onClick={() => setFinalizeModalTarget(null)}>
-                                Back
+                            <Button
+                                variant="outline"
+                                disabled={finalizingInvoiceId === finalizeModalTarget.id}
+                                onClick={() => {
+                                    setFinalizeModalTarget(null);
+                                    setFinalizeError('');
+                                    setCreditExposure(null);
+                                }}
+                            >
+                                {finalizingInvoiceId === finalizeModalTarget.id ? 'Finalizing…' : 'Back'}
                             </Button>
                             <button
                                 type="button"
-                                onClick={handleConfirmFinalize}
-                                className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold shadow-sm cursor-pointer"
+                                onClick={() => handleConfirmFinalize(finalizeErrorCode === 'CREDIT_LIMIT_EXCEEDED' && canOverrideCredit ? { overrideCreditLimit: true } : undefined)}
+                                disabled={finalizingInvoiceId === finalizeModalTarget.id || creditApprovalRequest?.status === 'Pending'}
+                                className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 disabled:cursor-wait text-white rounded-lg font-bold shadow-sm cursor-pointer"
                             >
-                                Finalize Invoice
+                                {finalizingInvoiceId === finalizeModalTarget.id ? 'Finalizing…' : 'Finalize Invoice'}
                             </button>
                         </div>
                     </div>

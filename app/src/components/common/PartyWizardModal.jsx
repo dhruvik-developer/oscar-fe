@@ -1042,9 +1042,13 @@ export const PartyWizardModal = ({ isOpen, onClose, onSave, existingParty = null
                                         <input
                                             type="number"
                                             value={formData.openingBalance}
-                                            onChange={(e) => updateField('openingBalance', parseFloat(e.target.value) || 0)}
+                                            onChange={(e) => updateField('openingBalance', e.target.value === '' ? '' : parseFloat(e.target.value))}
                                             className="w-full p-2.5 bg-card border border-border rounded-xl text-xs font-mono font-bold text-text"
+                                            placeholder="0.00"
                                         />
+                                        <span className="text-[10px] text-muted block mt-1">
+                                            Initial opening balance for this party (reflected in current balance and ledger).
+                                        </span>
                                     </div>
                                 </div>
                             </div>
@@ -1253,6 +1257,16 @@ export const PartyWizardModal = ({ isOpen, onClose, onSave, existingParty = null
                         >
                             Cancel
                         </button>
+                        {existingParty && step < 6 && (
+                            <button
+                                type="button"
+                                onClick={handleSubmit}
+                                className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs transition cursor-pointer shadow-md shadow-emerald-600/20"
+                            >
+                                <CheckCircle2 size={15} />
+                                <span>Save Changes</span>
+                            </button>
+                        )}
                         {step < 6 ? (
                             <button
                                 type="button"

@@ -140,6 +140,7 @@ export const salesService = {
   getQuotations: (query) => api.get('/sales/quotations/', { query }),
   getOrders: (query) => api.get('/sales/orders/', { query }),
   getInvoices: (query) => api.get('/sales/invoices/', { query }),
+  getApprovalRequest: (id) => api.get(`/approvals/requests/${id}/`),
   getPayments: (query) => api.get('/sales/payments/', { query }),
   createInvoice: (data) => api.post('/sales/invoices/', data),
   // Full document pipeline: Quotation → Order → Invoice → Challan → Payment → Return
@@ -159,6 +160,7 @@ export const salesService = {
   updateOrderStage: (id, stage) => api.patch(`/sales/orders/${id}/`, { stage }),
   convertOrderToChallan: (id) => api.post(`/sales/orders/${id}/convert-to-challan/`),
   convertOrderToInvoice: (id) => api.post(`/sales/orders/${id}/convert-to-invoice/`),
+  requestInvoiceCreditOverride: (id, reason) => api.post(`/sales/invoices/${id}/request-credit-override/`, { reason }),
   updateInvoiceStatus: (id, status) => api.patch(`/sales/invoices/${id}/`, { status }),
   convertInvoiceToChallan: (id, payload = {}) => api.post(`/sales/invoices/${id}/convert-to-challan/`, payload),
   convertChallanToInvoice: (id, payload = {}) => api.post(`/sales/delivery-challans/${id}/convert-to-invoice/`, payload),
@@ -317,6 +319,11 @@ export const inventoryService = {
   createQCReinspection: (data) => api.post('/inventory/qc/reinspection/', data),
   saveQCReinspectionDisposition: (data) => api.post('/inventory/qc/reinspection/', { ...data, actionType: 'disposition' }),
   getQCReports: (query) => api.get('/inventory/qc/reports/', { query: qcStage(query) }),
+  // Reprocess Workflow
+  getReprocessRecords: (query) => api.get('/inventory/reprocess/', { query }),
+  getReprocessRecord: (id) => api.get(`/inventory/reprocess/${id}/`),
+  sendBatchForReprocess: (data) => api.post('/inventory/reprocess/send/', data),
+  receiveReprocessReturn: (id, data) => api.post(`/inventory/reprocess/${id}/receive-return/`, data),
   // Lot / Taka Register
   getLotRegister: (query) => api.get('/inventory/lot-register/', { query }),
   createLotTaka: (data) => api.post('/inventory/lot-register/', data),
@@ -595,4 +602,3 @@ export const jobworkService = {
       `itc04_${quarter || 'Q'}_${financialYear || 'FY'}.csv`,
     ),
 };
-

@@ -563,7 +563,21 @@ export const HRMS_RESOURCES = {
     }),
   },
   approvalChains: plain('/hrms/approval-chains/'),
-  calendarEvents: dated('/hrms/calendar/events/', ['startDate', 'endDate', 'date']),
+  calendarEvents: {
+    path: '/hrms/calendar/events/',
+    toApi: (row) => {
+      const payload = { ...row, id: undefined, _synced: undefined, _pending: undefined };
+      if (payload.date) payload.date = isoOut(payload.date);
+      if (payload.startDate && !payload.startDate.includes('T')) payload.startDate = isoOut(payload.startDate);
+      if (payload.endDate && !payload.endDate.includes('T')) payload.endDate = isoOut(payload.endDate);
+      return compact(payload);
+    },
+    fromApi: (row) => ({
+      ...row,
+      _synced: true,
+      date: displayIn(row.date),
+    }),
+  },
 
   // ── textile HR operational resources (Oscar Scope) ───────────────────────
   incentives: {
@@ -722,6 +736,7 @@ export const publishJob = (id) => hrmsSync.act('jobs', id, 'publish', {});
 export const assignAsset = (id, payload) => hrmsSync.act('assets', id, 'assign', payload);
 export const returnAsset = (id, payload = {}) => hrmsSync.act('assets', id, 'return', payload);
 export const acknowledgePolicy = (id, payload = {}) => hrmsSync.act('policies', id, 'acknowledge', payload);
+export const fetchPolicyAcknowledgements = (id) => api.get('/hrms/policies/' + id + '/acknowledgements/').then(r => r?.data?.items || r?.data || []);
 export const approvePolicy = (id, payload = {}) => hrmsSync.act('policies', id, 'approve', payload);
 export const archivePolicy = (id, payload = {}) => hrmsSync.act('policies', id, 'archive', payload);
 export const submitPolicyForApproval = (id, payload = {}) =>

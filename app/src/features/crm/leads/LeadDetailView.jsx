@@ -133,6 +133,8 @@ import {
 
   AlertCircle,
 
+  DollarSign,
+
 } from 'lucide-react';
 
 import { api } from '../../../services/api';
@@ -1013,6 +1015,93 @@ function metricCards(counts) {
 
 
 // ── 1. Sources & Emails Tab (Screenshot Focus) ────────────────
+
+export function BrokerAttributionBanner({ lead }) {
+  const cv = lead?.custom_values || lead?.customValues || {};
+  const hasBroker = Boolean(cv.broker_id || lead?.broker_id || cv.broker_name || lead?.broker_name);
+  if (!hasBroker) return null;
+  const brkName = cv.broker_name || lead?.broker_name || 'Assigned Broker';
+  const brkCode = cv.broker_code || lead?.broker_code || 'BRK';
+  const commBasis = cv.commission_basis || lead?.commission_basis || 'percent';
+  const commRate = cv.commission_rate ?? lead?.commission_rate ?? 2;
+  const commStatus = lead?.commissionStatus || (lead?.stage?.toLowerCase() === 'won' ? 'Payable' : 'Pending');
+  const fabricQuality = cv.fabric_quality || lead?.fabric_quality || '';
+  const expectedMeters = Number(cv.expected_meters || lead?.expected_meters || 0);
+  const expectedTakas = Number(cv.expected_takas || lead?.expected_takas || 0);
+
+  const estCommission = commBasis === 'per_meter'
+    ? (expectedMeters * Number(commRate))
+    : commBasis === 'per_taka'
+    ? (expectedTakas * Number(commRate))
+    : (Number(lead?.amount || 0) * Number(commRate)) / 100;
+
+  return (
+    <div className="bg-gradient-to-r from-blue-50/90 to-indigo-50/90 border border-blue-200/80 rounded-xl p-4 shadow-xs">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+        <div className="flex items-center gap-2.5">
+          <span className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center shadow-xs">
+            <BriefcaseBusiness size={16} />
+          </span>
+          <div>
+            <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+              Broker Attribution: <span className="text-blue-700">{brkName}</span> ({brkCode})
+            </h4>
+            <p className="text-xs text-slate-500">Agreed commission terms recorded when this lead was acquired</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${
+            commStatus === 'Paid'
+              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+              : commStatus === 'Payable'
+              ? 'bg-blue-50 text-blue-700 border-blue-200 animate-pulse'
+              : 'bg-amber-50 text-amber-700 border-amber-200'
+          }`}>
+            Commission Status: {commStatus}
+          </span>
+          <Link
+            to={`/sales/broker-commissions?tab=leads&search=${encodeURIComponent(lead?.name || '')}`}
+            className="px-3 py-1 rounded-lg bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 text-xs font-semibold inline-flex items-center gap-1 shadow-2xs"
+          >
+            <DollarSign size={13} className="text-emerald-600" />
+            Ledger History
+          </Link>
+        </div>
+      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-white/80 rounded-lg p-3 border border-blue-100 text-xs">
+        <div>
+          <span className="text-slate-400 font-medium block">Agreed Basis</span>
+          <span className="font-semibold text-slate-800 capitalize">{String(commBasis).replace('_', ' ')}</span>
+          {fabricQuality && <span className="text-[11px] text-slate-500 block truncate" title={fabricQuality}>{fabricQuality}</span>}
+        </div>
+        <div>
+          <span className="text-slate-400 font-medium block">Agreed Rate</span>
+          <span className="font-bold text-blue-700">
+            {commRate} {commBasis === 'per_meter' ? '₹/meter' : commBasis === 'per_taka' ? '₹/taka' : '%'}
+          </span>
+          {(expectedMeters > 0 || expectedTakas > 0) && (
+            <span className="text-[11px] text-slate-500 block">
+              {commBasis === 'per_meter' && `${expectedMeters.toLocaleString()} m`}
+              {commBasis === 'per_taka' && `${expectedTakas.toLocaleString()} takas`}
+            </span>
+          )}
+        </div>
+        <div>
+          <span className="text-slate-400 font-medium block">Lead Value</span>
+          <span className="font-mono font-bold text-slate-900">
+            ₹{Number(lead?.amount || 0).toLocaleString()}
+          </span>
+        </div>
+        <div>
+          <span className="text-slate-400 font-medium block">Estimated Payout</span>
+          <span className="font-mono font-bold text-emerald-700">
+            ₹{Math.round(estCommission).toLocaleString()}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function SourcesAndEmailsTab({ lead, onCountsChange, onActivity }) {
 
@@ -5843,7 +5932,7 @@ function QuotationsTab({ lead, onActivity }) {
 
                 <td style={{ textAlign: 'right' }} className="font-bold font-mono">
 
-                  ${(q.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                  ₹{(q.amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
 
                 </td>
 

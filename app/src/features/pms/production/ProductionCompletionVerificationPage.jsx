@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ArrowLeft, Printer, MoreHorizontal, Eye, ListChecks,
   ClipboardList, Package, XCircle, CheckCircle2, AlertTriangle,
-  IndianRupee, Check, X, FileText,
+  IndianRupee, Check, X, FileText, LayoutGrid,
 } from 'lucide-react';
 import PageHeader from '../../../components/ui/PageHeader';
 import KpiCard from '../../../components/ui/KpiCard';
@@ -51,6 +51,14 @@ export default function ProductionCompletionVerificationPage() {
   const [verifyReasonInput, setVerifyReasonInput] = useState('');
   const [menuOpen, setMenuOpen] = useState(false);
   const [showPrintModal, setShowPrintModal] = useState(false);
+  const [activeTab, setActiveTab] = useState(
+    () => localStorage.getItem('oscar_pms_completion_tab') || 'summary'
+  );
+
+  const handleTabChange = (tabId) => {
+    setActiveTab(tabId);
+    localStorage.setItem('oscar_pms_completion_tab', tabId);
+  };
 
   const piIdParam = searchParams.get('pi');
 
@@ -219,6 +227,25 @@ export default function ProductionCompletionVerificationPage() {
     }
   };
 
+  const tabs = [
+    {
+      id: 'summary',
+      label: 'Summary & Approvals',
+      icon: ClipboardList,
+    },
+    {
+      id: 'daily',
+      label: 'Daily Production Register',
+      icon: ListChecks,
+      badge: rows.length,
+    },
+    {
+      id: 'all',
+      label: 'Show All',
+      icon: LayoutGrid,
+    },
+  ];
+
   return (
     <div className="pms-screen w-full space-y-3 sm:space-y-3.5">
       {/* Title */}
@@ -268,7 +295,48 @@ export default function ProductionCompletionVerificationPage() {
         </div>
       )}
 
-      {/* 1 — Summary card */}
+      {/* Screen Section Switcher */}
+      <div className="flex flex-wrap items-center justify-between gap-2.5 pt-1">
+        <div className="inline-flex p-1 bg-slate-100 dark:bg-slate-800/80 border border-slate-200/90 dark:border-slate-700/80 rounded-xl shadow-2xs">
+          {tabs.map((tab) => {
+            const Icon = tab.icon;
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => handleTabChange(tab.id)}
+                className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                  isActive
+                    ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-xs'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
+                }`}
+              >
+                <Icon size={14} className={isActive ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400'} />
+                <span>{tab.label}</span>
+                {tab.badge !== undefined && (
+                  <span
+                    className={`text-[11px] font-bold px-1.5 py-0.2 rounded-full ${
+                      isActive
+                        ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300'
+                        : 'bg-slate-200/80 text-slate-600 dark:bg-slate-700 dark:text-slate-300'
+                    }`}
+                  >
+                    {tab.badge}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="text-xs text-slate-400 hidden sm:flex items-center gap-1.5">
+          <span>Active view: <b className="text-slate-700 dark:text-slate-300 font-semibold">{tabs.find((t) => t.id === activeTab)?.label}</b></span>
+        </div>
+      </div>
+
+      {/* Section 1: Summary card */}
+      {(activeTab === 'summary' || activeTab === 'all') && (
       <div className="rounded-xl border border-[#e2eaf5] bg-white p-4 shadow-[0_1px_2px_rgba(16,42,82,0.06)]">
         <div className="flex flex-wrap items-center gap-2">
           <button
@@ -384,14 +452,16 @@ export default function ProductionCompletionVerificationPage() {
           <KpiCard label="Agreed Job Rate" value={jobRateLabel} icon={IndianRupee} tone="purple" />
         </div>
       </div>
+      )}
 
-      {/* 2 — Daily summary */}
+      {/* Section 2: Daily summary */}
+      {(activeTab === 'daily' || activeTab === 'all') && (
       <div className="rounded-xl border border-[#e2eaf5] bg-white shadow-[0_1px_2px_rgba(16,42,82,0.06)]">
         <div className="flex items-center gap-2 border-b border-slate-100 px-4 py-3">
           <span className="grid h-5 w-5 place-items-center rounded-full bg-[#2563eb] text-[11px] font-extrabold text-white">2</span>
           <h2 className="text-[13px] font-extrabold text-[#2563eb]">Daily Production Summary (Auto from Daily Production)</h2>
         </div>
-        <div className="pms-table-container">
+        <div className={`pms-table-container overflow-y-auto ${activeTab === 'all' ? 'max-h-[380px]' : 'max-h-[calc(100vh-275px)] min-h-[380px]'}`}>
           <table className="w-full min-w-[860px] text-center text-[12px] pms-sticky-header">
             <thead>
               <tr className="border-b border-slate-100 text-slate-500">
@@ -430,6 +500,7 @@ export default function ProductionCompletionVerificationPage() {
           </table>
         </div>
       </div>
+      )}
 
       {/* Verify & Approve Modal */}
       {showVerifyModal && (

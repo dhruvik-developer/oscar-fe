@@ -10,6 +10,8 @@ import {
   Layers,
   ArrowRight,
   ShieldAlert,
+  Package,
+  LayoutGrid,
 } from 'lucide-react';
 import PageHeader from '../../../components/ui/PageHeader';
 import KpiCard from '../../../components/ui/KpiCard';
@@ -33,6 +35,14 @@ export default function MachinesAndBeamsPage() {
   const [qualities, setQualities] = useState([]);
   const [yarns, setYarns] = useState([]);
   const [beams, setBeams] = useState([]);
+  const [activeTab, setActiveTab] = useState(
+    () => localStorage.getItem('oscar_pms_machines_beams_tab') || 'machines'
+  );
+
+  const handleTabChange = (tabId) => {
+    setActiveTab(tabId);
+    localStorage.setItem('oscar_pms_machines_beams_tab', tabId);
+  };
 
   // Add Beam form state
   const [bNo, setBNo] = useState('');
@@ -233,6 +243,36 @@ export default function MachinesAndBeamsPage() {
   const machines = statusData?.machines || [];
   const activeBeams = beams.filter((b) => b.status !== 'Finished');
 
+  const tabs = [
+    {
+      id: 'machines',
+      label: 'Loom Machine Status',
+      icon: Factory,
+      badge: machines.length,
+      badgeColor:
+        statusData?.urgent_machines?.length > 0
+          ? 'bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 animate-pulse'
+          : undefined,
+    },
+    {
+      id: 'beams',
+      label: 'Beams & Allocation',
+      icon: Layers,
+      badge: activeBeams.length,
+    },
+    {
+      id: 'yarn',
+      label: 'Yarn Stock & Cover',
+      icon: Package,
+      badge: statusData?.yarn_cover?.length || 0,
+    },
+    {
+      id: 'all',
+      label: 'Show All',
+      icon: LayoutGrid,
+    },
+  ];
+
   return (
     <div className="pms-screen w-full space-y-3 sm:space-y-3.5">
       <PageHeader
@@ -310,8 +350,50 @@ export default function MachinesAndBeamsPage() {
         </div>
       )}
 
-      {/* Machine Status Table - Fit to Screen */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-2xs">
+      {/* Screen Section Switcher */}
+      <div className="flex flex-wrap items-center justify-between gap-2.5 pt-1">
+        <div className="inline-flex p-1 bg-slate-100 dark:bg-slate-800/80 border border-slate-200/90 dark:border-slate-700/80 rounded-xl shadow-2xs">
+          {tabs.map((tab) => {
+            const Icon = tab.icon;
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => handleTabChange(tab.id)}
+                className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                  isActive
+                    ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-xs'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
+                }`}
+              >
+                <Icon size={14} className={isActive ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400'} />
+                <span>{tab.label}</span>
+                {tab.badge !== undefined && (
+                  <span
+                    className={`text-[11px] font-bold px-1.5 py-0.2 rounded-full ${
+                      tab.badgeColor ||
+                      (isActive
+                        ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300'
+                        : 'bg-slate-200/80 text-slate-600 dark:bg-slate-700 dark:text-slate-300')
+                    }`}
+                  >
+                    {tab.badge}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="text-xs text-slate-400 hidden sm:flex items-center gap-1.5">
+          <span>Active view: <b className="text-slate-700 dark:text-slate-300 font-semibold">{tabs.find((t) => t.id === activeTab)?.label}</b></span>
+        </div>
+      </div>
+
+      {/* Section 1: Machine Status Table */}
+      {(activeTab === 'machines' || activeTab === 'all') && (
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-2xs">
         <div className="px-4 sm:px-5 py-3 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-slate-800/30">
           <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 tracking-tight">
             Loom Machine Status & Days Remaining
@@ -320,7 +402,7 @@ export default function MachinesAndBeamsPage() {
             Ordered by beam runout urgency
           </span>
         </div>
-        <div className="pms-table-container max-h-[420px] overflow-y-auto">
+        <div className={`pms-table-container overflow-y-auto ${activeTab === 'all' ? 'max-h-[420px]' : 'max-h-[calc(100vh-275px)] min-h-[440px]'}`}>
           <table className="w-full text-xs text-left">
             <thead className="pms-sticky-header bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-semibold border-b border-slate-200 dark:border-slate-700">
               <tr>
@@ -388,8 +470,10 @@ export default function MachinesAndBeamsPage() {
           </table>
         </div>
       </div>
+      )}
 
-      {/* Beams Management Card */}
+      {/* Section 2: Beams Management Card */}
+      {(activeTab === 'beams' || activeTab === 'all') && (
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 sm:p-5 shadow-2xs space-y-4">
         <div className="flex justify-between items-center">
           <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 tracking-tight">
@@ -479,7 +563,7 @@ export default function MachinesAndBeamsPage() {
         )}
 
         {/* Beams Table */}
-        <div className="pms-table-container max-h-[360px] overflow-y-auto">
+        <div className={`pms-table-container overflow-y-auto ${activeTab === 'all' ? 'max-h-[360px]' : 'max-h-[calc(100vh-420px)] min-h-[360px]'}`}>
           <table className="w-full text-xs text-left">
             <thead className="pms-sticky-header bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-semibold border-b border-slate-200 dark:border-slate-700">
               <tr>
@@ -587,16 +671,17 @@ export default function MachinesAndBeamsPage() {
           </table>
         </div>
       </div>
+      )}
 
-      {/* Factory Yarn Stock & Weft Cover */}
-      {statusData?.yarn_cover && (
+      {/* Section 3: Factory Yarn Stock & Weft Cover */}
+      {(activeTab === 'yarn' || activeTab === 'all') && statusData && (
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-xs">
           <div className="px-3.5 sm:px-4 py-2 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30">
             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200">
               Yarn Stock & Weft Cover Days at this Factory
             </h3>
           </div>
-          <div className="pms-table-container max-h-[300px] overflow-y-auto">
+          <div className={`pms-table-container overflow-y-auto ${activeTab === 'all' ? 'max-h-[300px]' : 'max-h-[calc(100vh-280px)] min-h-[300px]'}`}>
             <table className="w-full text-xs text-left">
               <thead className="pms-sticky-header bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-semibold border-b border-slate-200 dark:border-slate-700">
                 <tr>

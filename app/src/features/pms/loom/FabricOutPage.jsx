@@ -20,6 +20,7 @@ import { loomService } from '../../../services/loomService';
 import { formatNum, preventNegativeInput } from '../utils/loomCalculations';
 import { useERP } from '../../../context/ERPContext';
 import { ConfirmModal } from '../../../components/ui/ConfirmModal';
+import CompanySelector from './components/CompanySelector';
 
 export default function FabricOutPage() {
   const navigate = useNavigate();
@@ -184,22 +185,14 @@ export default function FabricOutPage() {
         subtitle="Record fabric rolls (taka & meters) leaving the factory for dyeing mills, godowns or processing."
         actions={
           <div className="flex items-center gap-2">
-            <div className="h-[38px] flex items-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 shadow-2xs">
-              <Factory size={15} className="text-slate-400" />
-              <select
-                value={selectedFactoryId}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  setSelectedFactoryId(val);
-                  localStorage.setItem('oscar_pms_selected_factory', val);
-                }}
-                className="bg-transparent text-xs font-semibold text-slate-800 dark:text-slate-200 outline-none cursor-pointer"
-              >
-                {factories.map((f) => (
-                  <option key={f.id} value={f.id}>{f.name}</option>
-                ))}
-              </select>
-            </div>
+            <CompanySelector
+              factories={factories}
+              selectedFactoryId={selectedFactoryId}
+              onSelect={(val) => {
+                setSelectedFactoryId(val);
+                localStorage.setItem('oscar_pms_selected_factory', val);
+              }}
+            />
             <button
               type="button"
               onClick={fetchFactoryDispatches}

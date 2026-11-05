@@ -17,6 +17,7 @@ import { loomService } from '../../../services/loomService';
 import { formatNum, preventNegativeInput, clampNonNegative } from '../utils/loomCalculations';
 import { useERP } from '../../../context/ERPContext';
 import { ConfirmModal } from '../../../components/ui/ConfirmModal';
+import CompanySelector from './components/CompanySelector';
 
 export default function DailyLoomEntryPage() {
   const { showToast } = useERP();
@@ -215,22 +216,14 @@ export default function DailyLoomEntryPage() {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-2.5 sm:gap-3">
             {/* Factory select */}
-            <div className="h-[38px] flex items-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 shadow-2xs">
-              <Factory size={15} className="text-slate-400 shrink-0" />
-              <select
-                value={selectedFactoryId}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  setSelectedFactoryId(val);
-                  localStorage.setItem('oscar_pms_selected_factory', val);
-                }}
-                className="bg-transparent text-xs font-semibold text-slate-800 dark:text-slate-200 outline-none cursor-pointer"
-              >
-                {factories.map((f) => (
-                  <option key={f.id} value={f.id}>{f.name}</option>
-                ))}
-              </select>
-            </div>
+            <CompanySelector
+              factories={factories}
+              selectedFactoryId={selectedFactoryId}
+              onSelect={(val) => {
+                setSelectedFactoryId(val);
+                localStorage.setItem('oscar_pms_selected_factory', val);
+              }}
+            />
 
             {/* Date Picker */}
             <div className="h-[38px] flex items-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 shadow-2xs">

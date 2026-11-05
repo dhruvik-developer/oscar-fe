@@ -7,6 +7,7 @@ import { loomService } from '../../../services/loomService';
 import { qc, formatNum, preventNegativeInput } from '../utils/loomCalculations';
 import { useERP } from '../../../context/ERPContext';
 import { ConfirmModal } from '../../../components/ui/ConfirmModal';
+import CompanySelector from './components/CompanySelector';
 
 export default function LoomMastersPage() {
   const { showToast } = useERP();
@@ -784,20 +785,14 @@ export default function LoomMastersPage() {
                 Loom Inventory by Factory
               </h3>
               <div className="flex items-center gap-2">
-                <span className="text-xs font-medium text-slate-500">Factory:</span>
-                <select
-                  value={selectedFactoryId}
-                  onChange={(e) => {
-                    const val = e.target.value;
+                <CompanySelector
+                  factories={factories}
+                  selectedFactoryId={selectedFactoryId}
+                  onSelect={(val) => {
                     setSelectedFactoryId(val);
                     localStorage.setItem('oscar_pms_selected_factory', val);
                   }}
-                  className="h-[38px] rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 text-xs font-semibold text-slate-800 dark:text-slate-200 shadow-2xs cursor-pointer outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500"
-                >
-                  {factories.map((f) => (
-                    <option key={f.id} value={f.id}>{f.name} ({f.machines_count} looms)</option>
-                  ))}
-                </select>
+                />
               </div>
             </div>
 

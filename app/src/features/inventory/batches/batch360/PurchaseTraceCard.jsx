@@ -2,6 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, Droplets, Factory, Warehouse } from 'lucide-react';
 import { formatINR, formatNumberIN } from '../../../accounts/accountingShared';
+import { ColourChip } from '../../../purchase/DyeingColourField';
 import { Card } from './shared';
 
 const Row = ({ label, children }) => (
@@ -39,6 +40,7 @@ export default function PurchaseTraceCard({ trace }) {
       </ol>
 
       <dl className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {trace.dyeingColourName && <Row label="Dyeing colour"><ColourChip name={trace.dyeingColourName} hex={trace.dyeingColourHex} /></Row>}
         <Row label="Receipt date">{r.receiptDate}</Row>
         <Row label="Received">{formatNumberIN(r.receivedQty)}</Row>
         <Row label="Accepted (QC)">{r.acceptedQty != null ? formatNumberIN(r.acceptedQty) : null}</Row>

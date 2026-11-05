@@ -5932,7 +5932,7 @@ function QuotationsTab({ lead, onActivity }) {
 
                 <td style={{ textAlign: 'right' }} className="font-bold font-mono">
 
-                  ${(q.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                  ₹{(q.amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
 
                 </td>
 

@@ -143,7 +143,7 @@ export function PayVendorBillModal({ po, onClose, onBillUpdated }) {
   const notifyChanged = () => {
     if (typeof onBillUpdated === 'function') onBillUpdated();
     if (typeof refreshCollections === 'function') {
-      refreshCollections(['purchaseOrders', 'purchaseBills', 'vendorBills']);
+      refreshCollections(['purchaseOrders', 'purchaseBills', 'vendorBills', 'paymentOuts', 'journalEntries', 'parties', 'vendors']);
     }
   };
 

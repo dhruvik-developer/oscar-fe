@@ -85,7 +85,7 @@ export default function CandidateDetails() {
         position: c.position,
         jobType: "Full-time",
         dept,
-        salary: "$95,000 / annum",
+        salary: "₹95,000 / annum",
         location: c.location || "New York HQ",
         workMode: "Hybrid",
         sentDate: new Date().toISOString().split("T")[0],

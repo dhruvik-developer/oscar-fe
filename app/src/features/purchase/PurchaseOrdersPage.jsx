@@ -44,6 +44,7 @@ import {
   FabricFlowCards, FabricFlowSteps, YarnLinesEditor, OpeningCostsEditor, fabricFlowPayload, flowLabel,
   FABRIC_FLOW_B,
 } from './FabricFlowForm';
+import DyeingColourField, { ColourChip } from './DyeingColourField';
 import { PoFabricFlowPanel } from './PoFabricFlowPanel';
 import { PoActionMenu } from './PoActionMenu';
 import { PoDetailsModal } from './PoDetailsModal';
@@ -62,7 +63,7 @@ const purchaseOrderGuide = {
     ],
     tips: [
         'Use the Clone button on frequent supplier orders to duplicate items into a new draft in 1 click.',
-        'Once goods arrive at the dock, click "Create Bill" to post inventory intake and record Accounts Payable.',
+        'Once goods are received, open "Pay Vendor Bill" from the PO menu and enter the vendor invoice to record Accounts Payable.',
     ],
     workflow: ['Auto-Generated / Draft PO', 'Issued to Vendor', 'Goods Intake & Vendor Bill', '3-Way Match Verified', 'Disbursement Settlement'],
 };
@@ -92,6 +93,26 @@ function amountInWords(num) {
 
 // KPI tiles use the shared, theme-aware KpiCard.
 const KPI_TONE_BY_COLOR = { '#2563eb': 'blue', '#d97706': 'amber', '#059669': 'emerald', '#7c3aed': 'purple' };
+
+/** Contact details shown under a vendor dropdown of the Create PO form. */
+function VendorInfoCard({ vendor }) {
+  if (!vendor) return null;
+  return (
+    <div className="mt-2 p-2.5 rounded-xl border border-slate-200 bg-slate-50 text-[11px] space-y-1">
+      <div className="flex items-center justify-between font-bold text-slate-800">
+        <span>Vendor: {vendor.name}</span>
+        <span className="text-emerald-700 font-mono text-[10px] bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">Terms: {vendor.paymentTerms || 'Net 30'}</span>
+      </div>
+      <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-slate-600 text-[10px]">
+        <span>Code: <strong>{vendor.code || '—'}</strong></span>
+        <span>POC: <strong>{vendor.contactPerson || '—'}</strong></span>
+        <span>Email: {vendor.email || '—'}</span>
+        <span>Phone: {vendor.phone || '—'}</span>
+        {(vendor.gstin || vendor.gstNumber || vendor.gst) && <span>GST No: <strong>{vendor.gstin || vendor.gstNumber || vendor.gst}</strong></span>}
+      </div>
+    </div>
+  );
+}
 
 function Kpi({ icon, value, label, trend, iconColor }) {
   return <KpiCard icon={icon} value={value} label={label} trend={trend || undefined} tone={KPI_TONE_BY_COLOR[iconColor] || 'blue'} />;
@@ -141,7 +162,7 @@ const STATUS_PILL = {
 
 export const PurchaseOrdersPage = () => {
     const navigate = useNavigate();
-    const { purchaseOrders, vendors, items: inventoryItems, locations: erpLocations = [], fabrics: fabricMasters, addPurchaseOrder, updatePurchaseOrderStatus, cancelPurchaseOrder, deletePurchaseOrder, getPoBilledStatus, convertPurchaseOrderToBill, purchaseBills, paymentOuts, formatCurrency, formatDateDDMMYYYY, getCurrentDateFormatted, getCurrentISODate, addDaysISO, showToast, refreshCollections } = useERP();
+    const { purchaseOrders, vendors, items: inventoryItems, locations: erpLocations = [], fabrics: fabricMasters, addPurchaseOrder, updatePurchaseOrderStatus, cancelPurchaseOrder, deletePurchaseOrder, getPoBilledStatus, purchaseBills, vendorBills = [], paymentOuts, formatCurrency, formatDateDDMMYYYY, getCurrentDateFormatted, getCurrentISODate, addDaysISO, showToast, refreshCollections } = useERP();
     const { units } = useUnits();
     const [showAddModal, setShowAddModal] = useState(false);
     const [isFullscreen, setIsFullscreen] = useState(false);
@@ -294,10 +315,11 @@ export const PurchaseOrdersPage = () => {
     // empty for the older purchase types.
     const [fabricFlow, setFabricFlow] = useState('');
     const [dyeingMillId, setDyeingMillId] = useState('');
+    const [dyeingColour, setDyeingColour] = useState({ name: '', hex: '' });
     const [yarnRows, setYarnRows] = useState([]);
     const [costRows, setCostRows] = useState([]);
-    const resetFabricFlow = () => { setFabricFlow(''); setDyeingMillId(''); setYarnRows([]); setCostRows([]); };
-    const chooseFabricFlow = (flow) => { setFabricFlow(flow); setPurchaseType(PURCHASE_TYPE_GREY); if (flow !== FABRIC_FLOW_B) setDyeingMillId(''); };
+    const resetFabricFlow = () => { setFabricFlow(''); setDyeingMillId(''); setDyeingColour({ name: '', hex: '' }); setYarnRows([]); setCostRows([]); };
+    const chooseFabricFlow = (flow) => { setFabricFlow(flow); setPurchaseType(PURCHASE_TYPE_GREY); if (flow !== FABRIC_FLOW_B) { setDyeingMillId(''); setDyeingColour({ name: '', hex: '' }); } };
     // Used by the "Other purchase types" cards, hidden for now in the Create PO form.
     // const choosePurchaseType = (type) => { setPurchaseType(type); setFabricFlow(''); setDyeingMillId(''); };
     // Project association is separate from purchase type: a ready grey stock
@@ -452,6 +474,7 @@ export const PurchaseOrdersPage = () => {
         if (po.fabricFlow) {
             setFabricFlow(po.fabricFlow);
             setDyeingMillId(po.dyeingMillId || '');
+            setDyeingColour({ name: po.dyeingColourName || '', hex: po.dyeingColourHex || '' });
             setYarnRows(po.yarnLines || po.yarnRows || []);
             setCostRows(po.expenses || po.costRows || []);
         }
@@ -530,7 +553,7 @@ export const PurchaseOrdersPage = () => {
         const clonedType = purchaseTypeOf(po);
         setPurchaseType(clonedType === PURCHASE_TYPE_FINAL_JW ? '' : clonedType);
         resetFabricFlow();
-        if (po.fabricFlow) { setFabricFlow(po.fabricFlow); setDyeingMillId(po.dyeingMillId || ''); }
+        if (po.fabricFlow) { setFabricFlow(po.fabricFlow); setDyeingMillId(po.dyeingMillId || ''); setDyeingColour({ name: po.dyeingColourName || '', hex: po.dyeingColourHex || '' }); }
         setProjectMode(po.projectId ? 'project' : 'general');
         setProjectId(po.projectId || '');
         setIsFullscreen(false);
@@ -543,7 +566,7 @@ export const PurchaseOrdersPage = () => {
         if (!purchaseType && !fabricFlow) { alert('Select how the fabric reaches OSCAR.'); return; }
         let flowExtras = {};
         if (fabricFlow) {
-            const built = fabricFlowPayload({ flow: fabricFlow, dyeingMillId, yarnRows, costRows });
+            const built = fabricFlowPayload({ flow: fabricFlow, dyeingMillId, dyeingColourName: dyeingColour.name, dyeingColourHex: dyeingColour.hex, yarnRows, costRows });
             if (built.error) { alert(built.error); return; }
             flowExtras = built.payload;
         }
@@ -636,14 +659,6 @@ export const PurchaseOrdersPage = () => {
         }
     };
     const recordGrnForPo = (po) => navigate('/purchase/receipts', { state: { grnForPo: po.id } });
-    const handleConvertToBill = async (poId) => {
-        try {
-            await convertPurchaseOrderToBill(poId);
-            navigate('/purchase/bills');
-        } catch {
-            // The reason was shown; stay on the order.
-        }
-    };
     const getPoTimelineSteps = (po) => {
         const isIssued = po.status !== 'Draft';
         const poStatusInfo = getPoBilledStatus(po.id);
@@ -1034,6 +1049,86 @@ export const PurchaseOrdersPage = () => {
       return LEGACY_STATUS_MAP[po.status] || po.status || 'Draft';
     };
 
+        const getPoPaymentStatus = (po) => {
+      if (!po) return { isFullyPaid: false, isPartiallyPaid: false };
+      const poId = po.id;
+      const poNum = po.poNumber || po.po_number;
+
+      // 1. Linked vendor bills
+      const linkedVBs = (vendorBills || []).filter((b) => {
+        if (b.status === 'Cancelled' || b.status === 'Rejected') return false;
+        const bPoId = b.purchaseOrderId || b.purchase_order || b.purchase_order_id;
+        const bPoNum = b.poNumber || b.po_number;
+        return (poId && bPoId === poId) || (poNum && bPoNum === poNum);
+      });
+
+      if (linkedVBs.length > 0) {
+        let allPaid = true;
+        let anyPaid = false;
+        let totalPaid = 0;
+
+        linkedVBs.forEach((b) => {
+          const bTotal = Number(b.total || b.billAmount || b.amount || 0);
+          const bPaid = Number(b.amountPaid || b.amount_paid || (b.paymentStatus === 'Paid' || b.status === 'Paid' ? bTotal : 0));
+          const bOutstanding = Number(b.outstandingAmount != null ? b.outstandingAmount : Math.max(0, bTotal - bPaid));
+          const isPaid = b.paymentStatus === 'Paid' || b.status === 'Paid' || (bTotal > 0 && bOutstanding <= 0.01 && bPaid > 0);
+
+          totalPaid += bPaid;
+          if (!isPaid) allPaid = false;
+          if (bPaid > 0 || isPaid || b.paymentStatus === 'Partially Paid' || b.status === 'Partially Paid') {
+            anyPaid = true;
+          }
+        });
+
+        if (allPaid && linkedVBs.length > 0) {
+          return { isFullyPaid: true, isPartiallyPaid: false };
+        }
+        if (anyPaid || totalPaid > 0) {
+          return { isFullyPaid: false, isPartiallyPaid: true };
+        }
+      }
+
+      // 2. Linked purchase bills
+      const linkedPBs = (purchaseBills || []).filter((b) => {
+        if (b.status === 'Cancelled') return false;
+        const bPoId = b.purchaseOrderId || b.purchase_order || b.purchase_order_id;
+        const bPoRef = b.poRef || b.linkedPo || b.poNumber;
+        return (poId && bPoId === poId) || (poNum && bPoRef === poNum);
+      });
+
+      if (linkedPBs.length > 0) {
+        let allPaid = true;
+        let anyPaid = false;
+        let totalPaid = 0;
+
+        linkedPBs.forEach((b) => {
+          const bTotal = Number(b.total || b.amount || 0);
+          const bPaid = Number(b.amountPaid || b.amount_paid || (b.status === 'Paid' ? bTotal : 0));
+          const bBalance = Number(b.balanceDue != null ? b.balanceDue : (b.balance_due != null ? b.balance_due : Math.max(0, bTotal - bPaid)));
+          const isPaid = b.status === 'Paid' || (bTotal > 0 && bBalance <= 0.01 && bPaid > 0);
+
+          totalPaid += bPaid;
+          if (!isPaid) allPaid = false;
+          if (bPaid > 0 || isPaid || b.status === 'Partially Paid') anyPaid = true;
+        });
+
+        if (allPaid && linkedPBs.length > 0) {
+          return { isFullyPaid: true, isPartiallyPaid: false };
+        }
+        if (anyPaid || totalPaid > 0) {
+          return { isFullyPaid: false, isPartiallyPaid: true };
+        }
+      }
+
+      // 3. Fallback on PO fields directly
+      const poPaid = Number(po.amount_paid || po.amountPaid || 0);
+      const poTotal = Number(po.total || po.amount || 0);
+      const isPoPaid = po.paymentStatus === 'Paid' || po.payment_status === 'Paid' || (poTotal > 0 && poPaid >= poTotal);
+      const isPoPartial = po.paymentStatus === 'Partially Paid' || po.payment_status === 'Partially Paid' || (poPaid > 0 && !isPoPaid);
+
+      return { isFullyPaid: isPoPaid, isPartiallyPaid: isPoPartial };
+    };
+
     const totalPoValue = purchaseOrders.reduce((sum, p) => sum + (p.amount ?? p.total ?? 0), 0);
     const openPoCount = purchaseOrders.filter((p) => !['Fully Received', 'Cancelled'].includes(getOscarStatus(p))).length;
     const draftPoCount = purchaseOrders.filter((p) => getOscarStatus(p) === 'Draft').length;
@@ -1125,7 +1220,6 @@ export const PurchaseOrdersPage = () => {
 
     const renderStatusAction = (p) => {
       const poStatusInfo = getPoBilledStatus(p.id);
-      const hasRemaining = poStatusInfo.totalRemainingQty > 0;
       return (
         <div className="flex items-center justify-end gap-1.5 whitespace-nowrap">
           {getOscarStatus(p) === 'Draft' ? (
@@ -1147,11 +1241,6 @@ export const PurchaseOrdersPage = () => {
               {poStatusInfo.totalBilledQty <= 0 && (
                 <button onClick={() => cancelPurchaseOrder(p.id)} className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors" title="Cancel Purchase Order">
                   <Ban size={13}/>
-                </button>
-              )}
-              {hasRemaining && (
-                <button onClick={() => handleConvertToBill(p.id)} className="text-xs text-blue-600 font-semibold hover:underline inline-flex items-center gap-1 justify-end whitespace-nowrap">
-                  {poStatusInfo.status === 'Partially Billed' ? `Bill Remaining (${poStatusInfo.totalRemainingQty})` : 'Create Bill'} <ArrowRight size={11}/>
                 </button>
               )}
             </div>
@@ -1272,6 +1361,7 @@ export const PurchaseOrdersPage = () => {
                           {p.fabricFlow === FABRIC_FLOW_B ? 'Factory → Mill → OSCAR' : 'Factory → OSCAR'}
                         </span>
                       )}
+                      {p.fabricFlow === FABRIC_FLOW_B && <ColourChip name={p.dyeingColourName} hex={p.dyeingColourHex} className="text-[9px]" />}
                       <span className={`inline-flex items-center rounded-md border px-1.5 py-0.5 text-[9px] font-bold ${TYPE_BADGE[purchaseTypeOf(p)]?.cls || TYPE_BADGE[PURCHASE_TYPE_GREY].cls}`}>
                         {TYPE_BADGE[purchaseTypeOf(p)]?.label || purchaseTypeOf(p)}
                       </span>
@@ -1804,35 +1894,31 @@ export const PurchaseOrdersPage = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <div className="flex items-center justify-between mb-1">
-                    <label className="block font-semibold text-slate-700">{fabricFlow ? 'Factory / Vendor *' : 'Vendor / Supplier *'}</label>
+                    <label className="block font-semibold text-slate-700">{fabricFlow === FABRIC_FLOW_B ? 'Grey Fabric Vendor (Factory) *' : fabricFlow ? 'Factory / Vendor *' : 'Vendor / Supplier *'}</label>
                     <MasterSourceLink source="vendors" />
                   </div>
-                  <select value={selectedVendorId} onChange={(e) => setSelectedVendorId(e.target.value)} className="w-full border border-slate-300 rounded-lg p-2 bg-white text-slate-800 font-medium">
+                  <select value={selectedVendorId} onChange={(e) => { setSelectedVendorId(e.target.value); if (e.target.value === dyeingMillId) setDyeingMillId(''); }} className="w-full border border-slate-300 rounded-lg p-2 bg-white text-slate-800 font-medium">
                     {vendors.map((v) => (
                       <option key={v.id} value={v.id}>{v.name} ({v.code}) - Terms: {v.paymentTerms}</option>
                     ))}
                   </select>
-                  {(() => {
-                    const vend = vendors.find(v => v.id === selectedVendorId) || vendors[0];
-                    if (!vend) return null;
-                    return (
-                      <div className="mt-2 p-2.5 rounded-xl border border-slate-200 bg-slate-50 text-[11px] space-y-1">
-                        <div className="flex items-center justify-between font-bold text-slate-800">
-                          <span>Vendor: {vend.name}</span>
-                          <span className="text-emerald-700 font-mono text-[10px] bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">Terms: {vend.paymentTerms || 'Net 30'}</span>
-                        </div>
-                        <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-slate-600 text-[10px]">
-                          <span>Code: <strong>{vend.code || '—'}</strong></span>
-                          <span>POC: <strong>{vend.contactPerson || '—'}</strong></span>
-                          <span>Email: {vend.email || '—'}</span>
-                          <span>Phone: {vend.phone || '—'}</span>
-                          {(vend.gstin || vend.gstNumber || vend.gst) && <span>GST No: <strong>{vend.gstin || vend.gstNumber || vend.gst}</strong></span>}
-                        </div>
-                      </div>
-                    );
-                  })()}
+                  <VendorInfoCard vendor={vendors.find(v => v.id === selectedVendorId) || vendors[0]} />
                 </div>
-                <div>
+                {fabricFlow === FABRIC_FLOW_B && (
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block font-semibold text-slate-700" htmlFor="po-dyeing-mill">Dyeing Vendor (Mill) *</label>
+                      <MasterSourceLink source="vendors" />
+                    </div>
+                    <select id="po-dyeing-mill" value={dyeingMillId} onChange={(e) => setDyeingMillId(e.target.value)} className="w-full border border-slate-300 rounded-lg p-2 bg-white text-slate-800 font-medium">
+                      <option value="">Select dyeing vendor...</option>
+                      {vendors.filter((v) => v.id !== selectedVendorId).map((v) => <option key={v.id} value={v.id}>{v.name}{v.code ? ` (${v.code})` : ''}</option>)}
+                    </select>
+                    <VendorInfoCard vendor={vendors.find(v => v.id === dyeingMillId)} />
+                    <p className="mt-1 text-[10.5px] text-slate-500">The factory sends the grey fabric straight to this mill. It is tracked on the PO but never becomes OSCAR grey stock; OSCAR stock starts when the dyed fabric arrives.</p>
+                  </div>
+                )}
+                <div className={fabricFlow === FABRIC_FLOW_B ? 'sm:col-span-2' : ''}>
                   <label className="block font-semibold text-slate-700 mb-1">PO Number</label>
                   <input type="text" readOnly value="Auto-Generate" className="w-full border border-slate-200 rounded-lg p-2 bg-slate-50 text-slate-500 font-medium cursor-not-allowed"/>
                   <p className="text-[10px] text-slate-400 mt-1">Allocated by the server when the PO is saved.</p>
@@ -1917,16 +2003,7 @@ export const PurchaseOrdersPage = () => {
                 <button type="button" onClick={addBlankLine} className="mt-2 inline-flex items-center gap-1 text-[12px] font-semibold text-blue-600 hover:underline"><Plus size={13}/> Add Fabric Line</button>
               </div>
 
-              {fabricFlow === FABRIC_FLOW_B && (
-                <div className="rounded-xl border border-violet-200 bg-violet-50/40 p-3.5">
-                  <label className="block font-semibold text-slate-700 mb-1" htmlFor="po-dyeing-mill">Dyeing Mill</label>
-                  <select id="po-dyeing-mill" value={dyeingMillId} onChange={(e) => setDyeingMillId(e.target.value)} className="w-full sm:w-96 border border-slate-300 rounded-lg p-2 bg-white text-slate-800 font-medium">
-                    <option value="">Not decided yet</option>
-                    {vendors.filter((v) => v.id !== selectedVendorId).map((v) => <option key={v.id} value={v.id}>{v.name}{v.code ? ` (${v.code})` : ''}</option>)}
-                  </select>
-                  <p className="mt-1 text-[10.5px] text-slate-500">The factory sends the grey fabric straight to this mill. It is tracked on the PO but never becomes OSCAR grey stock; OSCAR stock starts when the dyed fabric arrives.</p>
-                </div>
-              )}
+              {fabricFlow === FABRIC_FLOW_B && <DyeingColourField name={dyeingColour.name} hex={dyeingColour.hex} onChange={setDyeingColour} />}
 
               {fabricFlow && (
                 <div>
@@ -1990,6 +2067,8 @@ export const PurchaseOrdersPage = () => {
           hasRemaining={getPoBilledStatus(actionMenuTarget.po.id).totalRemainingQty > 0}
           receivedQty={getPoReceivedQty(actionMenuTarget.po)}
           orderedQty={getPoQty(actionMenuTarget.po)}
+          isFullyPaid={getPoPaymentStatus(actionMenuTarget.po).isFullyPaid}
+          isPartiallyPaid={getPoPaymentStatus(actionMenuTarget.po).isPartiallyPaid}
           onClose={() => setActionMenuTarget(null)}
           onViewDetails={(po) => setDetailsModalPo(po)}
           onEdit={(po) => handleOpenEditModal(po)}

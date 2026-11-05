@@ -21,6 +21,7 @@ import {
   ChevronUp,
   Trash2,
   Layers,
+  Package,
   Building2,
   RefreshCw,
   Search,
@@ -30,6 +31,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { numIN } from '../../utils/formatters';
 import MasterSourceLink from '../../components/common/MasterSourceLink';
 import GrnDetailDrawer from './GrnDetailDrawer';
+import { ReceiptTypeNotice } from './DyeingColourField';
 
 const goodsReceiptGuide = {
   title: 'Goods Receipt Notes (GRN)',
@@ -65,9 +67,10 @@ export const GoodsReceiptPage = () => {
   const lineUnit = (it) => it.uom || it.unit || 'MTR';
   const unitTotals = (lines, qtyOf) => formatUnitTotals(sumByUnit(lines, { qty: qtyOf, uom: lineUnit, units }), { units });
 
-  // Tab state: 'pending' (bills awaiting receipt) | 'receipts' (completed GRN register)
-  const [activeTab, setActiveTab] = useState('pending');
+  // Tab state: 'receipts' (completed GRN register) | 'orders' (POs awaiting intake) | 'pending' (bills awaiting receipt)
+  const [activeTab, setActiveTab] = useState('receipts');
   const [grnList, setGrnList] = useState([]);
+  const [totalGrnCount, setTotalGrnCount] = useState(0);
   const [viewGrn, setViewGrn] = useState(null);
   const [loadingGrns, setLoadingGrns] = useState(false);
   const [grnSearch, setGrnSearch] = useState('');
@@ -104,8 +107,9 @@ export const GoodsReceiptPage = () => {
   const fetchGrns = useCallback(async () => {
     setLoadingGrns(true);
     try {
-      const res = await api.get('/purchase/receipts/');
+      const res = await api.get('/purchase/receipts/?page_size=1000');
       const rows = Array.isArray(res) ? res : (res?.results || res?.rows || []);
+      setTotalGrnCount(res?.count ?? rows.length);
       // The API answers in camelCase (grnNumber, receiptDate, ...); this page
       // reads the snake_case names, so fill those from the camelCase ones.
       setGrnList(rows.map((r) => ({
@@ -118,6 +122,7 @@ export const GoodsReceiptPage = () => {
     } catch (err) {
       console.error('Failed to fetch GRN list:', err);
       setGrnList([]);
+      setTotalGrnCount(0);
     } finally {
       setLoadingGrns(false);
     }
@@ -125,7 +130,10 @@ export const GoodsReceiptPage = () => {
 
   useEffect(() => {
     fetchGrns();
-  }, [fetchGrns]);
+    if (typeof refreshCollections === 'function') {
+      refreshCollections(['purchaseOrders', 'purchaseBills']);
+    }
+  }, [fetchGrns, refreshCollections]);
 
   // Set default location once locations are loaded
   useEffect(() => {
@@ -134,11 +142,66 @@ export const GoodsReceiptPage = () => {
     }
   }, [locations, standaloneForm.locationId]);
 
-  // Pending receipts from bills
-  const pendingReceipts = (purchaseBills || []).filter((b) => b.goodsReceived !== true && b.status !== 'Cancelled');
-  const receivedCount = grnList.length || (purchaseBills || []).filter((b) => b.goodsReceived === true).length;
-  const pendingQtyText = unitTotals(pendingReceipts.flatMap((b) => b.items || []), (it) => Number(it.qty) || 0);
-  const pendingValue = pendingReceipts.reduce((sum, b) => sum + (Number(b.total ?? b.amount) || 0), 0);
+  // Pending receipts from active Purchase Orders awaiting receipt (standard ERP flow)
+  const pendingPOs = useMemo(() => {
+    return (purchaseOrders || []).filter((po) => {
+      if (['Draft', 'Cancelled'].includes(po.status)) return false;
+      const lines = po.lineItems || po.items || [];
+      const ordered = lines.reduce((sum, l) => sum + (Number(l.qty ?? l.orderedQty) || 0), 0);
+      const received = lines.reduce((sum, l) => sum + (Number(l.receivedQty ?? l.received_qty) || 0), 0);
+      return ordered > 0 && received < ordered;
+    });
+  }, [purchaseOrders]);
+
+  const pendingPoLines = useMemo(() => {
+    return pendingPOs.flatMap((po) =>
+      (po.lineItems || po.items || []).map((l) => {
+        const ordered = Number(l.qty ?? l.orderedQty ?? 0);
+        const received = Number(l.receivedQty ?? l.received_qty ?? 0);
+        const remaining = Math.max(0, ordered - received);
+        const rate = Number(l.rate ?? l.price ?? 0);
+        return {
+          ...l,
+          qty: remaining,
+          uom: l.uom || l.unit || 'MTR',
+          value: remaining * rate,
+        };
+      })
+    ).filter((l) => l.qty > 0);
+  }, [pendingPOs]);
+
+  // Legacy pending receipts from bills
+  // A bill whose PO already has a GRN has nothing left to receive: goods come in
+  // through the GRN, and this list is only for bills raised without one.
+  const pendingReceipts = useMemo(() => {
+    return (purchaseBills || []).filter(
+      (b) => b.goodsReceived !== true && b.status !== 'Cancelled' && !b.poAlreadyReceived,
+    );
+  }, [purchaseBills]);
+
+  // Combined metrics across pending POs and pending bills
+  const pendingIntakeLabel = pendingPOs.length > 0
+    ? `${pendingPOs.length} ${pendingPOs.length === 1 ? 'Order' : 'Orders'}`
+    : `${pendingReceipts.length} ${pendingReceipts.length === 1 ? 'Bill' : 'Bills'}`;
+
+  const allPendingLines = useMemo(() => {
+    const billLines = pendingReceipts.flatMap((b) => b.items || []);
+    return [...pendingPoLines, ...billLines];
+  }, [pendingPoLines, pendingReceipts]);
+
+  const pendingQtyText = useMemo(() => {
+    if (allPendingLines.length === 0) return '0 MTR';
+    const formatted = unitTotals(allPendingLines, (it) => Number(it.qty) || 0);
+    return !formatted || formatted === '—' ? '0 MTR' : formatted;
+  }, [allPendingLines, unitTotals]);
+
+  const pendingValue = useMemo(() => {
+    const poVal = pendingPoLines.reduce((sum, l) => sum + (Number(l.value) || 0), 0);
+    const billVal = pendingReceipts.reduce((sum, b) => sum + (Number(b.total ?? b.amount) || 0), 0);
+    return poVal + billVal;
+  }, [pendingPoLines, pendingReceipts]);
+
+  const totalGrnDisplayCount = totalGrnCount || grnList.length;
 
   // Weight metadata helper
   const getLineWeightMeta = (line) => {
@@ -560,7 +623,7 @@ export const GoodsReceiptPage = () => {
   }, [grnList, grnSearch]);
 
   const [grnPage, setGrnPage] = useState(1);
-  const [grnPageSize, setGrnPageSize] = useState(10);
+  const [grnPageSize, setGrnPageSize] = useState(25);
 
   useEffect(() => {
     setGrnPage(1);
@@ -591,24 +654,39 @@ export const GoodsReceiptPage = () => {
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard label="Awaiting Receipt" value={`${pendingReceipts.length} Bills`} icon={Truck} tone="amber" />
-        <StatCard label="Pending Qty" value={pendingQtyText === '—' ? '0' : pendingQtyText} icon={Boxes} />
-        <StatCard label="Receivable Value" value={formatCurrency(pendingValue)} icon={ClipboardCheck} tone="blue" />
-        <StatCard label="Received GRNs" value={`${grnList.length} Notes`} icon={ShieldCheck} tone="green" />
+        <StatCard
+          label="Awaiting Receipt"
+          value={pendingIntakeLabel}
+          icon={Truck}
+          tone="amber"
+          note={pendingPOs.length > 0 ? `${pendingPOs.length} POs pending intake` : undefined}
+          onClick={() => setActiveTab('orders')}
+          className="cursor-pointer hover:shadow-md transition"
+        />
+        <StatCard
+          label="Pending Qty"
+          value={pendingQtyText}
+          icon={Boxes}
+          tone="blue"
+        />
+        <StatCard
+          label="Receivable Value"
+          value={formatCurrency(pendingValue)}
+          icon={ClipboardCheck}
+          tone="blue"
+        />
+        <StatCard
+          label="Received GRNs"
+          value={`${totalGrnDisplayCount} Notes`}
+          icon={ShieldCheck}
+          tone="green"
+          onClick={() => setActiveTab('receipts')}
+          className="cursor-pointer hover:shadow-md transition"
+        />
       </div>
 
       {/* Tabs */}
       <div className="flex border-b border-slate-200 gap-4">
-        <button
-          onClick={() => setActiveTab('pending')}
-          className={`pb-2.5 text-xs font-semibold border-b-2 transition ${
-            activeTab === 'pending'
-              ? 'border-blue-600 text-blue-700'
-              : 'border-transparent text-slate-500 hover:text-slate-800'
-          }`}
-        >
-          Pending Bills ({pendingReceipts.length})
-        </button>
         <button
           onClick={() => setActiveTab('receipts')}
           className={`pb-2.5 text-xs font-semibold border-b-2 transition ${
@@ -617,8 +695,32 @@ export const GoodsReceiptPage = () => {
               : 'border-transparent text-slate-500 hover:text-slate-800'
           }`}
         >
-          Completed GRN Register ({grnList.length})
+          Completed GRN Register ({totalGrnDisplayCount})
         </button>
+        {pendingPOs.length > 0 && (
+          <button
+            onClick={() => setActiveTab('orders')}
+            className={`pb-2.5 text-xs font-semibold border-b-2 transition ${
+              activeTab === 'orders'
+                ? 'border-blue-600 text-blue-700'
+                : 'border-transparent text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            Orders Awaiting Receipt ({pendingPOs.length})
+          </button>
+        )}
+        {pendingReceipts.length > 0 && (
+          <button
+            onClick={() => setActiveTab('pending')}
+            className={`pb-2.5 text-xs font-semibold border-b-2 transition ${
+              activeTab === 'pending'
+                ? 'border-blue-600 text-blue-700'
+                : 'border-transparent text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            Pending Bills ({pendingReceipts.length})
+          </button>
+        )}
       </div>
 
       {/* TAB 1: Completed GRN Register */}
@@ -758,6 +860,86 @@ export const GoodsReceiptPage = () => {
         </div>
       )}
 
+      {/* TAB 3: Purchase Orders Awaiting Intake */}
+      {activeTab === 'orders' && (
+        <div className="bg-white rounded-xl border border-[#dce5f4] shadow-xs overflow-hidden">
+          <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+            <div>
+              <h3 className="font-bold text-sm text-[#1F2E4A]">Purchase Orders Awaiting Goods Receipt</h3>
+              <p className="text-xs text-slate-500 mt-0.5">Approved purchase orders with remaining unreceived meterage</p>
+            </div>
+            <span className="text-xs text-slate-600 font-mono bg-amber-50 text-amber-700 border border-amber-200 px-2.5 py-1 rounded-full font-semibold">
+              {pendingPOs.length} orders pending
+            </span>
+          </div>
+          {pendingPOs.length === 0 ? (
+            <div className="p-12 text-center text-slate-400 text-xs">
+              No purchase orders awaiting intake. All approved orders are fully received.
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs text-slate-600">
+                <thead className="bg-slate-50 uppercase font-semibold text-slate-500 tracking-wider border-b border-slate-200 text-[11px]">
+                  <tr>
+                    <th className="py-2.5 px-4">PO Number</th>
+                    <th className="py-2.5 px-4">Date</th>
+                    <th className="py-2.5 px-4">Supplier / Mill</th>
+                    <th className="py-2.5 px-4">Fabric / Item</th>
+                    <th className="py-2.5 px-4 text-right">Ordered Qty</th>
+                    <th className="py-2.5 px-4 text-right">Received Qty</th>
+                    <th className="py-2.5 px-4 text-right">Remaining</th>
+                    <th className="py-2.5 px-4 text-center">Status</th>
+                    <th className="py-2.5 px-4 text-center">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {pendingPOs.map((po) => {
+                    const lines = po.lineItems || po.items || [];
+                    const ordered = lines.reduce((sum, l) => sum + (Number(l.qty ?? l.orderedQty) || 0), 0);
+                    const received = lines.reduce((sum, l) => sum + (Number(l.receivedQty ?? l.received_qty) || 0), 0);
+                    const remaining = Math.max(0, ordered - received);
+                    const fabricName = lines[0]?.fabricQualityName || lines[0]?.itemName || lines[0]?.name || lines[0]?.description || '—';
+                    const uom = lines[0]?.uom || 'MTR';
+                    return (
+                      <tr key={po.id} className="hover:bg-slate-50/70 transition-colors">
+                        <td className="p-4 font-mono font-bold text-blue-600">{po.poNumber}</td>
+                        <td className="p-4 text-slate-700">{formatDateDDMMYYYY(po.date || po.docDate || po.createdAt)}</td>
+                        <td className="p-4 font-medium text-slate-900">{po.vendorName || po.partyName || '—'}</td>
+                        <td className="p-4 text-slate-800">{fabricName}{lines.length > 1 ? ` (+${lines.length - 1} more)` : ''}</td>
+                        <td className="p-4 text-right font-mono text-slate-700">{numIN(ordered)} {uom}</td>
+                        <td className="p-4 text-right font-mono text-emerald-700 font-semibold">{numIN(received)} {uom}</td>
+                        <td className="p-4 text-right font-mono text-amber-700 font-bold bg-amber-50/50">{numIN(remaining)} {uom}</td>
+                        <td className="p-4 text-center">
+                          <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold border ${
+                            po.status === 'Partially Received'
+                              ? 'bg-amber-50 text-amber-700 border-amber-200'
+                              : 'bg-blue-50 text-blue-700 border-blue-200'
+                          }`}>
+                            {po.status}
+                          </span>
+                        </td>
+                        <td className="p-4 text-center">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              openStandaloneModal({ vendorId: po.vendorId || po.partyId });
+                              handlePoSelect(po.id);
+                            }}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 shadow-xs transition"
+                          >
+                            <PackageCheck size={13} /> Receive GRN
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* ── Standalone GRN Modal (Phase 2.2 with Taka Breakdown) ── */}
       {standaloneModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
@@ -823,6 +1005,9 @@ export const GoodsReceiptPage = () => {
                       <option key={po.id} value={po.id}>{po.poNumber || po.number} ({po.docDate || po.date})</option>
                     ))}
                   </select>
+                  <div className="mt-1.5 empty:hidden">
+                    <ReceiptTypeNotice po={purchaseOrders.find((p) => String(p.id) === String(standaloneForm.poId))} />
+                  </div>
                 </div>
 
                 <div>

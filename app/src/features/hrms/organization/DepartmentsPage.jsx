@@ -72,7 +72,7 @@ export function DepartmentsPage() {
       teams: 1,
       employees: 1,
       openRoles: 0,
-      budget: newDept.budget || '$150,000',
+      budget: newDept.budget || '₹150,000',
       status: 'Active',
     };
     setDepartments([created, ...departments]);
@@ -337,7 +337,7 @@ export function DepartmentsPage() {
             </label>
             <input
               type="text"
-              placeholder="e.g. $300,000"
+              placeholder="e.g. ₹300,000"
               value={newDept.budget}
               onChange={(e) => setNewDept({ ...newDept, budget: e.target.value })}
               className="w-full px-3.5 py-2 bg-off border border-bdr rounded-xl text-[13.5px] focus:outline-none focus:border-navy"

@@ -1,3 +1,5 @@
+import { ColourChip } from './DyeingColourField';
+import { FABRIC_FLOW_B, flowLabel } from './FabricFlowForm';
 import React, { useState } from 'react';
 import {
   X,
@@ -258,7 +260,8 @@ export function PoDetailsModal({
               <div className="mt-1 space-y-1 text-slate-700">
                 <div>Expected Date: <strong>{formatDateDDMMYYYY(po.expectedDate)}</strong></div>
                 <div>Project Reference: <strong>{po.projectCode || po.projectName || 'General Stock'}</strong></div>
-                {po.fabricFlow && <div>Fabric Flow: <strong>{po.fabricFlow}</strong></div>}
+                {po.fabricFlow && <div>Delivery Type: <strong>{flowLabel(po.fabricFlow)}</strong></div>}
+                {po.fabricFlow === FABRIC_FLOW_B && po.dyeingColourName && <div className="flex items-center gap-1.5">Dyeing Colour: <ColourChip name={po.dyeingColourName} hex={po.dyeingColourHex} /></div>}
               </div>
             </div>
             <div className="p-3 bg-slate-50 border border-slate-200/80 rounded-xl">

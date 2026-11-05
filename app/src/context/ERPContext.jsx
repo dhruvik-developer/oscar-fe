@@ -3385,6 +3385,8 @@ export const ERPProvider = ({ children, }) => {
             ...(po.fabricFlow ? {
                 fabricFlow: po.fabricFlow,
                 dyeingMillId: po.dyeingMillId || undefined,
+                dyeingColourName: po.dyeingColourName ?? null,
+                dyeingColourHex: po.dyeingColourHex ?? null,
                 yarnLines: po.yarnLines || [],
                 expenses: po.expenses || [],
             } : {}),

@@ -18,6 +18,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { api } from '../../services/api';
 import { useERP } from '../../context/ERPContext';
+import { ReceiptTypeNotice } from './DyeingColourField';
 import MasterSourceLink from '../../components/common/MasterSourceLink';
 
 function numIN(val) {
@@ -261,6 +262,8 @@ export function GoodsReceiptInlineSlide({ po, delivery, onClose, onReceiptSaved,
     }
     return list;
   }, [purchaseOrders, form.vendorId, po]);
+
+  const linkedPo = (purchaseOrders || []).find((p) => String(p.id) === String(form.poId)) || (form.poId ? po : null);
 
   const handleVendorSelect = (vendorId) => {
     setForm((prev) => ({
@@ -526,6 +529,17 @@ export function GoodsReceiptInlineSlide({ po, delivery, onClose, onReceiptSaved,
       const res = await api.post('/purchase/receipts/', payload, { idempotencyKey: key });
       const grnNum = res.grnNumber || res.grn_number || res.id;
       setSuccessMsg(`GRN #${grnNum} intake recorded successfully! Goods received and sent to QC hold.`);
+      // The next partial receipt starts empty, so a repeat Save has nothing to post.
+      setForm((prev) => ({
+        ...prev,
+        supplierChallanNo: '',
+        lines: prev.lines.map((l) => ({
+          ...l,
+          remainingQty: Math.max(0, Number(l.remainingQty || 0) - Number(l.receivedQty || 0)),
+          receivedQty: '',
+          totalCost: '',
+        })),
+      }));
 
       if (refreshCollections) {
         refreshCollections(['purchaseOrders', 'inventory']);
@@ -651,6 +665,7 @@ export function GoodsReceiptInlineSlide({ po, delivery, onClose, onReceiptSaved,
       )}
 
       <form onSubmit={handleSubmit} className="space-y-4 text-xs">
+        <ReceiptTypeNotice po={linkedPo} />
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 bg-slate-50/80 p-3.5 rounded-xl border border-slate-200">
           <div>
             <div className="flex items-center justify-between mb-1">
@@ -761,13 +776,15 @@ export function GoodsReceiptInlineSlide({ po, delivery, onClose, onReceiptSaved,
             </h4>
             <div className="flex items-center gap-3">
               <MasterSourceLink source="items" label="+ Add / Manage Items" />
-              <button
-                type="button"
-                onClick={handleAddLine}
-                className="text-xs font-bold text-emerald-700 hover:text-emerald-900 flex items-center gap-1"
-              >
-                <Plus size={13} /> Add Fabric Line
-              </button>
+              {!linkedPo?.fabricFlow && (
+                <button
+                  type="button"
+                  onClick={handleAddLine}
+                  className="text-xs font-bold text-emerald-700 hover:text-emerald-900 flex items-center gap-1"
+                >
+                  <Plus size={13} /> Add Fabric Line
+                </button>
+              )}
             </div>
           </div>
 

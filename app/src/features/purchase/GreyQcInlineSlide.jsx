@@ -174,10 +174,10 @@ export function GreyQcInlineSlide({ po, initialReceiptId, onClose, onQcSaved, on
     const isGrnCompleted = !isReprocessMode && effectiveGrnStatus && effectiveGrnStatus !== 'Pending';
     const lines = currentGrn.lines || [];
 
-    const recordedGoodTotal = Number(currentGrnMeta.goodQty ?? currentGrnMeta.cumulative?.good ?? (['Approved', 'Passed'].includes(effectiveGrnStatus) ? grnReceivedMeters : 0));
+    const recordedGoodTotal = Number(currentGrnMeta.goodQty ?? currentGrnMeta.cumulative?.good ?? (['Approved', 'Passed'].includes(effectiveGrnStatus) ? grnReceivedMeters : 0)) - Number(currentGrnMeta.sampleQty || 0);
     const recordedRejectTotal = Number(currentGrnMeta.rejectedQty ?? currentGrnMeta.rejectQty ?? currentGrnMeta.cumulative?.reject ?? (effectiveGrnStatus === 'Rejected' ? grnReceivedMeters : 0));
     const recordedReprocessTotal = Number(currentGrnMeta.reprocessQty ?? currentGrnMeta.cumulative?.reprocess ?? 0);
-    const recordedSampleTotal = Number(currentGrnMeta.secondQualityQty ?? currentGrnMeta.secondQty ?? currentGrnMeta.cumulative?.second ?? 0);
+    const recordedSampleTotal = Number(currentGrnMeta.sampleQty || currentGrnMeta.secondQualityQty || currentGrnMeta.secondQty || currentGrnMeta.cumulative?.second || 0);
 
     const batchRows = lines.map((line, idx) => {
       const fullQty = Number(line.received_qty || line.receivedQty || 0);
@@ -440,7 +440,6 @@ export function GreyQcInlineSlide({ po, initialReceiptId, onClose, onQcSaved, on
         receiptId: currentGrn.id,
         isReprocess: isReprocessMode,
         goodQty: stats.goodMeters,
-        secondQty: stats.sampleMeters,
         sampleQty: stats.sampleMeters,
         reprocessQty: stats.reprocessMeters,
         rejectQty: stats.rejectedMeters,
@@ -458,7 +457,6 @@ export function GreyQcInlineSlide({ po, initialReceiptId, onClose, onQcSaved, on
             goodQty: insp ? Number(insp.good || 0) : (b.disposition === 'Rejected' ? 0 : len),
             reprocessQty: insp ? Number(insp.reprocess || 0) : 0,
             rejectQty: insp ? Number(insp.reject || 0) : (b.disposition === 'Rejected' ? len : 0),
-            secondQty: insp ? Number(insp.sample || 0) : 0,
             sampleQty: insp ? Number(insp.sample || 0) : 0,
             holdQty: 0,
           };
@@ -468,7 +466,7 @@ export function GreyQcInlineSlide({ po, initialReceiptId, onClose, onQcSaved, on
       const res = await api.post('/inventory/qc/complete/', payload);
 
       setSuccessMsg(
-        `Batch QC completed successfully! Accepted: ${numIN(stats.goodMeters)} m posted to warehouse stock. Reprocess: ${numIN(stats.reprocessMeters)} m, Quarantined/Reject: ${numIN(stats.rejectedMeters)} m.`
+        `Batch QC completed successfully! Accepted: ${numIN(stats.goodMeters)} m posted to warehouse stock. Sample: ${numIN(stats.sampleMeters)} m, Reprocess: ${numIN(stats.reprocessMeters)} m, Quarantined/Reject: ${numIN(stats.rejectedMeters)} m.`
       );
 
       if (typeof showToast === 'function') {
@@ -892,7 +890,7 @@ export function GreyQcInlineSlide({ po, initialReceiptId, onClose, onQcSaved, on
               {/* Accepted (Good / Grade A) */}
               <div className="p-3 rounded-xl border border-emerald-200 bg-emerald-50/40 flex flex-col justify-between">
                 <label className="block text-[11px] font-bold text-emerald-800 mb-1.5">
-                  Accepted (Good)
+                  Usable Fabric Stock
                 </label>
                 <div className="relative flex items-center">
                   <input
@@ -912,7 +910,7 @@ export function GreyQcInlineSlide({ po, initialReceiptId, onClose, onQcSaved, on
               {/* Reprocess */}
               <div className="p-3 rounded-xl border border-amber-200 bg-amber-50/40 flex flex-col justify-between">
                 <label className="block text-[11px] font-bold text-amber-800 mb-1.5">
-                  Reprocess
+                  Reprocess Stock
                 </label>
                 <div className="relative flex items-center">
                   <input
@@ -932,7 +930,7 @@ export function GreyQcInlineSlide({ po, initialReceiptId, onClose, onQcSaved, on
               {/* Rejected */}
               <div className="p-3 rounded-xl border border-rose-200 bg-rose-50/40 flex flex-col justify-between">
                 <label className="block text-[11px] font-bold text-rose-800 mb-1.5">
-                  Rejected
+                  Short Stock Fabric
                 </label>
                 <div className="relative flex items-center">
                   <input
@@ -949,10 +947,10 @@ export function GreyQcInlineSlide({ po, initialReceiptId, onClose, onQcSaved, on
                 </div>
               </div>
 
-              {/* Sample / Second Quality */}
+              {/* Sample */}
               <div className="p-3 rounded-xl border border-blue-200 bg-blue-50/40 flex flex-col justify-between">
                 <label className="block text-[11px] font-bold text-blue-800 mb-1.5">
-                  Sample
+                  Sample Fabric Stock
                 </label>
                 <div className="relative flex items-center">
                   <input

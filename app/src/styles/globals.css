@@ -5517,36 +5517,7 @@ textarea:focus::placeholder {
   opacity: 0 !important;
 }
 
-/* ── PMS Loom Full-Bleed / Fit-to-Screen Spacing ───────────────────────── */
-.content:has(.pms-screen),
-.content.pms-scope {
-  padding: 8px 12px 16px !important;
-  max-width: 100% !important;
-  width: 100% !important;
-}
-
-@media (min-width: 768px) {
-  .content:has(.pms-screen),
-  .content.pms-scope {
-    padding: 10px 14px 18px !important;
-  }
-}
-
-@media (min-width: 1024px) {
-  .content:has(.pms-screen),
-  .content.pms-scope {
-    padding: 12px 16px 20px !important;
-  }
-}
-
-@media (min-width: 1920px) {
-  .content:has(.pms-screen),
-  .content.pms-scope {
-    padding-left: 20px !important;
-    padding-right: 20px !important;
-  }
-}
-
+/* ── PMS Loom & Production Section Styling ──────────────────────────────── */
 .pms-screen {
   width: 100%;
   max-width: 100%;
@@ -5589,31 +5560,132 @@ textarea:focus::placeholder {
 /* Canonical PMS controls matching Oscar Project Section */
 .pms-input, .pms-select {
   height: 38px;
-  padding: 0.5rem 0.75rem;
+  padding: 0.5rem 0.85rem;
   font-size: 0.8125rem;
   font-weight: 500;
-  border-radius: 0.5rem;
-  border: 1px solid #e2e8f0;
+  border-radius: 0.75rem !important; /* rounded-xl (12px) matching Project standard */
+  border: 1px solid var(--border, #dce5f4);
   background-color: #ffffff;
   color: #1e293b;
-  outline: none;
-  transition: all 0.15s ease-in-out;
+  outline: none !important;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.04);
+  transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out, background-color 0.15s ease-in-out;
+}
+
+.pms-select {
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%2364748b' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+  background-position: right 0.75rem center;
+  background-repeat: no-repeat;
+  background-size: 1.25em 1.25em;
+  padding-right: 2.25rem !important;
+}
+
+.pms-input:hover, .pms-select:hover {
+  border-color: #93c5fd;
 }
 
 .pms-input:focus, .pms-select:focus {
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+  border-color: #2563eb !important;
+  background-color: #ffffff !important;
+  box-shadow: 0 0 0 3.5px rgba(37, 99, 235, 0.18), 0 1px 2px 0 rgba(0, 0, 0, 0.05) !important;
+  outline: none !important;
 }
 
 .dark .pms-input, .dark .pms-select {
-  border-color: #334155;
+  border-color: var(--border, #334155);
   background-color: #1e293b;
   color: #f1f5f9;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.2);
+}
+
+.dark .pms-select {
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%2394a3b8' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+}
+
+.dark .pms-input:hover, .dark .pms-select:hover {
+  border-color: #475569;
 }
 
 .dark .pms-input:focus, .dark .pms-select:focus {
-  border-color: #60a5fa;
-  box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.2);
+  border-color: #3b82f6 !important;
+  background-color: #0f172a !important;
+  box-shadow: 0 0 0 3.5px rgba(59, 130, 246, 0.25), 0 1px 2px 0 rgba(0, 0, 0, 0.3) !important;
+  outline: none !important;
+}
+
+/* Also ensure all inputs, selects, textareas inside any .pms-screen get this beautiful focus box effect */
+.pms-screen input:not([type="checkbox"]):not([type="radio"]),
+.pms-screen select,
+.pms-screen textarea {
+  border-radius: 0.75rem;
+  border-color: var(--border, #dce5f4);
+  transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out, background-color 0.15s ease-in-out;
+}
+
+.pms-screen input:not([type="checkbox"]):not([type="radio"]):hover,
+.pms-screen select:hover,
+.pms-screen textarea:hover {
+  border-color: #93c5fd;
+}
+
+.pms-screen input:not([type="checkbox"]):not([type="radio"]):focus,
+.pms-screen select:focus,
+.pms-screen textarea:focus {
+  border-color: #2563eb !important;
+  background-color: #ffffff !important;
+  box-shadow: 0 0 0 3.5px rgba(37, 99, 235, 0.18), 0 1px 2px 0 rgba(0, 0, 0, 0.05) !important;
+  outline: none !important;
+}
+
+.dark .pms-screen input:not([type="checkbox"]):not([type="radio"]):hover,
+.dark .pms-screen select:hover,
+.dark .pms-screen textarea:hover {
+  border-color: #475569;
+}
+
+.dark .pms-screen input:not([type="checkbox"]):not([type="radio"]):focus,
+.dark .pms-screen select:focus,
+.dark .pms-screen textarea:focus {
+  border-color: #3b82f6 !important;
+  background-color: #0f172a !important;
+  box-shadow: 0 0 0 3.5px rgba(59, 130, 246, 0.25), 0 1px 2px 0 rgba(0, 0, 0, 0.3) !important;
+  outline: none !important;
+}
+
+/* Focus effect on control container pills (e.g. factory select, date pickers, power cut) */
+.pms-screen div[class*="h-[38px]"],
+.pms-screen div[class*="h-9"],
+.pms-screen div[class*="h-8"] {
+  border-radius: 0.75rem;
+  border-color: var(--border, #dce5f4);
+  transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+}
+
+.pms-screen div[class*="h-[38px]"]:hover,
+.pms-screen div[class*="h-9"]:hover {
+  border-color: #93c5fd;
+}
+
+.pms-screen div[class*="h-[38px]"]:focus-within,
+.pms-screen div[class*="h-9"]:focus-within,
+.pms-screen div[class*="h-8"]:focus-within {
+  border-color: #2563eb !important;
+  box-shadow: 0 0 0 3.5px rgba(37, 99, 235, 0.18), 0 1px 2px 0 rgba(0, 0, 0, 0.05) !important;
+}
+
+.dark .pms-screen div[class*="h-[38px]"]:focus-within,
+.dark .pms-screen div[class*="h-9"]:focus-within,
+.dark .pms-screen div[class*="h-8"]:focus-within {
+  border-color: #3b82f6 !important;
+  box-shadow: 0 0 0 3.5px rgba(59, 130, 246, 0.25), 0 1px 2px 0 rgba(0, 0, 0, 0.3) !important;
+}
+
+/* Keep compact table row number inputs nicely proportioned */
+.pms-screen table input[type="number"],
+.pms-screen table select {
+  border-radius: 0.5rem !important;
 }
 
 .pms-label {

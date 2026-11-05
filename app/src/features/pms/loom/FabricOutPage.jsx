@@ -16,7 +16,7 @@ import {
 import PageHeader from '../../../components/ui/PageHeader';
 import { Button } from '../../../components/ui/Button';
 import { loomService } from '../../../services/loomService';
-import { formatNum } from '../utils/loomCalculations';
+import { formatNum, preventNegativeInput } from '../utils/loomCalculations';
 import { useERP } from '../../../context/ERPContext';
 import { ConfirmModal } from '../../../components/ui/ConfirmModal';
 
@@ -97,7 +97,11 @@ export default function FabricOutPage() {
   const handleRecordDispatch = async (e) => {
     e.preventDefault();
     if (!oMeters || Number(oMeters) <= 0) {
-      showToast('Please enter dispatch meters', 'warning');
+      showToast('Please enter dispatch meters (must be greater than 0)', 'warning');
+      return;
+    }
+    if (oTaka && Number(oTaka) <= 0) {
+      showToast('Taka count must be greater than 0', 'warning');
       return;
     }
 
@@ -168,13 +172,13 @@ export default function FabricOutPage() {
   ];
 
   return (
-    <div className="pms-screen w-full space-y-3 sm:space-y-3.5">
+    <div className="pms-screen w-full space-y-6">
       <PageHeader
         title="Fabric Out & Dyeing Mill Dispatches"
         subtitle="Record fabric rolls (taka & meters) leaving the factory for dyeing mills, godowns or processing."
         actions={
           <div className="flex items-center gap-2">
-            <div className="h-[38px] flex items-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 shadow-2xs">
+            <div className="h-[38px] flex items-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 shadow-2xs">
               <Factory size={15} className="text-slate-400" />
               <select
                 value={selectedFactoryId}
@@ -275,9 +279,12 @@ export default function FabricOutPage() {
             <label className="pms-label">Taka (Rolls)</label>
             <input
               type="number"
+              min="1"
+              step="1"
               placeholder="e.g. 12"
               value={oTaka}
               onChange={(e) => setOTaka(e.target.value)}
+              onKeyDown={preventNegativeInput}
               className="pms-input w-full font-mono"
             />
           </div>
@@ -285,9 +292,12 @@ export default function FabricOutPage() {
             <label className="pms-label">Meters</label>
             <input
               type="number"
+              min="0.01"
+              step="any"
               placeholder="1440"
               value={oMeters}
               onChange={(e) => setOMeters(e.target.value)}
+              onKeyDown={preventNegativeInput}
               className="pms-input w-full font-mono"
               required
             />
@@ -336,7 +346,7 @@ export default function FabricOutPage() {
 
       {/* Section 2: Fabric Stock & Mills */}
       {(activeTab === 'stock' || activeTab === 'all') && (
-      <div className="space-y-3 sm:space-y-3.5">
+      <div className="space-y-6">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4">
           {/* Fabric Stock at Selected Factory */}
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm">

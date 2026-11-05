@@ -17,7 +17,7 @@ import PageHeader from '../../../components/ui/PageHeader';
 import KpiCard from '../../../components/ui/KpiCard';
 import { Button } from '../../../components/ui/Button';
 import { loomService } from '../../../services/loomService';
-import { qc, formatNum } from '../utils/loomCalculations';
+import { qc, formatNum, preventNegativeInput } from '../utils/loomCalculations';
 import { useERP } from '../../../context/ERPContext';
 import { ConfirmModal } from '../../../components/ui/ConfirmModal';
 
@@ -168,6 +168,10 @@ export default function MachinesAndBeamsPage() {
       showToast('Beam number and length are required', 'warning');
       return;
     }
+    if (Number(bLength) <= 0) {
+      showToast('Beam length must be greater than 0', 'error');
+      return;
+    }
     const q = qualities.find((x) => x.id === bQuality);
     const m = statusData?.machines?.find((x) => x.machine_id === bMachine);
 
@@ -274,13 +278,13 @@ export default function MachinesAndBeamsPage() {
   ];
 
   return (
-    <div className="pms-screen w-full space-y-3 sm:space-y-3.5">
+    <div className="pms-screen w-full space-y-6">
       <PageHeader
         title="Loom Machines & Beams"
         subtitle="Manage on-loom warp meters, spare beam parking, reed count validation, and daily loom status."
         actions={
           <div className="flex items-center gap-2">
-            <div className="h-[38px] flex items-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 shadow-2xs">
+            <div className="h-[38px] flex items-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 shadow-2xs">
               <Factory size={15} className="text-slate-400" />
               <select
                 value={selectedFactoryId}
@@ -502,6 +506,7 @@ export default function MachinesAndBeamsPage() {
               onChange={(e) => setBQuality(e.target.value)}
               className="pms-select w-full cursor-pointer"
             >
+              {!qualities.some((q) => q.id === bQuality) && <option value="">— Select Quality —</option>}
               {qualities.map((q) => (
                 <option key={q.id} value={q.id}>{q.name} (Reed {q.reed})</option>
               ))}
@@ -511,8 +516,10 @@ export default function MachinesAndBeamsPage() {
             <label className="pms-label">Length (m)</label>
             <input
               type="number"
+              min="1"
               value={bLength}
-              onChange={(e) => setBLength(Number(e.target.value))}
+              onChange={(e) => setBLength(e.target.value === '' ? '' : Math.max(0, Number(e.target.value)))}
+              onKeyDown={preventNegativeInput}
               className="pms-input w-full font-mono"
               required
             />
@@ -607,7 +614,7 @@ export default function MachinesAndBeamsPage() {
                           <select
                             id={`target_m_${b.id}`}
                             defaultValue={b.machine || ''}
-                            className="h-8 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 font-medium text-slate-800 dark:text-slate-200 cursor-pointer min-w-[120px] outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500"
+                            className="h-8 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 font-medium text-slate-800 dark:text-slate-200 cursor-pointer min-w-[120px] outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500"
                           >
                             <option value="">Select MCN...</option>
                             {machines.map((m) => (

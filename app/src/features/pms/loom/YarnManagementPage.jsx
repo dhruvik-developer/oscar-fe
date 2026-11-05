@@ -15,7 +15,7 @@ import {
 import PageHeader from '../../../components/ui/PageHeader';
 import { Button } from '../../../components/ui/Button';
 import { loomService } from '../../../services/loomService';
-import { formatNum } from '../utils/loomCalculations';
+import { formatNum, preventNegativeInput } from '../utils/loomCalculations';
 import { useERP } from '../../../context/ERPContext';
 import { ConfirmModal } from '../../../components/ui/ConfirmModal';
 
@@ -107,6 +107,10 @@ export default function YarnManagementPage() {
       showToast('Supplier, Kgs, and Rate are required', 'warning');
       return;
     }
+    if (Number(bkKgs) <= 0 || Number(bkRate) < 0) {
+      showToast('Kgs must be greater than 0 and rate cannot be negative', 'error');
+      return;
+    }
     try {
       await loomService.createYarnBooking({
         supplier: bkSupplier,
@@ -132,6 +136,10 @@ export default function YarnManagementPage() {
     e.preventDefault();
     if (!schBooking || !schFactory || !schKgs) {
       showToast('Booking, Factory, and Kgs are required', 'warning');
+      return;
+    }
+    if (Number(schKgs) <= 0 || (schRate && Number(schRate) < 0)) {
+      showToast('Kgs to send must be greater than 0 and rate cannot be negative', 'error');
       return;
     }
     const b = bookings.find((x) => x.id === schBooking);
@@ -226,7 +234,7 @@ export default function YarnManagementPage() {
   ];
 
   return (
-    <div className="pms-screen w-full space-y-3 sm:space-y-3.5">
+    <div className="pms-screen w-full space-y-6">
       <PageHeader
         title="Yarn Procurement & Delivery Pipeline"
         subtitle="Manage the 3-step yarn supply chain: Book Yarn → Schedule Factory Delivery → Confirm Receipt at Factory."
@@ -323,9 +331,12 @@ export default function YarnManagementPage() {
               <label className="pms-label">Total Kg</label>
               <input
                 type="number"
+                min="0.01"
+                step="any"
                 placeholder="10000"
                 value={bkKgs}
                 onChange={(e) => setBkKgs(e.target.value)}
+                onKeyDown={preventNegativeInput}
                 className="pms-input w-full font-mono"
                 required
               />
@@ -334,9 +345,12 @@ export default function YarnManagementPage() {
               <label className="pms-label">Rate ₹/kg</label>
               <input
                 type="number"
+                min="0"
+                step="any"
                 placeholder="210"
                 value={bkRate}
                 onChange={(e) => setBkRate(e.target.value)}
+                onKeyDown={preventNegativeInput}
                 className="pms-input w-full font-mono"
                 required
               />
@@ -407,9 +421,12 @@ export default function YarnManagementPage() {
               <label className="pms-label">Kg to Send</label>
               <input
                 type="number"
+                min="0.01"
+                step="any"
                 placeholder="5000"
                 value={schKgs}
                 onChange={(e) => setSchKgs(e.target.value)}
+                onKeyDown={preventNegativeInput}
                 className="pms-input w-full font-mono"
                 required
               />
@@ -418,9 +435,12 @@ export default function YarnManagementPage() {
               <label className="pms-label">Rate ₹/kg (blank = booked)</label>
               <input
                 type="number"
+                min="0"
+                step="any"
                 placeholder="Rate"
                 value={schRate}
                 onChange={(e) => setSchRate(e.target.value)}
+                onKeyDown={preventNegativeInput}
                 className="pms-input w-full"
               />
             </div>
@@ -490,8 +510,11 @@ export default function YarnManagementPage() {
                     <td className="py-2 px-2.5 sm:py-2.5 sm:px-3">
                       <input
                         type="number"
+                        min="0.01"
+                        step="any"
                         id={`recd_${d.id}`}
                         defaultValue={d.kgs}
+                        onKeyDown={preventNegativeInput}
                         className="w-20 sm:w-24 h-8 px-2 text-xs font-mono font-semibold rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-right outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500"
                       />
                     </td>

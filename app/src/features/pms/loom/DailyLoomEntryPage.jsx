@@ -13,7 +13,7 @@ import {
 import PageHeader from '../../../components/ui/PageHeader';
 import { Button } from '../../../components/ui/Button';
 import { loomService } from '../../../services/loomService';
-import { formatNum } from '../utils/loomCalculations';
+import { formatNum, preventNegativeInput, clampNonNegative } from '../utils/loomCalculations';
 import { useERP } from '../../../context/ERPContext';
 import { ConfirmModal } from '../../../components/ui/ConfirmModal';
 
@@ -78,10 +78,20 @@ export default function DailyLoomEntryPage() {
   }, [fetchDayData]);
 
   const handleRowChange = (machineId, field, val) => {
+    let sanitizedVal = val;
+    const numericFields = ['meters', 'damage', 'rpm', 'hours', 'stop'];
+    if (numericFields.includes(field)) {
+      if (val === '') {
+        sanitizedVal = '';
+      } else {
+        const num = parseFloat(val);
+        sanitizedVal = isNaN(num) || num < 0 ? 0 : (field === 'hours' && num > 24 ? 24 : num);
+      }
+    }
     setRows((prev) =>
       prev.map((r) => {
         if (r.machine_id === machineId) {
-          return { ...r, [field]: val };
+          return { ...r, [field]: sanitizedVal };
         }
         return r;
       })
@@ -120,6 +130,20 @@ export default function DailyLoomEntryPage() {
       showToast('Please select a factory first', 'warning');
       return;
     }
+
+    const hasNegative = rows.some((r) => 
+      (r.meters !== '' && Number(r.meters) < 0) ||
+      Number(r.damage || 0) < 0 ||
+      Number(r.rpm || 0) < 0 ||
+      Number(r.hours || 0) < 0 ||
+      Number(r.stop || 0) < 0
+    ) || Number(powerCut || 0) < 0;
+
+    if (hasNegative) {
+      showToast('Negative values are not allowed. Please enter 0 or greater.', 'error');
+      return;
+    }
+
     const warnings = [];
 
     // Client side check for beam remaining overages
@@ -149,7 +173,7 @@ export default function DailyLoomEntryPage() {
 
 
   return (
-    <div className="pms-screen w-full space-y-3 sm:space-y-3.5">
+    <div className="pms-screen w-full space-y-6">
       <PageHeader
         title="Daily Loom Production Entry"
         subtitle="Single-click coordinator matrix: Log daily machine output, stops, and power cuts across active looms."
@@ -182,7 +206,7 @@ export default function DailyLoomEntryPage() {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-2.5 sm:gap-3">
             {/* Factory select */}
-            <div className="h-[38px] flex items-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 shadow-2xs">
+            <div className="h-[38px] flex items-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 shadow-2xs">
               <Factory size={15} className="text-slate-400 shrink-0" />
               <select
                 value={selectedFactoryId}
@@ -200,7 +224,7 @@ export default function DailyLoomEntryPage() {
             </div>
 
             {/* Date Picker */}
-            <div className="h-[38px] flex items-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 shadow-2xs">
+            <div className="h-[38px] flex items-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 shadow-2xs">
               <Calendar size={15} className="text-slate-400 shrink-0" />
               <input
                 type="date"
@@ -211,14 +235,24 @@ export default function DailyLoomEntryPage() {
             </div>
 
             {/* Power cut */}
-            <div className="h-[38px] flex items-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 shadow-2xs">
+            <div className="h-[38px] flex items-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 shadow-2xs">
               <Zap size={15} className="text-amber-500 shrink-0" />
               <span className="text-xs font-medium text-slate-600 dark:text-slate-400 whitespace-nowrap">Power Cut:</span>
               <input
                 type="number"
                 step="0.5"
+                min="0"
                 value={powerCut}
-                onChange={(e) => setPowerCut(e.target.value)}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val === '') {
+                    setPowerCut('');
+                  } else {
+                    const num = parseFloat(val);
+                    setPowerCut(isNaN(num) || num < 0 ? 0 : num);
+                  }
+                }}
+                onKeyDown={preventNegativeInput}
                 className="w-12 bg-transparent text-xs font-bold text-slate-800 dark:text-slate-200 outline-none text-right"
               />
               <span className="text-xs text-slate-400">hrs</span>
@@ -303,9 +337,11 @@ export default function DailyLoomEntryPage() {
                     <td className="py-1 px-3">
                       <input
                         type="number"
+                        min="0"
                         placeholder="0"
                         value={r.meters}
                         onChange={(e) => handleRowChange(r.machine_id, 'meters', e.target.value)}
+                        onKeyDown={preventNegativeInput}
                         className="w-20 sm:w-24 px-2 py-1 text-xs font-mono font-bold rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-right focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
                       />
                     </td>
@@ -327,9 +363,11 @@ export default function DailyLoomEntryPage() {
                     <td className="py-1 px-3 text-right">
                       <input
                         type="number"
+                        min="0"
                         placeholder="0"
                         value={r.damage}
                         onChange={(e) => handleRowChange(r.machine_id, 'damage', e.target.value)}
+                        onKeyDown={preventNegativeInput}
                         className="w-14 px-1.5 py-1 text-xs font-mono rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-right outline-none"
                       />
                     </td>
@@ -338,24 +376,31 @@ export default function DailyLoomEntryPage() {
                         <td className="py-1 px-3 text-right">
                           <input
                             type="number"
+                            min="0"
                             value={r.rpm}
                             onChange={(e) => handleRowChange(r.machine_id, 'rpm', e.target.value)}
+                            onKeyDown={preventNegativeInput}
                             className="w-16 px-1.5 py-1 text-xs font-mono rounded border border-slate-200 dark:border-slate-700 text-right outline-none"
                           />
                         </td>
                         <td className="py-1 px-3 text-right">
                           <input
                             type="number"
+                            min="0"
+                            max="24"
                             value={r.hours}
                             onChange={(e) => handleRowChange(r.machine_id, 'hours', e.target.value)}
+                            onKeyDown={preventNegativeInput}
                             className="w-14 px-1.5 py-1 text-xs font-mono rounded border border-slate-200 dark:border-slate-700 text-right outline-none"
                           />
                         </td>
                         <td className="py-1 px-3 text-right">
                           <input
                             type="number"
+                            min="0"
                             value={r.stop}
                             onChange={(e) => handleRowChange(r.machine_id, 'stop', e.target.value)}
+                            onKeyDown={preventNegativeInput}
                             className="w-14 px-1.5 py-1 text-xs font-mono rounded border border-slate-200 dark:border-slate-700 text-right outline-none"
                           />
                         </td>

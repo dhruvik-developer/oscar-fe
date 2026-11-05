@@ -115,14 +115,14 @@ export default function LoomDashboardPage() {
   ];
 
   return (
-    <div className="pms-screen w-full space-y-3 sm:space-y-3.5">
+    <div className="pms-screen w-full space-y-6">
       <PageHeader
         title="Loom Manufacturing Command Center"
         subtitle="Executive monitoring: Beam runout forecasts, automated yarn weft cover days, and active production batches."
         actions={
           <div className="flex flex-wrap items-center gap-2">
             {/* Role switch */}
-            <div className="h-[38px] flex items-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 shadow-2xs text-xs">
+            <div className="h-[38px] flex items-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 shadow-2xs text-xs">
               <UserCheck size={15} className="text-slate-400" />
               <span className="text-slate-500 font-medium hidden sm:inline">Role:</span>
               <select

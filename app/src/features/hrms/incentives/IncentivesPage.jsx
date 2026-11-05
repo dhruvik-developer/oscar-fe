@@ -305,7 +305,7 @@ export default function IncentivesPage() {
   const skipped = quarterlyReport?.skipped || [];
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="flex flex-col gap-6 w-full pb-12">
       <PageHeader
         title="Salesperson Incentive Management"
         subtitle="Configure incentive schemes, calculate quarterly payouts net of returns, and control approve / hold / payout (Scope §12). Incentive is paid outside payroll."

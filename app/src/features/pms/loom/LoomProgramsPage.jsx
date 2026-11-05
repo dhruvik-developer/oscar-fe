@@ -20,7 +20,7 @@ import PageHeader from '../../../components/ui/PageHeader';
 import KpiCard from '../../../components/ui/KpiCard';
 import { Button } from '../../../components/ui/Button';
 import { loomService } from '../../../services/loomService';
-import { qc, formatNum } from '../utils/loomCalculations';
+import { qc, formatNum, preventNegativeInput } from '../utils/loomCalculations';
 import { useERP } from '../../../context/ERPContext';
 import { ConfirmModal } from '../../../components/ui/ConfirmModal';
 
@@ -137,6 +137,14 @@ export default function LoomProgramsPage() {
       showToast('Program Name, Target meters and Deadline are required', 'warning');
       return;
     }
+    if (Number(pTarget) <= 0) {
+      showToast('Target meters must be greater than 0', 'error');
+      return;
+    }
+    if (Number(pTrpm || 0) < 0 || Number(pTeff || 0) < 0 || Number(pTpower || 0) < 0) {
+      showToast('RPM, Efficiency, and Power values cannot be negative', 'error');
+      return;
+    }
     try {
       await loomService.createProgram({
         name: pName,
@@ -186,7 +194,7 @@ export default function LoomProgramsPage() {
     const c = q ? qc(q, yarnMap) : null;
 
     return (
-      <div className="pms-screen w-full space-y-3 sm:space-y-3.5">
+      <div className="pms-screen w-full space-y-6">
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           <Button variant="secondary" onClick={() => setOpenProgId(null)} size="sm">
             <ArrowLeft size={13} className="mr-1" /> Back to Programs
@@ -362,7 +370,7 @@ export default function LoomProgramsPage() {
   ];
 
   return (
-    <div className="pms-screen w-full space-y-3 sm:space-y-3.5">
+    <div className="pms-screen w-full space-y-6">
       <PageHeader
         title="Production Programs (Orders & Batches)"
         subtitle="Schedule and track manufacturing targets by factory and quality with dynamic yarn demand forecasts."
@@ -422,13 +430,13 @@ export default function LoomProgramsPage() {
         </h3>
         <form onSubmit={handleCreateProgram} className="grid grid-cols-2 md:grid-cols-5 gap-2.5 items-end">
           <div className="md:col-span-2">
-            <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">Program Name</label>
+            <label className="pms-label">Program Name</label>
             <input
               type="text"
               placeholder="e.g. 3103-A – Shree Laxmi – Nov"
               value={pName}
               onChange={(e) => setPName(e.target.value)}
-              className="w-full mt-1 h-8 rounded-lg border border-slate-200 dark:border-slate-700 px-2.5 text-xs"
+              className="pms-input w-full"
               required
             />
           </div>
@@ -460,8 +468,11 @@ export default function LoomProgramsPage() {
             <label className="pms-label">Target Meters</label>
             <input
               type="number"
+              min="1"
+              step="any"
               value={pTarget}
-              onChange={(e) => setPTarget(Number(e.target.value))}
+              onChange={(e) => setPTarget(e.target.value === '' ? '' : Math.max(0, Number(e.target.value)))}
+              onKeyDown={preventNegativeInput}
               className="pms-input w-full font-mono"
               required
             />
@@ -489,8 +500,10 @@ export default function LoomProgramsPage() {
             <label className="pms-label">Target RPM</label>
             <input
               type="number"
+              min="0"
               value={pTrpm}
-              onChange={(e) => setPTrpm(Number(e.target.value))}
+              onChange={(e) => setPTrpm(e.target.value === '' ? '' : Math.max(0, Number(e.target.value)))}
+              onKeyDown={preventNegativeInput}
               className="pms-input w-full"
             />
           </div>
@@ -498,8 +511,11 @@ export default function LoomProgramsPage() {
             <label className="pms-label">Target Eff %</label>
             <input
               type="number"
+              min="0"
+              max="100"
               value={pTeff}
-              onChange={(e) => setPTeff(Number(e.target.value))}
+              onChange={(e) => setPTeff(e.target.value === '' ? '' : Math.max(0, Number(e.target.value)))}
+              onKeyDown={preventNegativeInput}
               className="pms-input w-full"
             />
           </div>

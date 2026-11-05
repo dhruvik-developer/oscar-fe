@@ -3,7 +3,7 @@ import { Layers, Plus, Trash2, Edit2, Check, RefreshCw, Cpu, Package, Factory, U
 import PageHeader from '../../../components/ui/PageHeader';
 import { Button } from '../../../components/ui/Button';
 import { loomService } from '../../../services/loomService';
-import { qc, formatNum } from '../utils/loomCalculations';
+import { qc, formatNum, preventNegativeInput } from '../utils/loomCalculations';
 import { useERP } from '../../../context/ERPContext';
 import { ConfirmModal } from '../../../components/ui/ConfirmModal';
 
@@ -80,6 +80,18 @@ export default function LoomMastersPage() {
       showToast('Name, ends and PPI are required', 'warning');
       return;
     }
+    if (
+      Number(qForm.ends) <= 0 ||
+      Number(qForm.reed) <= 0 ||
+      Number(qForm.ppi) <= 0 ||
+      Number(qForm.crimp || 0) < 0 ||
+      Number(qForm.wastage || 0) < 0 ||
+      Number(qForm.reed_w || 0) <= 0 ||
+      Number(qForm.pick_charge || 0) < 0
+    ) {
+      showToast('Technical parameters must be positive numbers (ends, reed, width, PPI > 0)', 'error');
+      return;
+    }
     try {
       await loomService.createQuality(qForm);
       showToast('Fabric quality added', 'success');
@@ -107,6 +119,10 @@ export default function LoomMastersPage() {
       showToast('Name and denier are required', 'warning');
       return;
     }
+    if (Number(yForm.denier) <= 0 || Number(yForm.kg_per_bag || 0) <= 0 || Number(yForm.rate || 0) < 0) {
+      showToast('Denier and Kg per bag must be > 0, and rate cannot be negative', 'error');
+      return;
+    }
     try {
       await loomService.createYarn(yForm);
       showToast('Yarn type added', 'success');
@@ -118,6 +134,10 @@ export default function LoomMastersPage() {
   };
 
   const handleUpdateYarnRate = async (id, rate) => {
+    if (Number(rate) < 0) {
+      showToast('Yarn rate cannot be negative', 'error');
+      return;
+    }
     try {
       await loomService.updateYarn(id, { rate: Number(rate) });
       showToast('Yarn market rate updated', 'success');
@@ -160,6 +180,14 @@ export default function LoomMastersPage() {
       showToast('Please select a factory unit first', 'warning');
       return;
     }
+    if (Number(mForm.from_no) <= 0 || Number(mForm.to_no) <= 0 || Number(mForm.reed) <= 0) {
+      showToast('Machine numbers and reed count must be positive numbers', 'error');
+      return;
+    }
+    if (Number(mForm.to_no) < Number(mForm.from_no)) {
+      showToast('To Machine No cannot be less than From Machine No', 'warning');
+      return;
+    }
     try {
       await loomService.batchCreateMachines({
         factory: selectedFactoryId,
@@ -175,6 +203,10 @@ export default function LoomMastersPage() {
   };
 
   const handleUpdateMachineReed = async (id, reed) => {
+    if (Number(reed) <= 0) {
+      showToast('Machine reed must be greater than 0', 'error');
+      return;
+    }
     try {
       await loomService.updateMachine(id, { reed: Number(reed) });
       showToast('Machine reed updated', 'success');
@@ -215,7 +247,7 @@ export default function LoomMastersPage() {
   const factoryMachines = selectedFactory?.machines || [];
 
   return (
-    <div className="pms-screen w-full space-y-3 sm:space-y-3.5">
+    <div className="pms-screen w-full space-y-6">
       <PageHeader
         title="Loom PMS Masters"
         subtitle="Technical qualities, yarn count specs, factory looms and coordinator master files."
@@ -289,9 +321,11 @@ export default function LoomMastersPage() {
                 <label className="pms-label">Total Ends (Tar)</label>
                 <input
                   type="number"
+                  min="1"
                   placeholder="4872"
                   value={qForm.ends}
-                  onChange={(e) => setQForm({ ...qForm, ends: Number(e.target.value) })}
+                  onChange={(e) => setQForm({ ...qForm, ends: e.target.value === '' ? '' : Math.max(0, Number(e.target.value)) })}
+                  onKeyDown={preventNegativeInput}
                   className="pms-input w-full font-mono"
                   required
                 />
@@ -300,9 +334,11 @@ export default function LoomMastersPage() {
                 <label className="pms-label">Warp Crimp %</label>
                 <input
                   type="number"
+                  min="0"
                   step="0.1"
                   value={qForm.crimp}
-                  onChange={(e) => setQForm({ ...qForm, crimp: Number(e.target.value) })}
+                  onChange={(e) => setQForm({ ...qForm, crimp: e.target.value === '' ? '' : Math.max(0, Number(e.target.value)) })}
+                  onKeyDown={preventNegativeInput}
                   className="pms-input w-full"
                 />
               </div>
@@ -322,9 +358,11 @@ export default function LoomMastersPage() {
                 <label className="pms-label">Reed Count</label>
                 <input
                   type="number"
+                  min="1"
                   placeholder="84"
                   value={qForm.reed}
-                  onChange={(e) => setQForm({ ...qForm, reed: Number(e.target.value) })}
+                  onChange={(e) => setQForm({ ...qForm, reed: e.target.value === '' ? '' : Math.max(0, Number(e.target.value)) })}
+                  onKeyDown={preventNegativeInput}
                   className="pms-input w-full font-mono"
                   required
                 />
@@ -333,9 +371,11 @@ export default function LoomMastersPage() {
                 <label className="pms-label">Reed Width (inch)</label>
                 <input
                   type="number"
+                  min="0.1"
                   step="0.5"
                   value={qForm.reed_w}
-                  onChange={(e) => setQForm({ ...qForm, reed_w: Number(e.target.value) })}
+                  onChange={(e) => setQForm({ ...qForm, reed_w: e.target.value === '' ? '' : Math.max(0, Number(e.target.value)) })}
+                  onKeyDown={preventNegativeInput}
                   className="pms-input w-full"
                 />
               </div>
@@ -343,10 +383,12 @@ export default function LoomMastersPage() {
                 <label className="pms-label">Picks Per Inch (PPI)</label>
                 <input
                   type="number"
+                  min="1"
                   step="0.5"
                   placeholder="56"
                   value={qForm.ppi}
-                  onChange={(e) => setQForm({ ...qForm, ppi: Number(e.target.value) })}
+                  onChange={(e) => setQForm({ ...qForm, ppi: e.target.value === '' ? '' : Math.max(0, Number(e.target.value)) })}
+                  onKeyDown={preventNegativeInput}
                   className="pms-input w-full font-mono"
                   required
                 />
@@ -355,9 +397,11 @@ export default function LoomMastersPage() {
                 <label className="pms-label">Weft Wastage %</label>
                 <input
                   type="number"
+                  min="0"
                   step="0.1"
                   value={qForm.wastage}
-                  onChange={(e) => setQForm({ ...qForm, wastage: Number(e.target.value) })}
+                  onChange={(e) => setQForm({ ...qForm, wastage: e.target.value === '' ? '' : Math.max(0, Number(e.target.value)) })}
+                  onKeyDown={preventNegativeInput}
                   className="pms-input w-full"
                 />
               </div>
@@ -365,9 +409,11 @@ export default function LoomMastersPage() {
                 <label className="pms-label">Job ₹ / Pick</label>
                 <input
                   type="number"
+                  min="0"
                   step="0.01"
                   value={qForm.pick_charge}
-                  onChange={(e) => setQForm({ ...qForm, pick_charge: Number(e.target.value) })}
+                  onChange={(e) => setQForm({ ...qForm, pick_charge: e.target.value === '' ? '' : Math.max(0, Number(e.target.value)) })}
+                  onKeyDown={preventNegativeInput}
                   className="pms-input w-full"
                 />
               </div>
@@ -484,10 +530,12 @@ export default function LoomMastersPage() {
                 <label className="pms-label">Denier (spun: 5315 ÷ Ne)</label>
                 <input
                   type="number"
+                  min="0.01"
                   step="0.01"
                   placeholder="e.g. 89"
                   value={yForm.denier}
-                  onChange={(e) => setYForm({ ...yForm, denier: e.target.value })}
+                  onChange={(e) => setYForm({ ...yForm, denier: e.target.value === '' ? '' : Math.max(0, Number(e.target.value)) })}
+                  onKeyDown={preventNegativeInput}
                   className="pms-input w-full font-mono"
                   required
                 />
@@ -496,8 +544,11 @@ export default function LoomMastersPage() {
                 <label className="pms-label">Kg per Bag</label>
                 <input
                   type="number"
+                  min="0.1"
+                  step="any"
                   value={yForm.kg_per_bag}
-                  onChange={(e) => setYForm({ ...yForm, kg_per_bag: Number(e.target.value) })}
+                  onChange={(e) => setYForm({ ...yForm, kg_per_bag: e.target.value === '' ? '' : Math.max(0, Number(e.target.value)) })}
+                  onKeyDown={preventNegativeInput}
                   className="pms-input w-full font-mono"
                 />
               </div>
@@ -505,10 +556,12 @@ export default function LoomMastersPage() {
                 <label className="pms-label">Current Rate (₹ / kg)</label>
                 <input
                   type="number"
+                  min="0"
                   step="0.5"
                   placeholder="e.g. 210"
                   value={yForm.rate}
-                  onChange={(e) => setYForm({ ...yForm, rate: Number(e.target.value) })}
+                  onChange={(e) => setYForm({ ...yForm, rate: e.target.value === '' ? '' : Math.max(0, Number(e.target.value)) })}
+                  onKeyDown={preventNegativeInput}
                   className="pms-input w-full font-mono"
                 />
               </div>
@@ -555,8 +608,14 @@ export default function LoomMastersPage() {
                       <td className="py-1.5 px-2.5 sm:py-2 sm:px-3 text-right">
                         <input
                           type="number"
+                          min="0"
+                          step="0.5"
                           defaultValue={y.rate}
-                          onBlur={(e) => handleUpdateYarnRate(y.id, e.target.value)}
+                          onKeyDown={preventNegativeInput}
+                          onBlur={(e) => {
+                            const val = e.target.value;
+                            handleUpdateYarnRate(y.id, val === '' ? 0 : Math.max(0, Number(val)));
+                          }}
                           className="w-18 text-right px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700 text-xs font-semibold"
                         />
                       </td>
@@ -624,8 +683,10 @@ export default function LoomMastersPage() {
                   <label className="pms-label">From No</label>
                   <input
                     type="number"
+                    min="1"
                     value={mForm.from_no}
-                    onChange={(e) => setMForm({ ...mForm, from_no: Number(e.target.value) })}
+                    onChange={(e) => setMForm({ ...mForm, from_no: e.target.value === '' ? '' : Math.max(1, Number(e.target.value)) })}
+                    onKeyDown={preventNegativeInput}
                     className="pms-input w-full font-mono"
                   />
                 </div>
@@ -633,8 +694,10 @@ export default function LoomMastersPage() {
                   <label className="pms-label">To</label>
                   <input
                     type="number"
+                    min="1"
                     value={mForm.to_no}
-                    onChange={(e) => setMForm({ ...mForm, to_no: Number(e.target.value) })}
+                    onChange={(e) => setMForm({ ...mForm, to_no: e.target.value === '' ? '' : Math.max(1, Number(e.target.value)) })}
+                    onKeyDown={preventNegativeInput}
                     className="pms-input w-full font-mono"
                   />
                 </div>
@@ -642,8 +705,10 @@ export default function LoomMastersPage() {
                   <label className="pms-label">Reed</label>
                   <input
                     type="number"
+                    min="1"
                     value={mForm.reed}
-                    onChange={(e) => setMForm({ ...mForm, reed: Number(e.target.value) })}
+                    onChange={(e) => setMForm({ ...mForm, reed: e.target.value === '' ? '' : Math.max(1, Number(e.target.value)) })}
+                    onKeyDown={preventNegativeInput}
                     className="pms-input w-full font-mono"
                   />
                 </div>
@@ -671,7 +736,7 @@ export default function LoomMastersPage() {
                     setSelectedFactoryId(val);
                     localStorage.setItem('oscar_pms_selected_factory', val);
                   }}
-                  className="h-[38px] rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 text-xs font-semibold text-slate-800 dark:text-slate-200 shadow-2xs cursor-pointer outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500"
+                  className="h-[38px] rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 text-xs font-semibold text-slate-800 dark:text-slate-200 shadow-2xs cursor-pointer outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500"
                 >
                   {factories.map((f) => (
                     <option key={f.id} value={f.id}>{f.name} ({f.machines_count} looms)</option>
@@ -691,8 +756,13 @@ export default function LoomMastersPage() {
                     <span>R:</span>
                     <input
                       type="number"
+                      min="1"
                       defaultValue={m.reed}
-                      onBlur={(e) => handleUpdateMachineReed(m.id, e.target.value)}
+                      onKeyDown={preventNegativeInput}
+                      onBlur={(e) => {
+                        const val = e.target.value;
+                        handleUpdateMachineReed(m.id, val === '' ? 1 : Math.max(1, Number(val)));
+                      }}
                       className="w-11 text-center rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-[11px] font-semibold py-0.5"
                     />
                   </div>

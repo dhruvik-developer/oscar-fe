@@ -247,7 +247,7 @@ export default function ProductionCompletionVerificationPage() {
   ];
 
   return (
-    <div className="pms-screen w-full space-y-3 sm:space-y-3.5">
+    <div className="pms-screen w-full space-y-6">
       {/* Title */}
       <PageHeader
         title="Production Completion & Verification"
@@ -531,6 +531,7 @@ export default function ProductionCompletionVerificationPage() {
                   max={totalProduced ?? undefined}
                   value={rejectedQtyInput}
                   onChange={(e) => setRejectedQtyInput(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === '-' || e.key === 'e' || e.key === '+') e.preventDefault(); }}
                   className="w-full rounded-lg border border-slate-300 px-3 py-2 text-[12px] text-slate-800 outline-none focus:border-blue-500"
                 />
                 <p className="mt-1 text-[10.5px] text-slate-400">

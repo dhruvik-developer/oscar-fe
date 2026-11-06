@@ -10,14 +10,19 @@ import {
   Layers,
   ArrowRight,
   ShieldAlert,
+  Package,
+  LayoutGrid,
+  Building2,
 } from 'lucide-react';
 import PageHeader from '../../../components/ui/PageHeader';
 import KpiCard from '../../../components/ui/KpiCard';
 import { Button } from '../../../components/ui/Button';
+import TablePagination from '../../../components/ui/TablePagination';
 import { loomService } from '../../../services/loomService';
-import { qc, formatNum } from '../utils/loomCalculations';
+import { qc, formatNum, preventNegativeInput } from '../utils/loomCalculations';
 import { useERP } from '../../../context/ERPContext';
 import { ConfirmModal } from '../../../components/ui/ConfirmModal';
+import CompanySelector from './components/CompanySelector';
 
 export default function MachinesAndBeamsPage() {
   const { showToast } = useERP();
@@ -33,6 +38,14 @@ export default function MachinesAndBeamsPage() {
   const [qualities, setQualities] = useState([]);
   const [yarns, setYarns] = useState([]);
   const [beams, setBeams] = useState([]);
+  const [activeTab, setActiveTab] = useState(
+    () => localStorage.getItem('oscar_pms_machines_beams_tab') || 'machines'
+  );
+
+  const handleTabChange = (tabId) => {
+    setActiveTab(tabId);
+    localStorage.setItem('oscar_pms_machines_beams_tab', tabId);
+  };
 
   // Add Beam form state
   const [bNo, setBNo] = useState('');
@@ -86,6 +99,9 @@ export default function MachinesAndBeamsPage() {
   const fetchFactoryData = useCallback(async () => {
     if (!selectedFactoryId) return;
     setLoading(true);
+    setMachinePage(1);
+    setBeamPage(1);
+    setYarnPage(1);
     try {
       const [stRes, bRes] = await Promise.all([
         loomService.getFactoryStatus(selectedFactoryId),
@@ -156,6 +172,10 @@ export default function MachinesAndBeamsPage() {
     e.preventDefault();
     if (!bNo || !bLength) {
       showToast('Beam number and length are required', 'warning');
+      return;
+    }
+    if (Number(bLength) <= 0) {
+      showToast('Beam length must be greater than 0', 'error');
       return;
     }
     const q = qualities.find((x) => x.id === bQuality);
@@ -232,30 +252,81 @@ export default function MachinesAndBeamsPage() {
 
   const machines = statusData?.machines || [];
   const activeBeams = beams.filter((b) => b.status !== 'Finished');
+  const yarnCoverList = statusData?.yarn_cover || [];
+
+  const [machinePage, setMachinePage] = useState(1);
+  const [machinePageSize, setMachinePageSize] = useState(20);
+
+  const [beamPage, setBeamPage] = useState(1);
+  const [beamPageSize, setBeamPageSize] = useState(10);
+
+  const [yarnPage, setYarnPage] = useState(1);
+  const [yarnPageSize, setYarnPageSize] = useState(10);
+
+  const sortedMachines = useMemo(() => {
+    return [...machines].sort((a, b) => (a.beam ? a.days_left : -1) - (b.beam ? b.days_left : -1));
+  }, [machines]);
+
+  const paginatedMachines = useMemo(() => {
+    const start = (machinePage - 1) * machinePageSize;
+    return sortedMachines.slice(start, start + machinePageSize);
+  }, [sortedMachines, machinePage, machinePageSize]);
+
+  const paginatedBeams = useMemo(() => {
+    const start = (beamPage - 1) * beamPageSize;
+    return activeBeams.slice(start, start + beamPageSize);
+  }, [activeBeams, beamPage, beamPageSize]);
+
+  const paginatedYarnCover = useMemo(() => {
+    const start = (yarnPage - 1) * yarnPageSize;
+    return yarnCoverList.slice(start, start + yarnPageSize);
+  }, [yarnCoverList, yarnPage, yarnPageSize]);
+
+  const tabs = [
+    {
+      id: 'machines',
+      label: 'Loom Machine Status',
+      icon: Factory,
+      badge: machines.length,
+      badgeColor:
+        statusData?.urgent_machines?.length > 0
+          ? 'bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 animate-pulse'
+          : undefined,
+    },
+    {
+      id: 'beams',
+      label: 'Beams & Allocation',
+      icon: Layers,
+      badge: activeBeams.length,
+    },
+    {
+      id: 'yarn',
+      label: 'Yarn Stock & Cover',
+      icon: Package,
+      badge: statusData?.yarn_cover?.length || 0,
+    },
+    {
+      id: 'all',
+      label: 'Show All',
+      icon: LayoutGrid,
+    },
+  ];
 
   return (
-    <div className="pms-screen w-full space-y-3 sm:space-y-3.5">
+    <div className="pms-screen w-full space-y-6">
       <PageHeader
         title="Loom Machines & Beams"
         subtitle="Manage on-loom warp meters, spare beam parking, reed count validation, and daily loom status."
         actions={
           <div className="flex items-center gap-2">
-            <div className="h-[38px] flex items-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 shadow-2xs">
-              <Factory size={15} className="text-slate-400" />
-              <select
-                value={selectedFactoryId}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  setSelectedFactoryId(val);
-                  localStorage.setItem('oscar_pms_selected_factory', val);
-                }}
-                className="bg-transparent text-xs font-semibold text-slate-800 dark:text-slate-200 outline-none cursor-pointer"
-              >
-                {factories.map((f) => (
-                  <option key={f.id} value={f.id}>{f.name}</option>
-                ))}
-              </select>
-            </div>
+            <CompanySelector
+              factories={factories}
+              selectedFactoryId={selectedFactoryId}
+              onSelect={(val) => {
+                setSelectedFactoryId(val);
+                localStorage.setItem('oscar_pms_selected_factory', val);
+              }}
+            />
             <button
               type="button"
               onClick={fetchFactoryData}
@@ -268,6 +339,76 @@ export default function MachinesAndBeamsPage() {
           </div>
         }
       />
+
+      {/* Visible Company / Factory Units Tab Bar */}
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-3 sm:p-4 shadow-sm">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+          <div className="flex items-center gap-3 shrink-0">
+            <div className="w-9 h-9 rounded-xl bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0 border border-blue-100 dark:border-blue-900/40 shadow-2xs">
+              <Building2 size={18} />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                  Manufacturing Unit / Company
+                </span>
+                <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              </div>
+              <div className="text-sm font-extrabold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                <span>{factories.find((f) => f.id === selectedFactoryId)?.name || 'Select Unit'}</span>
+                {selectedFactoryId && (
+                  <span className="text-[11px] font-semibold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 px-2 py-0.5 rounded-full">
+                    {factories.find((f) => f.id === selectedFactoryId)?.machines_count || 0} Looms
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 lg:pb-0 pt-0.5 scrollbar-thin">
+            {factories.map((f) => {
+              const isSelected = f.id === selectedFactoryId;
+              return (
+                <button
+                  key={f.id}
+                  type="button"
+                  onClick={() => {
+                    setSelectedFactoryId(f.id);
+                    localStorage.setItem('oscar_pms_selected_factory', f.id);
+                  }}
+                  className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer border ${
+                    isSelected
+                      ? 'bg-blue-600 border-blue-600 text-white shadow-md shadow-blue-500/25 ring-2 ring-blue-500/20'
+                      : 'bg-slate-50/80 dark:bg-slate-800/60 border-slate-200/80 dark:border-slate-700/80 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 hover:border-slate-300 dark:hover:border-slate-600'
+                  }`}
+                >
+                  <Factory size={14} className={isSelected ? 'text-white' : 'text-slate-400'} />
+                  <span>{f.name}</span>
+                  {f.machines_count !== undefined && f.machines_count > 0 ? (
+                    <span
+                      className={`text-[10px] px-1.5 py-0.5 rounded-full font-black ${
+                        isSelected
+                          ? 'bg-white/25 text-white'
+                          : 'bg-slate-200/90 text-slate-700 dark:bg-slate-700 dark:text-slate-200'
+                      }`}
+                    >
+                      {f.machines_count}
+                    </span>
+                  ) : (
+                    <span
+                      className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
+                        isSelected ? 'bg-white/15 text-white/90' : 'text-slate-400'
+                      }`}
+                    >
+                      0
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
 
       {/* KPI Cards Strip */}
       {statusData && (
@@ -310,8 +451,50 @@ export default function MachinesAndBeamsPage() {
         </div>
       )}
 
-      {/* Machine Status Table - Fit to Screen */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-2xs">
+      {/* Screen Section Switcher */}
+      <div className="flex flex-wrap items-center justify-between gap-2.5 pt-1">
+        <div className="inline-flex p-1 bg-slate-100 dark:bg-slate-800/80 border border-slate-200/90 dark:border-slate-700/80 rounded-xl shadow-2xs">
+          {tabs.map((tab) => {
+            const Icon = tab.icon;
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => handleTabChange(tab.id)}
+                className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                  isActive
+                    ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-xs'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
+                }`}
+              >
+                <Icon size={14} className={isActive ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400'} />
+                <span>{tab.label}</span>
+                {tab.badge !== undefined && (
+                  <span
+                    className={`text-[11px] font-bold px-1.5 py-0.2 rounded-full ${
+                      tab.badgeColor ||
+                      (isActive
+                        ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300'
+                        : 'bg-slate-200/80 text-slate-600 dark:bg-slate-700 dark:text-slate-300')
+                    }`}
+                  >
+                    {tab.badge}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="text-xs text-slate-400 hidden sm:flex items-center gap-1.5">
+          <span>Active view: <b className="text-slate-700 dark:text-slate-300 font-semibold">{tabs.find((t) => t.id === activeTab)?.label}</b></span>
+        </div>
+      </div>
+
+      {/* Section 1: Machine Status Table */}
+      {(activeTab === 'machines' || activeTab === 'all') && (
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-2xs">
         <div className="px-4 sm:px-5 py-3 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-slate-800/30">
           <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 tracking-tight">
             Loom Machine Status & Days Remaining
@@ -320,7 +503,7 @@ export default function MachinesAndBeamsPage() {
             Ordered by beam runout urgency
           </span>
         </div>
-        <div className="pms-table-container max-h-[420px] overflow-y-auto">
+        <div className="pms-table-container overflow-x-auto">
           <table className="w-full text-xs text-left">
             <thead className="pms-sticky-header bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-semibold border-b border-slate-200 dark:border-slate-700">
               <tr>
@@ -343,53 +526,65 @@ export default function MachinesAndBeamsPage() {
                   </td>
                 </tr>
               ) : (
-                [...machines]
-                  .sort((a, b) => (a.beam ? a.days_left : -1) - (b.beam ? b.days_left : -1))
-                  .map((m) => {
-                    let alertBadge = null;
-                    if (!m.beam) {
-                      alertBadge = <span className="px-2.5 py-1 rounded-md text-[11px] font-bold bg-rose-100 text-rose-800 dark:bg-rose-950/40 dark:text-rose-300">Idle — load beam</span>;
-                    } else if (m.days_left <= 2 && !m.spare) {
-                      alertBadge = <span className="px-2.5 py-1 rounded-md text-[11px] font-bold bg-rose-100 text-rose-800 dark:bg-rose-950/40 dark:text-rose-300 animate-pulse">Prepare beam now</span>;
-                    } else if (m.days_left <= 7 && !m.spare) {
-                      alertBadge = <span className="px-2.5 py-1 rounded-md text-[11px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300">Prepare this week</span>;
-                    } else if (m.spare) {
-                      alertBadge = <span className="px-2.5 py-1 rounded-md text-[11px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300">Spare ready</span>;
-                    } else {
-                      alertBadge = <span className="px-2.5 py-1 rounded-md text-[11px] font-medium text-slate-500">Normal</span>;
-                    }
+                paginatedMachines.map((m) => {
+                  let alertBadge = null;
+                  if (!m.beam) {
+                    alertBadge = <span className="px-2.5 py-1 rounded-md text-[11px] font-bold bg-rose-100 text-rose-800 dark:bg-rose-950/40 dark:text-rose-300">Idle — load beam</span>;
+                  } else if (m.days_left <= 2 && !m.spare) {
+                    alertBadge = <span className="px-2.5 py-1 rounded-md text-[11px] font-bold bg-rose-100 text-rose-800 dark:bg-rose-950/40 dark:text-rose-300 animate-pulse">Prepare beam now</span>;
+                  } else if (m.days_left <= 7 && !m.spare) {
+                    alertBadge = <span className="px-2.5 py-1 rounded-md text-[11px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300">Prepare this week</span>;
+                  } else if (m.spare) {
+                    alertBadge = <span className="px-2.5 py-1 rounded-md text-[11px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300">Spare ready</span>;
+                  } else {
+                    alertBadge = <span className="px-2.5 py-1 rounded-md text-[11px] font-medium text-slate-500">Normal</span>;
+                  }
 
-                    return (
-                      <tr key={m.machine_id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/50 transition-colors">
-                        <td className="py-2.5 px-3 font-bold text-slate-900 dark:text-slate-100 whitespace-nowrap">MCN {m.no}</td>
-                        <td className="py-2.5 px-3 font-medium text-slate-700 dark:text-slate-300 whitespace-nowrap">{m.quality?.name || '—'}</td>
-                        <td className="py-2.5 px-3 text-slate-600 dark:text-slate-400 font-mono text-xs whitespace-nowrap">{m.beam?.no || '—'}</td>
-                        <td className="py-2.5 px-3 text-right font-medium whitespace-nowrap">{m.beam ? formatNum(m.rem) : '—'}</td>
-                        <td className="py-2.5 px-3 text-right text-slate-500 whitespace-nowrap">{formatNum(m.avg)}</td>
-                        <td className="py-2.5 px-3 text-right font-bold text-slate-800 dark:text-slate-200 whitespace-nowrap">
-                          {m.beam ? (isFinite(m.days_left) ? formatNum(m.days_left, 1) : '—') : '—'}
-                        </td>
-                        <td className="py-2.5 px-3 whitespace-nowrap">
-                          {m.spare ? (
-                            <span className="text-emerald-600 font-medium text-xs">
-                              {m.spare.quality_name} <span className="text-slate-400 font-mono text-[11px]">({m.spare.no})</span>
-                            </span>
-                          ) : (
-                            <span className="text-slate-400">—</span>
-                          )}
-                        </td>
-                        <td className="py-2.5 px-3 text-right text-slate-500 whitespace-nowrap">{m.reed}</td>
-                        <td className="py-2.5 px-3 text-center whitespace-nowrap">{alertBadge}</td>
-                      </tr>
-                    );
-                  })
+                  return (
+                    <tr key={m.machine_id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/50 transition-colors">
+                      <td className="py-2.5 px-3 font-bold text-slate-900 dark:text-slate-100 whitespace-nowrap">MCN {m.no}</td>
+                      <td className="py-2.5 px-3 font-medium text-slate-700 dark:text-slate-300 whitespace-nowrap">{m.quality?.name || '—'}</td>
+                      <td className="py-2.5 px-3 text-slate-600 dark:text-slate-400 font-mono text-xs whitespace-nowrap">{m.beam?.no || '—'}</td>
+                      <td className="py-2.5 px-3 text-right font-medium whitespace-nowrap">{m.beam ? formatNum(m.rem) : '—'}</td>
+                      <td className="py-2.5 px-3 text-right text-slate-500 whitespace-nowrap">{formatNum(m.avg)}</td>
+                      <td className="py-2.5 px-3 text-right font-bold text-slate-800 dark:text-slate-200 whitespace-nowrap">
+                        {m.beam ? (isFinite(m.days_left) ? formatNum(m.days_left, 1) : '—') : '—'}
+                      </td>
+                      <td className="py-2.5 px-3 whitespace-nowrap">
+                        {m.spare ? (
+                          <span className="text-emerald-600 font-medium text-xs">
+                            {m.spare.quality_name} <span className="text-slate-400 font-mono text-[11px]">({m.spare.no})</span>
+                          </span>
+                        ) : (
+                          <span className="text-slate-400">—</span>
+                        )}
+                      </td>
+                      <td className="py-2.5 px-3 text-right text-slate-500 whitespace-nowrap">{m.reed}</td>
+                      <td className="py-2.5 px-3 text-center whitespace-nowrap">{alertBadge}</td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
         </div>
-      </div>
 
-      {/* Beams Management Card */}
+        <TablePagination
+          total={sortedMachines.length}
+          page={machinePage}
+          pageSize={machinePageSize}
+          onPageChange={setMachinePage}
+          onPageSizeChange={(newSize) => {
+            setMachinePageSize(newSize);
+            setMachinePage(1);
+          }}
+          pageSizeOptions={[10, 20, 25, 50, 100]}
+        />
+      </div>
+      )}
+
+      {/* Section 2: Beams Management Card */}
+      {(activeTab === 'beams' || activeTab === 'all') && (
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 sm:p-5 shadow-2xs space-y-4">
         <div className="flex justify-between items-center">
           <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 tracking-tight">
@@ -418,6 +613,7 @@ export default function MachinesAndBeamsPage() {
               onChange={(e) => setBQuality(e.target.value)}
               className="pms-select w-full cursor-pointer"
             >
+              {!qualities.some((q) => q.id === bQuality) && <option value="">— Select Quality —</option>}
               {qualities.map((q) => (
                 <option key={q.id} value={q.id}>{q.name} (Reed {q.reed})</option>
               ))}
@@ -427,8 +623,10 @@ export default function MachinesAndBeamsPage() {
             <label className="pms-label">Length (m)</label>
             <input
               type="number"
+              min="1"
               value={bLength}
-              onChange={(e) => setBLength(Number(e.target.value))}
+              onChange={(e) => setBLength(e.target.value === '' ? '' : Math.max(0, Number(e.target.value)))}
+              onKeyDown={preventNegativeInput}
               className="pms-input w-full font-mono"
               required
             />
@@ -479,7 +677,7 @@ export default function MachinesAndBeamsPage() {
         )}
 
         {/* Beams Table */}
-        <div className="pms-table-container max-h-[360px] overflow-y-auto">
+        <div className="pms-table-container overflow-x-auto">
           <table className="w-full text-xs text-left">
             <thead className="pms-sticky-header bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-semibold border-b border-slate-200 dark:border-slate-700">
               <tr>
@@ -494,7 +692,7 @@ export default function MachinesAndBeamsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-              {activeBeams.map((b) => (
+              {paginatedBeams.map((b) => (
                 <tr key={b.id} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/50 transition-colors">
                   <td className="py-2 px-3 font-mono font-bold text-slate-900 dark:text-slate-100 whitespace-nowrap">{b.beam_no}</td>
                   <td className="py-2 px-3 font-medium text-slate-700 dark:text-slate-300 whitespace-nowrap">{b.quality_name}</td>
@@ -523,7 +721,7 @@ export default function MachinesAndBeamsPage() {
                           <select
                             id={`target_m_${b.id}`}
                             defaultValue={b.machine || ''}
-                            className="h-8 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 font-medium text-slate-800 dark:text-slate-200 cursor-pointer min-w-[120px] outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500"
+                            className="h-8 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 font-medium text-slate-800 dark:text-slate-200 cursor-pointer min-w-[120px] outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500"
                           >
                             <option value="">Select MCN...</option>
                             {machines.map((m) => (
@@ -586,17 +784,30 @@ export default function MachinesAndBeamsPage() {
             </tbody>
           </table>
         </div>
-      </div>
 
-      {/* Factory Yarn Stock & Weft Cover */}
-      {statusData?.yarn_cover && (
+        <TablePagination
+          total={activeBeams.length}
+          page={beamPage}
+          pageSize={beamPageSize}
+          onPageChange={setBeamPage}
+          onPageSizeChange={(newSize) => {
+            setBeamPageSize(newSize);
+            setBeamPage(1);
+          }}
+          pageSizeOptions={[10, 20, 50]}
+        />
+      </div>
+      )}
+
+      {/* Section 3: Factory Yarn Stock & Weft Cover */}
+      {(activeTab === 'yarn' || activeTab === 'all') && statusData && (
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-xs">
           <div className="px-3.5 sm:px-4 py-2 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30">
             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200">
               Yarn Stock & Weft Cover Days at this Factory
             </h3>
           </div>
-          <div className="pms-table-container max-h-[300px] overflow-y-auto">
+          <div className="pms-table-container overflow-x-auto">
             <table className="w-full text-xs text-left">
               <thead className="pms-sticky-header bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-semibold border-b border-slate-200 dark:border-slate-700">
                 <tr>
@@ -616,7 +827,7 @@ export default function MachinesAndBeamsPage() {
                     </td>
                   </tr>
                 ) : (
-                  statusData.yarn_cover.map((y) => (
+                  paginatedYarnCover.map((y) => (
                     <tr key={y.yarn_id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition-colors">
                       <td className="py-2 px-3 font-bold text-slate-800 dark:text-slate-200 whitespace-nowrap">{y.yarn_name}</td>
                       <td className="py-2 px-3 text-right font-mono font-semibold whitespace-nowrap">
@@ -642,6 +853,18 @@ export default function MachinesAndBeamsPage() {
               </tbody>
             </table>
           </div>
+
+          <TablePagination
+            total={yarnCoverList.length}
+            page={yarnPage}
+            pageSize={yarnPageSize}
+            onPageChange={setYarnPage}
+            onPageSizeChange={(newSize) => {
+              setYarnPageSize(newSize);
+              setYarnPage(1);
+            }}
+            pageSizeOptions={[10, 20, 50]}
+          />
         </div>
       )}
 

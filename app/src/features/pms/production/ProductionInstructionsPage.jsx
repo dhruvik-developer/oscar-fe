@@ -329,7 +329,7 @@ export default function ProductionInstructionsPage() {
   };
 
   return (
-    <div className="pms-screen w-full space-y-3 sm:space-y-3.5">
+    <div className="pms-screen w-full space-y-6">
       <PageHeader
         title="Production Instructions"
         subtitle="Create and manage production instructions for external agencies."
@@ -565,7 +565,17 @@ export default function ProductionInstructionsPage() {
                   </div>
                   <div>
                     <label className="block font-semibold text-slate-700 mb-1">Assigned Qty (Meter) *</label>
-                    <input type="number" min="0" step="any" required value={assignedQty} onChange={(e) => setAssignedQty(e.target.value)} placeholder="Meters" className="w-full border border-slate-300 rounded-lg p-2 bg-white text-slate-800 font-mono" />
+                    <input
+                      type="number"
+                      min="0.01"
+                      step="any"
+                      required
+                      value={assignedQty}
+                      onChange={(e) => setAssignedQty(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === '-' || e.key === 'e' || e.key === '+') e.preventDefault(); }}
+                      placeholder="Meters"
+                      className="w-full border border-slate-300 rounded-lg p-2 bg-white text-slate-800 font-mono"
+                    />
                   </div>
                   <div>
                     <label className="block font-semibold text-slate-700 mb-1">Process Type *</label>
@@ -764,10 +774,12 @@ export default function ProductionInstructionsPage() {
                         <label className="block text-[11px] font-semibold text-slate-600 mb-1">Invoice Quantity (Meters) *</label>
                         <input
                           type="number"
+                          min="0.01"
                           step="0.01"
                           required
                           value={matchQty}
                           onChange={(e) => setMatchQty(e.target.value)}
+                          onKeyDown={(e) => { if (e.key === '-' || e.key === 'e' || e.key === '+') e.preventDefault(); }}
                           className="w-full text-xs border border-slate-300 rounded-lg p-2 bg-white text-slate-800 font-mono"
                         />
                       </div>
@@ -775,10 +787,12 @@ export default function ProductionInstructionsPage() {
                         <label className="block text-[11px] font-semibold text-slate-600 mb-1">Invoice Rate (₹/M) *</label>
                         <input
                           type="number"
+                          min="0"
                           step="0.01"
                           required
                           value={matchRate}
                           onChange={(e) => setMatchRate(e.target.value)}
+                          onKeyDown={(e) => { if (e.key === '-' || e.key === 'e' || e.key === '+') e.preventDefault(); }}
                           className="w-full text-xs border border-slate-300 rounded-lg p-2 bg-white text-slate-800 font-mono"
                         />
                       </div>
@@ -872,7 +886,16 @@ export default function ProductionInstructionsPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">Assigned Qty (Meter) *</label>
-                  <input type="number" min="0" step="any" required value={editQty} onChange={(e) => setEditQty(e.target.value)} className="w-full border border-slate-300 rounded-lg p-2 bg-white text-slate-800 font-mono" />
+                  <input
+                    type="number"
+                    min="0.01"
+                    step="any"
+                    required
+                    value={editQty}
+                    onChange={(e) => setEditQty(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === '-' || e.key === 'e' || e.key === '+') e.preventDefault(); }}
+                    className="w-full border border-slate-300 rounded-lg p-2 bg-white text-slate-800 font-mono"
+                  />
                 </div>
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">Process Type</label>

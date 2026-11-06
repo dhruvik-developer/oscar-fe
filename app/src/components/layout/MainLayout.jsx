@@ -10,7 +10,7 @@ import { useModuleHydration } from '../../hooks/useModuleHydration';
 // ERP-only UI scope: graph.json global-shell guidance applied purely as a
 // CSS class. CRM/HRMS routes never receive `erp-scope`, so their UI is
 // untouched. No routing, data, or API logic changes here.
-const ERP_PREFIXES = ['/dashboard', '/sales', '/purchase', '/inventory', '/parties', '/accounts', '/reports'];
+const ERP_PREFIXES = ['/dashboard', '/sales', '/purchase', '/inventory', '/parties', '/accounts', '/reports', '/pms'];
 
 // Inside the "+ Add / Manage" popup (MasterSourceLink) the app runs in an
 // iframe: show only the page, without the sidebar, topbar and floating widgets.
@@ -51,6 +51,48 @@ export default function MainLayout() {
   useEffect(() => {
     setMobileSidebarOpen(false);
   }, [pathname, setMobileSidebarOpen]);
+
+  // Global guard: Prevent negative inputs in number fields across PMS and positive-only inputs
+  useEffect(() => {
+    const handleGlobalKeyDown = (e) => {
+      if (
+        (e.key === '-' || e.key === 'Subtract' || e.key === 'e' || e.key === '+') &&
+        e.target &&
+        e.target.tagName === 'INPUT' &&
+        e.target.type === 'number'
+      ) {
+        const minAttr = e.target.getAttribute('min');
+        if (
+          minAttr === '0' ||
+          Number(minAttr) >= 0 ||
+          e.target.closest('.pms-screen')
+        ) {
+          e.preventDefault();
+        }
+      }
+    };
+
+    const handleGlobalInput = (e) => {
+      if (
+        e.target &&
+        e.target.tagName === 'INPUT' &&
+        e.target.type === 'number' &&
+        (e.target.closest('.pms-screen') || Number(e.target.getAttribute('min')) >= 0)
+      ) {
+        const val = e.target.value;
+        if (val !== '' && Number(val) < 0) {
+          e.target.value = '0';
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleGlobalKeyDown, true);
+    window.addEventListener('input', handleGlobalInput, true);
+    return () => {
+      window.removeEventListener('keydown', handleGlobalKeyDown, true);
+      window.removeEventListener('input', handleGlobalInput, true);
+    };
+  }, []);
 
   // Escape closes the mobile navigation drawer.
   useEffect(() => {

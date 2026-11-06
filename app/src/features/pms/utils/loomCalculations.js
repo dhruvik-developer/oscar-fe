@@ -52,3 +52,21 @@ export function formatNum(val, decimals = 0) {
     maximumFractionDigits: decimals,
   });
 }
+
+/**
+ * Prevents typing negative characters and scientific notation ('-', 'e', '+') in number inputs.
+ */
+export function preventNegativeInput(e) {
+  if (e.key === '-' || e.key === 'e' || e.key === '+' || e.key === 'Subtract' || e.keyCode === 189) {
+    e.preventDefault();
+  }
+}
+
+/**
+ * Ensures a value is clamped to a non-negative number (>= 0).
+ */
+export function clampNonNegative(val, fallback = 0) {
+  if (val === '' || val === null || val === undefined) return '';
+  const num = parseFloat(val);
+  return isNaN(num) || num < 0 ? fallback : num;
+}

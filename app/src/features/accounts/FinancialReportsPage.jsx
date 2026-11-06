@@ -160,7 +160,7 @@ export function FinancialReportsPage() {
     } else if (reportType === 'ageing' && ag) {
       exportToCSV(`Ageing_${ageingType}_${stamp}`, ['Document #', 'Party', 'Date', 'Due Date', 'Total', 'Outstanding', 'Days Overdue', 'Bucket'], (ag.rows || []).map((r) => [r.documentNumber, r.partyName, r.date, r.dueDate, r.total, r.outstanding, r.daysOverdue, r.bucket]));
     } else if (reportType === 'budget') {
-      exportToCSV(`Budget_vs_Actual_${stamp}`, ['Account', 'Period start', 'Period end', 'Budget', 'Actual', 'Variance'], budgetRows.map((r) => [r.accountName, r.periodStart, r.periodEnd, r.amount, r.actual, r.variance]));
+      exportToCSV(`Budget_vs_Actual_${stamp}`, ['Account', 'Period start', 'Period end', 'Budget', 'Actual', 'Variance'], budgetRows.map((r) => [r.accountName, r.period_start || r.periodStart, r.period_end || r.periodEnd, r.amount, r.actual, r.variance]));
     }
   };
 
@@ -708,7 +708,7 @@ export function FinancialReportsPage() {
 
       {/* ADD / EDIT BUDGET MODAL */}
       {showBudgetModal && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-3">
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-3">
           <div className="bg-white rounded-2xl border border-slate-200 max-w-md w-full p-5 shadow-2xl text-xs space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-slate-200">
               <h3 className="font-bold text-base text-[#1F2E4A]">

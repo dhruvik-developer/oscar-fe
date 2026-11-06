@@ -14,12 +14,14 @@ import {
   AlertTriangle,
   ClipboardList,
   FileCheck2,
+  LayoutGrid,
 } from 'lucide-react';
 import PageHeader from '../../../components/ui/PageHeader';
 import KpiCard from '../../../components/ui/KpiCard';
 import { Button } from '../../../components/ui/Button';
+import TablePagination from '../../../components/ui/TablePagination';
 import { loomService } from '../../../services/loomService';
-import { qc, formatNum } from '../utils/loomCalculations';
+import { qc, formatNum, preventNegativeInput } from '../utils/loomCalculations';
 import { useERP } from '../../../context/ERPContext';
 import { ConfirmModal } from '../../../components/ui/ConfirmModal';
 
@@ -29,11 +31,26 @@ export default function LoomProgramsPage() {
   const [loading, setLoading] = useState(true);
   const [deleteConfirmProgId, setDeleteConfirmProgId] = useState(null);
   const [programs, setPrograms] = useState([]);
+  const [progPage, setProgPage] = useState(1);
+  const [progPageSize, setProgPageSize] = useState(10);
   const [factories, setFactories] = useState([]);
+
+  const paginatedPrograms = useMemo(() => {
+    const start = (progPage - 1) * progPageSize;
+    return programs.slice(start, start + progPageSize);
+  }, [programs, progPage, progPageSize]);
   const [qualities, setQualities] = useState([]);
   const [yarns, setYarns] = useState([]);
   const [openProgId, setOpenProgId] = useState(null);
   const [progStats, setProgStats] = useState(null);
+  const [activeTab, setActiveTab] = useState(
+    () => localStorage.getItem('oscar_pms_programs_tab') || 'list'
+  );
+
+  const handleTabChange = (tabId) => {
+    setActiveTab(tabId);
+    localStorage.setItem('oscar_pms_programs_tab', tabId);
+  };
 
   // Form
   const [pName, setPName] = useState('');
@@ -128,6 +145,14 @@ export default function LoomProgramsPage() {
       showToast('Program Name, Target meters and Deadline are required', 'warning');
       return;
     }
+    if (Number(pTarget) <= 0) {
+      showToast('Target meters must be greater than 0', 'error');
+      return;
+    }
+    if (Number(pTrpm || 0) < 0 || Number(pTeff || 0) < 0 || Number(pTpower || 0) < 0) {
+      showToast('RPM, Efficiency, and Power values cannot be negative', 'error');
+      return;
+    }
     try {
       await loomService.createProgram({
         name: pName,
@@ -177,7 +202,7 @@ export default function LoomProgramsPage() {
     const c = q ? qc(q, yarnMap) : null;
 
     return (
-      <div className="pms-screen w-full space-y-3 sm:space-y-3.5">
+      <div className="pms-screen w-full space-y-6">
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           <Button variant="secondary" onClick={() => setOpenProgId(null)} size="sm">
             <ArrowLeft size={13} className="mr-1" /> Back to Programs
@@ -333,8 +358,26 @@ export default function LoomProgramsPage() {
     );
   }
 
+  const tabs = [
+    {
+      id: 'list',
+      label: 'Active Programs & Progress',
+      icon: Layers,
+    },
+    {
+      id: 'create',
+      label: 'Create Program',
+      icon: Plus,
+    },
+    {
+      id: 'all',
+      label: 'Show All',
+      icon: LayoutGrid,
+    },
+  ];
+
   return (
-    <div className="pms-screen w-full space-y-3 sm:space-y-3.5">
+    <div className="pms-screen w-full space-y-6">
       <PageHeader
         title="Production Programs (Orders & Batches)"
         subtitle="Schedule and track manufacturing targets by factory and quality with dynamic yarn demand forecasts."
@@ -346,20 +389,50 @@ export default function LoomProgramsPage() {
         }
       />
 
-      {/* Create Program Card */}
+      {/* Screen Section Switcher */}
+      <div className="flex flex-wrap items-center justify-between gap-2.5 pt-1">
+        <div className="inline-flex p-1 bg-slate-100 dark:bg-slate-800/80 border border-slate-200/90 dark:border-slate-700/80 rounded-xl shadow-2xs">
+          {tabs.map((tab) => {
+            const Icon = tab.icon;
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => handleTabChange(tab.id)}
+                className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                  isActive
+                    ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-xs'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
+                }`}
+              >
+                <Icon size={14} className={isActive ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400'} />
+                <span>{tab.label}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="text-xs text-slate-400 hidden sm:flex items-center gap-1.5">
+          <span>Active view: <b className="text-slate-700 dark:text-slate-300 font-semibold">{tabs.find((t) => t.id === activeTab)?.label}</b></span>
+        </div>
+      </div>
+
+      {/* Section: Create Program Card */}
+      {(activeTab === 'create' || activeTab === 'all') && (
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3.5 sm:p-4 shadow-sm space-y-3">
         <h3 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-slate-100">
           Create Production Program <span className="text-slate-400 font-normal text-xs">(CEO / Production Head)</span>
         </h3>
         <form onSubmit={handleCreateProgram} className="grid grid-cols-2 md:grid-cols-5 gap-2.5 items-end">
           <div className="md:col-span-2">
-            <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">Program Name</label>
+            <label className="pms-label">Program Name</label>
             <input
               type="text"
               placeholder="e.g. 3103-A – Shree Laxmi – Nov"
               value={pName}
               onChange={(e) => setPName(e.target.value)}
-              className="w-full mt-1 h-8 rounded-lg border border-slate-200 dark:border-slate-700 px-2.5 text-xs"
+              className="pms-input w-full"
               required
             />
           </div>
@@ -391,8 +464,11 @@ export default function LoomProgramsPage() {
             <label className="pms-label">Target Meters</label>
             <input
               type="number"
+              min="1"
+              step="any"
               value={pTarget}
-              onChange={(e) => setPTarget(Number(e.target.value))}
+              onChange={(e) => setPTarget(e.target.value === '' ? '' : Math.max(0, Number(e.target.value)))}
+              onKeyDown={preventNegativeInput}
               className="pms-input w-full font-mono"
               required
             />
@@ -420,8 +496,10 @@ export default function LoomProgramsPage() {
             <label className="pms-label">Target RPM</label>
             <input
               type="number"
+              min="0"
               value={pTrpm}
-              onChange={(e) => setPTrpm(Number(e.target.value))}
+              onChange={(e) => setPTrpm(e.target.value === '' ? '' : Math.max(0, Number(e.target.value)))}
+              onKeyDown={preventNegativeInput}
               className="pms-input w-full"
             />
           </div>
@@ -429,8 +507,11 @@ export default function LoomProgramsPage() {
             <label className="pms-label">Target Eff %</label>
             <input
               type="number"
+              min="0"
+              max="100"
               value={pTeff}
-              onChange={(e) => setPTeff(Number(e.target.value))}
+              onChange={(e) => setPTeff(e.target.value === '' ? '' : Math.max(0, Number(e.target.value)))}
+              onKeyDown={preventNegativeInput}
               className="pms-input w-full"
             />
           </div>
@@ -456,15 +537,17 @@ export default function LoomProgramsPage() {
           </div>
         )}
       </div>
+      )}
 
-      {/* Programs List Table */}
+      {/* Section: Programs List Table */}
+      {(activeTab === 'list' || activeTab === 'all') && (
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm">
         <div className="px-3.5 py-2.5 sm:px-4 sm:py-3 border-b border-slate-100 dark:border-slate-800">
           <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
             Active Programs & Progress
           </h3>
         </div>
-        <div className="pms-table-container">
+        <div className="pms-table-container overflow-x-auto">
           <table className="w-full text-xs text-left pms-sticky-header">
             <thead className="bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-semibold border-b border-slate-200 dark:border-slate-700">
               <tr>
@@ -482,7 +565,7 @@ export default function LoomProgramsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-              {programs.map((p) => {
+              {paginatedPrograms.map((p) => {
                 const s = p.stats || {};
                 const isLate = (s.meters || 0) < (s.expected || 0);
 
@@ -553,7 +636,20 @@ export default function LoomProgramsPage() {
             </tbody>
           </table>
         </div>
+
+        <TablePagination
+          total={programs.length}
+          page={progPage}
+          pageSize={progPageSize}
+          onPageChange={setProgPage}
+          onPageSizeChange={(newSize) => {
+            setProgPageSize(newSize);
+            setProgPage(1);
+          }}
+          pageSizeOptions={[10, 20, 50]}
+        />
       </div>
+      )}
 
       <ConfirmModal
         isOpen={Boolean(deleteConfirmProgId)}

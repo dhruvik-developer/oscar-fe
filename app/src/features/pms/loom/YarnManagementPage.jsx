@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Package,
   Calendar,
@@ -10,11 +10,13 @@ import {
   Layers,
   Clock,
   AlertCircle,
+  LayoutGrid,
 } from 'lucide-react';
 import PageHeader from '../../../components/ui/PageHeader';
 import { Button } from '../../../components/ui/Button';
+import TablePagination from '../../../components/ui/TablePagination';
 import { loomService } from '../../../services/loomService';
-import { formatNum } from '../utils/loomCalculations';
+import { formatNum, preventNegativeInput } from '../utils/loomCalculations';
 import { useERP } from '../../../context/ERPContext';
 import { ConfirmModal } from '../../../components/ui/ConfirmModal';
 
@@ -27,6 +29,14 @@ export default function YarnManagementPage() {
   const [bookings, setBookings] = useState([]);
   const [deliveries, setDeliveries] = useState([]);
   const [stockOverview, setStockOverview] = useState([]);
+  const [activeTab, setActiveTab] = useState(
+    () => localStorage.getItem('oscar_pms_yarn_tab') || 'actions'
+  );
+
+  const handleTabChange = (tabId) => {
+    setActiveTab(tabId);
+    localStorage.setItem('oscar_pms_yarn_tab', tabId);
+  };
 
   // Step 1: Book Yarn Form
   const [bkSupplier, setBkSupplier] = useState('');
@@ -98,6 +108,10 @@ export default function YarnManagementPage() {
       showToast('Supplier, Kgs, and Rate are required', 'warning');
       return;
     }
+    if (Number(bkKgs) <= 0 || Number(bkRate) < 0) {
+      showToast('Kgs must be greater than 0 and rate cannot be negative', 'error');
+      return;
+    }
     try {
       await loomService.createYarnBooking({
         supplier: bkSupplier,
@@ -123,6 +137,10 @@ export default function YarnManagementPage() {
     e.preventDefault();
     if (!schBooking || !schFactory || !schKgs) {
       showToast('Booking, Factory, and Kgs are required', 'warning');
+      return;
+    }
+    if (Number(schKgs) <= 0 || (schRate && Number(schRate) < 0)) {
+      showToast('Kgs to send must be greater than 0 and rate cannot be negative', 'error');
       return;
     }
     const b = bookings.find((x) => x.id === schBooking);
@@ -184,8 +202,64 @@ export default function YarnManagementPage() {
   const pendingDeliveries = deliveries.filter((d) => d.status === 'Scheduled');
   const todayStr = new Date().toISOString().slice(0, 10);
 
+  const [delivPage, setDelivPage] = useState(1);
+  const [delivPageSize, setDelivPageSize] = useState(10);
+
+  const [bookingPage, setBookingPage] = useState(1);
+  const [bookingPageSize, setBookingPageSize] = useState(10);
+
+  const [stockPage, setStockPage] = useState(1);
+  const [stockPageSize, setStockPageSize] = useState(10);
+
+  const paginatedDeliveries = useMemo(() => {
+    const start = (delivPage - 1) * delivPageSize;
+    return pendingDeliveries.slice(start, start + delivPageSize);
+  }, [pendingDeliveries, delivPage, delivPageSize]);
+
+  const paginatedBookings = useMemo(() => {
+    const start = (bookingPage - 1) * bookingPageSize;
+    return bookings.slice(start, start + bookingPageSize);
+  }, [bookings, bookingPage, bookingPageSize]);
+
+  const activeStockOverview = useMemo(() => {
+    return stockOverview.filter((s) => s.recd > 0 || s.pending > 0 || s.warp > 0 || s.weft > 0);
+  }, [stockOverview]);
+
+  const paginatedStock = useMemo(() => {
+    const start = (stockPage - 1) * stockPageSize;
+    return activeStockOverview.slice(start, start + stockPageSize);
+  }, [activeStockOverview, stockPage, stockPageSize]);
+
+  const tabs = [
+    {
+      id: 'actions',
+      label: 'Book & Schedule',
+      icon: Plus,
+    },
+    {
+      id: 'receipt',
+      label: 'Confirm Receipt',
+      icon: CheckCircle2,
+    },
+    {
+      id: 'bookings',
+      label: 'Procurement Bookings',
+      icon: Package,
+    },
+    {
+      id: 'stock',
+      label: 'Live Factory Stock',
+      icon: Layers,
+    },
+    {
+      id: 'all',
+      label: 'Show All',
+      icon: LayoutGrid,
+    },
+  ];
+
   return (
-    <div className="pms-screen w-full space-y-3 sm:space-y-3.5">
+    <div className="pms-screen w-full space-y-6">
       <PageHeader
         title="Yarn Procurement & Delivery Pipeline"
         subtitle="Manage the 3-step yarn supply chain: Book Yarn → Schedule Factory Delivery → Confirm Receipt at Factory."
@@ -202,7 +276,37 @@ export default function YarnManagementPage() {
         }
       />
 
-      {/* 3 Step Action Grid */}
+      {/* Screen Section Switcher */}
+      <div className="flex flex-wrap items-center justify-between gap-2.5 pt-1">
+        <div className="inline-flex p-1 bg-slate-100 dark:bg-slate-800/80 border border-slate-200/90 dark:border-slate-700/80 rounded-xl shadow-2xs">
+          {tabs.map((tab) => {
+            const Icon = tab.icon;
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => handleTabChange(tab.id)}
+                className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                  isActive
+                    ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-xs'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
+                }`}
+              >
+                <Icon size={14} className={isActive ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400'} />
+                <span>{tab.label}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="text-xs text-slate-400 hidden sm:flex items-center gap-1.5">
+          <span>Active view: <b className="text-slate-700 dark:text-slate-300 font-semibold">{tabs.find((t) => t.id === activeTab)?.label}</b></span>
+        </div>
+      </div>
+
+      {/* Section 1: 3 Step Action Grid (Booking & Delivery forms) */}
+      {(activeTab === 'actions' || activeTab === 'all') && (
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3.5 sm:gap-4">
         {/* Step 1: Book Yarn */}
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 sm:p-5 shadow-2xs space-y-3.5">
@@ -240,9 +344,12 @@ export default function YarnManagementPage() {
               <label className="pms-label">Total Kg</label>
               <input
                 type="number"
+                min="0.01"
+                step="any"
                 placeholder="10000"
                 value={bkKgs}
                 onChange={(e) => setBkKgs(e.target.value)}
+                onKeyDown={preventNegativeInput}
                 className="pms-input w-full font-mono"
                 required
               />
@@ -251,9 +358,12 @@ export default function YarnManagementPage() {
               <label className="pms-label">Rate ₹/kg</label>
               <input
                 type="number"
+                min="0"
+                step="any"
                 placeholder="210"
                 value={bkRate}
                 onChange={(e) => setBkRate(e.target.value)}
+                onKeyDown={preventNegativeInput}
                 className="pms-input w-full font-mono"
                 required
               />
@@ -324,9 +434,12 @@ export default function YarnManagementPage() {
               <label className="pms-label">Kg to Send</label>
               <input
                 type="number"
+                min="0.01"
+                step="any"
                 placeholder="5000"
                 value={schKgs}
                 onChange={(e) => setSchKgs(e.target.value)}
+                onKeyDown={preventNegativeInput}
                 className="pms-input w-full font-mono"
                 required
               />
@@ -335,9 +448,12 @@ export default function YarnManagementPage() {
               <label className="pms-label">Rate ₹/kg (blank = booked)</label>
               <input
                 type="number"
+                min="0"
+                step="any"
                 placeholder="Rate"
                 value={schRate}
                 onChange={(e) => setSchRate(e.target.value)}
+                onKeyDown={preventNegativeInput}
                 className="pms-input w-full"
               />
             </div>
@@ -358,8 +474,10 @@ export default function YarnManagementPage() {
           </form>
         </div>
       </div>
+      )}
 
-      {/* Step 3: Confirm Receipt at Factory (Coordinator) */}
+      {/* Section 2: Confirm Receipt at Factory (Coordinator) */}
+      {(activeTab === 'receipt' || activeTab === 'all') && (
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3.5 sm:p-4 shadow-sm space-y-2.5">
         <div className="flex items-center gap-2">
           <span className="w-5 h-5 rounded-full bg-emerald-100 dark:bg-emerald-900 text-emerald-700 dark:text-emerald-200 text-xs font-bold flex items-center justify-center">3</span>
@@ -368,7 +486,7 @@ export default function YarnManagementPage() {
           </h3>
         </div>
 
-        <div className="pms-table-container">
+        <div className="pms-table-container overflow-x-auto">
           <table className="w-full text-xs text-left pms-sticky-header">
             <thead className="bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-semibold border-b border-slate-200 dark:border-slate-700">
               <tr>
@@ -384,7 +502,7 @@ export default function YarnManagementPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-              {pendingDeliveries.map((d) => {
+              {paginatedDeliveries.map((d) => {
                 const isLate = d.due < todayStr;
                 return (
                   <tr key={d.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50">
@@ -405,8 +523,11 @@ export default function YarnManagementPage() {
                     <td className="py-2 px-2.5 sm:py-2.5 sm:px-3">
                       <input
                         type="number"
+                        min="0.01"
+                        step="any"
                         id={`recd_${d.id}`}
                         defaultValue={d.kgs}
+                        onKeyDown={preventNegativeInput}
                         className="w-20 sm:w-24 h-8 px-2 text-xs font-mono font-semibold rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-right outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500"
                       />
                     </td>
@@ -440,16 +561,30 @@ export default function YarnManagementPage() {
             </tbody>
           </table>
         </div>
-      </div>
 
-      {/* Bookings Overview Table */}
+        <TablePagination
+          total={pendingDeliveries.length}
+          page={delivPage}
+          pageSize={delivPageSize}
+          onPageChange={setDelivPage}
+          onPageSizeChange={(newSize) => {
+            setDelivPageSize(newSize);
+            setDelivPage(1);
+          }}
+          pageSizeOptions={[10, 20, 50]}
+        />
+      </div>
+      )}
+
+      {/* Section 3: Bookings Overview Table */}
+      {(activeTab === 'bookings' || activeTab === 'all') && (
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm">
         <div className="px-3.5 py-2.5 sm:px-4 sm:py-3 border-b border-slate-100 dark:border-slate-800">
           <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
             Yarn Procurement Bookings
           </h3>
         </div>
-        <div className="pms-table-container">
+        <div className="pms-table-container overflow-x-auto">
           <table className="w-full text-xs text-left pms-sticky-header">
             <thead className="bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-semibold border-b border-slate-200 dark:border-slate-700">
               <tr>
@@ -466,7 +601,7 @@ export default function YarnManagementPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-              {bookings.map((b) => (
+              {paginatedBookings.map((b) => (
                 <tr key={b.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50">
                   <td className="py-2 px-2.5 sm:py-2.5 sm:px-3 font-bold text-slate-800 dark:text-slate-200">{b.supplier}</td>
                   <td className="py-2 px-2.5 sm:py-2.5 sm:px-3 font-medium text-slate-700 dark:text-slate-300">{b.yarn_name}</td>
@@ -496,19 +631,40 @@ export default function YarnManagementPage() {
                   </td>
                 </tr>
               ))}
+              {!bookings.length && (
+                <tr>
+                  <td colSpan={10} className="py-6 text-center text-slate-400">
+                    No yarn bookings recorded.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
-      </div>
 
-      {/* Stock by Factory (Auto calculated) */}
+        <TablePagination
+          total={bookings.length}
+          page={bookingPage}
+          pageSize={bookingPageSize}
+          onPageChange={setBookingPage}
+          onPageSizeChange={(newSize) => {
+            setBookingPageSize(newSize);
+            setBookingPage(1);
+          }}
+          pageSizeOptions={[10, 20, 50]}
+        />
+      </div>
+      )}
+
+      {/* Section 4: Stock by Factory (Auto calculated) */}
+      {(activeTab === 'stock' || activeTab === 'all') && (
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm">
         <div className="px-3.5 py-2.5 sm:px-4 sm:py-3 border-b border-slate-100 dark:border-slate-800">
           <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
             Automated Live Stock by Factory
           </h3>
         </div>
-        <div className="pms-table-container">
+        <div className="pms-table-container overflow-x-auto">
           <table className="w-full text-xs text-left pms-sticky-header">
             <thead className="bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-semibold border-b border-slate-200 dark:border-slate-700">
               <tr>
@@ -523,28 +679,46 @@ export default function YarnManagementPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-              {stockOverview
-                .filter((s) => s.recd > 0 || s.pending > 0 || s.warp > 0 || s.weft > 0)
-                .map((s, idx) => (
-                  <tr key={idx} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50">
-                    <td className="py-2 px-2.5 sm:py-2.5 sm:px-3 font-semibold text-slate-800 dark:text-slate-200">{s.factory_name}</td>
-                    <td className="py-2 px-2.5 sm:py-2.5 sm:px-3 font-medium text-slate-700 dark:text-slate-300">{s.yarn_name}</td>
-                    <td className="py-2 px-2.5 sm:py-2.5 sm:px-3 text-right font-mono">{formatNum(s.recd)}</td>
-                    <td className="py-2 px-2.5 sm:py-2.5 sm:px-3 text-right font-mono text-slate-500">{formatNum(s.warp, 1)}</td>
-                    <td className="py-2 px-2.5 sm:py-2.5 sm:px-3 text-right font-mono text-slate-500">{formatNum(s.weft, 1)}</td>
-                    <td className="py-2 px-2.5 sm:py-2.5 sm:px-3 text-right font-mono font-bold">
-                      <span className={s.bal < 0 ? 'text-rose-600 font-bold' : 'text-blue-600'}>
-                        {formatNum(s.bal)}
-                      </span>
-                    </td>
-                    <td className="py-2 px-2.5 sm:py-2.5 sm:px-3 text-right font-mono text-slate-500">{formatNum(s.bags, 1)}</td>
-                    <td className="py-2 px-2.5 sm:py-2.5 sm:px-3 text-right font-mono text-amber-600">{formatNum(s.pending)}</td>
-                  </tr>
-                ))}
+              {paginatedStock.map((s, idx) => (
+                <tr key={idx} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50">
+                  <td className="py-2 px-2.5 sm:py-2.5 sm:px-3 font-semibold text-slate-800 dark:text-slate-200">{s.factory_name}</td>
+                  <td className="py-2 px-2.5 sm:py-2.5 sm:px-3 font-medium text-slate-700 dark:text-slate-300">{s.yarn_name}</td>
+                  <td className="py-2 px-2.5 sm:py-2.5 sm:px-3 text-right font-mono">{formatNum(s.recd)}</td>
+                  <td className="py-2 px-2.5 sm:py-2.5 sm:px-3 text-right font-mono text-slate-500">{formatNum(s.warp, 1)}</td>
+                  <td className="py-2 px-2.5 sm:py-2.5 sm:px-3 text-right font-mono text-slate-500">{formatNum(s.weft, 1)}</td>
+                  <td className="py-2 px-2.5 sm:py-2.5 sm:px-3 text-right font-mono font-bold">
+                    <span className={s.bal < 0 ? 'text-rose-600 font-bold' : 'text-blue-600'}>
+                      {formatNum(s.bal)}
+                    </span>
+                  </td>
+                  <td className="py-2 px-2.5 sm:py-2.5 sm:px-3 text-right font-mono text-slate-500">{formatNum(s.bags, 1)}</td>
+                  <td className="py-2 px-2.5 sm:py-2.5 sm:px-3 text-right font-mono text-amber-600">{formatNum(s.pending)}</td>
+                </tr>
+              ))}
+              {!activeStockOverview.length && (
+                <tr>
+                  <td colSpan={8} className="py-6 text-center text-slate-400">
+                    No factory yarn balances yet.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
+
+        <TablePagination
+          total={activeStockOverview.length}
+          page={stockPage}
+          pageSize={stockPageSize}
+          onPageChange={setStockPage}
+          onPageSizeChange={(newSize) => {
+            setStockPageSize(newSize);
+            setStockPage(1);
+          }}
+          pageSizeOptions={[10, 20, 50]}
+        />
       </div>
+      )}
 
       <ConfirmModal
         isOpen={Boolean(deleteBookingConfirmId)}

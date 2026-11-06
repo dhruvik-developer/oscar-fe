@@ -74,7 +74,7 @@ export default function GenerateOfferModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
+    <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
       <div className="bg-white rounded-2xl border border-slate-300 shadow-2xl w-full max-w-lg p-4 sm:p-6 my-auto">
         <div className="flex justify-between items-center mb-4 pb-3 border-b border-slate-200">
           <div className="flex items-center gap-2">

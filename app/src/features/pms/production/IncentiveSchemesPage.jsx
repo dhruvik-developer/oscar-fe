@@ -558,7 +558,7 @@ export default function IncentiveSchemesPage() {
 
       {/* CREATE / EDIT SCHEME MODAL */}
       {showSchemeModal && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-3">
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-3">
           <div className="bg-white rounded-2xl border border-slate-200 max-w-lg w-full p-5 shadow-2xl text-xs space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-slate-200">
               <h3 className="font-bold text-base text-[#1F2E4A]">
@@ -714,7 +714,7 @@ export default function IncentiveSchemesPage() {
 
       {/* RUN CALCULATION MODAL */}
       {calcModalScheme && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-3">
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-3">
           <div className="bg-white rounded-2xl border border-slate-200 max-w-md w-full p-5 shadow-2xl text-xs space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-slate-200">
               <h3 className="font-bold text-base text-[#1F2E4A]">Run Calculation: {calcModalScheme.name}</h3>
@@ -814,7 +814,7 @@ export default function IncentiveSchemesPage() {
 
       {/* SETTLE PAY MODAL */}
       {payTarget && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-3">
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-3">
           <div className="bg-white rounded-2xl border border-slate-200 max-w-sm w-full p-5 shadow-2xl text-xs space-y-4">
             <h3 className="font-bold text-base text-[#1F2E4A]">Record Payout Settlement</h3>
             <p className="text-slate-600">

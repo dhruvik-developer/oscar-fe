@@ -245,7 +245,7 @@ function HrmsSetupPageOriginal() {
       </div>
 
       {isRoleModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4">
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
           <div className="bg-white rounded-2xl border border-bdr shadow-xl w-full max-w-md p-4 sm:p-6 max-h-[95vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-5 pb-3 border-b border-bdr">
               <h3 className="font-bold text-[16px] text-slate-900">Define Custom Role</h3>

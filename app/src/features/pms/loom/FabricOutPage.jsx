@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Truck,
@@ -11,13 +11,16 @@ import {
   CheckCircle2,
   Warehouse,
   ClipboardList,
+  LayoutGrid,
 } from 'lucide-react';
 import PageHeader from '../../../components/ui/PageHeader';
 import { Button } from '../../../components/ui/Button';
+import TablePagination from '../../../components/ui/TablePagination';
 import { loomService } from '../../../services/loomService';
-import { formatNum } from '../utils/loomCalculations';
+import { formatNum, preventNegativeInput } from '../utils/loomCalculations';
 import { useERP } from '../../../context/ERPContext';
 import { ConfirmModal } from '../../../components/ui/ConfirmModal';
+import CompanySelector from './components/CompanySelector';
 
 export default function FabricOutPage() {
   const navigate = useNavigate();
@@ -28,7 +31,22 @@ export default function FabricOutPage() {
   const [qualities, setQualities] = useState([]);
   const [selectedFactoryId, setSelectedFactoryId] = useState('');
   const [dispatches, setDispatches] = useState([]);
+  const [dispatchPage, setDispatchPage] = useState(1);
+  const [dispatchPageSize, setDispatchPageSize] = useState(10);
   const [inventorySummary, setInventorySummary] = useState(null);
+
+  const paginatedDispatches = useMemo(() => {
+    const start = (dispatchPage - 1) * dispatchPageSize;
+    return dispatches.slice(start, start + dispatchPageSize);
+  }, [dispatches, dispatchPage, dispatchPageSize]);
+  const [activeTab, setActiveTab] = useState(
+    () => localStorage.getItem('oscar_pms_fabric_out_tab') || 'dispatch'
+  );
+
+  const handleTabChange = (tabId) => {
+    setActiveTab(tabId);
+    localStorage.setItem('oscar_pms_fabric_out_tab', tabId);
+  };
 
   // Dispatch Form
   const [oQuality, setOQuality] = useState('');
@@ -88,7 +106,11 @@ export default function FabricOutPage() {
   const handleRecordDispatch = async (e) => {
     e.preventDefault();
     if (!oMeters || Number(oMeters) <= 0) {
-      showToast('Please enter dispatch meters', 'warning');
+      showToast('Please enter dispatch meters (must be greater than 0)', 'warning');
+      return;
+    }
+    if (oTaka && Number(oTaka) <= 0) {
+      showToast('Taka count must be greater than 0', 'warning');
       return;
     }
 
@@ -133,29 +155,44 @@ export default function FabricOutPage() {
     }
   };
 
+  const tabs = [
+    {
+      id: 'dispatch',
+      label: 'Record Dispatch',
+      icon: Plus,
+    },
+    {
+      id: 'stock',
+      label: 'Fabric Stock & Mills',
+      icon: Layers,
+    },
+    {
+      id: 'history',
+      label: 'Dispatch Challans Log',
+      icon: Truck,
+    },
+    {
+      id: 'all',
+      label: 'Show All',
+      icon: LayoutGrid,
+    },
+  ];
+
   return (
-    <div className="pms-screen w-full space-y-3 sm:space-y-3.5">
+    <div className="pms-screen w-full space-y-6">
       <PageHeader
         title="Fabric Out & Dyeing Mill Dispatches"
         subtitle="Record fabric rolls (taka & meters) leaving the factory for dyeing mills, godowns or processing."
         actions={
           <div className="flex items-center gap-2">
-            <div className="h-[38px] flex items-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 shadow-2xs">
-              <Factory size={15} className="text-slate-400" />
-              <select
-                value={selectedFactoryId}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  setSelectedFactoryId(val);
-                  localStorage.setItem('oscar_pms_selected_factory', val);
-                }}
-                className="bg-transparent text-xs font-semibold text-slate-800 dark:text-slate-200 outline-none cursor-pointer"
-              >
-                {factories.map((f) => (
-                  <option key={f.id} value={f.id}>{f.name}</option>
-                ))}
-              </select>
-            </div>
+            <CompanySelector
+              factories={factories}
+              selectedFactoryId={selectedFactoryId}
+              onSelect={(val) => {
+                setSelectedFactoryId(val);
+                localStorage.setItem('oscar_pms_selected_factory', val);
+              }}
+            />
             <button
               type="button"
               onClick={fetchFactoryDispatches}
@@ -169,7 +206,37 @@ export default function FabricOutPage() {
         }
       />
 
-      {/* Record Dispatch Form */}
+      {/* Screen Section Switcher */}
+      <div className="flex flex-wrap items-center justify-between gap-2.5 pt-1">
+        <div className="inline-flex p-1 bg-slate-100 dark:bg-slate-800/80 border border-slate-200/90 dark:border-slate-700/80 rounded-xl shadow-2xs">
+          {tabs.map((tab) => {
+            const Icon = tab.icon;
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => handleTabChange(tab.id)}
+                className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                  isActive
+                    ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-xs'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
+                }`}
+              >
+                <Icon size={14} className={isActive ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400'} />
+                <span>{tab.label}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="text-xs text-slate-400 hidden sm:flex items-center gap-1.5">
+          <span>Active view: <b className="text-slate-700 dark:text-slate-300 font-semibold">{tabs.find((t) => t.id === activeTab)?.label}</b></span>
+        </div>
+      </div>
+
+      {/* Section 1: Record Dispatch Form */}
+      {(activeTab === 'dispatch' || activeTab === 'all') && (
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 sm:p-5 shadow-2xs space-y-3.5">
         <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 tracking-tight">
           Record Fabric Out Challan <span className="text-slate-400 font-normal text-xs">(Coordinator)</span>
@@ -200,9 +267,12 @@ export default function FabricOutPage() {
             <label className="pms-label">Taka (Rolls)</label>
             <input
               type="number"
+              min="1"
+              step="1"
               placeholder="e.g. 12"
               value={oTaka}
               onChange={(e) => setOTaka(e.target.value)}
+              onKeyDown={preventNegativeInput}
               className="pms-input w-full font-mono"
             />
           </div>
@@ -210,9 +280,12 @@ export default function FabricOutPage() {
             <label className="pms-label">Meters</label>
             <input
               type="number"
+              min="0.01"
+              step="any"
               placeholder="1440"
               value={oMeters}
               onChange={(e) => setOMeters(e.target.value)}
+              onKeyDown={preventNegativeInput}
               className="pms-input w-full font-mono"
               required
             />
@@ -257,17 +330,20 @@ export default function FabricOutPage() {
           </div>
         </form>
       </div>
+      )}
 
-      {/* 2 Column Ledger Tables */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4">
-        {/* Fabric Stock at Selected Factory */}
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm">
-          <div className="px-3.5 py-2.5 sm:px-4 sm:py-3 border-b border-slate-100 dark:border-slate-800">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
-              Grey Fabric at Factory by Quality
-            </h3>
-          </div>
-          <div className="pms-table-container">
+      {/* Section 2: Fabric Stock & Mills */}
+      {(activeTab === 'stock' || activeTab === 'all') && (
+      <div className="space-y-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4">
+          {/* Fabric Stock at Selected Factory */}
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm">
+            <div className="px-3.5 py-2.5 sm:px-4 sm:py-3 border-b border-slate-100 dark:border-slate-800">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+                Grey Fabric at Factory by Quality
+              </h3>
+            </div>
+            <div className="pms-table-container overflow-x-auto">
             <table className="w-full text-xs text-left pms-sticky-header">
               <thead className="bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-semibold border-b border-slate-200 dark:border-slate-700">
                 <tr>
@@ -309,7 +385,7 @@ export default function FabricOutPage() {
               Grey Fabric Lying at Dyeing Mills
             </h3>
           </div>
-          <div className="pms-table-container">
+          <div className="pms-table-container overflow-x-auto">
             <table className="w-full text-xs text-left pms-sticky-header">
               <thead className="bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-semibold border-b border-slate-200 dark:border-slate-700">
                 <tr>
@@ -358,15 +434,18 @@ export default function FabricOutPage() {
           Open Completion & Auto-PO
         </Button>
       </div>
+      </div>
+      )}
 
-      {/* Dispatches Log Table */}
+      {/* Section 3: Dispatches Log Table */}
+      {(activeTab === 'history' || activeTab === 'all') && (
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm">
         <div className="px-3.5 py-2.5 sm:px-4 sm:py-3 border-b border-slate-100 dark:border-slate-800">
           <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
             Dispatch Challans Log
           </h3>
         </div>
-        <div className="pms-table-container">
+        <div className="pms-table-container overflow-x-auto">
           <table className="w-full text-xs text-left pms-sticky-header">
             <thead className="bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-semibold border-b border-slate-200 dark:border-slate-700">
               <tr>
@@ -381,7 +460,7 @@ export default function FabricOutPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-              {dispatches.map((d) => (
+              {paginatedDispatches.map((d) => (
                 <tr key={d.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50">
                   <td className="py-2 px-2.5 sm:py-2.5 sm:px-3 text-slate-500">{d.date}</td>
                   <td className="py-2 px-2.5 sm:py-2.5 sm:px-3 font-semibold text-slate-800 dark:text-slate-200">{d.quality_name}</td>
@@ -401,10 +480,30 @@ export default function FabricOutPage() {
                   </td>
                 </tr>
               ))}
+              {!dispatches.length && (
+                <tr>
+                  <td colSpan={8} className="py-8 text-center text-slate-400">
+                    No dispatches logged yet.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
+
+        <TablePagination
+          total={dispatches.length}
+          page={dispatchPage}
+          pageSize={dispatchPageSize}
+          onPageChange={setDispatchPage}
+          onPageSizeChange={(newSize) => {
+            setDispatchPageSize(newSize);
+            setDispatchPage(1);
+          }}
+          pageSizeOptions={[10, 20, 50]}
+        />
       </div>
+      )}
 
       <ConfirmModal
         isOpen={Boolean(deleteConfirmId)}

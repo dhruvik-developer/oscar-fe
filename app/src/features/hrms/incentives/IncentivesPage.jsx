@@ -305,7 +305,7 @@ export default function IncentivesPage() {
   const skipped = quarterlyReport?.skipped || [];
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="flex flex-col gap-6 w-full pb-12">
       <PageHeader
         title="Salesperson Incentive Management"
         subtitle="Configure incentive schemes, calculate quarterly payouts net of returns, and control approve / hold / payout (Scope §12). Incentive is paid outside payroll."
@@ -593,7 +593,7 @@ export default function IncentivesPage() {
 
       {/* Calculate Quarterly Modal */}
       {isCalcModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="bg-card border border-border rounded-xl shadow-lg w-full max-w-md p-6 space-y-4">
             <h3 className="text-lg font-bold text-text">Calculate Quarterly Incentive</h3>
             <p className="text-sm text-muted">
@@ -649,7 +649,7 @@ export default function IncentivesPage() {
 
       {/* Hold Modal */}
       {isHoldModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="bg-card border border-border rounded-xl shadow-lg w-full max-w-md p-6 space-y-4">
             <h3 className="text-lg font-bold text-text text-red-600 flex items-center gap-2">
               <AlertCircle className="w-5 h-5" /> Hold Incentive Payout
@@ -691,7 +691,7 @@ export default function IncentivesPage() {
 
       {/* Scheme Modal */}
       {isSchemeModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="bg-card border border-border rounded-xl shadow-lg w-full max-w-xl p-6 space-y-4 max-h-[90vh] overflow-y-auto">
             <h3 className="text-lg font-bold text-text">{schemeForm.id ? "Edit Incentive Scheme" : "New Incentive Scheme"}</h3>
             <p className="text-sm text-muted">

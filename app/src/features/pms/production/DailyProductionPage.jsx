@@ -280,8 +280,8 @@ export default function DailyProductionPage() {
     const numQty = Number(formQty);
     if (!numQty || numQty <= 0 || isNaN(numQty)) {
       errors.qty = 'Produced quantity must be greater than 0.';
-    } else if (balanceQty > 0 && numQty > (balanceQty * 1.25)) {
-      errors.qty = `Produced quantity exceeds remaining balance (${balanceQty.toLocaleString('en-IN')} Mtr) by more than 25%.`;
+    } else if (balanceQty > 0 && numQty > balanceQty) {
+      errors.qty = `Produced quantity (${numQty.toLocaleString('en-IN')} Mtr) exceeds remaining balance (${balanceQty.toLocaleString('en-IN')} Mtr) for this instruction.`;
     }
 
     const numRej = Number(formRejected) || 0;
@@ -719,7 +719,7 @@ export default function DailyProductionPage() {
 
       {/* Add / Edit modal */}
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-2xs">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
           <div className="w-full max-w-xl rounded-xl bg-white shadow-2xl border border-slate-200 overflow-hidden">
             <div className="bg-slate-900 text-white px-5 py-3.5 flex items-center justify-between">
               <div className="flex items-center gap-2">

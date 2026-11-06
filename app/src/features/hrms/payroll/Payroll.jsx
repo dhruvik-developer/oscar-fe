@@ -42,7 +42,7 @@ import { hrmsGuides } from "../../../data/hrms/hrmsGuides";
 import { Avatar } from "../../../components/hrms/Avatar";
 
 /** Payslip statuses the server uses, in order. */
-const PAYSLIP_STAGES = WORKFLOW_STAGES.filter((s) => s.id !== "Ready for Review");
+const PAYSLIP_STAGES = WORKFLOW_STAGES;
 
 /** Day counts can be fractional (half days) — print `20` or `19.5`. */
 function fmtDays(n) {
@@ -135,7 +135,7 @@ function downloadPayslipPdf(p) {
   const allowances = Number(p.allowances || 0);
   const status = clean(p.status || "In Progress");
   const paidDate = clean(fmtDate(p.paymentDate) || "N/A");
-  const paidAmt = p.paidAmount !== null && p.paidAmount !== undefined ? Number(p.paidAmount) : remaining;
+  const paidAmt = p.paidAmount !== null && p.paidAmount !== undefined ? Number(p.paidAmount) : null;
   const inr = (n) => Math.round(n).toLocaleString("en-IN");
 
   const lines = [
@@ -180,7 +180,7 @@ function downloadPayslipPdf(p) {
     `(NET PAYABLE: INR ${inr(remaining)}) Tj`,
     "0 -24 Td",
     "/F1 10 Tf",
-    `(Payout Status: ${status}   |   Disbursed: INR ${status === "Paid" ? inr(paidAmt) : "0"}   |   Date: ${paidDate}) Tj`,
+    `(Payout Status: ${status}   |   Disbursed: ${status === "Paid" && paidAmt !== null ? inr(paidAmt) : "—"}   |   Date: ${paidDate}) Tj`,
     "0 -32 Td",
     "/F1 9 Tf",
     "(This is a computer-generated salary slip. Attendance and leave figures are taken from HRMS records.) Tj",
@@ -1849,7 +1849,7 @@ export default function Payroll() {
           MODAL 1: PAYSLIP DETAIL MODAL (FORMULA BREAKDOWN)
          ========================================================================= */}
       {selectedPayslip && (
-        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4">
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
           <div className="bg-white rounded-2xl border border-bdr shadow-xl w-full max-w-md p-4 sm:p-6 flex flex-col gap-4 animate-in fade-in zoom-in-95 max-h-[95vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-bdr/60 pb-3">
               <div className="flex items-center gap-3">
@@ -2011,7 +2011,7 @@ export default function Payroll() {
           MODAL 2: GENERATE PAYROLL FROM ATTENDANCE (CONFIRMATION)
          ========================================================================= */}
       {showGenerateModal && (
-        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4">
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
           <div className="bg-white rounded-2xl border border-bdr shadow-xl w-full max-w-md p-4 sm:p-6 flex flex-col gap-4 animate-in fade-in zoom-in-95 max-h-[95vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-bdr/60 pb-3">
               <h3 className="font-bold text-[16px] text-slate-900">
@@ -2089,7 +2089,7 @@ export default function Payroll() {
           (Number(editDeductions) || 0) -
           (Number(editAdvance) || 0);
         return (
-        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4">
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
           <form
             onSubmit={handleSaveParams}
             className="bg-white rounded-2xl border border-bdr shadow-xl w-full max-w-lg p-4 sm:p-6 flex flex-col gap-4 animate-in fade-in zoom-in-95 max-h-[95vh] sm:max-h-[90vh] overflow-y-auto"
@@ -2268,7 +2268,7 @@ export default function Payroll() {
           MODAL 4: ADD SALARY STRUCTURE MODAL
          ========================================================================= */}
       {showAddStructureModal && (
-        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4">
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
           <form
             onSubmit={handleAddStructureSubmit}
             className="bg-white rounded-2xl border border-bdr shadow-xl w-full max-w-md p-4 sm:p-6 flex flex-col gap-4 animate-in fade-in zoom-in-95 max-h-[95vh] overflow-y-auto"
@@ -2361,7 +2361,7 @@ export default function Payroll() {
         const targets = computedEmployeePayrolls.filter((p) => confirmBulk.ids.includes(p.id));
         const targetNet = targets.reduce((sum, p) => sum + (Number(p.remainingPayable) || 0), 0);
         return (
-        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4">
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
           <div className="bg-white rounded-2xl border border-bdr shadow-2xl w-full max-w-lg p-4 sm:p-6 flex flex-col gap-4 animate-in fade-in zoom-in-95 max-h-[95vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-bdr/60 pb-3">
               <div>
@@ -2449,7 +2449,7 @@ export default function Payroll() {
           MODAL 6: GENERATE PAYROLL SLIP (PDF)
          ========================================================================= */}
       {showGenerateSlipModal && (
-        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4">
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
           <div className="bg-white rounded-2xl border border-bdr shadow-2xl w-full max-w-xl p-4 sm:p-6 flex flex-col gap-4 animate-in fade-in zoom-in-95 max-h-[95vh] sm:max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-bdr/60 pb-3">
               <div className="flex items-center gap-2.5">

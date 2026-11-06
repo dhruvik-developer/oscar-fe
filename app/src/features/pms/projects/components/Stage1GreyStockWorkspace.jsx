@@ -1370,7 +1370,7 @@ export function Stage1GreyStockWorkspace({
       </div>
 
       {isDetailsOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="bg-white rounded-xl max-w-md w-full p-5 space-y-4 shadow-xl border border-slate-200">
             <div className="flex items-center justify-between border-b border-slate-100 pb-2">
               <h4 className="text-sm font-bold text-slate-800">Project Requirement Details</h4>
@@ -1414,7 +1414,7 @@ export function Stage1GreyStockWorkspace({
       )}
 
       {isPoModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="bg-white rounded-xl max-w-md w-full p-5 space-y-4 shadow-xl border border-slate-200">
             <div className="flex items-center justify-between border-b border-slate-100 pb-2">
               <div className="flex items-center gap-2 text-blue-600">
@@ -1501,7 +1501,7 @@ export function Stage1GreyStockWorkspace({
       )}
 
       {isProdModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="bg-white rounded-xl max-w-md w-full p-5 space-y-4 shadow-xl border border-slate-200">
             <div className="flex items-center justify-between border-b border-slate-100 pb-2">
               <div className="flex items-center gap-2 text-purple-600">

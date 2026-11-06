@@ -32,7 +32,7 @@ function numIN(val) {
  */
 export function VendorBillInlineSlide({
   po, instruction, onClose, onBillSaved, onNextStep, onPrevStep,
-  createOnly = false, billableLines = [], poSummary = null, vendor = null,
+  createOnly = false, billableLines = [], poSummary = null, vendor = null, billVendors = [],
 }) {
   const {
     formatDateDDMMYYYY,
@@ -49,6 +49,7 @@ export function VendorBillInlineSlide({
   const [poDetails, setPoDetails] = useState(null);
 
   const [vendorBillNumber, setVendorBillNumber] = useState('');
+  const [billVendorId, setBillVendorId] = useState('');
   const [billDate, setBillDate] = useState(() => (createOnly ? '' : new Date().toISOString().split('T')[0]));
   const [dueDate, setDueDate] = useState(() => {
     const d = new Date();
@@ -372,6 +373,7 @@ export function VendorBillInlineSlide({
     setErrorMsg('');
 
     const entered = formLines.filter((l) => Number(l.billingQty) > 0);
+    if (billVendors.length > 0 && !billVendorId) return setErrorMsg('Select who sent this bill.');
     if (!vendorBillNumber.trim()) return setErrorMsg('Enter the vendor invoice number.');
     if (!billDate) return setErrorMsg('Enter the invoice date.');
     if (gstPct === '') return setErrorMsg('Select the GST on this invoice.');
@@ -390,7 +392,7 @@ export function VendorBillInlineSlide({
       const savedVb = await api.post('/purchase/vendor-bills/', {
         vendorBillNumber: vendorBillNumber.trim(),
         billDate,
-        vendorId: vendor?.vendorId || undefined,
+        vendorId: billVendorId || vendor?.vendorId || undefined,
         purchaseOrderId: poId,
         grnId: grnIds.length === 1 ? grnIds[0] : undefined,
         gstPct: Number(gstPct),
@@ -444,7 +446,7 @@ export function VendorBillInlineSlide({
         createPayable: true,
       });
 
-      setSuccessMsg(`✓ Vendor Bill ${activeVendorBill.vendorBillNumber} approved! Payable created.`);
+      setSuccessMsg(`✓ Vendor Bill ${activeVendorBill.vendorBillNumber} approved! Payable created as per the Vendor Bill amount, not the PO amount.`);
       showToast?.('Vendor Bill approved successfully.', 'success');
       if (refreshCollections) {
         refreshCollections(['vendorBills', 'purchaseBills', 'purchaseOrders']);
@@ -503,7 +505,9 @@ export function VendorBillInlineSlide({
               Create Vendor Bill
             </h3>
             <p className="text-[11px] text-slate-500 mt-0.5">
-              Enter the vendor's invoice as received. Matching runs after the bill is saved.
+              {billVendors.length > 0
+                ? 'One bill for fabric and dyeing together: enter the combined rate of each batch.'
+                : "Enter the vendor's invoice as received. Matching runs after the bill is saved."}
             </p>
           </div>
           <button
@@ -539,6 +543,16 @@ export function VendorBillInlineSlide({
           <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-800 flex items-center gap-2">
             <AlertTriangle size={15} className="shrink-0 text-rose-600" />
             <span>{errorMsg}</span>
+          </div>
+        )}
+
+        {billVendors.length > 0 && (
+          <div className="sm:w-1/2">
+            <label htmlFor="bill-vendor" className="text-[11px] font-bold text-slate-600 block mb-1">Bill From (payment goes to this vendor) *</label>
+            <select id="bill-vendor" required value={billVendorId} onChange={(e) => setBillVendorId(e.target.value)} className={inputCls}>
+              <option value="">Select vendor...</option>
+              {billVendors.map((v) => <option key={v.id} value={v.id}>{v.name} ({v.role})</option>)}
+            </select>
           </div>
         )}
 
@@ -593,7 +607,7 @@ export function VendorBillInlineSlide({
                 <th className="py-2.5 px-3">Fabric</th>
                 <th className="py-2.5 px-3 text-right">Received</th>
                 <th className="py-2.5 px-3 text-right">Available</th>
-                <th className="py-2.5 px-3 text-right">PO Rate</th>
+                <th className="py-2.5 px-3 text-right">{billVendors.length > 0 ? 'PO Rate (Fabric + Dyeing)' : 'PO Rate'}</th>
                 <th className="py-2.5 px-3">Billed Qty</th>
                 <th className="py-2.5 px-3">Vendor Rate (₹)</th>
                 <th className="py-2.5 px-3 text-right">Amount</th>
@@ -962,7 +976,7 @@ export function VendorBillInlineSlide({
                     disabled={submitting}
                     className="px-3 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded text-xs font-bold cursor-pointer transition-colors shadow-2xs"
                   >
-                    Approve with Variance
+                    Approve Vendor Bill Amount
                   </button>
                 </div>
               )}

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import {
   AlarmClock,
   AlertTriangle,
@@ -30,6 +30,7 @@ import {
 import { useERP } from '../../context/ERPContext';
 import { useCrmNotificationDigest } from '../../hooks/useCrmNotificationDigest';
 import { useIdleReady } from '../../hooks/useIdleReady';
+import { useSharedPolling } from '../../hooks/usePolling';
 import {
   clearReadNotifications,
   dismissNotification,
@@ -202,57 +203,38 @@ function useErpAlerts() {
   }, [items, zoneRequests, deliveryChallans, invoices]);
 }
 
-/** Active alert incidents and their badge, refreshed every 30s and on navigation. */
+/** Active alert incidents. Loads once on open/acknowledge (no background poll). */
 function useActiveIncidents() {
-  const { pathname } = useLocation();
-  const [state, setState] = useState({ list: [], badge: 0, status: 'loading' });
+  const [state, setState] = useState({ list: [], badge: 0, status: 'idle' });
 
   const load = useCallback(async () => {
-    const [badgeRes, listRes] = await Promise.allSettled([
-      alertService.getIncidentBadge(),
-      alertService.getIncidents({ status: 'Active' }),
-    ]);
-    // `api.get` resolves with the response body itself.
-    setState((prev) => {
-      const next = { ...prev };
-      if (badgeRes.status === 'fulfilled') {
-        const c = badgeRes.value?.activeCount ?? badgeRes.value?.count ?? 0;
-        next.badge = Number(c) || 0;
-      }
-      if (listRes.status === 'fulfilled') {
-        const body = listRes.value;
-        const list = Array.isArray(body) ? body : body?.results || [];
-        next.list = Array.isArray(list) ? list : [];
-        next.status = 'ready';
-      } else {
-        next.status = 'error';
-      }
-      return next;
-    });
+    setState((prev) => ({ ...prev, status: prev.list.length ? prev.status : 'loading' }));
+    try {
+      const body = await alertService.getIncidents({ status: 'Active' });
+      const list = Array.isArray(body) ? body : body?.results || [];
+      const safe = Array.isArray(list) ? list : [];
+      setState({ list: safe, badge: safe.length, status: 'ready' });
+    } catch {
+      setState((prev) => ({ ...prev, status: 'error' }));
+    }
   }, []);
 
-  useEffect(() => {
-    let cancelled = false;
-    const tick = () => { if (!cancelled) load(); };
-    tick();
-    const timer = setInterval(tick, 30000);
-    return () => {
-      cancelled = true;
-      clearInterval(timer);
-    };
-  }, [pathname, load]);
-
+  // Acknowledge writes through immediately, then reloads so the panel stays in step.
   const acknowledge = useCallback(async (id) => {
     let removed;
     setState((prev) => {
       removed = prev.list.find((a) => a.id === id);
-      return { ...prev, list: prev.list.filter((a) => a.id !== id), badge: Math.max(0, prev.badge - 1) };
+      const next = prev.list.filter((a) => a.id !== id);
+      return { ...prev, list: next, badge: next.length };
     });
     try {
       await alertService.acknowledgeIncident(id);
       return true;
     } catch {
-      if (removed) setState((prev) => ({ ...prev, list: [removed, ...prev.list], badge: prev.badge + 1 }));
+      if (removed) setState((prev) => {
+        const next = [removed, ...prev.list];
+        return { ...prev, list: next, badge: next.length };
+      });
       return false;
     } finally {
       load();

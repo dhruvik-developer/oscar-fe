@@ -10,7 +10,6 @@ import {
   Truck,
   Receipt,
   CreditCard,
-  IndianRupee,
   Clock,
   Printer,
   Ban,
@@ -35,10 +34,8 @@ export function PoActionMenu({
   onBatchRegistry,
   onReceiveGoods,
   onPerformQc,
-  onSupplierDispatch,
   onPayVendorBill,
   onMatchVendorBill,
-  onViewLandedCosts,
   onMovementHistory,
   onPrint,
   onCancelPo,
@@ -119,9 +116,7 @@ export function PoActionMenu({
   const canEdit = isDraft;
   const canReceiveGoods = !isDraft && !isPendingApproval && !isCancelled && !isFullyReceived;
   const canPerformQc = !isDraft && !isPendingApproval && !isCancelled;
-  const canDispatch = !isDraft && !isPendingApproval && !isCancelled;
   // Factory -> OSCAR goes straight to GRN; only a mill PO has a dispatch to record.
-  const isMillFlow = po?.fabricFlow === 'FACTORY_TO_MILL';
   const canPayBill = !isDraft && !isCancelled && !isPoFullyPaid;
   const canMatchBill = canPayBill;
   const canDelete = isDraft;
@@ -232,27 +227,11 @@ export function PoActionMenu({
       >
         <span className="flex items-center gap-2">
           <PackageCheck size={13} className="text-emerald-600 shrink-0" />
-          <span>Receive Goods (GRN)</span>
+          <span>{po?.fabricFlow === 'OSCAR_TO_MILL' ? 'Receive Dyed Fabric' : 'Receive Goods (GRN)'}</span>
         </span>
         {isFullyReceived && <span className="text-[9.5px] text-emerald-700 font-semibold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">Received</span>}
         {isPartiallyReceived && <span className="text-[9.5px] text-amber-700 font-semibold bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">Partial</span>}
       </button>
-
-      {isMillFlow && <button
-        type="button"
-        role="menuitem"
-        disabled={!canDispatch}
-        onClick={() => handleAction(onSupplierDispatch)}
-        title={!canDispatch ? 'PO must be approved before logging dispatch' : 'Log vendor shipment / challan'}
-        className={`w-full px-3 py-1.5 text-left flex items-center gap-2 transition-colors ${
-          canDispatch
-            ? 'hover:bg-amber-50 hover:text-amber-700 cursor-pointer text-slate-700'
-            : 'opacity-40 cursor-not-allowed text-slate-400'
-        }`}
-      >
-        <Truck size={13} className="text-amber-600 shrink-0" />
-        <span>Supplier Dispatch</span>
-      </button>}
 
       <button
         type="button"
@@ -294,16 +273,6 @@ export function PoActionMenu({
       <div className="px-3 pt-1 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
         Cost &amp; Tracking
       </div>
-
-      <button
-        type="button"
-        role="menuitem"
-        onClick={() => handleAction(onViewLandedCosts)}
-        className="w-full px-3 py-1.5 text-left flex items-center gap-2 hover:bg-slate-50 hover:text-emerald-700 transition-colors cursor-pointer text-slate-700"
-      >
-        <IndianRupee size={13} className="text-emerald-600 shrink-0" />
-        <span>View Landed Costs</span>
-      </button>
 
       <button
         type="button"

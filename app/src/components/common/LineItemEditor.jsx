@@ -639,33 +639,21 @@ export const LineItemEditor = ({
                                 onChange={(e) => handleFieldChange(index, 'description', e.target.value)}
                                 className="w-full text-[11px] px-2.5 py-1 mt-1.5 rounded-md border border-border/70 bg-card text-text placeholder:text-muted focus:outline-none focus:border-primary transition"
                               />
-                                {/* Multi-Batch & Taka Allocation Status & Trigger */}
-                                {item.itemId && (
+                                {/* Multi-Batch & Taka Allocation Status (only when allocated) */}
+                                {item.itemId && Array.isArray(item.takaAllocations) && item.takaAllocations.length > 0 && (
                                   <div className="mt-1.5 flex items-center gap-1.5 flex-wrap">
-                                    {Array.isArray(item.takaAllocations) && item.takaAllocations.length > 0 ? (
-                                      <button
-                                        type="button"
-                                        onClick={() => openBatchAllocation(index)}
-                                        className="inline-flex items-center gap-1.5 px-2 py-0.5 text-[11px] font-bold rounded-md bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 transition cursor-pointer shadow-2xs"
-                                        title="Click to view or adjust multi-batch & taka allocations"
-                                      >
-                                        <Layers size={11} className="text-emerald-600" />
-                                        <span>
-                                          Allocated: {item.takaAllocations.reduce((sum, a) => sum + Number(a.qty || 0), 0)} {item.uom || stockUnit || 'Mtr'} (
-                                          {[...new Set(item.takaAllocations.map((a) => a.lotNo).filter(Boolean))].length || 1} {([...new Set(item.takaAllocations.map((a) => a.lotNo).filter(Boolean))].length || 1) === 1 ? 'Batch' : 'Batches'})
-                                        </span>
-                                      </button>
-                                    ) : (
-                                      <button
-                                        type="button"
-                                        onClick={() => openBatchAllocation(index)}
-                                        className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-bold rounded-md bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 border border-indigo-200 dark:border-indigo-800 transition cursor-pointer shadow-2xs"
-                                        title="Allocate across available inventory batches & takas"
-                                      >
-                                        <Layers size={11} className="text-indigo-600" />
-                                        <span>+ Pick Batches</span>
-                                      </button>
-                                    )}
+                                    <button
+                                      type="button"
+                                      onClick={() => openBatchAllocation(index)}
+                                      className="inline-flex items-center gap-1.5 px-2 py-0.5 text-[11px] font-bold rounded-md bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 transition cursor-pointer shadow-2xs"
+                                      title="Click to view or adjust multi-batch & taka allocations"
+                                    >
+                                      <Layers size={11} className="text-emerald-600" />
+                                      <span>
+                                        Allocated: {item.takaAllocations.reduce((sum, a) => sum + Number(a.qty || 0), 0)} {item.uom || stockUnit || 'Mtr'} (
+                                        {[...new Set(item.takaAllocations.map((a) => a.lotNo).filter(Boolean))].length || 1} {([...new Set(item.takaAllocations.map((a) => a.lotNo).filter(Boolean))].length || 1) === 1 ? 'Batch' : 'Batches'})
+                                      </span>
+                                    </button>
                                   </div>
                                 )}
                             </div>

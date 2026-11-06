@@ -27,6 +27,29 @@ import KpiCard from '../../../components/ui/KpiCard';
 import { useTableSort } from '../../../hooks/useTableSort';
 import SortableTh from '../../../components/ui/SortableTh';
 
+/** The API's names -> the names this screen reads. */
+const sampleFromApi = (s) => ({
+  ...s,
+  sample_number: s.sampleNumber,
+  issue_date: s.sampleDate,
+  party_name: s.partyName,
+  salesperson_name: s.salespersonName,
+  broker_name: s.brokerName,
+  sample_type: s.sampleType,
+  due_date: s.dueDate,
+  quantity: Number(s.quantity) || 0,
+  returned_quantity: Number(s.returnedQuantity) || 0,
+  outstanding: (Number(s.quantity) || 0) - (Number(s.returnedQuantity) || 0) - (Number(s.consumedQuantity) || 0),
+});
+
+const dashboardFromApi = (d) => (d ? {
+  ...d,
+  activeSamplesCount: (d.totalIssued || 0) - (d.returnedCount || 0) - (d.consumedCount || 0),
+  activeMeters: (Number(d.totalMetersIssued) || 0) - (Number(d.totalMetersReturned) || 0) - (Number(d.totalMetersConsumed) || 0),
+  totalExpense: Number(d.totalConsumedExpense) || 0,
+  consumedMeters: Number(d.totalMetersConsumed) || 0,
+} : null);
+
 export default function SampleListPage() {
   const [samples, setSamples] = useState([]);
   const [dashboard, setDashboard] = useState(null);
@@ -72,8 +95,8 @@ export default function SampleListPage() {
         inventoryService.getSampleDashboard(),
       ]);
       const data = samplesRes?.data || samplesRes?.results || samplesRes || [];
-      setSamples(Array.isArray(data) ? data : []);
-      setDashboard(dashRes?.data || dashRes || null);
+      setSamples(Array.isArray(data) ? data.map(sampleFromApi) : []);
+      setDashboard(dashboardFromApi(dashRes?.data || dashRes));
     } catch (err) {
       console.error('Failed to load samples:', err);
     } finally {
@@ -369,7 +392,7 @@ export default function SampleListPage() {
                           <button
                             onClick={() => {
                               setActiveSample(s);
-                              setReturnQty(String(s.quantity - (s.returned_quantity || 0)));
+                              setReturnQty(String(s.outstanding));
                               setShowReturnModal(true);
                             }}
                             className="px-2.5 py-1 text-xs font-medium text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded border border-emerald-200 transition-colors"
@@ -379,7 +402,7 @@ export default function SampleListPage() {
                           <button
                             onClick={() => {
                               setActiveSample(s);
-                              setConsumeQty(String(s.quantity - (s.returned_quantity || 0)));
+                              setConsumeQty(String(s.outstanding));
                               setShowConsumeModal(true);
                             }}
                             className="px-2.5 py-1 text-xs font-medium text-purple-700 bg-purple-50 hover:bg-purple-100 rounded border border-purple-200 transition-colors"

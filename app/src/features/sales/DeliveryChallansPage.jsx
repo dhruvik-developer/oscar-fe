@@ -433,24 +433,6 @@ export const DeliveryChallansPage = () => {
                 >
                   <Printer size={13}/>
                 </button>
-                {c.status !== 'Cancelled' && (
-                  <button
-                    onClick={() => setSendModalChallan(c)}
-                    className="p-1 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded text-xs flex items-center gap-1 cursor-pointer"
-                    title="Send Waybill & Warranty Card"
-                  >
-                    <Send size={13}/>
-                  </button>
-                )}
-                {c.status !== 'Cancelled' && !challanHasInvoice(c) && (
-                  <button
-                    onClick={() => handleConvertToInvoice(c)}
-                    className="p-1 text-emerald-600 hover:text-emerald-800 hover:bg-emerald-50 rounded text-xs flex items-center gap-1 cursor-pointer"
-                    title="Convert to Sales Invoice"
-                  >
-                    <FileText size={13}/>
-                  </button>
-                )}
                 {c.status === 'Draft' && <Button size="sm" onClick={() => prepareDraftDispatch(c)}>Prepare Dispatch</Button>}
                 {c.status !== 'Draft' && c.status !== 'Delivered' && c.status !== 'Cancelled' && (
                   <button
@@ -754,14 +736,6 @@ export const DeliveryChallansPage = () => {
                 <StatusBadge status={selectedChallan.status}/>
               </div>
               <div className="flex flex-wrap lg:flex-nowrap items-center gap-2">
-                {selectedChallan.status !== 'Cancelled' && (
-                  <button
-                    onClick={() => setSendModalChallan(selectedChallan)}
-                    className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold cursor-pointer flex items-center gap-1.5 shadow-2xs text-xs"
-                  >
-                    <Send size={13}/> Send Waybill & Card
-                  </button>
-                )}
                 {selectedChallan.status !== 'Cancelled' && !challanHasInvoice(selectedChallan) && (
                   <button
                     onClick={() => handleConvertToInvoice(selectedChallan)}

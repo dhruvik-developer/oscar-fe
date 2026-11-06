@@ -13,7 +13,6 @@ import {
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { toISODate } from '../../utils/dateUtils';
 import { DocumentTimeline } from '../../components/common/DocumentTimeline';
-import { SupplierDeliveryInlineSlide } from './SupplierDeliveryInlineSlide';
 import { GoodsReceiptInlineSlide } from './GoodsReceiptInlineSlide';
 import { LotTakaInlineSlide } from './LotTakaInlineSlide';
 import { GreyQcInlineSlide } from './GreyQcInlineSlide';
@@ -42,13 +41,13 @@ import useUnits from '../../hooks/useUnits';
 import { formatQty, formatUnitTotals, sumByUnit, unitKey, resolveUnit } from '../../utils/uom';
 import {
   FabricFlowCards, FabricFlowSteps, YarnLinesEditor, OpeningCostsEditor, fabricFlowPayload, flowLabel,
-  FABRIC_FLOW_B,
+  FABRIC_FLOW_B, FABRIC_FLOW_C,
 } from './FabricFlowForm';
+import { DyeingOrderLines, ReceiveDyedFabricDrawer } from './PoDyeingPanel';
 import DyeingColourField, { ColourChip } from './DyeingColourField';
 import { PoFabricFlowPanel } from './PoFabricFlowPanel';
 import { PoActionMenu } from './PoActionMenu';
 import { PoDetailsModal } from './PoDetailsModal';
-import { PoLandedCostsModal } from './PoLandedCostsModal';
 import { PoMovementHistoryModal } from './PoMovementHistoryModal';
 import { PoDeleteConfirmModal } from './PoDeleteConfirmModal';
 
@@ -291,6 +290,7 @@ export const PurchaseOrdersPage = () => {
     const [printPoTarget, setPrintPoTarget] = useState(null);
     const [editingPo, setEditingPo] = useState(null);
     const [actionMenuTarget, setActionMenuTarget] = useState(null);
+    const [dyeingPo, setDyeingPo] = useState(null);
     const [expandedPoId, setExpandedPoId] = useState(null);
     const [expandedBatches, setExpandedBatches] = useState([]);
     const [expandedPoGroup, setExpandedPoGroup] = useState(null);
@@ -300,9 +300,7 @@ export const PurchaseOrdersPage = () => {
     const [detailsModalPo, setDetailsModalPo] = useState(null);
     const [grnModalPo, setGrnModalPo] = useState(null);
     const [qcModalPo, setQcModalPo] = useState(null);
-    const [dispatchModalPo, setDispatchModalPo] = useState(null);
     const [billMatchModalPo, setBillMatchModalPo] = useState(null);
-    const [landedCostPo, setLandedCostPo] = useState(null);
     const [movementHistoryPo, setMovementHistoryPo] = useState(null);
     const [deleteConfirmPo, setDeleteConfirmPo] = useState(null);
     const [selectedVendorId, setSelectedVendorId] = useState(vendors[0]?.id || '');
@@ -316,10 +314,29 @@ export const PurchaseOrdersPage = () => {
     const [fabricFlow, setFabricFlow] = useState('');
     const [dyeingMillId, setDyeingMillId] = useState('');
     const [dyeingColour, setDyeingColour] = useState({ name: '', hex: '' });
+    const [dyeingRate, setDyeingRate] = useState('');
+    // Flow 2: the grey PO this dyeing order draws on, and the batches kept.
+    const [greySources, setGreySources] = useState([]);
+    const [sourcePoId, setSourcePoId] = useState('');
+    const [dyeBatches, setDyeBatches] = useState([]);
+    const loadGreyBatches = async (poId, saved = null) => {
+        setSourcePoId(poId);
+        setDyeBatches([]);
+        if (!poId) return;
+        try {
+            const res = await api.get(`/purchase/orders/${poId}/grey-batches/`);
+            const rows = (res?.results || []).map((b) => ({ ...b, qty: Number(b.availableToSend) }));
+            setDyeBatches(saved
+                ? rows.filter((b) => saved.some((x) => x.batchId === b.batchId)).map((b) => ({ ...b, qty: Number(saved.find((x) => x.batchId === b.batchId).qty) }))
+                : rows);
+        } catch (err) {
+            alert(err?.message || 'Could not load the batches of this PO.');
+        }
+    };
     const [yarnRows, setYarnRows] = useState([]);
     const [costRows, setCostRows] = useState([]);
-    const resetFabricFlow = () => { setFabricFlow(''); setDyeingMillId(''); setDyeingColour({ name: '', hex: '' }); setYarnRows([]); setCostRows([]); };
-    const chooseFabricFlow = (flow) => { setFabricFlow(flow); setPurchaseType(PURCHASE_TYPE_GREY); if (flow !== FABRIC_FLOW_B) { setDyeingMillId(''); setDyeingColour({ name: '', hex: '' }); } };
+    const resetFabricFlow = () => { setFabricFlow(''); setDyeingMillId(''); setDyeingColour({ name: '', hex: '' }); setDyeingRate(''); setSourcePoId(''); setDyeBatches([]); setYarnRows([]); setCostRows([]); };
+    const chooseFabricFlow = (flow) => { setFabricFlow(flow); setPurchaseType(PURCHASE_TYPE_GREY); if (flow !== FABRIC_FLOW_B) { setDyeingMillId(''); setDyeingRate(''); } if (flow !== FABRIC_FLOW_B && flow !== FABRIC_FLOW_C) setDyeingColour({ name: '', hex: '' }); if (flow !== FABRIC_FLOW_C) { setSourcePoId(''); setDyeBatches([]); } };
     // Used by the "Other purchase types" cards, hidden for now in the Create PO form.
     // const choosePurchaseType = (type) => { setPurchaseType(type); setFabricFlow(''); setDyeingMillId(''); };
     // Project association is separate from purchase type: a ready grey stock
@@ -475,6 +492,11 @@ export const PurchaseOrdersPage = () => {
             setFabricFlow(po.fabricFlow);
             setDyeingMillId(po.dyeingMillId || '');
             setDyeingColour({ name: po.dyeingColourName || '', hex: po.dyeingColourHex || '' });
+            setDyeingRate(po.dyeingRate ?? '');
+            if (po.fabricFlow === FABRIC_FLOW_C) {
+                setDyeingRate((po.items || po.lineItems || [])[0]?.rate ?? '');
+                loadGreyBatches(po.sourcePurchaseOrderId || '', po.dyeingBatches);
+            }
             setYarnRows(po.yarnLines || po.yarnRows || []);
             setCostRows(po.expenses || po.costRows || []);
         }
@@ -483,6 +505,11 @@ export const PurchaseOrdersPage = () => {
         setIsFullscreen(false);
         setShowAddModal(true);
     };
+
+    React.useEffect(() => {
+        if (fabricFlow !== FABRIC_FLOW_C) return;
+        api.get('/purchase/orders/grey-sources/').then((res) => setGreySources(res?.results || [])).catch(() => setGreySources([]));
+    }, [fabricFlow]);
 
     // Projects for the optional association, read when the form opens.
     React.useEffect(() => {
@@ -553,22 +580,39 @@ export const PurchaseOrdersPage = () => {
         const clonedType = purchaseTypeOf(po);
         setPurchaseType(clonedType === PURCHASE_TYPE_FINAL_JW ? '' : clonedType);
         resetFabricFlow();
-        if (po.fabricFlow) { setFabricFlow(po.fabricFlow); setDyeingMillId(po.dyeingMillId || ''); setDyeingColour({ name: po.dyeingColourName || '', hex: po.dyeingColourHex || '' }); }
+        if (po.fabricFlow) { setFabricFlow(po.fabricFlow); setDyeingMillId(po.dyeingMillId || ''); setDyeingColour({ name: po.dyeingColourName || '', hex: po.dyeingColourHex || '' }); setDyeingRate(po.dyeingRate ?? ''); }
         setProjectMode(po.projectId ? 'project' : 'general');
         setProjectId(po.projectId || '');
         setIsFullscreen(false);
         setShowAddModal(true);
     };
+    // The PO total stays what the factory is owed; dyeing is the mill's, shown beside it.
+    const orderLines = fabricFlow === FABRIC_FLOW_C
+        ? dyeBatches.map((b) => ({ batchId: b.batchId, itemId: b.itemId, qty: b.qty, rate: dyeingRate, uom: b.uom || 'Mtr' }))
+        : lineItems;
+    const fabricAmount = orderLines.reduce((sum, it) => sum + ((Number(it.qty) || 0) * (Number(it.rate) || 0)), 0);
+    const orderedQty = orderLines.reduce((sum, it) => sum + (Number(it.qty) || 0), 0);
+    const dyeingEstimate = fabricFlow === FABRIC_FLOW_B ? orderedQty * (Number(dyeingRate) || 0) : 0;
     const [saving, setSaving] = useState(false);
     const handleCreate = async (e) => {
         e.preventDefault();
-        const validLines = lineItems.filter((it) => it.itemId && Number(it.qty) > 0 && Number(it.rate) > 0);
+        const validLines = orderLines.filter((it) => it.itemId && Number(it.qty) > 0 && Number(it.rate) > 0);
+        if (fabricFlow === FABRIC_FLOW_C) {
+            if (!sourcePoId) { alert('Select the grey fabric PO.'); return; }
+            if (!(Number(dyeingRate) > 0)) { alert('Enter the Dyeing Rate.'); return; }
+            const over = dyeBatches.find((b) => Number(b.qty) > Number(b.availableToSend));
+            if (over) { alert(`${over.batchCode} has only ${over.availableToSend} available.`); return; }
+            if (dyeBatches.some((b) => !(Number(b.qty) > 0))) { alert('Enter the quantity of every batch, or remove it.'); return; }
+        }
         if (!purchaseType && !fabricFlow) { alert('Select how the fabric reaches OSCAR.'); return; }
         let flowExtras = {};
         if (fabricFlow) {
-            const built = fabricFlowPayload({ flow: fabricFlow, dyeingMillId, dyeingColourName: dyeingColour.name, dyeingColourHex: dyeingColour.hex, yarnRows, costRows });
+            const built = fabricFlowPayload({ flow: fabricFlow, dyeingMillId, dyeingColourName: dyeingColour.name, dyeingColourHex: dyeingColour.hex, dyeingRate, yarnRows, costRows });
             if (built.error) { alert(built.error); return; }
             flowExtras = built.payload;
+            if (fabricFlow === FABRIC_FLOW_C) {
+                flowExtras = { ...flowExtras, sourcePurchaseOrderId: sourcePoId, dyeingBatches: validLines.map((it) => ({ batchId: it.batchId })) };
+            }
         }
         if (projectMode === 'project' && !projectId) { alert('Select the project, or choose General Stock.'); return; }
         if (!selectedVendorId) { alert('Vendor is required.'); return; }
@@ -1358,10 +1402,13 @@ export const PurchaseOrdersPage = () => {
                     <div className="mt-2 flex flex-wrap items-center gap-1.5">
                       {(p.fabricFlow || purchaseTypeOf(p) === PURCHASE_TYPE_GREY) && (
                         <span className="inline-flex items-center rounded-md border border-teal-200 bg-teal-50 px-1.5 py-0.5 text-[9px] font-bold text-teal-700">
-                          {p.fabricFlow === FABRIC_FLOW_B ? 'Factory → Mill → OSCAR' : 'Factory → OSCAR'}
+                          {p.fabricFlow === FABRIC_FLOW_B ? 'Factory → Mill → OSCAR' : p.fabricFlow === FABRIC_FLOW_C ? 'OSCAR → Mill → OSCAR' : 'Factory → OSCAR'}
                         </span>
                       )}
-                      {p.fabricFlow === FABRIC_FLOW_B && <ColourChip name={p.dyeingColourName} hex={p.dyeingColourHex} className="text-[9px]" />}
+                      {(p.fabricFlow === FABRIC_FLOW_B || p.fabricFlow === FABRIC_FLOW_C) && <ColourChip name={p.dyeingColourName} hex={p.dyeingColourHex} className="text-[9px]" />}
+                      {p.fabricFlow === FABRIC_FLOW_B && Number(p.dyeingRate) > 0 && (
+                        <span className="inline-flex items-center rounded-md border border-violet-200 bg-violet-50 px-1.5 py-0.5 text-[9px] font-bold text-violet-700">Dyeing ₹{Number(p.dyeingRate)}/unit</span>
+                      )}
                       <span className={`inline-flex items-center rounded-md border px-1.5 py-0.5 text-[9px] font-bold ${TYPE_BADGE[purchaseTypeOf(p)]?.cls || TYPE_BADGE[PURCHASE_TYPE_GREY].cls}`}>
                         {TYPE_BADGE[purchaseTypeOf(p)]?.label || purchaseTypeOf(p)}
                       </span>
@@ -1637,10 +1684,10 @@ export const PurchaseOrdersPage = () => {
                                           type="button"
                                           onClick={openBatch}
                                           className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1 text-[9.5px] font-semibold text-slate-700 shadow-2xs transition-all hover:border-blue-300 hover:bg-blue-50/70 hover:text-blue-700 active:scale-95 cursor-pointer"
-                                          title={`Open 360° traceability view for ${batch.batchCode}`}
+                                          title={`Show QR code of ${batch.batchCode}`}
                                         >
                                           <Eye size={10.5} className="text-slate-400" />
-                                          <span>Batch 360°</span>
+                                          <span>QR Code</span>
                                         </button>
 
                                         {hasReprocess ? (
@@ -1894,7 +1941,7 @@ export const PurchaseOrdersPage = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <div className="flex items-center justify-between mb-1">
-                    <label className="block font-semibold text-slate-700">{fabricFlow === FABRIC_FLOW_B ? 'Grey Fabric Vendor (Factory) *' : fabricFlow ? 'Factory / Vendor *' : 'Vendor / Supplier *'}</label>
+                    <label className="block font-semibold text-slate-700">{fabricFlow === FABRIC_FLOW_C ? 'Dyeing Mill (Vendor) *' : fabricFlow === FABRIC_FLOW_B ? 'Grey Fabric Vendor (Factory) *' : fabricFlow ? 'Factory / Vendor *' : 'Vendor / Supplier *'}</label>
                     <MasterSourceLink source="vendors" />
                   </div>
                   <select value={selectedVendorId} onChange={(e) => { setSelectedVendorId(e.target.value); if (e.target.value === dyeingMillId) setDyeingMillId(''); }} className="w-full border border-slate-300 rounded-lg p-2 bg-white text-slate-800 font-medium">
@@ -1915,6 +1962,9 @@ export const PurchaseOrdersPage = () => {
                       {vendors.filter((v) => v.id !== selectedVendorId).map((v) => <option key={v.id} value={v.id}>{v.name}{v.code ? ` (${v.code})` : ''}</option>)}
                     </select>
                     <VendorInfoCard vendor={vendors.find(v => v.id === dyeingMillId)} />
+                    <label className="block font-semibold text-slate-700 mt-2 mb-1" htmlFor="po-dyeing-rate">Dyeing Rate (₹ / unit) *</label>
+                    <input id="po-dyeing-rate" type="number" min="0" step="0.01" value={dyeingRate} onChange={(e) => setDyeingRate(e.target.value)} placeholder="e.g. 15" className="w-full border border-slate-300 rounded-lg p-1.5 bg-white text-slate-800" />
+                    <p className="mt-1 text-[10.5px] text-slate-500">Agreed charge. The vendor bill's rate is matched against fabric rate + this rate.</p>
                     <p className="mt-1 text-[10.5px] text-slate-500">The factory sends the grey fabric straight to this mill. It is tracked on the PO but never becomes OSCAR grey stock; OSCAR stock starts when the dyed fabric arrives.</p>
                   </div>
                 )}
@@ -1932,6 +1982,9 @@ export const PurchaseOrdersPage = () => {
                   <input type="date" required value={expectedDate} onChange={(e) => setExpectedDate(e.target.value)} className="w-full border border-slate-300 rounded-lg p-2 bg-white text-slate-800"/>
                 </div>
               </div>
+              {fabricFlow === FABRIC_FLOW_C ? (
+                <DyeingOrderLines sources={greySources} sourcePoId={sourcePoId} onSource={(id) => loadGreyBatches(id)} rows={dyeBatches} onRows={setDyeBatches} rate={dyeingRate} onRate={setDyeingRate} />
+              ) : (
               <div>
                 <label className="font-semibold text-slate-700 block mb-2">PO Item — Grey Fabric</label>
                 <div className="border border-slate-200 rounded-xl overflow-x-auto">
@@ -2002,10 +2055,11 @@ export const PurchaseOrdersPage = () => {
                 </div>
                 <button type="button" onClick={addBlankLine} className="mt-2 inline-flex items-center gap-1 text-[12px] font-semibold text-blue-600 hover:underline"><Plus size={13}/> Add Fabric Line</button>
               </div>
+              )}
 
-              {fabricFlow === FABRIC_FLOW_B && <DyeingColourField name={dyeingColour.name} hex={dyeingColour.hex} onChange={setDyeingColour} />}
+              {(fabricFlow === FABRIC_FLOW_B || fabricFlow === FABRIC_FLOW_C) && <DyeingColourField name={dyeingColour.name} hex={dyeingColour.hex} onChange={setDyeingColour} />}
 
-              {fabricFlow && (
+              {fabricFlow && fabricFlow !== FABRIC_FLOW_C && (
                 <div>
                   <label className="font-semibold text-slate-700 block mb-2">Yarn Details <span className="font-normal text-slate-400">(optional)</span></label>
                   <YarnLinesEditor
@@ -2018,7 +2072,7 @@ export const PurchaseOrdersPage = () => {
                 </div>
               )}
 
-              {fabricFlow && (
+              {fabricFlow && fabricFlow !== FABRIC_FLOW_C && (
                 <div>
                   <label className="font-semibold text-slate-700 block mb-2">Costs &amp; Expenses <span className="font-normal text-slate-400">(optional now — add or update on the PO later)</span></label>
                   <OpeningCostsEditor rows={costRows} onChange={setCostRows} flow={fabricFlow} formatCurrency={formatCurrency} />
@@ -2037,15 +2091,28 @@ export const PurchaseOrdersPage = () => {
                     <h4 className="text-[12px] font-extrabold text-[#17294e] uppercase tracking-wide">Order Summary</h4>
                     <div className="flex items-center justify-between text-[12px]">
                       <span className="text-slate-500 font-medium">Total Quantity</span>
-                      <strong className="font-mono text-slate-900">{formatUnitTotals(sumByUnit(lineItems.filter((it) => Number(it.qty) > 0), { uom: (it) => it.uom || 'Mtr', units }), { units })}</strong>
+                      <strong className="font-mono text-slate-900">{formatUnitTotals(sumByUnit(orderLines.filter((it) => Number(it.qty) > 0), { uom: (it) => it.uom || 'Mtr', units }), { units })}</strong>
                     </div>
                     <div className="flex items-center justify-between text-[12px]">
-                      <span className="text-slate-500 font-medium">Total Amount (₹)</span>
-                      <strong className="font-mono text-slate-900">{formatCurrency(lineItems.reduce((s, it) => s + ((Number(it.qty) || 0) * (Number(it.rate) || 0)), 0))}</strong>
+                      <span className="text-slate-500 font-medium">{fabricFlow === FABRIC_FLOW_B ? 'Fabric Amount (Factory)' : 'Total Amount (₹)'}</span>
+                      <strong className="font-mono text-slate-900">{formatCurrency(fabricAmount)}</strong>
                     </div>
+                    {fabricFlow === FABRIC_FLOW_B && (
+                      <>
+                        <div className="flex items-center justify-between text-[12px]">
+                          <span className="text-slate-500 font-medium">Dyeing Estimate (Mill) <span className="font-mono text-[10.5px]">{orderedQty} × ₹{Number(dyeingRate) || 0}</span></span>
+                          <strong className="font-mono text-slate-900">{formatCurrency(dyeingEstimate)}</strong>
+                        </div>
+                        <div className="flex items-center justify-between text-[12px] border-t border-slate-200 pt-2">
+                          <span className="font-bold text-slate-700">Total Order Cost</span>
+                          <strong className="font-mono text-slate-900">{formatCurrency(fabricAmount + dyeingEstimate)}</strong>
+                        </div>
+                        <p className="text-[10.5px] text-slate-500">One vendor bill covers fabric and dyeing together; the actual charge comes from that bill.</p>
+                      </>
+                    )}
                     <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-2.5 mt-1">
                       <p className="text-[10px] font-bold text-emerald-700 uppercase tracking-wide">Amount in Words</p>
-                      <p className="text-[12px] font-semibold text-emerald-800 mt-0.5">{amountInWords(lineItems.reduce((s, it) => s + ((Number(it.qty) || 0) * (Number(it.rate) || 0)), 0))}</p>
+                      <p className="text-[12px] font-semibold text-emerald-800 mt-0.5">{amountInWords(fabricAmount + dyeingEstimate)}</p>
                     </div>
                   </div>
                 </div>
@@ -2079,13 +2146,12 @@ export const PurchaseOrdersPage = () => {
               showToast('All ordered quantity has already been received for this purchase order.');
               return;
             }
+            if (po.fabricFlow === FABRIC_FLOW_C) { setDyeingPo(po); return; }
             setGrnModalPo(po);
           }}
           onPerformQc={(po) => setQcModalPo(po)}
-          onSupplierDispatch={(po) => setDispatchModalPo(po)}
           onPayVendorBill={(po) => setBillMatchModalPo(po)}
           onMatchVendorBill={(po) => setBillMatchModalPo(po)}
-          onViewLandedCosts={(po) => setLandedCostPo(po)}
           onMovementHistory={(po) => setMovementHistoryPo(po)}
           onPrint={(po) => setPrintPoTarget(po)}
           onCancelPo={(po) => {
@@ -2148,23 +2214,7 @@ export const PurchaseOrdersPage = () => {
         </div>
       )}
 
-      {/* ── Supplier Dispatch Compact Modal ── */}
-      {dispatchModalPo && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-2 sm:p-4 animate-in fade-in">
-          <div className="bg-white border border-slate-200 shadow-2xl rounded-2xl w-full max-w-5xl max-h-[95vh] sm:max-h-[92vh] overflow-y-auto flex flex-col p-4 sm:p-6 text-xs">
-            <SupplierDeliveryInlineSlide
-              po={dispatchModalPo}
-              onClose={() => setDispatchModalPo(null)}
-              onDeliverySaved={() => {
-                setDispatchModalPo(null);
-                if (typeof refreshCollections === 'function') {
-                  refreshCollections(['purchaseOrders']);
-                }
-              }}
-            />
-          </div>
-        </div>
-      )}
+      {dyeingPo && <ReceiveDyedFabricDrawer po={dyeingPo} onClose={() => setDyeingPo(null)} onSaved={() => refreshCollections?.(['purchaseOrders'])} />}
 
       {/* ── Pay Vendor Bill Modal Workspace ── */}
       {billMatchModalPo && (
@@ -2179,20 +2229,13 @@ export const PurchaseOrdersPage = () => {
         />
       )}
 
-      {/* ── View Landed Costs Modal ── */}
-      {landedCostPo && (
-        <PoLandedCostsModal
-          po={landedCostPo}
-          formatCurrency={formatCurrency}
-          onClose={() => setLandedCostPo(null)}
-        />
-      )}
-
       {/* ── Movement History Modal ── */}
       {movementHistoryPo && (
         <PoMovementHistoryModal
           po={movementHistoryPo}
           formatDateDDMMYYYY={formatDateDDMMYYYY}
+          isFullyPaid={getPoPaymentStatus(movementHistoryPo).isFullyPaid}
+          isPartiallyPaid={getPoPaymentStatus(movementHistoryPo).isPartiallyPaid}
           onClose={() => setMovementHistoryPo(null)}
         />
       )}

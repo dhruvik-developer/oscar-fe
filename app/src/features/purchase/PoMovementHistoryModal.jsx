@@ -13,15 +13,22 @@ import {
   Warehouse,
 } from 'lucide-react';
 import { api } from '../../services/api';
+import { useERP } from '../../context/ERPContext';
 
 export function PoMovementHistoryModal({
   po,
-  formatDateDDMMYYYY,
+  formatDateDDMMYYYY = (d) => d || '',
+  isFullyPaid: isFullyPaidProp,
+  isPartiallyPaid: isPartiallyPaidProp,
   onClose,
 }) {
+  const erp = useERP?.() || {};
+  const { vendorBills = [], purchaseBills = [] } = erp;
+
   const [loading, setLoading] = useState(false);
   const [grns, setGrns] = useState([]);
   const [deliveries, setDeliveries] = useState([]);
+  const [poDetails, setPoDetails] = useState(null);
 
   useEffect(() => {
     if (!po?.id) return;
@@ -31,7 +38,8 @@ export function PoMovementHistoryModal({
     Promise.allSettled([
       api.get('/purchase/receipts/', { params: { purchaseOrderId: po.id } }),
       api.get('/purchase/deliveries/', { params: { purchaseOrderId: po.id } }),
-    ]).then(([grnRes, delRes]) => {
+      api.get(`/purchase/vendor-bills/po-details/?poId=${po.id}`),
+    ]).then(([grnRes, delRes, poDetailsRes]) => {
       if (cancelled) return;
       if (grnRes.status === 'fulfilled') {
         const rows = Array.isArray(grnRes.value) ? grnRes.value : (grnRes.value?.results || grnRes.value?.data || []);
@@ -40,6 +48,10 @@ export function PoMovementHistoryModal({
       if (delRes.status === 'fulfilled') {
         const rows = Array.isArray(delRes.value) ? delRes.value : (delRes.value?.results || delRes.value?.data || []);
         setDeliveries(rows);
+      }
+      if (poDetailsRes.status === 'fulfilled') {
+        const data = poDetailsRes.value?.data || poDetailsRes.value;
+        setPoDetails(data);
       }
       setLoading(false);
     });
@@ -58,9 +70,73 @@ export function PoMovementHistoryModal({
   const hasReceipts = grns.length > 0 || receivedQty > 0;
   const isApproved = !['Draft', 'Pending Approval'].includes(po.status);
   const isFullyReceived = po.status === 'Fully Received' || (orderedQty > 0 && receivedQty >= orderedQty);
+
   // Factory -> OSCAR goes straight to GRN; dispatch is a step only on a mill PO,
   // or where one was already recorded.
-  const showDispatch = po.fabricFlow === 'FACTORY_TO_MILL' || hasDispatches;
+  const showDispatch = hasDispatches;
+
+  // ── Billing & Payment matching ──
+  const poId = po.id;
+  const poNum = po.poNumber || po.po_number;
+
+  const linkedVBs = (poDetails?.bills?.length ? poDetails.bills : null) || (vendorBills || []).filter((b) => {
+    if (b.status === 'Cancelled' || b.status === 'Rejected') return false;
+    const bPoId = b.purchaseOrderId || b.purchase_order || b.purchase_order_id;
+    const bPoNum = b.poNumber || b.po_number;
+    return (poId && bPoId === poId) || (poNum && bPoNum === poNum);
+  });
+
+  const linkedPBs = (purchaseBills || []).filter((b) => {
+    if (b.status === 'Cancelled') return false;
+    const bPoId = b.purchaseOrderId || b.purchase_order || b.purchase_order_id;
+    const bPoRef = b.poRef || b.linkedPo || b.poNumber;
+    return (poId && bPoId === poId) || (poNum && bPoRef === poNum);
+  });
+
+  const allLinkedBills = [...linkedVBs, ...linkedPBs];
+  const hasBills = allLinkedBills.length > 0 || Boolean(po.billedQty) || po.status === 'Billed' || Boolean(poDetails?.poSummary?.totalBills);
+
+  // Check paid status
+  const isPaid = Boolean(
+    isFullyPaidProp ||
+    po?.paymentStatus === 'Paid' ||
+    po?.payment_status === 'Paid' ||
+    (Number(poDetails?.poSummary?.totalPaidAmount || 0) > 0 && Number(poDetails?.poSummary?.totalOutstandingAmount || 0) <= 0.01) ||
+    (allLinkedBills.length > 0 && allLinkedBills.every((b) => {
+      const bTotal = Number(b.billAmount || b.total || b.amount || 0);
+      const bPaid = Number(b.amountPaid || b.amount_paid || (b.paymentStatus === 'Paid' || b.status === 'Paid' ? bTotal : 0));
+      const bOutstanding = Number(b.outstandingAmount != null ? b.outstandingAmount : (b.balanceDue != null ? b.balanceDue : Math.max(0, bTotal - bPaid)));
+      return b.paymentStatus === 'Paid' || b.status === 'Paid' || (bTotal > 0 && bOutstanding <= 0.01 && bPaid > 0);
+    })) ||
+    (Number(po?.total || po?.amount || 0) > 0 && Number(po?.amount_paid || po?.amountPaid || 0) >= Number(po?.total || po?.amount || 0))
+  );
+
+  const isPartial = Boolean(
+    !isPaid && (
+      isPartiallyPaidProp ||
+      po?.paymentStatus === 'Partially Paid' ||
+      po?.payment_status === 'Partially Paid' ||
+      Number(poDetails?.poSummary?.totalPaidAmount || 0) > 0 ||
+      allLinkedBills.some((b) => {
+        const bPaid = Number(b.amountPaid || b.amount_paid || 0);
+        return bPaid > 0 || b.paymentStatus === 'Partially Paid' || b.status === 'Partially Paid';
+      }) ||
+      Number(po?.amount_paid || po?.amountPaid || 0) > 0
+    )
+  );
+
+  const isMatchedOrBilled = Boolean(
+    hasBills && (
+      po.status === 'Billed' ||
+      Number(poDetails?.poSummary?.totalBilledAmount || 0) > 0 ||
+      linkedVBs.some((b) => ['Approved', 'Matched'].includes(b.matchingStatus || b.matchStatus) || ['Approved', 'Verified'].includes(b.status || b.approvalStatus)) ||
+      linkedPBs.some((b) => ['Approved', 'Verified', 'Unpaid'].includes(b.status))
+    )
+  );
+
+  const latestBill = allLinkedBills[0];
+  const latestBillDate = latestBill?.billDate || latestBill?.created_at ? formatDateDDMMYYYY(latestBill?.billDate || latestBill?.created_at) : null;
+  const billDocNum = latestBill?.vendorBillNumber || latestBill?.billNumber || latestBill?.invoiceNumber || '';
 
   const steps = [
     {
@@ -110,13 +186,19 @@ export function PoMovementHistoryModal({
     {
       id: 'billing',
       title: 'Vendor Bill Matching & Accounts Payable',
-      desc: po.billedQty || po.bills?.length
-        ? 'Vendor invoice matched and inventory value committed to stock ledger.'
+      desc: isPaid
+        ? (billDocNum ? `Vendor bill ${billDocNum} matched and payment fully settled.` : 'Vendor bill matched, approved, and payment fully settled.')
+        : isPartial
+        ? (billDocNum ? `Partial payment disbursement recorded against vendor bill ${billDocNum}.` : 'Partial disbursement recorded against vendor bill.')
+        : isMatchedOrBilled
+        ? (billDocNum ? `Vendor bill ${billDocNum} matched and verified. Awaiting payment disbursement.` : 'Vendor invoice matched and inventory value committed to stock ledger.')
+        : hasBills
+        ? 'Vendor invoice uploaded, pending 3-way reconciliation.'
         : 'Pending invoice intake and 3-way reconciliation.',
-      date: null,
+      date: isPaid || isPartial || hasBills ? latestBillDate : null,
       icon: Receipt,
-      status: po.status === 'Billed' ? 'complete' : 'pending',
-      badge: po.status === 'Billed' ? 'Billed' : 'Pending Bill',
+      status: isPaid ? 'complete' : (isPartial || hasBills) ? 'in_progress' : 'pending',
+      badge: isPaid ? 'Paid' : isPartial ? 'Partially Paid' : isMatchedOrBilled ? 'Billed' : hasBills ? 'Pending Match' : 'Pending Bill',
     },
   ].filter((step) => step.id !== 'dispatch' || showDispatch);
 

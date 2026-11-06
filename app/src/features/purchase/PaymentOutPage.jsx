@@ -361,9 +361,9 @@ export const PaymentOutPage = ({ embedded = false }) => {
                     <label className="block font-semibold text-slate-700 mb-1">Target Vendor Bill *</label>
                     <select required value={selectedBillId} onChange={(e) => handleBillSelect(e.target.value)} className="w-full border border-slate-300 rounded-lg p-2 bg-white text-slate-800 font-medium">
                       <option value="">Select bill</option>
-                      {purchaseBills.filter((b) => b.status !== 'Draft').map((b) => {
+                      {purchaseBills.filter((b) => b.status !== 'Draft' && getBillOutstanding(b.id).balanceDue > 0.01).map((b) => {
                         const outstanding = getBillOutstanding(b.id);
-                        const tag = b.status === 'Cancelled' ? ' [Cancelled]' : outstanding.balanceDue <= 0.01 ? ' [Settled]' : ` [Due: ${formatCurrency(outstanding.balanceDue)}]`;
+                        const tag = b.status === 'Cancelled' ? ' [Cancelled]' : ` [Due: ${formatCurrency(outstanding.balanceDue)}]`;
                         return (
                           <option key={b.id} value={b.id}>
                             {b.billNumber} - {b.vendor}{tag}

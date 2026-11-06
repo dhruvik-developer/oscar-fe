@@ -513,9 +513,27 @@ export const ERPProvider = ({ children, }) => {
         m?.itemId ?? m?.itemSku,
         Number(m?.quantity),
     ].join('|');
-    const refreshCollections = (keys) => {
+    const refreshCollections = useCallback((keys) => {
         if (!isBackendEnabled() || !keys?.length) return Promise.resolve({});
+        // This read stands in for any lazy read of the same keys: a page that
+        // reads a collection and refreshes it on mount would otherwise pull it
+        // twice. An in-flight read is not joined — it may predate the write
+        // this refresh is here to show.
+        const tracked = keys.filter((key) => syncSettersRef.current[key]);
+        tracked.forEach((key) => {
+            queuedKeysRef.current.delete(key);
+            inFlightKeysRef.current.add(key);
+        });
+        setBackendStatus((prev) => (prev.loading ? prev : { ...prev, loading: true }));
         return pullAll(keys).then((collections) => {
+            tracked.forEach((key) => {
+                if (key in collections) {
+                    loadedKeysRef.current.add(key);
+                    failedKeysRef.current.delete(key);
+                } else {
+                    failedKeysRef.current.set(key, Date.now());
+                }
+            });
             Object.entries(collections).forEach(([key, rows]) => {
                 const setter = syncSettersRef.current[key];
                 if (!setter || !Array.isArray(rows)) return;
@@ -532,8 +550,11 @@ export const ERPProvider = ({ children, }) => {
                 });
             });
             return collections;
-        }).catch(() => ({}));
-    };
+        }).catch(() => ({})).finally(() => {
+            tracked.forEach((key) => inFlightKeysRef.current.delete(key));
+            setBackendStatus((prev) => ({ ...prev, loading: inFlightKeysRef.current.size > 0 }));
+        });
+    }, []);
 
     /**
      * Re-point local stock mirrors at the server row after reconcile, so the
@@ -3388,6 +3409,9 @@ export const ERPProvider = ({ children, }) => {
                 dyeingMillId: po.dyeingMillId || undefined,
                 dyeingColourName: po.dyeingColourName ?? null,
                 dyeingColourHex: po.dyeingColourHex ?? null,
+                dyeingRate: po.dyeingRate ?? null,
+                sourcePurchaseOrderId: po.sourcePurchaseOrderId,
+                dyeingBatches: po.dyeingBatches,
                 yarnLines: po.yarnLines || [],
                 expenses: po.expenses || [],
             } : {}),

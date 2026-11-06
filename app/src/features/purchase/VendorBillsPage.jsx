@@ -10,8 +10,6 @@ import {
   Plus,
   X,
   Eye,
-  Pencil,
-  Trash2,
   Send,
   Upload,
   Building2,
@@ -140,10 +138,22 @@ export const VendorBillsPage = () => {
     return g?.billNumber || b.grnId;
   };
 
-  // Eligible POs for the dropdown (exclude Cancelled)
+  // POs with received fabric still to bill, from the server, read as the form opens.
+  const [billablePoIds, setBillablePoIds] = useState(null);
+  useEffect(() => {
+    if (!showModal) return;
+    let live = true;
+    api.get('/purchase/vendor-bills/billable-pos/')
+      .then((res) => { if (live) setBillablePoIds(new Set(res?.results || [])); })
+      .catch(() => { if (live) setBillablePoIds(null); });
+    return () => { live = false; };
+  }, [showModal]);
+
+  // Eligible POs for the dropdown; a bill being edited keeps its own PO.
   const eligiblePOs = useMemo(() => {
-    return (purchaseOrders || []).filter((p) => p.status !== 'Cancelled');
-  }, [purchaseOrders]);
+    return (purchaseOrders || []).filter((p) => p.status !== 'Cancelled'
+      && (!billablePoIds || billablePoIds.has(p.id) || p.id === fPoId));
+  }, [purchaseOrders, billablePoIds, fPoId]);
 
   const filteredPOs = useMemo(() => {
     const q = poSearch.trim().toLowerCase();
@@ -502,12 +512,6 @@ export const VendorBillsPage = () => {
                     <td className="p-2.5 text-center whitespace-nowrap">
                       <button onClick={() => setSelectedId(b.id)} className="p-1.5 text-muted hover:text-primary hover:bg-card-hover rounded-lg cursor-pointer" title="View">
                         <Eye size={13} />
-                      </button>
-                      <button onClick={() => openEdit(b)} className="p-1.5 text-muted hover:text-primary hover:bg-card-hover rounded-lg cursor-pointer" title="Edit">
-                        <Pencil size={13} />
-                      </button>
-                      <button onClick={() => handleDelete(b)} className="p-1.5 text-muted hover:text-rose-600 hover:bg-rose-50 rounded-lg cursor-pointer" title="Delete">
-                        <Trash2 size={13} />
                       </button>
                     </td>
                   </tr>

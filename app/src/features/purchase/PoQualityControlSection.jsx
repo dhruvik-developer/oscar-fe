@@ -17,7 +17,7 @@ export function PoQualityControlSection({
   navigate,
   onViewAllEntries,
   onProceedToVerification,
-  defaultExpanded = true,
+  defaultExpanded = false,
 }) {
   const { showToast } = useERP() || {};
 

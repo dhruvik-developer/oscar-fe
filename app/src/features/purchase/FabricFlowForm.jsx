@@ -8,6 +8,7 @@ import { Factory, Warehouse, Droplets, ArrowRight, Plus, Trash2 } from 'lucide-r
  */
 export const FABRIC_FLOW_A = 'FACTORY_TO_OSCAR';
 export const FABRIC_FLOW_B = 'FACTORY_TO_MILL';
+export const FABRIC_FLOW_C = 'OSCAR_TO_MILL';
 
 export const FABRIC_FLOW_OPTIONS = [
   {
@@ -18,11 +19,18 @@ export const FABRIC_FLOW_OPTIONS = [
     steps: ['PO', 'Factory production & dispatch', 'Receipt at OSCAR', 'Grey Fabric batch per receipt', 'QC → stock'],
   },
   {
+    value: FABRIC_FLOW_C,
+    label: 'OSCAR Warehouse → Dyeing Mill → OSCAR Warehouse',
+    hint: 'Grey fabric is already at OSCAR. Pick its grey PO and the batches to send to the dyeing mill.',
+    icons: [Warehouse, Droplets, Warehouse],
+    steps: ['Grey PO & batches', 'PO approval sends it to the mill', 'Receive dyed fabric', 'Dyed Fabric batch', 'QC → stock'],
+  },
+  {
     value: FABRIC_FLOW_B,
     label: 'Factory → Dyeing Mill → OSCAR',
     hint: 'Factory sends grey fabric directly to the dyeing mill. OSCAR receives the dyed fabric after processing.',
     icons: [Factory, Droplets, Warehouse],
-    steps: ['PO', 'Factory dispatch to mill', 'Mill receipt & dyeing', 'Dyed fabric receipt at OSCAR', 'Dyed Fabric batch per receipt', 'QC → stock'],
+    steps: ['PO', 'Dyeing at mill', 'Dyed fabric receipt at OSCAR', 'Dyed Fabric batch per receipt', 'QC → stock'],
   },
 ];
 
@@ -36,14 +44,14 @@ export const EXPENSE_CATEGORIES = [
   { value: 'OTHER', label: 'Other', types: ['Loading / unloading', 'Other expense'] },
 ];
 
-export const expenseCategoriesFor = (flow) => EXPENSE_CATEGORIES.filter((c) => !c.flowB || flow === FABRIC_FLOW_B);
+export const expenseCategoriesFor = (flow) => EXPENSE_CATEGORIES.filter((c) => !c.flowB || flow !== FABRIC_FLOW_A);
 
 const inputCls = 'w-full border border-slate-300 rounded-lg p-1.5 bg-white text-slate-800';
 
 /** The two workflow cards shown at the top of the Create PO form. */
 export function FabricFlowCards({ value, onChange }) {
   return (
-    <div role="radiogroup" aria-label="Fabric workflow" className="grid grid-cols-1 md:grid-cols-2 gap-3">
+    <div role="radiogroup" aria-label="Fabric workflow" className="grid grid-cols-1 md:grid-cols-3 gap-3">
       {FABRIC_FLOW_OPTIONS.map((opt) => {
         const active = value === opt.value;
         return (
@@ -240,12 +248,14 @@ export function OpeningCostsEditor({ rows, onChange, flow, formatCurrency }) {
 }
 
 /** Rows of the form -> the API payload; returns an error message or the payload. */
-export function fabricFlowPayload({ flow, dyeingMillId, dyeingColourName, dyeingColourHex, yarnRows, costRows }) {
+export function fabricFlowPayload({ flow, dyeingMillId, dyeingColourName, dyeingColourHex, dyeingRate, yarnRows, costRows }) {
   const colourName = String(dyeingColourName || '').trim();
   const colourHex = String(dyeingColourHex || '').trim();
   if (flow === FABRIC_FLOW_B && !dyeingMillId) return { error: 'Select the Dyeing Vendor (Mill) for this order.' };
-  if (flow === FABRIC_FLOW_B && !colourName) return { error: 'Select the Dyeing Colour for this order.' };
-  if (flow === FABRIC_FLOW_B && colourHex && !/^#[0-9A-Fa-f]{6}$/.test(colourHex)) {
+  const toMill = flow === FABRIC_FLOW_B || flow === FABRIC_FLOW_C;
+  if (toMill && !colourName) return { error: 'Select the Dyeing Colour for this order.' };
+  if (flow === FABRIC_FLOW_B && !(Number(dyeingRate) > 0)) return { error: 'Enter the Dyeing Rate for this order.' };
+  if (toMill && colourHex && !/^#[0-9A-Fa-f]{6}$/.test(colourHex)) {
     return { error: 'The dyeing colour code must look like #1F3A5F.' };
   }
   const yarnLines = yarnRows.filter((r) => r.itemId || r.yarnQuality || Number(r.requiredQty) > 0);
@@ -261,8 +271,9 @@ export function fabricFlowPayload({ flow, dyeingMillId, dyeingColourName, dyeing
     payload: {
       fabricFlow: flow,
       dyeingMillId: flow === FABRIC_FLOW_B ? (dyeingMillId || undefined) : undefined,
-      dyeingColourName: flow === FABRIC_FLOW_B ? colourName : null,
-      dyeingColourHex: flow === FABRIC_FLOW_B ? (colourHex.toUpperCase() || null) : null,
+      dyeingColourName: toMill ? colourName : null,
+      dyeingColourHex: toMill ? (colourHex.toUpperCase() || null) : null,
+      dyeingRate: flow === FABRIC_FLOW_B ? Number(dyeingRate) : null,
       yarnLines: yarnLines.map(({ key, ...r }) => ({
         ...r,
         itemId: r.itemId || undefined,

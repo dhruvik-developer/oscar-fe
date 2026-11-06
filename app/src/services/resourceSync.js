@@ -122,21 +122,36 @@ export function rowsOf(body) {
  */
 export function createSync(registry, { label = 'sync' } = {}) {
   const get = (key) => registry[key];
+  // Identical in-flight pulls (same key + query) share one page walk so
+  // concurrent or StrictMode-remounted callers do not duplicate requests.
+  const inflight = new Map();
+  const inflightKey = (key, query) => `${key}:${JSON.stringify(query || {})}`;
 
   /** Load one collection, or `null` when the read failed. */
   async function pull(key, query = {}) {
     const resource = get(key);
     if (!resource || !isBackendEnabled()) return null;
-    try {
-      // Walks every page; the server serves at most 200 rows per request.
-      const rows = await getAllPages(resource.pullPath || resource.path, {
-        query: { ...(resource.pullQuery || {}), ...query },
-      });
-      return resource.fromApi ? rows.map(resource.fromApi) : rows;
-    } catch (err) {
-      console.warn(`[${label}] pull ${key} failed:`, err?.message || err);
-      return null;
-    }
+
+    const id = inflightKey(key, query);
+    const pending = inflight.get(id);
+    if (pending) return pending;
+
+    const promise = (async () => {
+      try {
+        // Walks every page; the server serves at most 200 rows per request.
+        const rows = await getAllPages(resource.pullPath || resource.path, {
+          query: { ...(resource.pullQuery || {}), ...query },
+        });
+        return resource.fromApi ? rows.map(resource.fromApi) : rows;
+      } catch (err) {
+        console.warn(`[${label}] pull ${key} failed:`, err?.message || err);
+        return null;
+      }
+    })().finally(() => {
+      if (inflight.get(id) === promise) inflight.delete(id);
+    });
+    inflight.set(id, promise);
+    return promise;
   }
 
   /**

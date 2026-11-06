@@ -927,11 +927,6 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
                                                     <button onClick={() => setSelectedInvoice(inv)} className="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors cursor-pointer" title="View Invoice">
                                                         <Eye className="w-4 h-4"/>
                                                     </button>
-                                                    {inv.status !== 'Cancelled' && !invoiceHasChallan(inv) && (
-                                                        <button onClick={() => handleConvertToChallan(inv)} className="px-2 py-0.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded text-[10px] font-bold cursor-pointer inline-flex items-center gap-1 transition-colors" title="Convert to Delivery Challan">
-                                                            <Truck className="w-3 h-3"/> Challan
-                                                        </button>
-                                                    )}
                                                     
                                                     {isDraft ? (
                                                         <>
@@ -1283,12 +1278,6 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
                                 <StatusBadge status={selectedInvoice.status}/>
                             </div>
                             <div className="flex flex-wrap lg:flex-nowrap items-center gap-2">
-                                {selectedInvoice.status !== 'Cancelled' && !invoiceHasChallan(selectedInvoice) && (
-                                    <button onClick={() => handleConvertToChallan(selectedInvoice)} className="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-lg font-semibold flex items-center gap-1.5 cursor-pointer" title="Convert to Delivery Challan">
-                                        <Truck size={13}/>
-                                        Convert to Delivery Challan
-                                    </button>
-                                )}
                                 <button onClick={() => setPrintInvoiceTarget(selectedInvoice)} className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-semibold flex items-center gap-1.5 cursor-pointer">
                                     <Printer size={13}/>
                                     Print Official Invoice
@@ -1521,16 +1510,6 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
                                         setPayAmount(getInvoiceOutstanding(selectedInvoice.id).balanceDue);
                                     }} className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-semibold text-xs shadow-sm flex items-center gap-1.5 cursor-pointer">
                                         <IndianRupee className="w-3.5 h-3.5"/> Settle Payment
-                                    </button>
-                                )}
-
-                                {selectedInvoice.status !== 'Cancelled' && !invoiceHasChallan(selectedInvoice) && (
-                                    <button
-                                        onClick={() => handleConvertToChallan(selectedInvoice)}
-                                        className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold text-xs shadow-xs flex items-center gap-1 cursor-pointer"
-                                        title="Convert to Delivery Challan"
-                                    >
-                                        <Truck size={12}/> Convert to Delivery Challan
                                     </button>
                                 )}
                                 <button onClick={() => setSelectedInvoice(null)} className="px-4 py-1.5 border border-slate-300 hover:bg-slate-100 text-slate-700 rounded-lg font-semibold text-xs cursor-pointer">

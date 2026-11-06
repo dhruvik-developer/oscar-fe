@@ -14,7 +14,7 @@
  * With no auth token the module is inert: every push resolves to `null` and the
  * app keeps behaving exactly as it did before it had a backend.
  */
-import { api, ApiError } from './api';
+import { api, ApiError, getAllPages } from './api';
 import { mapWithLimit } from './resourceSync';
 import { getStoredToken } from '../utils/authUtils';
 import { formatDateDDMMYYYY, toISODate } from '../utils/dateUtils';
@@ -558,6 +558,9 @@ export const RESOURCES = {
         if (doc.dyeingMillId !== undefined) payload.dyeingMillId = doc.dyeingMillId || null;
         if (doc.dyeingColourName !== undefined) payload.dyeingColourName = doc.dyeingColourName || null;
         if (doc.dyeingColourHex !== undefined) payload.dyeingColourHex = doc.dyeingColourHex || null;
+        if (doc.dyeingRate !== undefined) payload.dyeingRate = doc.dyeingRate ?? null;
+        if (doc.sourcePurchaseOrderId !== undefined) payload.sourcePurchaseOrderId = doc.sourcePurchaseOrderId;
+        if (Array.isArray(doc.dyeingBatches)) payload.dyeingBatches = doc.dyeingBatches;
         if (Array.isArray(doc.yarnLines)) payload.yarnLines = doc.yarnLines;
         if (Array.isArray(doc.expenses)) payload.expenses = doc.expenses;
         return payload;
@@ -965,9 +968,7 @@ export const PULL_ORDER = [
   'bankAccounts', 'chartOfAccounts', 'journalEntries',
 ];
 
-// ── transport ───────────────────────────────────────────────────────────────
-
-const PAGE_SIZE = 200;
+  // ── transport ───────────────────────────────────────────────────────────────
 
 /** One key per create attempt; `randomUUID` needs a secure context. */
 function newIdempotencyKey() {
@@ -979,20 +980,35 @@ function newIdempotencyKey() {
  * Load one collection. Returns `null` (not `[]`) when the read fails, so the
  * caller can tell "the server has nothing" from "the server did not answer"
  * and leave the existing rows alone in the second case.
+ *
+ * Pulls every page (`getAllPages`) so a registry collection above the server's
+ * per-request cap is never silently truncated, and shares an in-flight read
+ * per key so concurrent callers do not issue duplicate page walks.
  */
+const inflightPulls = new Map();
+
 export async function pullResource(key) {
   const resource = RESOURCES[key];
   if (!resource) return null;
-  try {
-    const body = await api.get(resource.pullPath || resource.path, {
-      query: { limit: PAGE_SIZE },
-    });
-    const rows = Array.isArray(body) ? body : (body?.results || []);
-    return rows.map(resource.fromApi || ((r) => r));
-  } catch (err) {
-    console.warn(`[backendSync] pull ${key} failed:`, err?.message || err);
-    return null;
-  }
+
+  const inflight = inflightPulls.get(key);
+  if (inflight) return inflight;
+
+  const promise = (async () => {
+    try {
+      const rows = await getAllPages(resource.pullPath || resource.path, {
+        query: resource.pullQuery || {},
+      });
+      return rows.map(resource.fromApi || ((r) => r));
+    } catch (err) {
+      console.warn(`[backendSync] pull ${key} failed:`, err?.message || err);
+      return null;
+    }
+  })().finally(() => {
+    if (inflightPulls.get(key) === promise) inflightPulls.delete(key);
+  });
+  inflightPulls.set(key, promise);
+  return promise;
 }
 
 /**

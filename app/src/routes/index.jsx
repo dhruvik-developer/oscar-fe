@@ -195,7 +195,8 @@ const LotTakaRegisterPage = lazy(() => import('../features/inventory/LotTakaRegi
 const TakaTagPrintPage = lazy(() => import('../features/inventory/TakaTagPrintPage'));
 const BatchRegistryPage = lazy(() => import('../features/inventory/batches/BatchRegistryPage'));
 const PublicBatchPassportPage = lazy(() => import('../features/inventory/batches/PublicBatchPassportPage'));
-const BatchTraceabilityPage = lazy(() => import('../features/inventory/batches/BatchTraceabilityPage'));
+const BatchQrPage = lazy(() => import('../features/inventory/batches/BatchQrPage'));
+const BatchAtoZPage = lazy(() => import('../features/inventory/batches/BatchAtoZPage'));
 const ProductionRunsPage = lazy(() => import('../features/inventory/batches/ProductionRunsPage'));
 const SampleListPage = lazy(() => import('../features/inventory/samples/SampleListPage'));
 const TripListPage = lazy(() => import('../features/inventory/logistics/TripListPage'));
@@ -550,8 +551,9 @@ const router = createBrowserRouter([
       { path: 'inventory/taka-tags', element: <Navigate to="/inventory/batches" replace /> },
       { path: 'inventory/batches', element: <Page component={BatchRegistryPage} title="Batch Registry" /> },
       { path: 'inventory/production-runs', element: <Page component={ProductionRunsPage} title="Production Runs" /> },
-      // A batch QR tag opens this (signed in; cost shown only with ledger access).
-      { path: 'inventory/batches/:code', element: <Page component={BatchTraceabilityPage} title="Batch Traceability" /> },
+      // A batch QR opens this (signed in; cost shown only with ledger access).
+      { path: 'inventory/batches/:code/a-to-z', element: <Page component={BatchAtoZPage} title="Batch A to Z" /> },
+      { path: 'inventory/batches/:code', element: <Page component={BatchQrPage} title="Batch QR" /> },
       { path: 'inventory/samples', element: <Page component={SampleListPage} title="Sample Management" /> },
       { path: 'inventory/trips', element: <Page component={TripListPage} title="Logistics & Tempo Trips" /> },
       { path: 'inventory/grey', element: <Page component={SubInventoryPage} title="Grey Inventory" /> },

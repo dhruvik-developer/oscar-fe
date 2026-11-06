@@ -545,9 +545,14 @@ export const BillMatchingPage = () => {
                     <p className="text-slate-400 font-semibold mb-2">Approval Action</p>
                     <textarea value={remarks} onChange={(ev) => setRemarks(ev.target.value)} rows={4} placeholder={isMismatch ? 'Approval remarks (required for a mismatched bill)' : 'Approval remarks (optional)'} className={`w-full border rounded-lg p-2 bg-white text-slate-800 placeholder:text-slate-400 ${remarksError ? 'border-rose-400' : 'border-slate-300'}`} />
                     {remarksError && <p className="text-[11px] font-semibold text-rose-600">{remarksError}</p>}
+                    {isMismatch && isPending && (
+                      <p className="mt-2 text-[11px] font-semibold text-amber-800">
+                        Approving accepts the vendor's bill: payable will be {formatCurrency(Number(selected.total ?? selected.amount) || 0)} incl. GST as per the Vendor Bill, not the PO amount.
+                      </p>
+                    )}
                     <div className="flex gap-2 mt-3">
                       <button onClick={handleApprove} disabled={!isPending || actionBusy || !authed} title={!authed ? 'Session expired — log in again' : undefined} className="flex-1 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white rounded-lg font-semibold flex items-center justify-center gap-1.5 cursor-pointer">
-                        <Check size={14} /> Approve Bill
+                        <Check size={14} /> Approve Vendor Bill
                       </button>
                       <button onClick={handleReject} disabled={!isPending || actionBusy || !authed} title={!authed ? 'Session expired — log in again' : undefined} className="flex-1 px-3 py-2 bg-white border border-rose-300 text-rose-600 hover:bg-rose-50 disabled:opacity-40 rounded-lg font-semibold flex items-center justify-center gap-1.5 cursor-pointer">
                         <X size={14} /> Reject Bill
@@ -575,7 +580,7 @@ export const BillMatchingPage = () => {
                             <div key={idx} className="relative">
                               <span className={`absolute -left-5 top-0.5 w-3.5 h-3.5 rounded-full ${dot} ring-4 ring-white`} />
                               <p className="text-slate-500 font-mono text-[10px]">{h.at || ''}</p>
-                              <p className="font-semibold text-slate-800">{action || '—'}</p>
+                              <p className="font-semibold text-slate-800">{/^approved/i.test(action) ? `Vendor Bill ${action}` : action || '—'}</p>
                               {(h.by) && <p className="text-slate-500">by {h.by}</p>}
                               {h.remarks && <p className="text-slate-600 mt-0.5">{h.remarks}</p>}
                             </div>

@@ -5,7 +5,7 @@ import { DataTable } from '../../components/ui/DataTable';
 import { StatusBadge } from '../../components/ui/StatusBadge';
 import { StatCard } from '../../components/ui/StatCard';
 import { Button } from '../../components/ui/Button';
-import { Plus, FileSpreadsheet, CheckCircle2, DollarSign, X, Eye, Printer, Clock, AlertCircle, FileText, Ban, MapPin } from 'lucide-react';
+import { Plus, FileSpreadsheet, CheckCircle2, IndianRupee, X, Eye, Printer, Clock, AlertCircle, FileText, Ban, MapPin } from 'lucide-react';
 import { LineItemEditor } from '../../components/common/LineItemEditor';
 import { DocumentTimeline } from '../../components/common/DocumentTimeline';
 import { RelatedDocumentsCard } from '../../components/common/RelatedDocumentsCard';
@@ -343,7 +343,7 @@ export const PurchaseBillsPage = () => {
                           }}
                           className="px-2.5 py-1 bg-primary hover:bg-primary-hover text-white rounded-xl text-[11px] font-semibold cursor-pointer shadow-2xs transition-colors flex items-center gap-1"
                         >
-                          <DollarSign size={11}/> Pay Bill
+                          <IndianRupee size={11}/> Pay Bill
                         </button>
                       </div>
                     ) : (
@@ -362,13 +362,11 @@ export const PurchaseBillsPage = () => {
     const unpaidBillsCount = purchaseBills.filter(b => getBillOutstanding(b.id).balanceDue > 0).length;
 
     return (<div className="space-y-6">
-      <PageHeader title="Purchase Bills & Accounts Payable" subtitle="Supplier invoice intake, line-item inventory replenishment, remaining balance tracking, and vendor disbursements." guide={purchaseBillGuide} actions={<Button icon={Plus} onClick={() => setShowAddModal(true)}>
-            Enter Vendor Bill
-          </Button>}/>
+      <PageHeader title="Purchase Bills & Accounts Payable" subtitle="Supplier invoice intake, line-item inventory replenishment, remaining balance tracking, and vendor disbursements." guide={purchaseBillGuide} />
 
       {/* Purchase Bills KPI Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard label="Total Billed Invoices" value={formatCurrency(totalBilled)} icon={DollarSign} />
+        <StatCard label="Total Billed Invoices" value={formatCurrency(totalBilled)} icon={IndianRupee} />
         <StatCard label="AP Payable Due" value={formatCurrency(totalApOutstanding)} icon={Clock} trend={{ positive: totalApOutstanding === 0, text: totalApOutstanding > 0 ? `${unpaidBillsCount} unpaid bills` : 'All bills cleared' }} highlight={totalApOutstanding > 0} />
         <StatCard label="Total Disbursed" value={formatCurrency(totalDisbursed)} icon={CheckCircle2} trend={{ positive: true, text: 'Disbursements verified' }} />
         <StatCard label="Active Bills" value={`${purchaseBills.length} Bills`} icon={FileText} subtext={`${unpaidBillsCount} awaiting payment`} />
@@ -600,7 +598,7 @@ export const PurchaseBillsPage = () => {
           <div className="bg-white rounded-xl border border-slate-200 max-w-md w-full p-4 sm:p-6 shadow-2xl text-xs max-h-[95vh] overflow-y-auto">
             <div className="flex items-center justify-between pb-3 border-b border-slate-200">
               <div className="flex items-center gap-2">
-                <DollarSign className="w-5 h-5 text-emerald-600"/>
+                <IndianRupee className="w-5 h-5 text-emerald-600"/>
                 <h3 className="font-bold text-base text-slate-900">Disburse Vendor Payment</h3>
               </div>
               <button onClick={() => setShowPayModal(null)} className="text-slate-400 hover:text-slate-600">

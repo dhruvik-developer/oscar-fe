@@ -388,7 +388,7 @@ export function DiscountRequestModal({ isOpen, onClose, invoice, onSaved }) {
       isOpen={isOpen}
       onClose={onClose}
       size="lg"
-      title="Early payment discount request"
+      title="Payment discount request"
       subtitle={`${invoice.invoiceNumber} · ${invoice.customerName}`}
       footer={(
         <div className="flex justify-end gap-2 w-full">

@@ -4,7 +4,7 @@ import { useERP } from '../../context/ERPContext';
 import { DataTable } from '../../components/ui/DataTable';
 import { StatusBadge } from '../../components/ui/StatusBadge';
 import { Button } from '../../components/ui/Button';
-import { Plus, Truck, CheckCircle2, X, AlertTriangle, Printer, Package, MapPin, UserCheck, Ban, ShieldAlert, Eye, Award, Send, FileText, ShieldCheck } from 'lucide-react';
+import { Plus, Truck, CheckCircle2, X, AlertTriangle, Printer, Package, MapPin, UserCheck, Ban, ShieldAlert, Eye, Award, Send, ShieldCheck } from 'lucide-react';
 import { RelatedDocumentsCard } from '../../components/common/RelatedDocumentsCard';
 import { PageHeader } from '../../components/common/PageHeader';
 import { formatDateDDMMYYYY } from '../../utils/dateUtils';
@@ -31,34 +31,8 @@ const challanGuide = {
     workflow: ['Sales Order Confirmed', 'Delivery Challan Generated', 'Carrier In-Transit', 'Consignee Receives Goods', 'POD Verified & Invoice Issued'],
 };
 export const DeliveryChallansPage = () => {
-    const { deliveryChallans, addDeliveryChallan, updateDeliveryChallanStatus, cancelDeliveryChallan, convertChallanToInvoice, salesOrders, invoices, paymentIns, items: masterItems, calculateItemStock } = useERP();
+    const { deliveryChallans, addDeliveryChallan, updateDeliveryChallanStatus, cancelDeliveryChallan, salesOrders, invoices, paymentIns, items: masterItems, calculateItemStock } = useERP();
     const location = useLocation();
-    const navigate = useNavigate();
-
-    const handleConvertToInvoice = async (challan) => {
-        if (!challan) return;
-        try {
-            const inv = await convertChallanToInvoice(challan.id);
-            if (inv) {
-                setSelectedChallan(null);
-                navigate('/sales/invoices');
-            }
-        } catch (err) {
-            console.error('Failed to convert challan to invoice:', err);
-        }
-    };
-
-    const challanHasInvoice = (challan) => {
-        if (!challan) return false;
-        return (invoices || []).some(inv =>
-            inv.status !== 'Cancelled' && (
-                (challan.id && (inv.deliveryChallanId === challan.id || inv.sourceDeliveryChallanId === challan.id)) ||
-                (challan.challanNumber && (inv.deliveryChallanNumber === challan.challanNumber)) ||
-                (challan.sourceInvoiceId && inv.id === challan.sourceInvoiceId) ||
-                (challan.invoiceId && inv.id === challan.invoiceId)
-            )
-        );
-    };
     React.useEffect(() => {
         if (location.state?.challanId) setSelectedChallan(deliveryChallans.find(dc => dc.id === location.state.challanId) || null);
     }, [location.state, deliveryChallans]);
@@ -208,7 +182,7 @@ export const DeliveryChallansPage = () => {
         setLineItems(updated);
     };
 
-    const handleCreate = (e) => {
+    const handleCreate = async (e) => {
         e.preventDefault();
         const order = draftChallan || salesOrders.find((o) => o.id === selectedSoId);
         if (!order) {
@@ -241,25 +215,42 @@ export const DeliveryChallansPage = () => {
             return;
         }
 
-        const created = addDeliveryChallan({
-            ...(draftChallan ? { ...draftChallan, id: draftChallan.id } : {}),
-            // The challan number is allocated by the server (DC series).
-            challanNumber: draftChallan?.challanNumber,
-            salesOrderId: draftChallan ? undefined : order?.id,
-            sourceSalesOrderId: draftChallan ? undefined : order?.id,
-            salesOrderNumber: order?.orderNumber || '',
-            sourceSalesOrderNumber: order?.orderNumber || '',
-            linkedSo: order?.orderNumber || '',
-            customerId: order?.customerId,
-            customer: order?.customer,
-            dispatchDate: new Date().toISOString().split('T')[0],
-            transporter,
-            vehicleNo,
-            status: 'In Transit',
-            items: validLines,
-            lineItems: validLines,
-        });
-        if (created) { setShowAddModal(false); setSelectedChallan(created); setDraftChallan(null); }
+        setValidationError('');
+        try {
+            const created = await Promise.resolve(addDeliveryChallan({
+                ...(draftChallan ? { ...draftChallan, id: draftChallan.id } : {}),
+                // The challan number is allocated by the server (DC series).
+                challanNumber: draftChallan?.challanNumber,
+                salesOrderId: draftChallan ? undefined : order?.id,
+                sourceSalesOrderId: draftChallan ? undefined : order?.id,
+                salesOrderNumber: order?.orderNumber || '',
+                sourceSalesOrderNumber: order?.orderNumber || '',
+                linkedSo: order?.orderNumber || '',
+                customerId: order?.customerId,
+                customer: order?.customer,
+                dispatchDate: new Date().toISOString().split('T')[0],
+                transporter,
+                vehicleNo,
+                status: draftChallan ? 'Dispatched' : 'Draft',
+                items: validLines,
+                lineItems: validLines,
+            }));
+            if (created) {
+                setShowAddModal(false);
+                setSelectedChallan(created);
+                setDraftChallan(null);
+            }
+        } catch (err) {
+            const fieldErrors = err?.payload?.field_errors;
+            if (fieldErrors && typeof fieldErrors === 'object') {
+                const detail = Object.entries(fieldErrors)
+                    .map(([field, messages]) => `${field}: ${[].concat(messages).filter(Boolean).join(', ')}`)
+                    .join(' | ');
+                setValidationError(detail || err?.message || 'Some fields need attention.');
+            } else {
+                setValidationError(err?.message || 'Could not save the delivery challan.');
+            }
+        }
     };
     const markDelivered = async (id) => {
         if (podSavingIds.has(id)) return;
@@ -267,7 +258,7 @@ export const DeliveryChallansPage = () => {
         try {
             const updated = await updateDeliveryChallanStatus(id, 'Delivered');
             if (updated && selectedChallan?.id === id) {
-                setSelectedChallan({ ...selectedChallan, ...updated, status: 'Delivered' });
+                setSelectedChallan((prev) => (prev?.id === id ? { ...prev, ...updated } : prev));
             }
         } catch {
             // The context reports the server error; leave the challan unchanged.
@@ -736,15 +727,6 @@ export const DeliveryChallansPage = () => {
                 <StatusBadge status={selectedChallan.status}/>
               </div>
               <div className="flex flex-wrap lg:flex-nowrap items-center gap-2">
-                {selectedChallan.status !== 'Cancelled' && !challanHasInvoice(selectedChallan) && (
-                  <button
-                    onClick={() => handleConvertToInvoice(selectedChallan)}
-                    className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-lg font-semibold cursor-pointer flex items-center gap-1.5 shadow-2xs text-xs"
-                    title="Convert to Sales Invoice"
-                  >
-                    <FileText size={13}/> Convert to Sales Invoice
-                  </button>
-                )}
                 <button onClick={() => setPrintChallanTarget(selectedChallan)} className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-semibold cursor-pointer flex items-center gap-1.5">
                   <Printer size={13}/> Print Waybill
                 </button>
@@ -811,11 +793,19 @@ export const DeliveryChallansPage = () => {
                 if (isCancelled) progressPct = 0;
 
                 const advanceStage = async (nextStatus) => {
+                  if (podSavingIds.has(selectedChallan.id)) return;
+                  setPodSavingIds((prev) => new Set(prev).add(selectedChallan.id));
                   try {
                     const updated = await updateDeliveryChallanStatus(selectedChallan.id, nextStatus);
-                    if (updated) setSelectedChallan({ ...selectedChallan, ...updated, status: nextStatus });
+                    if (updated) setSelectedChallan((prev) => (prev?.id === selectedChallan.id ? { ...prev, ...updated } : prev));
                   } catch {
                     // The context reports the server error; leave the status unchanged.
+                  } finally {
+                    setPodSavingIds((prev) => {
+                      const next = new Set(prev);
+                      next.delete(selectedChallan.id);
+                      return next;
+                    });
                   }
                 };
 
@@ -841,29 +831,32 @@ export const DeliveryChallansPage = () => {
                         <div className="flex flex-wrap lg:flex-nowrap items-center gap-1.5">
                           {currentStatus === 'Dispatched' && (
                             <button
+                              disabled={podSavingIds.has(selectedChallan.id)}
                               onClick={() => advanceStage('In Transit')}
-                              className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold cursor-pointer flex items-center gap-1 shadow-2xs transition-all"
+                              className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold cursor-pointer flex items-center gap-1 shadow-2xs transition-all disabled:opacity-60 disabled:cursor-not-allowed"
                               title="Advance vehicle to In Transit highway route"
                             >
-                              <Truck size={12} /> Move Vehicle to Transit
+                              <Truck size={12} /> {podSavingIds.has(selectedChallan.id) ? 'Saving...' : 'Move Vehicle to Transit'}
                             </button>
                           )}
                           {currentStatus === 'In Transit' && (
                             <button
+                              disabled={podSavingIds.has(selectedChallan.id)}
                               onClick={() => advanceStage('Out for Delivery')}
-                              className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-semibold cursor-pointer flex items-center gap-1 shadow-2xs transition-all"
+                              className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-semibold cursor-pointer flex items-center gap-1 shadow-2xs transition-all disabled:opacity-60 disabled:cursor-not-allowed"
                               title="Advance vehicle to local distribution hub"
                             >
-                              <Truck size={12} /> Move to Out for Delivery
+                              <Truck size={12} /> {podSavingIds.has(selectedChallan.id) ? 'Saving...' : 'Move to Out for Delivery'}
                             </button>
                           )}
                           {(currentStatus === 'Out for Delivery' || currentStatus === 'In Transit') && (
                             <button
+                              disabled={podSavingIds.has(selectedChallan.id)}
                               onClick={() => advanceStage('Delivered')}
-                              className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold cursor-pointer flex items-center gap-1 shadow-2xs transition-all"
+                              className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold cursor-pointer flex items-center gap-1 shadow-2xs transition-all disabled:opacity-60 disabled:cursor-not-allowed"
                               title="Complete delivery and sign POD"
                             >
-                              <CheckCircle2 size={12} /> Complete Delivery
+                              <CheckCircle2 size={12} /> {podSavingIds.has(selectedChallan.id) ? 'Saving...' : 'Complete Delivery'}
                             </button>
                           )}
                         </div>
@@ -1031,14 +1024,6 @@ export const DeliveryChallansPage = () => {
                     }}
                   >
                     Cancel Challan
-                  </Button>
-                )}
-                {selectedChallan.status !== 'Cancelled' && !challanHasInvoice(selectedChallan) && (
-                  <Button
-                    onClick={() => handleConvertToInvoice(selectedChallan)}
-                    className="bg-emerald-600 hover:bg-emerald-700 text-white"
-                  >
-                    <FileText size={13} className="mr-1"/> Convert to Sales Invoice
                   </Button>
                 )}
                 <Button variant="outline" onClick={() => setSelectedChallan(null)}>

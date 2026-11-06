@@ -336,15 +336,24 @@ export const PurchaseBillsPage = () => {
                             <Ban size={13}/>
                           </button>
                         )}
-                        <button
-                          onClick={() => {
-                            setShowPayModal(b);
-                            setPayAmount(outstanding.balanceDue);
-                          }}
-                          className="px-2.5 py-1 bg-primary hover:bg-primary-hover text-white rounded-xl text-[11px] font-semibold cursor-pointer shadow-2xs transition-colors flex items-center gap-1"
-                        >
-                          <IndianRupee size={11}/> Pay Bill
-                        </button>
+                        {b.status === 'Draft' ? (
+                          <span
+                            className="text-[11px] font-semibold text-amber-600 dark:text-amber-400"
+                            title="Not posted yet. Pay it through Pay Vendor Bill on the purchase order."
+                          >
+                            Draft
+                          </span>
+                        ) : (
+                          <button
+                            onClick={() => {
+                              setShowPayModal(b);
+                              setPayAmount(outstanding.balanceDue);
+                            }}
+                            className="px-2.5 py-1 bg-primary hover:bg-primary-hover text-white rounded-xl text-[11px] font-semibold cursor-pointer shadow-2xs transition-colors flex items-center gap-1"
+                          >
+                            <IndianRupee size={11}/> Pay Bill
+                          </button>
+                        )}
                       </div>
                     ) : (
                       <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 inline-flex items-center gap-1">
@@ -574,7 +583,7 @@ export const PurchaseBillsPage = () => {
                     >
                       <Ban size={13} /> Cancel Bill
                     </button>
-                    {getBillOutstanding(selectedBill.id).balanceDue > 0.01 && (
+                    {selectedBill.status !== 'Draft' && getBillOutstanding(selectedBill.id).balanceDue > 0.01 && (
                       <Button onClick={() => {
                         setShowPayModal(selectedBill);
                         setPayAmount(getBillOutstanding(selectedBill.id).balanceDue);

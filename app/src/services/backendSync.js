@@ -591,7 +591,14 @@ export const RESOURCES = {
       attachmentFileId: vb.attachmentFileId || undefined,
       gstPct: vb.gstPct !== undefined ? num(vb.gstPct) : undefined,
       remarks: vb.remarks || vb.notes || undefined,
-      lineItems: (vb.lineItems || vb.items || []).map(lineToApi),
+      // Vendor bills are billed per batch: the server tracks billable qty by
+      // these and refuses a mill bill line without its batch.
+      lineItems: (vb.lineItems || vb.items || []).map((line, index) => compact({
+        ...lineToApi(line, index),
+        batchId: line.batchId || undefined,
+        batchNumber: line.batchNumber || line.batchCode || undefined,
+        grnId: line.grnId || undefined,
+      })),
     }),
     fromApi: (row) => {
       const lines = (row.lineItems || row.items || []).map(lineFromApi);
@@ -1125,9 +1132,10 @@ export function describeError(err) {
     const fieldErrors = err.payload?.field_errors;
     if (fieldErrors && typeof fieldErrors === 'object') {
       const [field, messages] = Object.entries(fieldErrors)[0] || [];
-      if (field) return `${field}: ${[].concat(messages)[0]}`;
+      if (field) return `${field}: ${[].concat(messages).filter(Boolean).join(', ')}`;
     }
-    return err.message;
+    if (err.payload?.detail && typeof err.payload.detail === 'string') return err.payload.detail;
+    return err.message || 'Request failed.';
   }
   return err?.message || 'Could not reach the server';
 }

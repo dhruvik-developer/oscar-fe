@@ -2272,7 +2272,7 @@ export const ERPProvider = ({ children, }) => {
             });
         }
     };
-    const convertQuotationToDeliveryChallan = (id) => {
+    const convertQuotationToDeliveryChallan = async (id) => {
         const quote = quotations.find(q => q.id === id);
         if (!quote) return;
         const existing = deliveryChallans.find(dc => dc.sourceQuotationId === id);
@@ -2281,7 +2281,7 @@ export const ERPProvider = ({ children, }) => {
             showToast('An active quotation with line items is required.');
             return;
         }
-        const challan = addDeliveryChallan({
+        const challan = await addDeliveryChallan({
             sourceQuotationId: quote.id, sourceQuotationNumber: quote.quoteNumber,
             customerId: quote.customerId, customer: quote.customer,
             billingAddress: quote.billingAddress, shippingAddress: quote.shippingAddress,
@@ -2289,8 +2289,8 @@ export const ERPProvider = ({ children, }) => {
             date: getCurrentDateFormatted(), dispatchDate: '', transporter: '', vehicleNo: '',
             items: quote.items.map(item => ({ ...item })),
         });
-        setQuotations(prev => prev.map(q => q.id === id ? { ...q, deliveryChallanId: challan.id,
-            activity: [...(q.activity || []), { id: crypto.randomUUID(), type: `Delivery challan ${challan.challanNumber} created`, quotationId: id, timestamp: new Date().toISOString() }] } : q));
+        if (challan) setQuotations(prev => prev.map(q => q.id === id ? { ...q, deliveryChallanId: challan.id,
+            activity: [...(q.activity || []), { id: crypto.randomUUID(), type: `Delivery challan ${challan.challanNumber || ''} created`, quotationId: id, timestamp: new Date().toISOString() }] } : q));
         return challan;
     };
     /**
@@ -2604,7 +2604,7 @@ export const ERPProvider = ({ children, }) => {
             }
         }
         const defaultAddresses = resolvePartyAddresses(inv.customerId, inv.customer);
-        const challan = addDeliveryChallan({
+        const challan = await addDeliveryChallan({
             sourceInvoiceId: inv.id,
             sourceInvoiceNumber: inv.invoiceNumber,
             invoiceId: inv.id,
@@ -2633,8 +2633,6 @@ export const ERPProvider = ({ children, }) => {
                 rate: Number(it.rate) || 0,
             })),
         });
-        setInvoices(prev => prev.map(i => String(i.id) === String(invoiceId) ? { ...i, deliveryChallanId: challan?.id } : i));
-        showToast(`Draft delivery challan ${challan?.challanNumber || ''} created for Invoice ${inv.invoiceNumber}.`);
         return challan;
     };
     const convertChallanToInvoice = async (challanId, payload = {}) => {
@@ -2810,7 +2808,7 @@ export const ERPProvider = ({ children, }) => {
         const invoice = await convertSalesOrderToInvoice(orderId, payload);
         return { challan, invoice };
     };
-    const addDeliveryChallan = (challan) => {
+    const addDeliveryChallan = async (challan) => {
         const previous = challan.id ? deliveryChallans.find(dc => dc.id === challan.id) : null;
         if (previous && previous.status !== 'Draft') return previous;
         const salesOrderId = challan.salesOrderId || challan.sourceSalesOrderId;
@@ -2824,8 +2822,9 @@ export const ERPProvider = ({ children, }) => {
             )
         ));
         if (activeDuplicate) {
-            showToast(`Sales Order ${salesOrderNumber || ''} already has an active Delivery Challan. Complete or cancel it before creating another.`);
-            return null;
+            const message = `Sales Order ${salesOrderNumber || ''} already has an active Delivery Challan. Complete or cancel it before creating another.`;
+            showToast(message);
+            throw rejectCreate(message);
         }
 
         const challanItems = challan.items || challan.lineItems || [];
@@ -2850,12 +2849,15 @@ export const ERPProvider = ({ children, }) => {
             dispatchDate: challan.dispatchDate || getCurrentISODate(),
             transporter: challan.transporter || '',
             vehicleNo: challan.vehicleNo || '',
-            status: challan.status || 'In Transit',
+            status: challan.status || 'Draft',
             items: challanItems,
             lineItems: challanItems,
         };
-        // Auto-create matching Sales Order if none exists for this Delivery Challan
-        if (!newChallan.salesOrderId && !newChallan.salesOrderNumber) {
+
+        // Resolve/create the Sales Order only when offline/local; the server path
+        // must never create a duplicate sales order during challan creation.
+        let linkedAutoOrder = null;
+        if (!isBackendEnabled() && !newChallan.salesOrderId && !newChallan.salesOrderNumber) {
             const soItems = (challanItems || []).map((line, idx) => ({
                 id: line.id || `so-item-${Date.now()}-${idx}`,
                 itemId: line.itemId || '',
@@ -2873,7 +2875,7 @@ export const ERPProvider = ({ children, }) => {
                 tax: Number(line.tax || 18),
                 amount: (Number(line.qty || line.orderedQty || 1)) * (Number(line.rate || 0)),
             }));
-            const autoOrder = {
+            linkedAutoOrder = {
                 id: `so-${Date.now()}`,
                 orderNumber: `SO-${String(Date.now()).slice(-6)}`,
                 customerId: newChallan.customerId,
@@ -2890,24 +2892,71 @@ export const ERPProvider = ({ children, }) => {
                 lineItems: soItems,
                 notes: `Auto-created from Delivery Challan ${newChallan.challanNumber || ''}`,
             };
-            setSalesOrders((prev) => [autoOrder, ...prev]);
-            persistCreate('salesOrders', autoOrder, setSalesOrders);
-            newChallan.salesOrderId = autoOrder.id;
-            newChallan.sourceSalesOrderId = autoOrder.id;
-            newChallan.salesOrderNumber = autoOrder.orderNumber;
-            newChallan.sourceSalesOrderNumber = autoOrder.orderNumber;
-            newChallan.linkedSo = autoOrder.orderNumber;
+            setSalesOrders((prev) => [linkedAutoOrder, ...prev]);
+            newChallan.salesOrderId = linkedAutoOrder.id;
+            newChallan.sourceSalesOrderId = linkedAutoOrder.id;
+            newChallan.salesOrderNumber = linkedAutoOrder.orderNumber;
+            newChallan.sourceSalesOrderNumber = linkedAutoOrder.orderNumber;
+            newChallan.linkedSo = linkedAutoOrder.orderNumber;
+        }
+
+        if (isBackendEnabled() && previous && isServerId(previous.id)) {
+            // A draft already on the server is updated, then dispatched. POSTing
+            // it again would create a second challan. Lines go only if they
+            // changed, since the server re-validates every line it receives.
+            const previousLines = previous.items || [];
+            const linesChanged = challanItems.length !== previousLines.length
+                || challanItems.some((line, idx) => Number(line.qty) !== Number(previousLines[idx]?.qty));
+            const updated = await pushUpdate('deliveryChallans', previous.id, {
+                transporter: newChallan.transporter,
+                vehicleNo: newChallan.vehicleNo,
+                dispatchDate: newChallan.dispatchDate,
+                ...(linesChanged ? { items: challanItems } : {}),
+            });
+            if (updated) reconcile(setDeliveryChallans, previous.id, updated);
+            if (newChallan.status === 'Draft') return updated;
+            const dispatched = await runDocAction('deliveryChallans', previous.id, 'dispatch', {}, setDeliveryChallans, {
+                refresh: ['deliveryChallans', 'salesOrders', 'inventoryMovements', 'items'],
+            });
+            showToast(`Delivery Challan ${previous.challanNumber || ''} dispatched.`);
+            return dispatched || updated;
+        }
+
+        if (isBackendEnabled() && !previous) {
+            // Create the challan as Draft, then dispatch explicitly. This avoids
+            // duplicate dispatch attempts and makes status transitions observable.
+            const savedDraft = await createOnServer('deliveryChallans', { ...newChallan, status: 'Draft' }, setDeliveryChallans, {
+                label: 'Delivery Challan',
+            });
+            let saved = savedDraft;
+            if (newChallan.status && newChallan.status !== 'Draft' && savedDraft?.id) {
+                saved = await runDocAction('deliveryChallans', savedDraft.id, 'dispatch', {}, setDeliveryChallans, {
+                    refresh: ['deliveryChallans', 'salesOrders', 'inventoryMovements', 'items'],
+                });
+                saved = saved || savedDraft;
+            } else {
+                refreshCollections(['deliveryChallans', 'salesOrders']);
+            }
+            showToast(`Delivery Challan ${saved?.challanNumber || savedDraft?.challanNumber || ''} ${saved?.status === 'Draft' ? 'saved as draft' : 'dispatched'}.`);
+            return saved;
         }
 
         setDeliveryChallans((prev) => previous ? prev.map(dc => dc.id === newChallan.id ? newChallan : dc) : [newChallan, ...prev]);
 
+        if (linkedAutoOrder) {
+            persistCreate('salesOrders', linkedAutoOrder, setSalesOrders);
+        }
+
         // Draft quotation conversions reserve no stock and have no fulfillment effects.
         if (newChallan.status === 'Draft') {
-            showToast(`Draft delivery challan ${newChallan.challanNumber} created.`);
+            showToast(`Draft delivery challan ${newChallan.challanNumber || ''} created.`);
+            persistCreate('deliveryChallans', newChallan, setDeliveryChallans, {
+                refresh: ['deliveryChallans', 'salesOrders'],
+            });
             return newChallan;
         }
 
-        // Serial numbers removal for serialized items
+        // Serial numbers removal for serialized items (local/offline path)
         if (newChallan.items && newChallan.items.length > 0) {
             newChallan.items.forEach((line) => {
                 const targetSku = line.sku || line.itemSku;
@@ -2919,54 +2968,7 @@ export const ERPProvider = ({ children, }) => {
             });
         }
 
-        // Update linked Sales Order line fulfillment (deliveredQty, remainingQty, stage)
-        const linkedSoId = newChallan.salesOrderId;
-        const linkedSoNum = newChallan.salesOrderNumber || newChallan.linkedSo;
-        if (linkedSoId || linkedSoNum) {
-            setSalesOrders((prev) => prev.map((order) => {
-                if (order.id !== linkedSoId && order.orderNumber !== linkedSoNum) return order;
-
-                let allDelivered = true;
-                let anyDelivered = false;
-
-                const updatedLines = (order.items || []).map((soLine) => {
-                    const matchedChallanLine = newChallan.items.find((cl) => 
-                        (cl.id && cl.id === soLine.id) ||
-                        (cl.itemId && cl.itemId === soLine.itemId) ||
-                        (cl.itemSku && cl.itemSku === soLine.itemSku) ||
-                        (cl.sku && cl.sku === soLine.sku) ||
-                        (cl.description && cl.description === soLine.description)
-                    );
-
-                    const dispatchedThisTime = matchedChallanLine ? Number(matchedChallanLine.qty || matchedChallanLine.dispatchedQty || 0) : 0;
-                    const prevDelivered = Number(soLine.deliveredQty || 0);
-                    const totalDelivered = prevDelivered + dispatchedThisTime;
-                    const totalOrdered = Number(soLine.orderedQty ?? soLine.qty ?? 1);
-                    const remaining = Math.max(0, totalOrdered - totalDelivered);
-
-                    if (totalDelivered > 0) anyDelivered = true;
-                    if (totalDelivered < totalOrdered) allDelivered = false;
-
-                    return {
-                        ...soLine,
-                        deliveredQty: totalDelivered,
-                        remainingQty: remaining,
-                    };
-                });
-
-                const newStage = allDelivered ? 'Fully Dispatched' : anyDelivered ? 'Partially Dispatched' : order.stage;
-
-                return {
-                    ...order,
-                    items: updatedLines,
-                    lineItems: updatedLines,
-                    stage: order.stage === 'Invoiced' ? 'Invoiced' : newStage,
-                    status: order.stage === 'Invoiced' ? 'Invoiced' : newStage,
-                };
-            }));
-        }
-
-        showToast(`Delivery Challan ${newChallan.challanNumber} issued.`);
+        showToast(`Delivery Challan ${newChallan.challanNumber || ''} issued.`);
         persistCreate('deliveryChallans', newChallan, setDeliveryChallans, {
             onServer: (saved) => {
                 if (saved && saved.id && saved.id !== newChallan.id) {
@@ -2976,8 +2978,6 @@ export const ERPProvider = ({ children, }) => {
                             : m
                     )));
                 }
-                // Non-draft challans dispatch stock server-side (the create
-                // itself only numbers the document).
                 const dispatchThenRefresh = () => refreshCollections(['deliveryChallans', 'inventoryMovements', 'salesOrders', 'items']);
                 if (saved && saved.id && saved.status && saved.status !== 'Draft' && saved.status !== 'Cancelled') {
                     api.post(`/sales/challans/${saved.id}/dispatch/`, {}).then(dispatchThenRefresh, dispatchThenRefresh);
@@ -2994,22 +2994,19 @@ export const ERPProvider = ({ children, }) => {
             showToast('This challan is a draft. Dispatch must be prepared before delivery can be recorded.');
             return Promise.resolve(null);
         }
-        if (status === 'Delivered' && isBackendEnabled() && isServerId(id)) {
-            return runDocAction('deliveryChallans', id, 'confirm-pod', {}, setDeliveryChallans, {
-                refresh: ['deliveryChallans', 'salesOrders'],
+        if (isBackendEnabled() && isServerId(id)) {
+            const action = status === 'Delivered' ? 'confirm-pod' : 'update-status';
+            const data = status === 'Delivered' ? {} : { status };
+            return runDocAction('deliveryChallans', id, action, data, setDeliveryChallans, {
+                refresh: ['deliveryChallans', 'salesOrders', 'inventoryMovements', 'items'],
             }).then((saved) => {
-                showToast(`Proof of delivery saved for Challan ${saved?.challanNumber || challan?.challanNumber || ''}.`);
+                showToast(status === 'Delivered'
+                    ? `Proof of delivery saved for Challan ${saved?.challanNumber || challan?.challanNumber || ''}.`
+                    : `Challan updated to ${saved?.status || status}.`);
                 return saved;
             });
         }
-        setDeliveryChallans((prev) => prev.map((c) => {
-            if (c.id !== id)
-                return c;
-            // The order stage follows dispatched quantities on the server
-            // (Partially / Fully Dispatched); delivery of a challan does not
-            // change it, so nothing is mirrored locally here.
-            return { ...c, status };
-        }));
+        setDeliveryChallans((prev) => prev.map((c) => (c.id === id ? { ...c, status } : c)));
         persistUpdate('deliveryChallans', id, { status }, setDeliveryChallans);
         showToast(`Challan updated to ${status}.`);
         return Promise.resolve({ ...challan, status });
@@ -4031,16 +4028,16 @@ export const ERPProvider = ({ children, }) => {
             return [];
         }
     };
-    const approveVendorBill = async (id, remarks) => {        const target = vendorBills.find((b) => b.id === id);
+    const approveVendorBill = async (id, remarks, approvalBasis) => {        const target = vendorBills.find((b) => b.id === id);
         if (!target) return null;
         if (!isBackendEnabled() || !isServerId(id)) {
             showToast('Approval needs backend connection.');
             return null;
         }
         try {
-            const row = await api.post(`/purchase/vendor-bills/${id}/approve/`, { remarks: remarks || '' });
+            const row = await api.post(`/purchase/vendor-bills/${id}/approve/`, { remarks: remarks || '', approvalBasis });
             applyApprovalRow(id, row || {}, 'Approved');
-            showToast(`Vendor bill ${target.vendorBillNumber} approved.`);
+            showToast(`Vendor bill ${target.vendorBillNumber} approved${approvalBasis === 'PO' ? ' at the PO amount' : ''}.`);
             return row;
         } catch (err) {
             console.warn('[ERP] could not approve vendor bill:', err);

@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Search, CheckCircle2, Receipt, Eye, IndianRupee, X, Zap, Printer, Clock, AlertCircle, FileText, Plus, Ban, Check, Edit, Lock, ShieldAlert, MapPin, Truck } from 'lucide-react';
+import { Search, CheckCircle2, Receipt, Eye, BadgePercent, IndianRupee, X, Zap, Printer, Clock, AlertCircle, FileText, Plus, Ban, Check, Edit, Lock, ShieldAlert, MapPin, Truck } from 'lucide-react';
 import { useERP } from '../../context/ERPContext';
-import { salesService } from '../../services/domainServices';
+import { receivablesService, salesService } from '../../services/domainServices';
 import { StatCard } from '../../components/ui/StatCard';
 import { LineItemEditor } from '../../components/common/LineItemEditor';
 import { DocumentTimeline } from '../../components/common/DocumentTimeline';
 import { RelatedDocumentsCard } from '../../components/common/RelatedDocumentsCard';
 import { PaymentReceiptModal } from '../../components/common/PaymentReceiptModal';
+import { DiscountRequestModal, RecordPaymentModal } from './receivables/PaymentDialogs';
+import { errorText, num, useCan } from './receivables/receivablesFormat';
 import { PrintInvoiceModal } from '../../components/common/PrintInvoiceModal';
 import { StatusBadge } from '../../components/ui/StatusBadge';
 import { Button } from '../../components/ui/Button';
@@ -29,7 +31,7 @@ const invoiceGuide = {
     ],
     tips: [
         'Proforma Invoices convert into Draft Sales Invoices, giving you full flexibility to adjust parts and quantities before final commercial posting.',
-        'Use the ⚡ Settle button on unpaid invoices to record payment and generate an official printable receipt voucher in 1 click.',
+        'Use the ⚡ Settle button on unpaid invoices to enter the amount received and generate an official printable receipt voucher.',
     ],
     workflow: ['Proforma / SO Draft Created', 'Adjust Line Items & Addresses', 'Finalize Commercial Invoice', 'Collect Payment', 'Receipt Voucher Issued'],
 };
@@ -118,6 +120,9 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
     const [selectedInvoice, setSelectedInvoice] = useState(null);
     const [showPaymentModal, setShowPaymentModal] = useState(null);
     const [activeReceipt, setActiveReceipt] = useState(null);
+    const [settleTarget, setSettleTarget] = useState(null);
+    const [discountTarget, setDiscountTarget] = useState(null);
+    const can = useCan();
     const [printInvoiceTarget, setPrintInvoiceTarget] = useState(null);
 
     // Cancellation & Finalize modals
@@ -537,28 +542,40 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
         setShowCreateModal(false);
     };
 
-    const handleQuickSettleAndReceipt = async (inv) => {
-        const outstanding = getInvoiceOutstanding(inv.id);
-        const amountToPay = outstanding.balanceDue > 0 ? outstanding.balanceDue : inv.total;
-        const payment = await addPaymentIn({
-            customerId: inv.customerId,
-            customer: inv.customer,
-            invoiceId: inv.id,
-            invoiceNumber: inv.invoiceNumber,
-            amount: amountToPay,
-            mode: 'Bank Wire Direct',
-            reference: `AUTO-SETTLE-${inv.invoiceNumber}`,
-        });
-        if (!payment) return;
+    // A discount on the invoice lines, or an approved early-payment discount.
+    const hasDiscount = (inv) => Number(inv.discountTotal) > 0 || Number(inv.settlementDiscount) > 0;
+
+    // The request form needs the receivables row: it carries the payment facts.
+    const openPaymentsAndDiscounts = async (inv) => {
+        try {
+            const body = await receivablesService.getReceivables({ search: inv.invoiceNumber, page_size: 50 });
+            const rows = Array.isArray(body) ? body : body?.results || [];
+            const row = rows.find((r) => r.id === inv.id);
+            if (!row) {
+                showToast('This invoice could not be found in receivables.');
+            } else if (num(row.paidAmount) <= 0) {
+                showToast('Record a payment on this invoice before requesting a discount.');
+            } else if (!row.hasEarlyPayment) {
+                showToast('An early-payment discount needs a payment made before the due date.');
+            } else {
+                setDiscountTarget(row);
+            }
+        } catch (err) {
+            showToast(errorText(err, 'Could not load this invoice.'));
+        }
+    };
+
+    const handleSettleSaved = (payment) => {
+        refreshCollections(['invoices', 'paymentIns']);
         setActiveReceipt({
             id: payment.id,
-            receiptNumber: payment.receiptNumber || payment.payment_number,
-            invoiceNumber: inv.invoiceNumber,
-            customer: inv.customer,
+            receiptNumber: payment.payment_number,
+            invoiceNumber: settleTarget?.invoiceNumber,
+            customer: payment.customerName || settleTarget?.customer,
             amount: payment.amount,
-            date: payment.date,
+            date: formatDateDDMMYYYY(payment.date),
             paymentMode: payment.mode,
-            reference: payment.reference || payment.referenceNumber,
+            reference: payment.transactionReference || payment.referenceNumber,
         });
     };
 
@@ -950,8 +967,13 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
                                                                 <Printer className="w-4 h-4"/>
                                                             </button>
                                                             {inv.status !== 'Cancelled' && outstanding.balanceDue > 0.01 && (
-                                                                <button onClick={() => handleQuickSettleAndReceipt(inv)} className="px-2 py-1 text-[10px] font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded shadow-xs inline-flex items-center gap-1 transition-colors cursor-pointer" title="1-Click Settle & Print Payment Receipt">
+                                                                <button onClick={() => setSettleTarget(inv)} className="px-2 py-1 text-[10px] font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded shadow-xs inline-flex items-center gap-1 transition-colors cursor-pointer" title="Record the payment received for this invoice">
                                                                     <Zap className="w-3 h-3"/> Settle
+                                                                </button>
+                                                            )}
+                                                            {inv.status !== 'Cancelled' && !hasDiscount(inv) && can('request_payment_discount') && (
+                                                                <button onClick={() => openPaymentsAndDiscounts(inv)} className="px-2 py-1 text-[10px] font-bold text-primary bg-primary/10 border border-primary/25 hover:bg-primary hover:border-primary hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 rounded shadow-xs inline-flex items-center gap-1 whitespace-nowrap transition-colors cursor-pointer" title="Request an early-payment discount on this invoice">
+                                                                    <BadgePercent className="w-3 h-3"/> Payments & Discounts
                                                                 </button>
                                                             )}
                                                         </>
@@ -987,7 +1009,7 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
                         <div className="flex items-center justify-between pb-3 border-b border-slate-200">
                             <div>
                                 <h2 className="text-base font-bold text-slate-900">
-                                    {editingDraftTarget ? `Edit Draft Invoice ${editingDraftTarget.invoiceNumber}` : 'Issue Commercial Tax Invoice'}
+                                    {editingDraftTarget ? `Edit Draft Invoice ${editingDraftTarget.invoiceNumber || ''}`.trim() : 'Issue Commercial Tax Invoice'}
                                 </h2>
                                 <p className="text-[11px] text-slate-500 mt-0.5">
                                     Draft invoices can be freely modified before commercial locking and financial ledger posting.
@@ -1050,14 +1072,14 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
                                     <input type="date" value={invoiceDate} onChange={(e) => { setInvoiceDate(e.target.value); applyTermDays(termDays, e.target.value); }} className="border border-slate-300 rounded-xl px-3 py-2 bg-white text-slate-800"/>
                                 </div>
 
-                                <div className="flex flex-col gap-1">
+                                <div className="flex flex-col gap-1 min-w-0">
                                     <label htmlFor="invoice-terms" className="font-semibold text-slate-700">Payment Terms</label>
                                     <div className="flex gap-2">
-                                        <select id="invoice-terms" value={termChoice} onChange={(e) => chooseTerms(e.target.value, customDays === '' ? null : Number(customDays))} className="flex-1 border border-slate-300 rounded-xl px-3 py-2 bg-white text-slate-800">
+                                        <select id="invoice-terms" value={termChoice} onChange={(e) => chooseTerms(e.target.value, customDays === '' ? null : Number(customDays))} className="flex-1 min-w-0 border border-slate-300 rounded-xl px-3 py-2 bg-white text-slate-800">
                                             {INVOICE_TERM_OPTIONS.map((o) => <option key={o.label} value={o.label}>{o.label}</option>)}
                                         </select>
                                         {termChoice === 'Custom' && (
-                                            <input type="number" min="0" aria-label="Custom credit days" placeholder="Days" value={customDays} onChange={(e) => { setCustomDays(e.target.value); if (e.target.value !== '') applyTermDays(Number(e.target.value)); }} className="w-20 border border-slate-300 rounded-xl px-2 py-2 bg-white text-slate-800"/>
+                                            <input type="number" min="0" aria-label="Custom credit days" placeholder="Days" value={customDays} onChange={(e) => { setCustomDays(e.target.value); if (e.target.value !== '') applyTermDays(Number(e.target.value)); }} className="w-16 shrink-0 border border-slate-300 rounded-xl px-2 py-2 bg-white text-slate-800"/>
                                         )}
                                     </div>
                                 </div>
@@ -1504,6 +1526,12 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
                                     </button>
                                 )}
 
+                                {selectedInvoice.status !== 'Cancelled' && selectedInvoice.status !== 'Draft' && !hasDiscount(selectedInvoice) && can('request_payment_discount') && (
+                                    <button onClick={() => openPaymentsAndDiscounts(selectedInvoice)} className="px-3 py-1.5 text-primary bg-primary/10 border border-primary/25 hover:bg-primary hover:border-primary hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 rounded-lg font-semibold text-xs shadow-sm flex items-center gap-1.5 whitespace-nowrap transition-colors cursor-pointer">
+                                        <BadgePercent className="w-3.5 h-3.5"/> Payments & Discounts
+                                    </button>
+                                )}
+
                                 {selectedInvoice.status !== 'Cancelled' && getInvoiceOutstanding(selectedInvoice.id).balanceDue > 0.01 && (
                                     <button onClick={() => {
                                         setShowPaymentModal(selectedInvoice);
@@ -1817,7 +1845,26 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
                 </div>
             )}
 
-            {/* Instant Settle Payment Receipt Modal */}
+            {/* Settle: the same payment form as Payments & Discounts */}
+            <RecordPaymentModal
+                isOpen={Boolean(settleTarget)}
+                onClose={() => setSettleTarget(null)}
+                presetCustomerId={settleTarget?.customerId}
+                presetInvoiceId={settleTarget?.id}
+                onSaved={handleSettleSaved}
+            />
+
+            <DiscountRequestModal
+                isOpen={Boolean(discountTarget)}
+                onClose={() => setDiscountTarget(null)}
+                invoice={discountTarget}
+                onSaved={() => {
+                    showToast(`Discount request saved for ${discountTarget?.invoiceNumber}.`);
+                    refreshCollections(['invoices', 'paymentIns']);
+                }}
+            />
+
+            {/* Payment Receipt Modal */}
             <PaymentReceiptModal receipt={activeReceipt} onClose={() => setActiveReceipt(null)}/>
 
             {/* Official Printable Commercial Tax Invoice Document */}

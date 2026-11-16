@@ -29,7 +29,7 @@ const paymentInGuide = {
         },
     ],
     tips: [
-        'You can also click "⚡ Settle" directly from the Sales Invoices screen to record payment with 1 click!',
+        'You can also click "⚡ Settle" directly from the Sales Invoices screen to record a payment for that invoice.',
         'Each recorded payment immediately adjusts the customer’s live credit balance in Customer 360°.',
     ],
 };

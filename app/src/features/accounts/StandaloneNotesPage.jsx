@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { modal } from '../../context/ModalContext';
 import {
   FileText,
   Plus,
@@ -179,7 +180,7 @@ export default function StandaloneNotesPage({ embedded = false }) {
       await accountingService.approveStandaloneNote(note.id);
       loadNotes();
     } catch (err) {
-      alert(describeApiError(err));
+      await modal.error(describeApiError(err), 'Approval Error');
     }
   };
 
@@ -188,7 +189,7 @@ export default function StandaloneNotesPage({ embedded = false }) {
       await accountingService.postStandaloneNote(note.id);
       loadNotes();
     } catch (err) {
-      alert(describeApiError(err));
+      await modal.error(describeApiError(err), 'Post Error');
     }
   };
 
@@ -202,7 +203,7 @@ export default function StandaloneNotesPage({ embedded = false }) {
       setCancelReason('');
       loadNotes();
     } catch (err) {
-      alert(describeApiError(err));
+      await modal.error(describeApiError(err), 'Cancel Error');
     } finally {
       setCancelling(false);
     }

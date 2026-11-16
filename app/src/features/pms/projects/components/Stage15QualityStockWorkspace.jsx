@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { modal } from '../../../../context/ModalContext';
 import {
   Activity,
   AlertCircle,
@@ -438,9 +439,13 @@ export function Stage15QualityStockWorkspace({
 
   // Release Allocation
   const handleReleaseAllocation = async (allocationId) => {
-    if (!window.confirm('Are you sure you want to release this allocation? The reserved meters will return to unallocated available stock.')) {
-      return;
-    }
+    const ok = await modal.confirm({
+      title: 'Release Allocation',
+      message: 'Are you sure you want to release this allocation? The reserved meters will return to unallocated available stock.',
+      confirmLabel: 'Release Stock',
+      iconType: 'warning',
+    });
+    if (!ok) return;
     setSubmitting(true);
     try {
       await releaseStage15Allocation(projectId, allocationId);

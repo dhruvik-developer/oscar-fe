@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { modal } from '../../context/ModalContext';
 import { useERP } from '../../context/ERPContext';
 import { DataTable } from '../../components/ui/DataTable';
 import { StatusBadge } from '../../components/ui/StatusBadge';
@@ -121,16 +122,16 @@ export const PurchaseReturnsPage = () => {
         e.preventDefault();
         const bill = purchaseBills.find((b) => b.id === selectedBillId);
         if (!bill) {
-            alert('Select the purchase bill being returned against.');
+            await modal.warning('Select the purchase bill being returned against.', 'Bill Required');
             return;
         }
         const activeLines = returnItems.filter((it) => Number(it.qty) > 0);
         if (activeLines.length === 0) {
-            alert('Please specify at least 1 item with return quantity > 0.');
+            await modal.warning('Please specify at least 1 item with return quantity > 0.', 'Quantity Required');
             return;
         }
         if (!reason.trim()) {
-            alert('Enter the reason for the return.');
+            await modal.warning('Enter the reason for the return.', 'Reason Required');
             return;
         }
         setSaving(true);

@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
+import { modal } from '../../../context/ModalContext';
 import { useNavigate } from 'react-router-dom';
 import { X } from 'lucide-react';
 import LeadFormsManager from '../leads/LeadFormsManager';
@@ -66,7 +67,7 @@ export default function LeadFormsPage() {
     // asks the user to switch a form on.
     if (toggling) return;
     if (!isServerId(formId)) {
-      alert('Open this form in the builder and save it before switching it on.');
+      await modal.warning('Open this form in the builder and save it before switching it on.', 'Form Not Saved');
       return;
     }
     const next = String(activeFormId) === String(formId) ? null : formId;
@@ -74,7 +75,7 @@ export default function LeadFormsPage() {
     try {
       await setLiveLeadForm(next);
     } catch (err) {
-      alert(`Could not change the form status: ${err?.message || err}`);
+      await modal.error(`Could not change the form status: ${err?.message || err}`, 'Status Error');
     } finally {
       setToggling(false);
     }

@@ -1,3 +1,4 @@
+import { modal } from '../../../context/ModalContext';
 import { useState } from "react";
 import { Avatar } from "../../../components/hrms/Avatar";
 import { useAppStore } from "../../../stores/appStore";
@@ -27,8 +28,13 @@ export default function Performance() {
       </div>
       <div className="bg-white border border-bdr rounded-xl shadow-sm overflow-hidden">
         <div className="p-5 flex flex-wrap justify-between gap-3 border-b border-bdr"><h3 className="font-semibold">Goals & KPIs</h3>
-          <div className="flex gap-2"><select value={filter} onChange={(e) => setFilter(e.target.value)} className="h-8 px-2 bg-off border border-bdr rounded-lg text-[12px]"><option>All</option><option>In Progress</option><option>Completed</option></select><button onClick={() => {
-    const t = prompt("Goal title");
+          <div className="flex gap-2"><select value={filter} onChange={(e) => setFilter(e.target.value)} className="h-8 px-2 bg-off border border-bdr rounded-lg text-[12px]"><option>All</option><option>In Progress</option><option>Completed</option></select><button onClick={async () => {
+    const t = await modal.prompt({
+      title: "Add Goal",
+      label: "Goal Title",
+      placeholder: "e.g. Complete Q4 audit",
+      required: true
+    });
     if (t) setGoals([...goals, { id: "G" + Date.now(), emp: "Ayesha Khan", avatar: "https://i.pravatar.cc/100?img=5", title: t, target: "1", progress: 10, due: "Dec 31", status: "In Progress" }]);
   }} className="px-3 py-1.5 bg-primary hover:bg-primary-hover text-white rounded-lg text-[12px] transition shadow-xs cursor-pointer">Add Goal</button></div>
         </div>

@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { modal } from '../../context/ModalContext';
 import { useSearchParams } from 'react-router-dom';
 import StandaloneNotesPage from './StandaloneNotesPage';
 import { Plus, Trash2, RotateCcw, Search } from 'lucide-react';
@@ -100,7 +101,13 @@ function JournalTab({ accounts, accountsError, onPosted }) {
   const aggregates = data?.aggregates || {};
 
   const handleReverse = async (entry) => {
-    if (!window.confirm(`Post a reversing entry for ${entry.entryNumber}? The original will be marked Reversed.`)) return;
+    const ok = await modal.confirm({
+      title: 'Post Reversing Entry',
+      message: `Post a reversing entry for ${entry.entryNumber}? The original will be marked Reversed.`,
+      confirmLabel: 'Post Reversal',
+      iconType: 'warning',
+    });
+    if (!ok) return;
     setReversingId(entry.id);
     setActionError('');
     try {

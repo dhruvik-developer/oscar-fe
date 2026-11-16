@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { modal } from '../../context/ModalContext';
 import UomSelect from '../../components/common/UomSelect';
 import MasterSourceLink from '../../components/common/MasterSourceLink';
 import { formatQty } from '../../utils/uom';
@@ -645,8 +646,16 @@ export default function QuotationComposerPage({ embedded = null } = {}) {
     }
   }
 
-  function embeddedCancel() {
-    if (isDirty() && !window.confirm('Discard unsaved changes?')) return;
+  async function embeddedCancel() {
+    if (isDirty()) {
+      const ok = await modal.confirm({
+        title: 'Discard Changes',
+        message: 'Discard unsaved changes?',
+        confirmLabel: 'Discard',
+        iconType: 'warning',
+      });
+      if (!ok) return;
+    }
     embedded.onCancel();
   }
 

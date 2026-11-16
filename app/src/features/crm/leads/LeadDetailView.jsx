@@ -1,4 +1,5 @@
 import { findDealForLead } from '../../../services/dealService';
+import { modal } from '../../../context/ModalContext';
 import { CRM_EVENT } from '../../../services/leadStageAutomation';
 
 import CrmKpiCard from '../common/CrmKpiCard';
@@ -1251,12 +1252,15 @@ function SourcesAndEmailsTab({ lead, onCountsChange, onActivity }) {
 
 
 
-  function runLink() {
-
-    const url = window.prompt('Enter link URL', 'https://');
-
+  async function runLink() {
+    const url = await modal.prompt({
+      title: 'Insert Link',
+      message: 'Enter destination URL for the link:',
+      defaultValue: 'https://',
+      placeholder: 'https://example.com',
+      confirmLabel: 'Insert Link',
+    });
     if (url) formatDoc('createLink', url);
-
   }
 
 

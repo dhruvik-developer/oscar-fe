@@ -1,3 +1,4 @@
+import { modal } from '../../../context/ModalContext';
 import { useState, useMemo, useEffect } from "react";
 import { Avatar } from "../../../components/hrms/Avatar";
 import { useNavigate } from "react-router-dom";
@@ -600,8 +601,14 @@ export default function TrainingFunnel({ embedded = false, onBack }) {
                           </button>
                           <button
                             type="button"
-                            onClick={() => {
-                              if (confirm(`Delete training "${t.name}"?`)) {
+                            onClick={async () => {
+                              const confirmed = await modal.deleteConfirm({
+                                title: "Delete Training?",
+                                message: `Are you sure you want to delete training "${t.name}"?`,
+                                itemName: t.name,
+                                confirmText: "Delete Training"
+                              });
+                              if (confirmed) {
                                 deleteTraining(t.id);
                                 showToast(`Deleted "${t.name}"`);
                               }
@@ -639,8 +646,13 @@ export default function TrainingFunnel({ embedded = false, onBack }) {
 
           <button
             type="button"
-            onClick={() => {
-              if (confirm("Reset training funnel data to initial realistic defaults?")) {
+            onClick={async () => {
+              const confirmed = await modal.warning({
+                title: "Reset Training Data?",
+                message: "Reset training funnel data to initial realistic defaults? Any custom training records will be replaced.",
+                confirmText: "Reset Defaults"
+              });
+              if (confirmed) {
                 resetToDefaults();
                 showToast("Training data reset to defaults");
               }
@@ -856,8 +868,14 @@ export default function TrainingFunnel({ embedded = false, onBack }) {
                 {editingItem ? (
                   <button
                     type="button"
-                    onClick={() => {
-                      if (confirm(`Delete training "${editingItem.name}"?`)) {
+                    onClick={async () => {
+                      const confirmed = await modal.deleteConfirm({
+                        title: "Delete Training?",
+                        message: `Are you sure you want to delete training "${editingItem.name}"?`,
+                        itemName: editingItem.name,
+                        confirmText: "Delete Training"
+                      });
+                      if (confirmed) {
                         deleteTraining(editingItem.id);
                         setModalOpen(false);
                         showToast("Training deleted");

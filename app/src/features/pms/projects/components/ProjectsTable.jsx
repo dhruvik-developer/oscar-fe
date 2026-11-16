@@ -15,9 +15,9 @@ import { useTableSort } from '../../../../hooks/useTableSort';
 import { SortableTh } from '../../../../components/ui/SortableTh';
 
 function formatDate(val) {
-  if (!val) return '—';
+  if (!val) return '"”';
   const d = new Date(val);
-  if (Number.isNaN(d.getTime())) return '—';
+  if (Number.isNaN(d.getTime())) return '"”';
   return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
@@ -91,23 +91,23 @@ export function ProjectsTable({
     <div className="bg-white rounded-xl border border-slate-200 shadow-2xs overflow-hidden">
       <div className="overflow-x-auto">
         <table className="w-full text-left border-collapse min-w-[1250px]">
-          <thead>
-            <tr className="border-b border-slate-200 bg-slate-50/70 text-[10.5px] font-bold text-slate-500 uppercase tracking-wider">
-              <SortableTh sort={sort} sortKey="code" className="py-3 px-3.5 whitespace-nowrap">PROJECT ID</SortableTh>
-              <SortableTh sort={sort} sortKey="customerName" className="py-3 px-3.5 whitespace-nowrap">CUSTOMER</SortableTh>
-              <SortableTh sort={sort} sortKey="crmOrderId" className="py-3 px-3.5 whitespace-nowrap">ORDER / ITEM</SortableTh>
-              <SortableTh sort={sort} sortKey="projectManager" className="py-3 px-3.5 whitespace-nowrap">PROJECT MANAGER</SortableTh>
-              <th className="py-3 px-3.5 whitespace-nowrap">TYPE</th>
-              <SortableTh sort={sort} sortKey="requirementMeters" className="py-3 px-3.5 whitespace-nowrap text-right" align="right">REQUIREMENT (m)</SortableTh>
-              <SortableTh sort={sort} sortKey="dyeingSentMeters" className="py-3 px-3.5 whitespace-nowrap text-right" align="right">DYEING SENT (m)</SortableTh>
-              <SortableTh sort={sort} sortKey="customerProject" className="py-3 px-3.5 whitespace-nowrap">CUSTOMER PROJECT</SortableTh>
-              <SortableTh sort={sort} sortKey="ownProject" className="py-3 px-3.5 whitespace-nowrap">OWN PROJECT</SortableTh>
-              <SortableTh sort={sort} sortKey="paymentStatus" className="py-3 px-3.5 whitespace-nowrap text-center" align="center">PAYMENT STATUS</SortableTh>
-              <SortableTh sort={sort} sortKey="status" className="py-3 px-3.5 whitespace-nowrap text-center" align="center">OVERALL STATUS</SortableTh>
-              <SortableTh sort={sort} sortKey="completion" className="py-3 px-3.5 whitespace-nowrap min-w-[130px]">COMPLETION</SortableTh>
-              <SortableTh sort={sort} sortKey="startDate" className="py-3 px-3.5 whitespace-nowrap">START DATE</SortableTh>
-              <SortableTh sort={sort} sortKey="expectedCompletionDate" className="py-3 px-3.5 whitespace-nowrap">EXPECTED END</SortableTh>
-              <th className="py-3 px-3.5 whitespace-nowrap text-center">ACTIONS</th>
+          <thead className="table-head-std">
+            <tr className="table-head-row-std">
+              <SortableTh sort={sort} sortKey="code">PROJECT ID</SortableTh>
+              <SortableTh sort={sort} sortKey="customerName">CUSTOMER</SortableTh>
+              <SortableTh sort={sort} sortKey="crmOrderId">ORDER / ITEM</SortableTh>
+              <SortableTh sort={sort} sortKey="projectManager">PROJECT MANAGER</SortableTh>
+              <th>TYPE</th>
+              <SortableTh sort={sort} sortKey="requirementMeters" align="right">REQUIREMENT (m)</SortableTh>
+              <SortableTh sort={sort} sortKey="dyeingSentMeters" align="right">DYEING SENT (m)</SortableTh>
+              <SortableTh sort={sort} sortKey="customerProject">CUSTOMER PROJECT</SortableTh>
+              <SortableTh sort={sort} sortKey="ownProject">OWN PROJECT</SortableTh>
+              <SortableTh sort={sort} sortKey="paymentStatus" align="center">PAYMENT STATUS</SortableTh>
+              <SortableTh sort={sort} sortKey="status" align="center">OVERALL STATUS</SortableTh>
+              <SortableTh sort={sort} sortKey="completion" className="min-w-[130px]">COMPLETION</SortableTh>
+              <SortableTh sort={sort} sortKey="startDate">START DATE</SortableTh>
+              <SortableTh sort={sort} sortKey="expectedCompletionDate">EXPECTED END</SortableTh>
+              <th className="text-center">ACTIONS</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 text-xs text-slate-700">
@@ -155,7 +155,7 @@ export function ProjectsTable({
 
                     {/* CUSTOMER */}
                     <td className="py-3.5 px-3.5 whitespace-nowrap font-semibold text-slate-900">
-                      {row.customerName || '—'}
+                      {row.customerName || '"”'}
                     </td>
 
                     {/* ORDER / ITEM */}

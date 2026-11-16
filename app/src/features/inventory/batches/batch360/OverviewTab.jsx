@@ -4,7 +4,7 @@ import { ClipboardCheck, Droplets, History, RefreshCcw, ShoppingCart, Undo2 } fr
 import { useERP } from '../../../../context/ERPContext';
 import { inventoryService } from '../../../../services/domainServices';
 import { describeApiError } from '../../../accounts/accountingShared';
-import { batchUrl } from '../printBatchTag';
+import { batchHistoryUrl } from '../printBatchTag';
 import RegisterTakasForm from '../RegisterTakasForm';
 import { Card, Stat, btnGhost, btnPrimary, useBatchAction } from './shared';
 
@@ -26,7 +26,7 @@ function BatchQr({ code }) {
   const [src, setSrc] = useState('');
   useEffect(() => {
     let alive = true;
-    QRCode.toDataURL(batchUrl(code), { margin: 1, width: 160 })
+    QRCode.toDataURL(batchHistoryUrl(code), { margin: 1, width: 160 })
       .then((url) => { if (alive) setSrc(url); })
       .catch(() => { if (alive) setSrc(''); });
     return () => { alive = false; };

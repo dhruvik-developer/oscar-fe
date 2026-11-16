@@ -26,6 +26,7 @@ export function Modal({
   resizable = true,
   allowMaximize = true,
   className = '',
+  backdropClassName = '',
 }) {
   const [isMaximized, setIsMaximized] = useState(false);
   const [customSize, setCustomSize] = useState(null); // { width, height }
@@ -55,17 +56,17 @@ export function Modal({
     setIsMaximized((prev) => !prev);
   }, []);
 
-  // Corner resize drag handler
-  const handleResizeMouseDown = useCallback((e) => {
-    if (e.button !== 0) return; // only left click
+  // Corner resize drag handler (supports mouse, pointer, and touch)
+  const handleResizeStart = useCallback((e) => {
+    if (e.button !== undefined && e.button !== 0) return; // only primary / left click
     e.preventDefault();
     e.stopPropagation();
 
     const card = cardRef.current;
     if (!card) return;
 
-    const startX = e.clientX;
-    const startY = e.clientY;
+    const startX = e.clientX ?? (e.touches && e.touches[0]?.clientX) ?? 0;
+    const startY = e.clientY ?? (e.touches && e.touches[0]?.clientY) ?? 0;
     const rect = card.getBoundingClientRect();
     const startWidth = rect.width;
     const startHeight = rect.height;
@@ -73,9 +74,11 @@ export function Modal({
     setIsResizing(true);
     setIsMaximized(false);
 
-    const onMouseMove = (moveEvent) => {
-      const deltaX = moveEvent.clientX - startX;
-      const deltaY = moveEvent.clientY - startY;
+    const onPointerMove = (moveEvent) => {
+      const clientX = moveEvent.clientX ?? (moveEvent.touches && moveEvent.touches[0]?.clientX) ?? startX;
+      const clientY = moveEvent.clientY ?? (moveEvent.touches && moveEvent.touches[0]?.clientY) ?? startY;
+      const deltaX = clientX - startX;
+      const deltaY = clientY - startY;
 
       const minW = Math.min(360, window.innerWidth - 32);
       const maxW = window.innerWidth - 32;
@@ -91,18 +94,26 @@ export function Modal({
       });
     };
 
-    const onMouseUp = () => {
+    const onPointerUp = () => {
       setIsResizing(false);
-      window.removeEventListener('mousemove', onMouseMove);
-      window.removeEventListener('mouseup', onMouseUp);
+      window.removeEventListener('mousemove', onPointerMove);
+      window.removeEventListener('mouseup', onPointerUp);
+      window.removeEventListener('pointermove', onPointerMove);
+      window.removeEventListener('pointerup', onPointerUp);
+      window.removeEventListener('touchmove', onPointerMove);
+      window.removeEventListener('touchend', onPointerUp);
       document.body.style.userSelect = '';
       document.body.style.cursor = '';
     };
 
     document.body.style.userSelect = 'none';
     document.body.style.cursor = 'nwse-resize';
-    window.addEventListener('mousemove', onMouseMove);
-    window.addEventListener('mouseup', onMouseUp);
+    window.addEventListener('mousemove', onPointerMove);
+    window.addEventListener('mouseup', onPointerUp);
+    window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('pointerup', onPointerUp);
+    window.addEventListener('touchmove', onPointerMove, { passive: true });
+    window.addEventListener('touchend', onPointerUp);
   }, []);
 
   if (!isOpen) return null;
@@ -146,7 +157,7 @@ export function Modal({
 
   return (
     <div
-      className="modal-backdrop"
+      className={`modal-backdrop ${backdropClassName}`.trim()}
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose?.();
       }}
@@ -202,7 +213,9 @@ export function Modal({
             tabIndex={-1}
             aria-label="Resize modal"
             title="Drag to resize modal (double-click to reset)"
-            onMouseDown={handleResizeMouseDown}
+            onPointerDown={handleResizeStart}
+            onMouseDown={handleResizeStart}
+            onTouchStart={handleResizeStart}
             onDoubleClick={() => setCustomSize(null)}
             className="modal-resize-handle"
           >

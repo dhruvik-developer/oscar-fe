@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { modal } from '../../context/ModalContext';
 import { useERP } from '../../context/ERPContext';
 import { DataTable } from '../../components/ui/DataTable';
 import { StatCard } from '../../components/ui/StatCard';
@@ -70,10 +71,10 @@ export const QuotationsPage = () => {
         navigate('/sales/quotations/create');
     };
 
-    const handleConvert = (quote) => {
+    const handleConvert = async (quote) => {
         if (!quote) return;
         if (['Rejected', 'Cancelled'].includes(quote.status)) {
-            alert('Cannot convert a rejected or cancelled quotation to a Sales Order. Please clone or create a new quotation.');
+            await modal.warning('Cannot convert a rejected or cancelled quotation to a Sales Order. Please clone or create a new quotation.', 'Cannot Convert');
             return;
         }
         const order = convertQuotationToSalesOrder(quote.id);

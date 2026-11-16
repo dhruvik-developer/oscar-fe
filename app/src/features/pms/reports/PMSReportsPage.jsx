@@ -38,7 +38,7 @@ export default function PMSReportsPage() {
     [projects, settings]
   );
 
-  const th = 'px-3 py-2 text-left text-[10px] font-bold uppercase tracking-wider text-slate-500';
+  const th = 'th-std text-left';
   const td = 'px-3 py-2 text-[11px] text-slate-700';
 
   return (
@@ -104,8 +104,8 @@ export default function PMSReportsPage() {
           <section className="rounded-xl border border-[#dce5f4] bg-white p-5 shadow-2xs overflow-x-auto">
             <h3 className="text-sm font-bold text-slate-800 mb-3">Stage Bottlenecks</h3>
             <table className="w-full border-collapse">
-              <thead className="bg-[#f6f9ff]">
-                <tr>
+              <thead className="table-head-std">
+                <tr className="table-head-row-std">
                   {['Department', 'Avg cycle (days)', 'Avg planned (days)', '% of plan', 'Stages'].map((h) => (
                     <th key={h} className={th}>{h}</th>
                   ))}
@@ -131,8 +131,8 @@ export default function PMSReportsPage() {
           <section className="rounded-xl border border-[#dce5f4] bg-white p-5 shadow-2xs overflow-x-auto">
             <h3 className="text-sm font-bold text-slate-800 mb-3">Delay Root Causes</h3>
             <table className="w-full border-collapse">
-              <thead className="bg-[#f6f9ff]">
-                <tr>
+              <thead className="table-head-std">
+                <tr className="table-head-row-std">
                   {['Cause', 'Delays', 'Share', 'Cumulative'].map((h) => (
                     <th key={h} className={th}>{h}</th>
                   ))}
@@ -157,8 +157,8 @@ export default function PMSReportsPage() {
           <section className="rounded-xl border border-[#dce5f4] bg-white p-5 shadow-2xs overflow-x-auto">
             <h3 className="text-sm font-bold text-slate-800 mb-3">Department Capacity</h3>
             <table className="w-full border-collapse">
-              <thead className="bg-[#f6f9ff]">
-                <tr>
+              <thead className="table-head-std">
+                <tr className="table-head-row-std">
                   {['Department', 'Open tasks', 'Capacity', 'Utilisation', 'Band', 'Blocked'].map((h) => (
                     <th key={h} className={th}>{h}</th>
                   ))}

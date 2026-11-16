@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useAppStore } from "../../../stores/appStore";
 import { usePerformanceStore, getRatingScaleTier, calculateWeightedScore } from "../../../stores/performanceStore";
 import { RATING_SCALES as ratingScales } from "../../../services/performanceScales";
@@ -37,6 +37,7 @@ export default function Appraisal() {
   const employees = useAppStore((s) => s.employees) || [];
 
   const {
+    hydrate,
     appraisals,
     cycles,
     role,
@@ -53,6 +54,11 @@ export default function Appraisal() {
     finalizeAppraisal,
     syncRatingToProfile,
   } = usePerformanceStore();
+
+  // Hydrate on mount
+  useEffect(() => {
+    hydrate?.();
+  }, [hydrate]);
 
   // Active Tab: 'active' | 'history'
   const [tab, setTab] = useState("active");
@@ -108,12 +114,11 @@ export default function Appraisal() {
   // Filter appraisals based on role and tab
   const filtered = useMemo(() => {
     return appraisals.filter((r) => {
-      // History tab filter: only Completed/Archived appraisals or previous cycles
+      // History tab: completed appraisals. Active tab: ongoing appraisals.
       if (tab === "history") {
-        if (r.status !== "Completed" && r.cycle === "Q4 2024") return false;
+        if (r.status !== "Completed") return false;
       } else {
-        // Active tab: exclude old completed records from prior cycles
-        if (r.status === "Completed" && r.cycle !== "Q4 2024") return false;
+        if (r.status === "Completed") return false;
       }
 
       // Role filter simulation
@@ -228,18 +233,18 @@ export default function Appraisal() {
   }
 
   // Save Add/Edit
-  function save() {
+  async function save() {
     if (!validateForm()) return;
 
     if (editRow) {
-      updateAppraisal(editRow.id, form);
+      await updateAppraisal(editRow.id, form);
       if (form.status === "Completed") {
         syncRatingToProfile(editRow.id);
       }
       showToast("Appraisal updated successfully.");
       setEditRow(null);
     } else {
-      addAppraisal(form);
+      await addAppraisal(form);
       showToast("Appraisal created successfully.");
       setAddOpen(false);
     }
@@ -512,16 +517,17 @@ export default function Appraisal() {
             {role === "HR" && (
               <Button
                 onClick={() => {
+                  const firstEmp = employees[0];
                   setForm({
-                    employee: employees[0]?.name || "",
-                    cycle: cycles.find((c) => c.status === "Active")?.name.replace("Performance Cycle", "").trim() || "Q4 2024",
-                    reviewer: "David Park",
+                    employee: firstEmp?.name || "",
+                    cycle: cycles.find((c) => c.status === "Active")?.name.replace("Performance Cycle", "").trim() || "Annual Review 2026",
+                    reviewer: employees[1]?.name || firstEmp?.name || "Reviewer",
                     rating: 4.0,
                     status: "Draft",
                     stage: "Self Review",
                     due: "15 Nov 2024",
-                    department: "Engineering",
-                    designation: "Senior Engineer",
+                    department: firstEmp?.department || "Engineering",
+                    designation: firstEmp?.designation || "Senior Specialist",
                   });
                   setFormErrors({});
                   setAddOpen(true);
@@ -547,7 +553,7 @@ export default function Appraisal() {
           >
             Active Appraisals
             <span className="px-1.5 py-0.2 rounded-full text-[11px] bg-blue-50 text-blue-700 font-semibold">
-              {appraisals.filter((a) => a.status !== "Completed" || a.cycle === "Q4 2024").length}
+              {appraisals.filter((a) => a.status !== "Completed").length}
             </span>
           </button>
 
@@ -715,21 +721,6 @@ export default function Appraisal() {
           </label>
 
           <label className="flex flex-col gap-1">
-            <span className="text-[11px] font-medium text-slate-500">Review Cycle</span>
-            <select
-              value={form.cycle}
-              onChange={(e) => setForm({ ...form, cycle: e.target.value })}
-              className="h-9 px-3 bg-white border border-[#e2e8f0] rounded-xl text-[13px]"
-            >
-              {cycles.map((c) => (
-                <option key={c.id} value={c.name.replace("Performance Cycle", "").replace("Appraisal Cycle", "").trim()}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label className="flex flex-col gap-1">
             <span className="flex items-center justify-between">
               <span className="text-[11px] font-medium text-slate-500">Reviewer *</span>
               <MasterSourceLink source="employees" />
@@ -749,19 +740,6 @@ export default function Appraisal() {
               ))}
             </select>
             {formErrors.reviewer && <span className="text-[11px] text-red-500">{formErrors.reviewer}</span>}
-          </label>
-
-          <label className="flex flex-col gap-1">
-            <span className="text-[11px] font-medium text-slate-500">Initial Rating (1.0 - 5.0)</span>
-            <input
-              type="number"
-              step={0.1}
-              min={1}
-              max={5}
-              value={form.rating}
-              onChange={(e) => setForm({ ...form, rating: Number(e.target.value) })}
-              className="h-9 px-3 bg-white border border-[#e2e8f0] rounded-xl text-[13px]"
-            />
           </label>
 
           <label className="flex flex-col gap-1">
@@ -796,7 +774,20 @@ export default function Appraisal() {
             </select>
           </label>
 
-          <label className="flex flex-col gap-1 sm:col-span-2">
+          <label className="flex flex-col gap-1">
+            <span className="text-[11px] font-medium text-slate-500">Initial Rating (1.0 - 5.0)</span>
+            <input
+              type="number"
+              step={0.1}
+              min={1}
+              max={5}
+              value={form.rating}
+              onChange={(e) => setForm({ ...form, rating: Number(e.target.value) })}
+              className="h-9 px-3 bg-white border border-[#e2e8f0] rounded-xl text-[13px]"
+            />
+          </label>
+
+          <label className="flex flex-col gap-1">
             <span className="text-[11px] font-medium text-slate-500">Due Date *</span>
             <input
               type="text"
@@ -1331,8 +1322,8 @@ export default function Appraisal() {
             </Button>
             <Button
               variant="danger"
-              onClick={() => {
-                if (deleteRow) deleteAppraisal(deleteRow.id);
+              onClick={async () => {
+                if (deleteRow) await deleteAppraisal(deleteRow.id);
                 setDeleteRow(null);
                 showToast("Appraisal deleted successfully.");
               }}

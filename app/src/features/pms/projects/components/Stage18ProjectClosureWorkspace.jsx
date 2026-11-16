@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { modal } from '../../../../context/ModalContext';
 import {
   Activity,
   AlertCircle,
@@ -97,9 +98,13 @@ export function Stage18ProjectClosureWorkspace({
 
   // Handle final close action
   const handleConfirmClose = async (force = false) => {
-    if (!window.confirm(`Are you sure you want to sign off and close Project ${code}?`)) {
-      return;
-    }
+    const ok = await modal.confirm({
+      title: 'Close Project',
+      message: `Are you sure you want to sign off and close Project ${code}?`,
+      confirmLabel: 'Sign Off & Close',
+      iconType: 'warning',
+    });
+    if (!ok) return;
     setSubmitting(true);
     try {
       await closePmsProject(projectId, { force });

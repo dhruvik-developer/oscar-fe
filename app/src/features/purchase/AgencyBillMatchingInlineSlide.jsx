@@ -931,6 +931,7 @@ export function AgencyBillMatchingInlineSlide({
             <p className="text-xs text-slate-600 leading-relaxed">
               Discrepancies exist between the Final Approved PO and the Agency Invoice. Under company governance policy,
               approving a mismatched invoice requires an authorized reason to be recorded permanently in the audit history.
+              Approving accepts the Agency Invoice amount ₹{numIN(invoiceTotal)}, not the PO amount.
             </p>
             <div>
               <label className="block text-xs font-bold text-slate-800 mb-1">
@@ -958,7 +959,7 @@ export function AgencyBillMatchingInlineSlide({
                 onClick={() => handleAction('approve')}
                 className="px-4 py-1.5 bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-white text-xs font-bold rounded-lg shadow-sm"
               >
-                Confirm & Approve Mismatch
+                Confirm & Approve Invoice Amount
               </button>
             </div>
           </div>

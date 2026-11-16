@@ -28,7 +28,7 @@ const salesOrderGuide = {
         { term: 'SO Lifecycle', definition: 'The flexible progression: Draft → Confirmed → Proforma (Optional) → Partially / Fully Dispatched (Challan) → Invoiced → Closed. Only dispatched quantity can be invoiced.' },
     ],
     tips: [
-        'Use the 📋 Clone button on any past order to duplicate customer and line items in 1 click.',
+        'Use the ðŸ“‹ Clone button on any past order to duplicate customer and line items in 1 click.',
         'If stock is 0 or low, click [+PO] directly on the line item to requisition missing units immediately.',
     ],
     workflow: ['Quotation Approved', 'Sales Order Confirmed', 'Proforma Issued (Optional)', 'Delivery Challan Dispatched', 'Sales Invoice Issued', 'Payment Receipt Settled'],
@@ -439,7 +439,7 @@ export const SalesOrdersPage = () => {
                       stageVal === 'Invoiced' ? 'bg-purple-50 text-purple-700 border-purple-200' :
                       stageVal === 'Pending Approval' ? 'bg-orange-50 text-orange-700 border-orange-300' :
                       'bg-slate-50 text-slate-700 border-slate-200'
-                    }`} title={stageVal === 'Pending Approval' ? 'Discount or margin needs approval — see the approvals inbox' : undefined}>
+                    }`} title={stageVal === 'Pending Approval' ? 'Discount or margin needs approval "” see the approvals inbox' : undefined}>
                       {stageVal}
                     </span>
                   </div>
@@ -621,7 +621,7 @@ export const SalesOrdersPage = () => {
                         </span>
                       </div>
                       <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-slate-600 text-[10px]">
-                        <span>POC: <strong>{selectedCustomer.contactPerson || '—'}</strong></span>
+                        <span>POC: <strong>{selectedCustomer.contactPerson || '"”'}</strong></span>
                         <span>Email: {selectedCustomer.email}</span>
                         <span>Phone: {selectedCustomer.phone}</span>
                         <span>Outstanding: ₹{(selectedCustomer.balance || 0).toLocaleString('en-IN')}</span>
@@ -814,14 +814,14 @@ export const SalesOrdersPage = () => {
                 {selectedOrder.items && selectedOrder.items.length > 0 && (
                   <div className="overflow-x-auto rounded-lg border border-slate-200">
                     <table className="w-full min-w-[640px] lg:min-w-0 text-left text-xs text-slate-600">
-                      <thead className="bg-slate-50 uppercase font-semibold text-slate-500 tracking-wider border-b border-slate-200 text-[10px]">
-                        <tr>
-                          <th className="py-2 px-3">Item / Description</th>
-                          <th className="py-2 px-3 text-center">Ordered</th>
-                          <th className="py-2 px-3 text-center">Delivered</th>
-                          <th className="py-2 px-3 text-center">Invoiced</th>
-                          <th className="py-2 px-3 text-center">Remaining to Deliver</th>
-                          <th className="py-2 px-3 text-right">Line Total</th>
+                      <thead className="table-head-std">
+                        <tr className="table-head-row-std">
+                          <th>Item / Description</th>
+                          <th className="text-center">Ordered</th>
+                          <th className="text-center">Delivered</th>
+                          <th className="text-center">Invoiced</th>
+                          <th className="text-center">Remaining to Deliver</th>
+                          <th className="text-right">Line Total</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100 bg-white">

@@ -1,3 +1,4 @@
+import { modal } from '../../../context/ModalContext';
 import { useState, useMemo, useEffect, useRef } from "react";
 import {
   Calendar as CalendarIcon,
@@ -347,8 +348,13 @@ export function CalendarPage() {
     showToast("Calendar (.ics) downloaded successfully");
   };
 
-  const handleResetDefaults = () => {
-    if (confirm("Reset calendar to default company events and holidays?")) {
+  const handleResetDefaults = async () => {
+    const confirmed = await modal.warning({
+      title: "Reset Calendar Defaults?",
+      message: "Reset calendar to default company events and holidays? Custom changes will be replaced.",
+      confirmText: "Reset Defaults"
+    });
+    if (confirmed) {
       resetToDefaults();
       showToast("Calendar reset to defaults");
     }

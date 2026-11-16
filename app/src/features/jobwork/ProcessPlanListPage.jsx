@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { modal } from '../../context/ModalContext';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Plus,
@@ -854,18 +855,19 @@ export default function ProcessPlanListPage() {
       });
       setPlans((prev) => [saved, ...prev]);
     } catch (err) {
-      window.alert(errorMessage(err, 'Could not duplicate the process plan.'));
+      await modal.error(errorMessage(err, 'Could not duplicate the process plan.'), 'Duplicate Error');
     }
   };
 
   const handleDelete = async (id) => {
     setMenuId(null);
-    if (!window.confirm('Delete this process plan?')) return;
+    const ok = await modal.deleteConfirm('Delete this process plan?', 'Delete Process Plan');
+    if (!ok) return;
     try {
       await deletePlan(id);
       setPlans((prev) => prev.filter((p) => p.id !== id));
     } catch (err) {
-      window.alert(errorMessage(err, 'Could not delete the process plan.'));
+      await modal.error(errorMessage(err, 'Could not delete the process plan.'), 'Delete Error');
     }
   };
 

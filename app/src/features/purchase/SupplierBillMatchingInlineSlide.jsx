@@ -524,7 +524,7 @@ export function SupplierBillMatchingInlineSlide({ po, instruction, onClose, onBi
               className="px-4 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-xs cursor-pointer transition-colors"
             >
               <Scale size={14} />
-              {submitting ? 'Approving...' : 'Approve with Variance Exception'}
+              {submitting ? 'Approving...' : 'Approve Vendor Bill Amount (Variance)'}
             </button>
           ) : !activeBill ? (
             <button

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { modal } from '../../context/ModalContext';
 import {
   Factory, Calendar, UserCheck, FileText, CheckCircle2, ArrowRight,
   Clock, Layers, AlertCircle, Save, Send, ShieldCheck, Lock, ExternalLink,
@@ -212,7 +213,8 @@ export function PoDailyProductionEntrySection({ po, onUpdated, navigate, onSwitc
 
   // Delete entry (draft only)
   const handleDeleteEntry = async (entryId) => {
-    if (!window.confirm('Are you sure you want to delete this daily production entry?')) return;
+    const ok = await modal.deleteConfirm('Are you sure you want to delete this daily production entry?', 'Delete Production Entry');
+    if (!ok) return;
     try {
       await purchaseService.deleteDailyProductionEntry(entryId);
       if (showToast) showToast('Entry deleted successfully.', 'info');

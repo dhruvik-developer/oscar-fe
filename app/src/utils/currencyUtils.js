@@ -113,6 +113,13 @@ export function getCurrencySymbol(currencyStr = 'INR (₹)') {
   return getCurrencyConfig(currencyStr).symbol;
 }
 
+// Indian compact scale steps: Crore → Lakh → Thousand.
+const COMPACT_STEPS = [
+  { limit: 10000000, divisor: 10000000, suffix: 'Cr' },
+  { limit: 100000, divisor: 100000, suffix: 'L' },
+  { limit: 1000, divisor: 1000, suffix: 'K' },
+];
+
 export function formatCurrency(amount, currencyStr = 'INR (₹)', options = {}) {
   const num = typeof amount === 'number' ? amount : parseFloat(amount) || 0;
   const config = getCurrencyConfig(currencyStr, options.customRates);
@@ -124,14 +131,27 @@ export function formatCurrency(amount, currencyStr = 'INR (₹)', options = {}) 
   const isNegative = converted < 0;
   const absVal = Math.abs(converted);
 
-  const formattedNumber = absVal.toLocaleString('en-IN', {
+  // Compact Indian scale: ₹51.30L / ₹66.00K / ₹1.25Cr (opt-in via `compact`).
+  const step = options.compact ? COMPACT_STEPS.find((s) => absVal >= s.limit) : null;
+  const scaledVal = step ? absVal / step.divisor : absVal;
+
+  const formattedNumber = scaledVal.toLocaleString('en-IN', {
     minimumFractionDigits: minDecimals,
     maximumFractionDigits: maxDecimals
   });
+  const suffix = step ? step.suffix : '';
 
   if (options.symbolSuffix) {
-    return `${isNegative ? '-' : ''}${formattedNumber} ${config.symbol}`;
+    return `${isNegative ? '-' : ''}${formattedNumber}${suffix} ${config.symbol}`;
   }
 
-  return `${isNegative ? '-' : ''}${config.symbol}${formattedNumber}`;
+  return `${isNegative ? '-' : ''}${config.symbol}${formattedNumber}${suffix}`;
+}
+
+/**
+ * Compact Indian currency helper: ₹51.30L, ₹5.20L, ₹66.00K, ₹1.10L, ₹22.00K.
+ * Thin wrapper over formatCurrency so both share symbol, rate and decimals.
+ */
+export function formatCompactCurrency(amount, currencyStr = 'INR (₹)', options = {}) {
+  return formatCurrency(amount, currencyStr, { ...options, compact: true });
 }

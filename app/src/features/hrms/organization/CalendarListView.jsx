@@ -1,3 +1,4 @@
+import { modal } from '../../../context/ModalContext';
 import { Clock, MapPin, Users, ExternalLink, Edit2, Trash2, Calendar as CalendarIcon } from "lucide-react";
 import { EVENT_CATEGORIES } from "./calendarConfig";
 import { formatHumanDate, formatShortDate } from "./calendarUtils";
@@ -140,9 +141,15 @@ export function CalendarListView({
               {onDeleteEvent && (
                 <button
                   type="button"
-                  onClick={(e) => {
+                  onClick={async (e) => {
                     e.stopPropagation();
-                    if (confirm(`Delete event "${ev.title}"?`)) {
+                    const confirmed = await modal.deleteConfirm({
+                      title: "Delete Event?",
+                      message: `Are you sure you want to delete event "${ev.title}"?`,
+                      itemName: ev.title,
+                      confirmText: "Delete Event"
+                    });
+                    if (confirmed) {
                       onDeleteEvent(ev.id);
                     }
                   }}

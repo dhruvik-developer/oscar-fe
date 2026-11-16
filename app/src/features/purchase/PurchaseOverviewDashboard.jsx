@@ -657,17 +657,26 @@ export function PurchaseOverviewDashboard({
                 <Truck size={14} className="text-amber-600" />
                 <h3 className="text-[13px] font-extrabold text-[#17294e]">Pending Receipts</h3>
                 <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[9.5px] font-bold text-amber-800">
-                  {pendingReceipts.length} Active Orders
+                  Next {pendingReceipts.length}
                 </span>
               </div>
-              <button
-                type="button"
-                onClick={onManageReceipts}
-                className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-600 hover:underline cursor-pointer"
-                title="Open the Goods Receipt (GRN) module"
-              >
-                Manage Receipts <ChevronRight size={12} />
-              </button>
+              <div className="flex items-center gap-2.5">
+                <button
+                  type="button"
+                  onClick={onViewAllPending}
+                  className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-600 hover:text-blue-700 hover:underline cursor-pointer"
+                >
+                  View All <ChevronRight size={12} />
+                </button>
+                <button
+                  type="button"
+                  onClick={onManageReceipts}
+                  className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-600 hover:underline cursor-pointer"
+                  title="Open the Goods Receipt (GRN) module"
+                >
+                  Manage Receipts <ChevronRight size={12} />
+                </button>
+              </div>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full min-w-[540px] text-left text-[11px]">
@@ -705,6 +714,7 @@ export function PurchaseOverviewDashboard({
             </div>
           </div>
           <div className="border-t border-slate-100 px-4 py-2 bg-slate-50/50 flex items-center justify-between text-[10px] text-slate-500">
+            <span>Showing next {pendingReceipts.length} of {allPendingReceipts.length} pending orders</span>
             <span>Pending Intake Total: <strong className="text-amber-800 font-mono">{kpis.pendingQty.toLocaleString('en-IN')} Mtr</strong></span>
             <button
               type="button"

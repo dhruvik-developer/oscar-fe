@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
+import { modal } from '../../context/ModalContext';
 import { useNavigate } from 'react-router-dom';
 import {
   CheckCircle,
@@ -119,7 +120,7 @@ export default function ApprovalsInboxPage() {
       setComments('');
       await loadData();
     } catch (err) {
-      alert(err?.message || 'Failed to submit approval decision');
+      await modal.error(err?.message || 'Failed to submit approval decision', 'Approval Error');
     } finally {
       setSubmitting(false);
     }
@@ -131,20 +132,21 @@ export default function ApprovalsInboxPage() {
       await approvalService.updateRule(rule.id, { is_active: !rule.is_active });
       await loadData();
     } catch (err) {
-      alert(err?.message || 'Failed to update approval rule');
+      await modal.error(err?.message || 'Failed to update approval rule', 'Update Error');
     } finally {
       setSubmitting(false);
     }
   };
 
   const handleDeleteRule = async (rule) => {
-    if (!window.confirm(`Delete approval rule "${rule.name}"? Requests already raised under it are kept.`)) return;
+    const ok = await modal.deleteConfirm(`Delete approval rule "${rule.name}"? Requests already raised under it are kept.`, 'Delete Approval Rule');
+    if (!ok) return;
     setSubmitting(true);
     try {
       await approvalService.deleteRule(rule.id);
       await loadData();
     } catch (err) {
-      alert(err?.message || 'Failed to delete approval rule');
+      await modal.error(err?.message || 'Failed to delete approval rule', 'Delete Error');
     } finally {
       setSubmitting(false);
     }
@@ -170,7 +172,7 @@ export default function ApprovalsInboxPage() {
       });
       await loadData();
     } catch (err) {
-      alert(err?.message || 'Failed to create approval rule');
+      await modal.error(err?.message || 'Failed to create approval rule', 'Create Rule Error');
     } finally {
       setSubmitting(false);
     }

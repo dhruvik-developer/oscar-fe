@@ -794,7 +794,7 @@ export default function Payroll() {
     <div className="flex flex-col gap-6">
       <PageHeader
         title="Payroll Management"
-        subtitle={<>Attendance-driven payroll: <span className="font-semibold text-slate-700">Net Payable = Standard − Per-day × (Working days − Attended − Paid leave) + Earnings − Deductions − Advance</span></>}
+        //subtitle={<>Attendance-driven payroll: <span className="font-semibold text-slate-700">Net Payable = Standard − Per-day × (Working days − Attended − Paid leave) + Earnings − Deductions − Advance</span></>}
         guide={hrmsGuides.payroll}
         actions={
           <>

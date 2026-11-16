@@ -1,3 +1,4 @@
+import { modal } from '../../../context/ModalContext';
 import { useState, useEffect } from "react";
 import { X, Calendar, Clock, MapPin, Users, Link as LinkIcon, Trash2, Tag, Info } from "lucide-react";
 import { EVENT_CATEGORIES, DEPARTMENTS } from "./calendarConfig";
@@ -329,8 +330,14 @@ export function AddEditEventModal({
             {isEditMode && onDelete ? (
               <button
                 type="button"
-                onClick={() => {
-                  if (confirm(`Are you sure you want to delete "${formData.title}"?`)) {
+                onClick={async () => {
+                  const confirmed = await modal.deleteConfirm({
+                    title: "Delete Event?",
+                    message: `Are you sure you want to delete "${formData.title}"?`,
+                    itemName: formData.title,
+                    confirmText: "Delete Event"
+                  });
+                  if (confirmed) {
                     onDelete(initialEvent.id);
                   }
                 }}

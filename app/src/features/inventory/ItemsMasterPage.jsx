@@ -414,7 +414,7 @@ export const ItemsMasterPage = () => {
         await refreshCollections(['items']);
       }
       if (deleted.length) showToast?.(`Deleted ${deleted.length} item(s) successfully.`);
-      if (failed.length) showToast?.(`Could not delete ${failed.length} item(s) — ${failed.join('; ')}`);
+      if (failed.length) showToast?.(`Could not delete ${failed.length} item(s) "” ${failed.join('; ')}`);
       setSelectedIds((prev) => {
         const next = new Set(prev);
         deleted.forEach((it) => next.delete(String(it.id)));
@@ -500,11 +500,11 @@ export const ItemsMasterPage = () => {
       });
     });
     if (skipped > 0) {
-      showToast?.(`${skipped} row(s) skipped — the item name is required.`);
+      showToast?.(`${skipped} row(s) skipped "” the item name is required.`);
     }
   };
 
-  // ── Purchase Order Creation Integration ──
+  // â”€â”€ Purchase Order Creation Integration â”€â”€
   // 1. Open PO modal for a single item row
   const handleOpenPoForSingleItem = (item) => {
     const avail = Number(item.availableQty ?? item.stock ?? 0);
@@ -599,7 +599,7 @@ export const ItemsMasterPage = () => {
 
   return (
     <div className="space-y-5 pb-12">
-      {/* ── Top Header / Breadcrumb ── */}
+      {/* â”€â”€ Top Header / Breadcrumb â”€â”€ */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           {/* Breadcrumb matching image */}
@@ -658,7 +658,7 @@ export const ItemsMasterPage = () => {
         </div>
       </div>
 
-      {/* ── KPI Stat Cards & Shortage Alert Banner (Matching Attached Reference Image) ── */}
+      {/* â”€â”€ KPI Stat Cards & Shortage Alert Banner (Matching Attached Reference Image) â”€â”€ */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 items-stretch">
         {/* 4 Stat Cards */}
         <div className="lg:col-span-8 grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -827,7 +827,7 @@ export const ItemsMasterPage = () => {
         </div>
       </div>
 
-      {/* ── Filter Controls Row (Matching Attached Reference Image) ── */}
+      {/* â”€â”€ Filter Controls Row (Matching Attached Reference Image) â”€â”€ */}
       <div className="bg-white p-3.5 rounded-xl border border-slate-200/80 shadow-2xs">
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
           {/* 1. Fabric Quality */}
@@ -929,13 +929,13 @@ export const ItemsMasterPage = () => {
         </div>
       </div>
 
-      {/* ── Fabric Inventory Table (Exact Columns & Design from Reference Image) ── */}
+      {/* â”€â”€ Fabric Inventory Table (Exact Columns & Design from Reference Image) â”€â”€ */}
       <div className="bg-white border border-slate-200/80 rounded-2xl shadow-xs overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse text-xs">
-            <thead>
-              <tr className="bg-slate-50/80 border-b border-slate-200/80 text-slate-600 font-bold text-[11px]">
-                <th className="py-3 px-3.5 w-10 text-center">
+            <thead className="table-head-std">
+              <tr className="table-head-row-std">
+                <th className="w-10 text-center">
                   <input
                     type="checkbox"
                     checked={allOnPageSelected}
@@ -947,19 +947,19 @@ export const ItemsMasterPage = () => {
                     title={allOnPageSelected ? 'Deselect all on this page' : 'Select all on this page'}
                   />
                 </th>
-                <th className="py-3 px-2 text-center w-14">Sr. No.</th>
-                <SortableTh sort={itemSort} sortKey="sku" className="py-3 px-3">SKU / Model #</SortableTh>
-                <SortableTh sort={itemSort} sortKey="quality" className="py-3 px-3">Fabric Quality</SortableTh>
-                <SortableTh sort={itemSort} sortKey="design" className="py-3 px-3">Design</SortableTh>
-                <SortableTh sort={itemSort} sortKey="colour" className="py-3 px-3">Shade / Colour</SortableTh>
-                <SortableTh sort={itemSort} sortKey="onHand" className="py-3 px-3 text-right" align="right">Total Stock (m)</SortableTh>
-                <SortableTh sort={itemSort} sortKey="reserved" className="py-3 px-3 text-right" align="right">Reserved (m)</SortableTh>
-                <SortableTh sort={itemSort} sortKey="available" className="py-3 px-3 text-right" align="right">Available (m)</SortableTh>
-                <SortableTh sort={itemSort} sortKey="cost" className="py-3 px-3 text-right" align="right">Unit Cost (₹)</SortableTh>
-                <SortableTh sort={itemSort} sortKey="sell" className="py-3 px-3 text-right" align="right">Selling Rate (₹)</SortableTh>
-                <SortableTh sort={itemSort} sortKey="status" className="py-3 px-3 text-center" align="center">Status</SortableTh>
-                <SortableTh sort={itemSort} sortKey="reorder" className="py-3 px-3 text-right" align="right">Reorder Qty (m)</SortableTh>
-                <th className="py-3 px-3 text-center w-36">Actions</th>
+                <th className="text-center w-14">Sr. No.</th>
+                <SortableTh sort={itemSort} sortKey="sku">SKU / Model #</SortableTh>
+                <SortableTh sort={itemSort} sortKey="quality">Fabric Quality</SortableTh>
+                <SortableTh sort={itemSort} sortKey="design">Design</SortableTh>
+                <SortableTh sort={itemSort} sortKey="colour">Shade / Colour</SortableTh>
+                <SortableTh sort={itemSort} sortKey="onHand" align="right">Total Stock (m)</SortableTh>
+                <SortableTh sort={itemSort} sortKey="reserved" align="right">Reserved (m)</SortableTh>
+                <SortableTh sort={itemSort} sortKey="available" align="right">Available (m)</SortableTh>
+                <SortableTh sort={itemSort} sortKey="cost" align="right">Unit Cost (₹)</SortableTh>
+                <SortableTh sort={itemSort} sortKey="sell" align="right">Selling Rate (₹)</SortableTh>
+                <SortableTh sort={itemSort} sortKey="status" align="center">Status</SortableTh>
+                <SortableTh sort={itemSort} sortKey="reorder" align="right">Reorder Qty (m)</SortableTh>
+                <th className="text-center w-36">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -1142,7 +1142,7 @@ export const ItemsMasterPage = () => {
           </table>
         </div>
 
-        {/* ── Table Footer & Pagination (Matching Reference Image) ── */}
+        {/* â”€â”€ Table Footer & Pagination (Matching Reference Image) â”€â”€ */}
         <AppPagination
           total={filteredItems.length}
           page={currentPage}
@@ -1153,7 +1153,7 @@ export const ItemsMasterPage = () => {
         />
       </div>
 
-      {/* ── Table Row Action Menu Portal ── */}
+      {/* â”€â”€ Table Row Action Menu Portal â”€â”€ */}
       {menuAnchor && createPortal(
         <div
           className="item-row-action-menu fixed z-[9999] w-44 bg-white border border-slate-200 rounded-xl shadow-xl py-1 text-xs animate-in fade-in zoom-in-95 duration-100"
@@ -1210,7 +1210,7 @@ export const ItemsMasterPage = () => {
         document.body
       )}
 
-      {/* ── Floating Bulk Action Bar when checkboxes are selected ── */}
+      {/* â”€â”€ Floating Bulk Action Bar when checkboxes are selected â”€â”€ */}
       {selectedIds.size > 0 && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-slate-900 text-white px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-3.5 border border-slate-700 animate-in fade-in slide-in-from-bottom-4 duration-200">
           <div className="flex items-center gap-2 pr-2 border-r border-slate-700">
@@ -1259,7 +1259,7 @@ export const ItemsMasterPage = () => {
         </div>
       )}
 
-      {/* ── Purchase Order Creation Modal (Direct from Total Inventory) ── */}
+      {/* â”€â”€ Purchase Order Creation Modal (Direct from Total Inventory) â”€â”€ */}
       {poModalConfig && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in duration-150">
           <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-2xl w-full p-5 sm:p-6 space-y-4 max-h-[90vh] overflow-y-auto">
@@ -1315,13 +1315,13 @@ export const ItemsMasterPage = () => {
                 <label className="font-bold text-slate-700 block mb-1">Order Fabric Line Items</label>
                 <div className="border border-slate-200 rounded-xl overflow-hidden">
                   <table className="w-full text-left text-xs">
-                    <thead className="bg-slate-50 text-slate-600 font-bold border-b border-slate-200">
-                      <tr>
-                        <th className="p-2.5">Fabric Quality / SKU</th>
-                        <th className="p-2.5 w-24 text-right">Order Qty</th>
-                        <th className="p-2.5 w-16 text-center">UOM</th>
-                        <th className="p-2.5 w-28 text-right">Unit Rate (₹)</th>
-                        <th className="p-2.5 w-28 text-right">Total (₹)</th>
+                    <thead className="table-head-std">
+                      <tr className="table-head-row-std">
+                        <th>Fabric Quality / SKU</th>
+                        <th className="w-24 text-right">Order Qty</th>
+                        <th className="w-16 text-center">UOM</th>
+                        <th className="w-28 text-right">Unit Rate (₹)</th>
+                        <th className="w-28 text-right">Total (₹)</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -1405,7 +1405,7 @@ export const ItemsMasterPage = () => {
                 <Info size={16} className="text-blue-600 shrink-0 mt-0.5" />
                 <span>
                   The Purchase Order will be created in <strong>Draft status</strong> and can be approved according to company permissions.
-                  Creating or approving this PO does not increase physical stock — stock increases strictly upon confirmed <strong>Goods Receipt (GRN)</strong>.
+                  Creating or approving this PO does not increase physical stock "” stock increases strictly upon confirmed <strong>Goods Receipt (GRN)</strong>.
                 </span>
               </div>
 
@@ -1453,7 +1453,7 @@ export const ItemsMasterPage = () => {
         </div>
       )}
 
-      {/* ── Minimum Threshold Settings Modal ── */}
+      {/* â”€â”€ Minimum Threshold Settings Modal â”€â”€ */}
       {showThresholdModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in duration-150">
           <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-md w-full p-5 space-y-4">
@@ -1506,8 +1506,8 @@ export const ItemsMasterPage = () => {
 
               <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-600 text-[11px] space-y-1">
                 <p className="font-semibold text-slate-800">Calculation Metric:</p>
-                <p>• Physical Grey Stock at Godowns minus Sales Order Reservations.</p>
-                <p>• External Processor WIP and Finished Fabric are excluded.</p>
+                <p>"¢ Physical Grey Stock at Godowns minus Sales Order Reservations.</p>
+                <p>"¢ External Processor WIP and Finished Fabric are excluded.</p>
               </div>
 
               <div className="flex items-center justify-end gap-2 pt-2">
@@ -1531,7 +1531,7 @@ export const ItemsMasterPage = () => {
         </div>
       )}
 
-      {/* ── Shortage Details Modal ── */}
+      {/* â”€â”€ Shortage Details Modal â”€â”€ */}
       {showShortageModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in duration-150">
           <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-lg w-full p-5 space-y-4">
@@ -1629,7 +1629,7 @@ export const ItemsMasterPage = () => {
         </div>
       )}
 
-      {/* ── Page Guide Modal ── */}
+      {/* â”€â”€ Page Guide Modal â”€â”€ */}
       {showGuideModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in duration-150">
           <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-lg w-full p-5 space-y-4">
@@ -1655,9 +1655,9 @@ export const ItemsMasterPage = () => {
               </p>
               <p>
                 <strong>Stock Buckets:</strong>
-                <br />• <em>Available Grey Stock</em> = Physical Godown Grey - Sales Order Reservations.
-                <br />• <em>External Job Work WIP</em> = Grey fabric sent to external dyeing/printing processors (tracked separately per vendor).
-                <br />• <em>Excluded buckets</em>: Finished fabric, QC Hold, Reprocess, Reject/Scrap, and Sample items.
+                <br />"¢ <em>Available Grey Stock</em> = Physical Godown Grey - Sales Order Reservations.
+                <br />"¢ <em>External Job Work WIP</em> = Grey fabric sent to external dyeing/printing processors (tracked separately per vendor).
+                <br />"¢ <em>Excluded buckets</em>: Finished fabric, QC Hold, Reprocess, Reject/Scrap, and Sample items.
               </p>
               <p>
                 <strong>Replenishment:</strong> Creating a Purchase Order produces an approved commercial contract. Only confirmed <strong>Goods Receipt (GRN)</strong> physically increases warehouse inventory.
@@ -1676,7 +1676,7 @@ export const ItemsMasterPage = () => {
         </div>
       )}
 
-      {/* ── Delete Confirmation Modal ── */}
+      {/* â”€â”€ Delete Confirmation Modal â”€â”€ */}
       {deleteModalConfig.isOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in duration-150">
           <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-md w-full p-6 space-y-4">

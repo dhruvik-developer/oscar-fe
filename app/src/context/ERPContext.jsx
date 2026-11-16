@@ -1,3 +1,4 @@
+import { modal } from './ModalContext';
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import { formatDateDDMMYYYY, getCurrentDateFormatted, getCurrentISODate, addDaysISO, toISODate, toDisplayDate } from '../utils/dateUtils';
 import { formatCurrency as formatCurrencyUtil, getCurrencySymbol, getCurrencyConfig, CURRENCY_CONFIGS, fetchLiveExchangeRates, DEFAULT_RATES, setBaseCurrency } from '../utils/currencyUtils';
@@ -4638,6 +4639,7 @@ export const ERPProvider = ({ children, }) => {
             refreshFromBackend,
             refreshCollections,
             showToast,
+            modal,
             warranties,
             addWarrantyCard,
             updateWarrantyCard,

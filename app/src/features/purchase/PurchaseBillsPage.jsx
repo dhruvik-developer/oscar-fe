@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { modal } from '../../context/ModalContext';
 import { useSearchParams } from 'react-router-dom';
 import { useERP } from '../../context/ERPContext';
 import { DataTable } from '../../components/ui/DataTable';
@@ -82,8 +83,8 @@ export const PurchaseBillsPage = () => {
         e.preventDefault();
         const po = purchaseOrders.find((p) => p.id === selectedPoId);
         const vend = vendors.find((v) => v.id === selectedVendorId);
-        if (!vend) { alert('Select a vendor.'); return; }
-        if (!billDate) { alert('Enter the bill date.'); return; }
+        if (!vend) { await modal.warning('Select a vendor.', 'Vendor Required'); return; }
+        if (!billDate) { await modal.warning('Enter the bill date.', 'Date Required'); return; }
         setSaving(true);
         try {
             await addPurchaseBill({

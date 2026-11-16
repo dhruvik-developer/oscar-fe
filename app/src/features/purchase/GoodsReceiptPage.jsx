@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { modal } from '../../context/ModalContext';
 import { TablePagination } from '../../components/ui/TablePagination';
 import { useERP } from '../../context/ERPContext';
 import { StatusBadge } from '../../components/ui/StatusBadge';
@@ -36,7 +37,7 @@ import { ReceiptTypeNotice } from './DyeingColourField';
 
 const goodsReceiptGuide = {
   title: 'Goods Receipt Notes (GRN)',
-  subtitle: 'Physical intake verification, roll/taka breakdown, 3-way matching (PO ⇄ GRN ⇄ Bill), and QC checkpoint.',
+  subtitle: 'Physical intake verification, roll/taka breakdown, 3-way matching (PO â‡„ GRN â‡„ Bill), and QC checkpoint.',
   purpose: 'Every purchase order and delivery from suppliers/mills is received through physical GRN verification. This screen captures taka rolls per line, compares received meters against ordered PO meterage, records shortage/excess, and routes goods to QC inspection before stock release.',
   keyTerms: [
     { term: 'GRN (Goods Receipt Note)', definition: 'The physical intake document capturing roll-by-roll actual meters, kg, width, and lot numbers.' },
@@ -197,7 +198,7 @@ export const GoodsReceiptPage = () => {
   const pendingQtyText = useMemo(() => {
     if (allPendingLines.length === 0) return '0 MTR';
     const formatted = unitTotals(allPendingLines, (it) => Number(it.qty) || 0);
-    return !formatted || formatted === '—' ? '0 MTR' : formatted;
+    return !formatted || formatted === '"”' ? '0 MTR' : formatted;
   }, [allPendingLines, unitTotals]);
 
   const pendingValue = useMemo(() => {
@@ -277,7 +278,7 @@ export const GoodsReceiptPage = () => {
     fetchGrns();
   };
 
-  // ── Standalone GRN Form Handlers (Phase 2.2) ──
+  // â”€â”€ Standalone GRN Form Handlers (Phase 2.2) â”€â”€
   const openStandaloneModal = (prefill = {}) => {
     setStandaloneError('');
     setStandaloneSuccess('');
@@ -526,10 +527,16 @@ export const GoodsReceiptPage = () => {
     }));
   };
 
-  const handleAutoSplitTakas = (lineId) => {
+  const handleAutoSplitTakas = async (lineId) => {
     const line = standaloneForm.lines.find((l) => l.id === lineId);
     if (!line) return;
-    const countStr = window.prompt(`How many rolls to split ${line.receivedQty} meters into?`, '');
+    const countStr = await modal.prompt({
+      title: 'Auto-Split Rolls',
+      message: `How many rolls to split ${line.receivedQty} meters into?`,
+      defaultValue: '',
+      placeholder: 'e.g. 4',
+      confirmLabel: 'Split Rolls',
+    });
     const count = parseInt(countStr, 10);
     if (!count || count <= 0) return;
 
@@ -846,15 +853,15 @@ export const GoodsReceiptPage = () => {
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200 uppercase tracking-wider text-[11px]">
-                    <tr>
-                      <th className="px-4 py-3">GRN #</th>
-                      <th className="px-4 py-3">Receipt Date</th>
-                      <th className="px-4 py-3">Supplier</th>
-                      <th className="px-4 py-3">Supplier Challan #</th>
-                      <th className="px-4 py-3">PO Number</th>
-                      <th className="px-4 py-3 text-right">Lines</th>
-                      <th className="px-4 py-3 text-center">QC Status</th>
+                  <thead className="table-head-std">
+                    <tr className="table-head-row-std">
+                      <th>GRN #</th>
+                      <th>Receipt Date</th>
+                      <th>Supplier</th>
+                      <th>Supplier Challan #</th>
+                      <th>PO Number</th>
+                      <th className="text-right">Lines</th>
+                      <th className="text-center">QC Status</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -872,8 +879,8 @@ export const GoodsReceiptPage = () => {
                         </td>
                         <td className="px-4 py-3 text-slate-700">{g.receipt_date}</td>
                         <td className="px-4 py-3 font-medium text-slate-900">{g.vendorName}</td>
-                        <td className="px-4 py-3 font-mono text-slate-700">{g.supplier_challan_no || '—'}</td>
-                        <td className="px-4 py-3 font-mono text-slate-700">{g.poNumber || '—'}</td>
+                        <td className="px-4 py-3 font-mono text-slate-700">{g.supplier_challan_no || '"”'}</td>
+                        <td className="px-4 py-3 font-mono text-slate-700">{g.poNumber || '"”'}</td>
                         <td className="px-4 py-3 text-right font-semibold text-slate-800">{g.lines?.length || 0}</td>
                         <td className="px-4 py-3 text-center">
                           <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold border ${
@@ -917,14 +924,14 @@ export const GoodsReceiptPage = () => {
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs text-slate-600">
-                <thead className="bg-slate-50 uppercase font-semibold text-slate-500 tracking-wider border-b border-slate-200 text-[11px]">
-                  <tr>
-                    <th className="py-2.5 px-4">Bill Number</th>
-                    <th className="py-2.5 px-4">Supplier</th>
-                    <th className="py-2.5 px-4">Date</th>
-                    <th className="py-2.5 px-4 text-right">Bill Items</th>
-                    <th className="py-2.5 px-4 text-right">Amount</th>
-                    <th className="py-2.5 px-4 text-center">Action</th>
+                <thead className="table-head-std">
+                  <tr className="table-head-row-std">
+                    <th>Bill Number</th>
+                    <th>Supplier</th>
+                    <th>Date</th>
+                    <th className="text-right">Bill Items</th>
+                    <th className="text-right">Amount</th>
+                    <th className="text-center">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -952,7 +959,7 @@ export const GoodsReceiptPage = () => {
         </div>
       )}
 
-      {/* ── Standalone GRN Modal (Phase 2.2 with Taka Breakdown) ── */}
+      {/* â”€â”€ Standalone GRN Modal (Phase 2.2 with Taka Breakdown) â”€â”€ */}
       {standaloneModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
           <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden">
@@ -1268,14 +1275,14 @@ export const GoodsReceiptPage = () => {
                           <span className="text-slate-500 font-medium">Variance vs PO:</span>
                           {shortage > 0 ? (
                             <span className="text-amber-600 font-semibold flex items-center gap-1">
-                              ⚠️ Shortage: {numIN(shortage)} m ({Math.round((shortage / line.orderedQty) * 100)}%)
+                              âš ï¸ Shortage: {numIN(shortage)} m ({Math.round((shortage / line.orderedQty) * 100)}%)
                             </span>
                           ) : excess > 0 ? (
                             <span className="text-blue-600 font-semibold flex items-center gap-1">
-                              ℹ️ Excess: +{numIN(excess)} m ({Math.round((excess / line.orderedQty) * 100)}%)
+                              â„¹ï¸ Excess: +{numIN(excess)} m ({Math.round((excess / line.orderedQty) * 100)}%)
                             </span>
                           ) : (
-                            <span className="text-emerald-600 font-semibold">✓ Exact match with PO</span>
+                            <span className="text-emerald-600 font-semibold">âœ“ Exact match with PO</span>
                           )}
                         </div>
                       )}
@@ -1285,7 +1292,7 @@ export const GoodsReceiptPage = () => {
                         <div className="flex items-center justify-between border-b border-slate-200/80 pb-2">
                           <span className="font-extrabold text-[#17294e] text-xs flex items-center gap-1.5">
                             <Package size={14} className="text-blue-700" />
-                            Batch Details — Auto-Generated Batch
+                            Batch Details "” Auto-Generated Batch
                           </span>
                           <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-100/70 text-blue-800 font-bold">
                             Batch Number: Auto (assigned on save)
@@ -1369,14 +1376,14 @@ export const GoodsReceiptPage = () => {
         </div>
       )}
 
-      {/* ── Bill-scoped Receive Modal (Legacy) ── */}
+      {/* â”€â”€ Bill-scoped Receive Modal (Legacy) â”€â”€ */}
       {selectedBill && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
           <div className="bg-white rounded-xl border border-slate-200 shadow-xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
             <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
               <div>
                 <h3 className="font-bold text-slate-900 text-sm">Goods Intake: {selectedBill.billNumber}</h3>
-                <p className="text-xs text-slate-500 mt-0.5">{selectedBill.vendor} • {formatDateDDMMYYYY(selectedBill.date)}</p>
+                <p className="text-xs text-slate-500 mt-0.5">{selectedBill.vendor} "¢ {formatDateDDMMYYYY(selectedBill.date)}</p>
               </div>
               <button onClick={() => setSelectedBill(null)} className="text-slate-400 hover:text-slate-600 p-1 rounded-md">
                 <X size={16} />

@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
+import { modal } from '../../context/ModalContext';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Search, CheckCircle2, Receipt, Eye, BadgePercent, IndianRupee, X, Zap, Printer, Clock, AlertCircle, FileText, Plus, Ban, Check, Edit, Lock, ShieldAlert, MapPin, Truck } from 'lucide-react';
 import { useERP } from '../../context/ERPContext';
@@ -31,7 +32,7 @@ const invoiceGuide = {
     ],
     tips: [
         'Proforma Invoices convert into Draft Sales Invoices, giving you full flexibility to adjust parts and quantities before final commercial posting.',
-        'Use the ⚡ Settle button on unpaid invoices to enter the amount received and generate an official printable receipt voucher.',
+        'Use the Ã¢Å¡Â¡ Settle button on unpaid invoices to enter the amount received and generate an official printable receipt voucher.',
     ],
     workflow: ['Proforma / SO Draft Created', 'Adjust Line Items & Addresses', 'Finalize Commercial Invoice', 'Collect Payment', 'Receipt Voucher Issued'],
 };
@@ -325,7 +326,7 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
         }
     };
 
-    // [Quotation & Proforma Invoice modules are commented out] — the Source Proforma picker is hidden; kept for later.
+    // [Quotation & Proforma Invoice modules are commented out] Ã¢â‚¬" the Source Proforma picker is hidden; kept for later.
     const handlePiSelect = (piId) => {
         setLinkedPiId(piId);
         if (piId !== 'None') {
@@ -569,14 +570,25 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
         refreshCollections(['invoices', 'paymentIns']);
         setActiveReceipt({
             id: payment.id,
-            receiptNumber: payment.payment_number,
+            receiptNumber: payment.payment_number || payment.receiptNumber,
             invoiceNumber: settleTarget?.invoiceNumber,
             customer: payment.customerName || settleTarget?.customer,
             amount: payment.amount,
             date: formatDateDDMMYYYY(payment.date),
             paymentMode: payment.mode,
             reference: payment.transactionReference || payment.referenceNumber,
+            discounts: payment.discounts || [],
+            discountTotal: payment.discountTotal || 0,
+            totalSettled: payment.totalSettled || payment.amount,
         });
+        showToast(`Payment receipt ${payment.payment_number || payment.receiptNumber || ''} recorded successfully.`);
+        if (selectedInvoice && settleTarget && selectedInvoice.id === settleTarget.id) {
+            setSelectedInvoice(prev => prev ? ({
+                ...prev,
+                paidAmount: (Number(prev.paidAmount || prev.amountPaid || 0) + Number(payment.amount || 0)),
+                settlementDiscount: (Number(prev.settlementDiscount || 0) + Number(payment.discountTotal || 0)),
+            }) : null);
+        }
     };
 
     const handleRecordPaymentSubmit = async (e) => {
@@ -586,7 +598,7 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
         const maxAllowed = outstanding.balanceDue > 0 ? outstanding.balanceDue : showPaymentModal.total;
         if (payAmount <= 0) return;
         if (payAmount > maxAllowed) {
-            alert(`Payment amount cannot exceed outstanding balance (${formatCurrency(maxAllowed)}).`);
+            await modal.warning(`Payment amount cannot exceed outstanding balance (${formatCurrency(maxAllowed)}).`, 'Invalid Amount');
             return;
         }
         setIsSubmittingPayment(true);
@@ -884,16 +896,16 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
                 {/* Data Table */}
                 <div className="overflow-x-auto">
                     <table className="w-full text-left border-collapse text-xs">
-                        <thead>
-                            <tr className="border-b border-slate-200 bg-slate-50 text-slate-500 font-semibold select-none">
-                                <th className="py-3 px-6 whitespace-nowrap">Invoice #</th>
-                                <th className="py-3 px-6 whitespace-nowrap">Customer</th>
-                                <th className="py-3 px-6 whitespace-nowrap">Linked SO</th>
-                                <th className="py-3 px-6 whitespace-nowrap">Invoice Date</th>
-                                <th className="py-3 px-6 whitespace-nowrap">Status</th>
-                                <th className="py-3 px-6 text-right whitespace-nowrap">Total</th>
-                                <th className="py-3 px-6 text-right whitespace-nowrap">Balance Due</th>
-                                <th className="py-3 px-4 text-center whitespace-nowrap">Action</th>
+                        <thead className="table-head-std">
+                            <tr className="table-head-row-std">
+                                <th>Invoice #</th>
+                                <th>Customer</th>
+                                <th>Linked SO</th>
+                                <th>Invoice Date</th>
+                                <th>Status</th>
+                                <th className="text-right">Total</th>
+                                <th className="text-right">Balance Due</th>
+                                <th className="text-center">Action</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100 text-slate-700">
@@ -967,13 +979,8 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
                                                                 <Printer className="w-4 h-4"/>
                                                             </button>
                                                             {inv.status !== 'Cancelled' && outstanding.balanceDue > 0.01 && (
-                                                                <button onClick={() => setSettleTarget(inv)} className="px-2 py-1 text-[10px] font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded shadow-xs inline-flex items-center gap-1 transition-colors cursor-pointer" title="Record the payment received for this invoice">
+                                                                <button onClick={() => setSettleTarget(inv)} className="px-2 py-1 text-[10px] font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded shadow-xs inline-flex items-center gap-1 transition-colors cursor-pointer" title="Record customer payment and discounts for this invoice">
                                                                     <Zap className="w-3 h-3"/> Settle
-                                                                </button>
-                                                            )}
-                                                            {inv.status !== 'Cancelled' && !hasDiscount(inv) && can('request_payment_discount') && (
-                                                                <button onClick={() => openPaymentsAndDiscounts(inv)} className="px-2 py-1 text-[10px] font-bold text-primary bg-primary/10 border border-primary/25 hover:bg-primary hover:border-primary hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 rounded shadow-xs inline-flex items-center gap-1 whitespace-nowrap transition-colors cursor-pointer" title="Request an early-payment discount on this invoice">
-                                                                    <BadgePercent className="w-3 h-3"/> Payments & Discounts
                                                                 </button>
                                                             )}
                                                         </>
@@ -1220,7 +1227,7 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
                             {/* Charges billed on top of the goods */}
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                 <div>
-                                    <label className="text-xs font-semibold text-slate-800 block mb-1.5">Freight Charges (₹)</label>
+                                    <label className="text-xs font-semibold text-slate-800 block mb-1.5">Freight Charges (Ã¢"šÂ¹)</label>
                                     <input
                                         type="number"
                                         min="0"
@@ -1232,7 +1239,7 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
                                     />
                                 </div>
                                 <div>
-                                    <label className="text-xs font-semibold text-slate-800 block mb-1.5">Other Charges (₹)</label>
+                                    <label className="text-xs font-semibold text-slate-800 block mb-1.5">Other Charges (Ã¢"šÂ¹)</label>
                                     <input
                                         type="number"
                                         min="0"
@@ -1330,7 +1337,7 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
                                 </div>
                             </div>
 
-                            {/* E-INVOICE & E-WAY BILL PANEL (Simulated §2) */}
+                            {/* E-INVOICE & E-WAY BILL PANEL (Simulated Ã‚§2) */}
                             <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 text-xs space-y-3">
                                 <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-200">
                                     <div className="flex items-center gap-2">
@@ -1382,8 +1389,8 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
                                                     {selectedInvoice.irn}
                                                 </p>
                                                 <div className="flex justify-between text-[11px] text-slate-500">
-                                                    <span>Ack No: <strong className="text-slate-700 font-mono">{selectedInvoice.ackNo || selectedInvoice.ack_no || '—'}</strong></span>
-                                                    <span>Ack Date: <strong className="text-slate-700">{selectedInvoice.ackDate || selectedInvoice.ack_date ? new Date(selectedInvoice.ackDate || selectedInvoice.ack_date).toLocaleDateString() : '—'}</strong></span>
+                                                    <span>Ack No: <strong className="text-slate-700 font-mono">{selectedInvoice.ackNo || selectedInvoice.ack_no || 'Ã¢â‚¬"'}</strong></span>
+                                                    <span>Ack Date: <strong className="text-slate-700">{selectedInvoice.ackDate || selectedInvoice.ack_date ? new Date(selectedInvoice.ackDate || selectedInvoice.ack_date).toLocaleDateString() : 'Ã¢â‚¬"'}</strong></span>
                                                 </div>
                                                 <div className="pt-1 flex justify-end">
                                                     <button
@@ -1438,7 +1445,7 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
                                                     #{selectedInvoice.ewayBillNumber || selectedInvoice.eway_bill_number}
                                                 </p>
                                                 <div className="flex justify-between text-[11px] text-slate-500">
-                                                    <span>Generated: <strong className="text-slate-700">{selectedInvoice.ewayBillDate || selectedInvoice.eway_bill_date ? new Date(selectedInvoice.ewayBillDate || selectedInvoice.eway_bill_date).toLocaleDateString() : '—'}</strong></span>
+                                                    <span>Generated: <strong className="text-slate-700">{selectedInvoice.ewayBillDate || selectedInvoice.eway_bill_date ? new Date(selectedInvoice.ewayBillDate || selectedInvoice.eway_bill_date).toLocaleDateString() : 'Ã¢â‚¬"'}</strong></span>
                                                     <span>Valid: <strong className="text-slate-700">{selectedInvoice.ewayBillValidUntil || selectedInvoice.eway_bill_valid_until ? new Date(selectedInvoice.ewayBillValidUntil || selectedInvoice.eway_bill_valid_until).toLocaleDateString() : 'Active'}</strong></span>
                                                 </div>
                                             </div>
@@ -1526,18 +1533,9 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
                                     </button>
                                 )}
 
-                                {selectedInvoice.status !== 'Cancelled' && selectedInvoice.status !== 'Draft' && !hasDiscount(selectedInvoice) && can('request_payment_discount') && (
-                                    <button onClick={() => openPaymentsAndDiscounts(selectedInvoice)} className="px-3 py-1.5 text-primary bg-primary/10 border border-primary/25 hover:bg-primary hover:border-primary hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 rounded-lg font-semibold text-xs shadow-sm flex items-center gap-1.5 whitespace-nowrap transition-colors cursor-pointer">
-                                        <BadgePercent className="w-3.5 h-3.5"/> Payments & Discounts
-                                    </button>
-                                )}
-
                                 {selectedInvoice.status !== 'Cancelled' && getInvoiceOutstanding(selectedInvoice.id).balanceDue > 0.01 && (
-                                    <button onClick={() => {
-                                        setShowPaymentModal(selectedInvoice);
-                                        setPayAmount(getInvoiceOutstanding(selectedInvoice.id).balanceDue);
-                                    }} className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-semibold text-xs shadow-sm flex items-center gap-1.5 cursor-pointer">
-                                        <IndianRupee className="w-3.5 h-3.5"/> Settle Payment
+                                    <button onClick={() => setSettleTarget(selectedInvoice)} className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-semibold text-xs shadow-sm flex items-center gap-1.5 cursor-pointer">
+                                        <IndianRupee className="w-3.5 h-3.5"/> Record Payment
                                     </button>
                                 )}
                                 <button onClick={() => setSelectedInvoice(null)} className="px-4 py-1.5 border border-slate-300 hover:bg-slate-100 text-slate-700 rounded-lg font-semibold text-xs cursor-pointer">
@@ -1629,7 +1627,7 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
 
                         {finalizeErrorCode === 'CREDIT_LIMIT_EXCEEDED' && creditExposure && (
                             <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-slate-700">
-                                <p className="mb-2 font-bold text-amber-900">Credit-limit review — {creditExposure.customerName}</p>
+                                <p className="mb-2 font-bold text-amber-900">Credit-limit review Ã¢â‚¬" {creditExposure.customerName}</p>
                                 <dl className="space-y-1">
                                     <div className="flex justify-between gap-3"><dt>Credit Limit</dt><dd className="font-semibold">{formatCurrency(creditExposure.creditLimit)}</dd></div>
                                     <div className="flex justify-between gap-3"><dt>Current Outstanding</dt><dd className="font-semibold">{formatCurrency(creditExposure.currentOutstanding)}</dd></div>
@@ -1649,7 +1647,7 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
                                             disabled={finalizingInvoiceId === finalizeModalTarget.id}
                                             className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-lg font-bold text-xs shadow-sm cursor-pointer transition-colors"
                                         >
-                                            {finalizingInvoiceId === finalizeModalTarget.id ? 'Overriding & Finalizing…' : 'Approve & Finalize (Override Credit Limit)'}
+                                            {finalizingInvoiceId === finalizeModalTarget.id ? 'Overriding & FinalizingÃ¢â‚¬Â¦' : 'Approve & Finalize (Override Credit Limit)'}
                                         </button>
                                     </div>
                                 ) : creditApprovalRequest?.status === 'Pending' ? (
@@ -1681,7 +1679,7 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
                                             disabled={requestingCreditApproval || !creditOverrideReason.trim()}
                                             className="rounded-md bg-amber-700 px-3 py-1.5 font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
                                         >
-                                            {requestingCreditApproval ? 'Requesting…' : 'Request Owner Approval'}
+                                            {requestingCreditApproval ? 'RequestingÃ¢â‚¬Â¦' : 'Request Owner Approval'}
                                         </button>
                                     </div>
                                 )}
@@ -1698,7 +1696,7 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
                                     setCreditExposure(null);
                                 }}
                             >
-                                {finalizingInvoiceId === finalizeModalTarget.id ? 'Finalizing…' : 'Back'}
+                                {finalizingInvoiceId === finalizeModalTarget.id ? 'FinalizingÃ¢â‚¬Â¦' : 'Back'}
                             </Button>
                             <button
                                 type="button"
@@ -1706,7 +1704,7 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
                                 disabled={finalizingInvoiceId === finalizeModalTarget.id || creditApprovalRequest?.status === 'Pending'}
                                 className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 disabled:cursor-wait text-white rounded-lg font-bold shadow-sm cursor-pointer"
                             >
-                                {finalizingInvoiceId === finalizeModalTarget.id ? 'Finalizing…' : 'Finalize Invoice'}
+                                {finalizingInvoiceId === finalizeModalTarget.id ? 'FinalizingÃ¢â‚¬Â¦' : 'Finalize Invoice'}
                             </button>
                         </div>
                     </div>

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { modal } from '../../context/ModalContext';
 import {
   ShieldCheck, Calendar, UserCheck, FileText, CheckCircle2,
   Clock, Layers, AlertCircle, Save, Send, Link2, MapPin,
@@ -260,7 +261,8 @@ export function PoQualityControlSection({
 
   // Delete Draft entry
   const handleDeleteDraft = async (entryId) => {
-    if (!window.confirm('Are you sure you want to delete this draft QC entry?')) return;
+    const ok = await modal.deleteConfirm('Are you sure you want to delete this draft QC entry?', 'Delete Draft QC Entry');
+    if (!ok) return;
     try {
       await purchaseService.deletePoQcInspection(po.id, entryId);
       if (showToast) showToast('Draft QC entry deleted.', 'info');

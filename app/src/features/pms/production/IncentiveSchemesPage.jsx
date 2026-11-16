@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { modal } from '../../../context/ModalContext';
 import {
   DollarSign,
   Plus,
@@ -270,7 +271,13 @@ export default function IncentiveSchemesPage() {
   };
 
   const handleReverseCalc = async (id) => {
-    const reason = prompt('Please specify reversal reason:');
+    const reason = await modal.prompt({
+      title: 'Reverse Incentive Calculation',
+      message: 'Please specify reversal reason:',
+      placeholder: 'Enter reason...',
+      required: true,
+      confirmLabel: 'Reverse Calculation',
+    });
     if (!reason) return;
     try {
       await productionService.reverseIncentiveCalculation(id, { reason });

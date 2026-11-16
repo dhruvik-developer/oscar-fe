@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { modal } from '../../context/ModalContext';
 import {
   Package,
   PackageCheck,
@@ -449,10 +450,16 @@ export function GoodsReceiptInlineSlide({ po, delivery, onClose, onReceiptSaved,
     }));
   };
 
-  const handleAutoSplitTakas = (lineId) => {
+  const handleAutoSplitTakas = async (lineId) => {
     const line = form.lines.find((l) => l.id === lineId);
     if (!line) return;
-    const countStr = window.prompt(`How many rolls to split ${line.receivedQty} meters into?`, '4');
+    const countStr = await modal.prompt({
+      title: 'Auto-Split Rolls',
+      message: `How many rolls to split ${line.receivedQty} meters into?`,
+      defaultValue: '4',
+      placeholder: 'e.g. 4',
+      confirmLabel: 'Split Rolls',
+    });
     const count = parseInt(countStr, 10);
     if (!count || count <= 0) return;
 

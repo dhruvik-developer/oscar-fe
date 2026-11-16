@@ -1,3 +1,4 @@
+import { modal } from '../../../context/ModalContext';
 import React, { useState, useMemo, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
@@ -1317,8 +1318,14 @@ export function CompanyPolicyModule({ forcedSection }) {
                           </button>
                           <button
                             type="button"
-                            onClick={() => {
-                              if (confirm(`Delete category "${cat.name}"?`)) {
+                            onClick={async () => {
+                              const confirmed = await modal.deleteConfirm({
+                                title: "Delete Category?",
+                                message: `Are you sure you want to delete category "${cat.name}"?`,
+                                itemName: cat.name,
+                                confirmText: "Delete Category"
+                              });
+                              if (confirmed) {
                                 deleteCategory(cat.id);
                                 showToast?.(`Deleted category ${cat.name}`);
                               }

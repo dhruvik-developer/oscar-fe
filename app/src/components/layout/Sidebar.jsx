@@ -481,14 +481,15 @@ export const NAV = [
     ],
   },
 
-  {
-    label: 'Reports',
-    icon: BarChart3,
-    children: [
-      { label: 'Standard Reports', to: '/reports', dot: true },
-      { label: 'Owner Executive MIS', to: '/reports/owner-mis' },
-    ],
-  },
+  // [TEMPORARILY HIDDEN] Reports module — comment out to hide from sidebar
+  // {
+  //   label: 'Reports',
+  //   icon: BarChart3,
+  //   children: [
+  //     { label: 'Standard Reports', to: '/reports', dot: true },
+  //     { label: 'Owner Executive MIS', to: '/reports/owner-mis' },
+  //   ],
+  // },
 
   {
     label: 'Administration',

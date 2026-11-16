@@ -37,13 +37,37 @@
   --shadow-modal: var(--shadow-modal);
   --shadow-popover: var(--shadow-popover);
 
-  /* Canonical control sizes — one value for every button / KPI */
+  /* Canonical control sizes "” one value for every button / KPI */
   --btn-height: 38px;
   --kpi-min-height: 92px;
   --kpi-badge: 44px;
+  --table-header-height: 44px;
 }
 
 /* Tailwind-native canonical utilities (use these in className) */
+@utility table-head-std {
+  background-color: var(--table-head-bg);
+}
+
+@utility table-head-row-std {
+  height: 44px;
+  min-height: 44px;
+  background-color: var(--table-head-bg);
+  border-bottom: 1px solid var(--border);
+}
+
+@utility th-std {
+  height: 44px;
+  min-height: 44px;
+  padding-inline: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.25;
+  color: var(--text-secondary);
+  background-color: var(--table-head-bg);
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
 @utility btn-std {
   height: var(--btn-height);
   min-height: var(--btn-height);
@@ -81,11 +105,11 @@
 
 @layer base {
 /* =========================================================
-   EVENMORE UNIFIED PLATFORM — GLOBAL STYLES
+   EVENMORE UNIFIED PLATFORM "” GLOBAL STYLES
    Design System Baseline: CRM Application & Multi-Theme Engine
    ========================================================= */
 
-/* ── CSS Custom Properties (Multi-Theme System) ─────────── */
+/* â”€â”€ CSS Custom Properties (Multi-Theme System) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 :root, [data-theme="light"] {
   font-family: "Manrope", "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --primary: #1f6bff;
@@ -230,7 +254,7 @@
   --body-bg: radial-gradient(circle at top left, rgba(16, 185, 129, 0.12), transparent 35%), linear-gradient(180deg, #051611 0%, #030e0b 100%);
 }
 
-/* ── Oscar theme: light pages + navy sidebar, matching the login page ─── */
+/* â”€â”€ Oscar theme: light pages + navy sidebar, matching the login page â”€â”€â”€ */
 [data-theme="oscar"] {
   --primary: #1B5FD6;
   --primary-dark: #1747C4;
@@ -269,7 +293,7 @@
   --body-bg: radial-gradient(circle at top left, rgba(202, 222, 255, 0.35), transparent 28%), linear-gradient(180deg, #fbfdff 0%, #f3f7ff 100%);
 }
 
-/* ── Oscar sidebar: login-page blue gradient pill + blue accents ───────── */
+/* â”€â”€ Oscar sidebar: login-page blue gradient pill + blue accents â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 /* The login page's fabric photo under a slate-navy veil, so the shell
    carries the same texture and tone as the sign-in screen. */
 [data-theme="oscar"] .sidebar {
@@ -307,7 +331,7 @@
 [data-theme="oscar"] .sub-item.active {
   background: var(--brand-tint, rgba(125, 180, 246, 0.14));
   color: #ffffff;
-  /* Accent bar as an inset shadow — a real border-left would widen the row. */
+  /* Accent bar as an inset shadow "” a real border-left would widen the row. */
   box-shadow:
     inset 3px 0 0 0 var(--brand-accent, #7DB4F6),
     inset 0 0 0 1px rgba(255, 255, 255, 0.1),
@@ -318,7 +342,7 @@
 }
 }
 
-/* ── Theme Adaptations for Dark / Midnight / Emerald Modes (Global Specificity) ── */
+/* â”€â”€ Theme Adaptations for Dark / Midnight / Emerald Modes (Global Specificity) â”€â”€ */
 [data-theme="dark"],
 [data-theme="midnight"],
 [data-theme="emerald"],
@@ -701,10 +725,10 @@ button.bg-\[\#16233a\]:hover {
 
 
 
-/* ── Reset ──────────────────────────────────────────────── */
+/* â”€â”€ Reset â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 *, *::before, *::after { box-sizing: border-box; }
 
-/* ── Caret visibility ───────────────────────────────────────
+/* â”€â”€ Caret visibility â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
    Read-only text (titles, headers, KPIs, table cells) must never render a
    text-insertion caret when clicked (e.g. when the browser's caret-browsing
    mode is on). Editable surfaces keep their normal caret. */
@@ -738,7 +762,7 @@ button { cursor: pointer; }
 a { text-decoration: none; color: inherit; }
 img { display: block; max-width: 100%; }
 
-/* ── App Shell ──────────────────────────────────────────── */
+/* â”€â”€ App Shell â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 /* Mobile-first: one column below lg; the sidebar becomes an off-canvas
    drawer (see "Mobile Sidebar Drawer" below). */
 .app-shell {
@@ -800,7 +824,7 @@ img { display: block; max-width: 100%; }
   }
 }
 
-/* ── Custom Scrollbars & Arrow Suppression ───────────────── */
+/* â”€â”€ Custom Scrollbars & Arrow Suppression â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 /* Hide native Windows scrollbar arrow buttons across the entire app */
 ::-webkit-scrollbar-button {
   display: none !important;
@@ -808,7 +832,7 @@ img { display: block; max-width: 100%; }
   height: 0 !important;
 }
 
-/* ── Sidebar Custom Styling ─────────────────────────────── */
+/* â”€â”€ Sidebar Custom Styling â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .sidebar {
   background: linear-gradient(180deg, var(--sidebar-bg-from) 0%, var(--sidebar-bg-to) 100%);
   color: var(--sidebar-text);
@@ -918,7 +942,7 @@ img { display: block; max-width: 100%; }
 
 .brand-menu:hover { background: rgba(255, 255, 255, 0.08); }
 
-/* ── Sidebar Navigation Hierarchy ───────────────────────── */
+/* â”€â”€ Sidebar Navigation Hierarchy â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .side-nav {
   display: flex;
   flex-direction: column;
@@ -1151,7 +1175,7 @@ img { display: block; max-width: 100%; }
   flex: 1;
 }
 
-/* ── Accent nav items (Inventory → Stock Position) ─────────────────────
+/* â”€â”€ Accent nav items (Inventory → Stock Position) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
    A nav item that sets `accent` renders its icon as a tinted chip and gets
    a colour-matched active state, hover arrow and guide line. Items without
    `accent` are untouched by everything below. Colours arrive as `--chip`
@@ -1301,7 +1325,7 @@ img { display: block; max-width: 100%; }
 
 .sidebar-resize-handle:hover .resize-thumb { opacity: 1; }
 
-/* ── Mobile Sidebar Drawer (below lg) ───────────────────── */
+/* â”€â”€ Mobile Sidebar Drawer (below lg) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .sidebar-backdrop {
   display: none;
 }
@@ -1361,7 +1385,7 @@ img { display: block; max-width: 100%; }
   to { opacity: 1; }
 }
 
-/* ── Topbar ──────────────────────────────────────────────── */
+/* â”€â”€ Topbar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .topbar {
   height: 62px;
   background: var(--topbar-bg);
@@ -1445,7 +1469,7 @@ img { display: block; max-width: 100%; }
   color: var(--primary);
 }
 
-/* Topbar mobile controls (hamburger + compact search) — hidden by default */
+/* Topbar mobile controls (hamburger + compact search) "” hidden by default */
 .topbar-hamburger,
 .top-search-compact {
   display: none;
@@ -1579,7 +1603,7 @@ img { display: block; max-width: 100%; }
   }
 }
 
-/* ── Notification center rows: actions replace the time on hover / focus;
+/* â”€â”€ Notification center rows: actions replace the time on hover / focus;
    on touch screens (no hover) they stay visible and the time moves to the meta line. */
 .notif-panel {
   max-height: min(640px, calc(100dvh - 88px));
@@ -1657,7 +1681,7 @@ img { display: block; max-width: 100%; }
 .profile-text small { font-size: 0.82rem; color: var(--muted); }
 .profile-chev { color: var(--text-secondary); }
 
-/* ── Page Header ─────────────────────────────────────────── */
+/* â”€â”€ Page Header â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .page-head {
   padding: 16px 24px 12px;
   border-bottom: 1px solid var(--border);
@@ -1710,8 +1734,8 @@ img { display: block; max-width: 100%; }
   flex-shrink: 0;
 }
 
-/* ── Buttons ─────────────────────────────────────────────── */
-/* Canonical size: every text button is 38px tall, 13px font — no variants. */
+/* â”€â”€ Buttons â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* Canonical size: every text button is 38px tall, 13px font "” no variants. */
 .btn-primary, .btn-outline, .btn-ghost, .btn-danger {
   height: 38px;
   min-height: 38px;
@@ -1768,7 +1792,7 @@ img { display: block; max-width: 100%; }
 .btn-sm { height: 38px; min-height: 38px; padding: 0 16px; font-size: 0.8125rem; }
 .btn-lg { height: 38px; min-height: 38px; padding: 0 16px; font-size: 0.8125rem; }
 
-/* Icon button — 38px square to match text-button height */
+/* Icon button "” 38px square to match text-button height */
 .icon-ghost {
   width: 38px;
   height: 38px;
@@ -1798,7 +1822,7 @@ img { display: block; max-width: 100%; }
   border-radius: 10px;
 }
 
-/* ── Cards ───────────────────────────────────────────────── */
+/* â”€â”€ Cards â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .card {
   background: var(--card);
   border: 1px solid var(--border);
@@ -1831,9 +1855,9 @@ img { display: block; max-width: 100%; }
   }
 }
 
-/* ── Stat Cards ──────────────────────────────────────────── */
+/* â”€â”€ Stat Cards â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 /* Canonical KPI size: every KPI card is min 92px tall, 14/16px padding,
-   44px icon badge, 20px value, 11px label — identical everywhere. */
+   44px icon badge, 20px value, 11px label "” identical everywhere. */
 .stat-card {
   background: var(--card);
   border: 1px solid var(--border);
@@ -1948,14 +1972,14 @@ img { display: block; max-width: 100%; }
   }
 }
 
-/* ── KPI size guardrail: every KPI variant shares the canonical box ── */
+/* â”€â”€ KPI size guardrail: every KPI variant shares the canonical box â”€â”€ */
 .hrms-stat-card {
   min-height: 92px;
   padding: 14px 16px;
   border-radius: var(--radius-lg);
 }
 
-/* ── Table ───────────────────────────────────────────────── */
+/* â”€â”€ Table â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .table-card {
   background: var(--card);
   border: 1px solid var(--border);
@@ -1995,43 +2019,122 @@ img { display: block; max-width: 100%; }
   font-size: 0.875rem;
 }
 
-.data-table thead th, .leads-table thead th {
-  background: var(--table-head-bg);
-  color: var(--text-secondary);
-  font-size: 0.78rem;
-  font-weight: 700;
-  text-align: inherit;
-  padding: 13px 14px;
-  border-bottom: 1px solid var(--border);
-  white-space: nowrap;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
+/* =========================================================
+   OSCAR ERP — CANONICAL GLOBAL TABLE HEADER DESIGN SYSTEM
+   Standardizes all table headers across every module in the ERP:
+   - Font size: 12px
+   - Font weight: 600 (semibold)
+   - Header height: 44px
+   - Consistent horizontal padding: 12px
+   - Consistent vertical alignment: center (middle)
+   - Consistent text alignment according to column type
+   - Compact line height: 1.25 (15px-16px)
+   - Consistent border-bottom: 1px solid var(--border)
+   - Consistent background: var(--table-head-bg)
+   - Consistent text color: var(--text-secondary)
+   - Consistent sorting icon size (14px) and spacing (6px)
+   ========================================================= */
+
+/* Thead container */
+table:not(.printable-document table):not(.no-standard-header table) thead,
+.table-head-std {
+  background-color: var(--table-head-bg) !important;
 }
 
+/* Thead row */
+table:not(.printable-document table):not(.no-standard-header table) thead tr,
+.table-head-row-std {
+  height: 44px !important;
+  min-height: 44px !important;
+  max-height: 44px;
+  background-color: var(--table-head-bg) !important;
+  border-bottom: 1px solid var(--border) !important;
+}
+
+/* Standard table header cells */
+table:not(.printable-document table):not(.no-standard-header table) thead th,
+.th-std,
+.table-header-cell,
+.data-table thead th,
+.leads-table thead th,
+.hrms-table thead th {
+  height: 44px !important;
+  min-height: 44px !important;
+  box-sizing: border-box !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  padding-left: 12px !important;
+  padding-right: 12px !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  line-height: 1.25 !important;
+  color: var(--text-secondary) !important;
+  background-color: var(--table-head-bg) !important;
+  border-bottom: 1px solid var(--border) !important;
+  vertical-align: middle !important;
+  text-align: left;
+  white-space: normal;
+  overflow-wrap: break-word;
+  word-break: normal;
+  letter-spacing: 0.015em;
+  text-transform: none;
+}
+
+/* Specific text alignments according to column type */
+table:not(.printable-document table):not(.no-standard-header table) thead th.text-left,
+table:not(.printable-document table):not(.no-standard-header table) thead th[align="left"],
 .data-table thead th.text-left,
-.leads-table thead th.text-left,
-.data-table tbody td.text-left,
-.leads-table tbody td.text-left {
+.leads-table thead th.text-left {
   text-align: left !important;
 }
 
+table:not(.printable-document table):not(.no-standard-header table) thead th.text-center,
+table:not(.printable-document table):not(.no-standard-header table) thead th[align="center"],
 .data-table thead th.text-center,
-.leads-table thead th.text-center,
-.data-table tbody td.text-center,
-.leads-table tbody td.text-center {
+.leads-table thead th.text-center {
   text-align: center !important;
 }
 
+table:not(.printable-document table):not(.no-standard-header table) thead th.text-right,
+table:not(.printable-document table):not(.no-standard-header table) thead th[align="right"],
 .data-table thead th.text-right,
-.leads-table thead th.text-right,
-.data-table tbody td.text-right,
-.leads-table tbody td.text-right {
+.leads-table thead th.text-right {
   text-align: right !important;
+}
+
+/* Ensure buttons and links inside header cells inherit typography and fill cell */
+table:not(.printable-document table):not(.no-standard-header table) thead th button,
+.th-std button,
+.table-header-cell button {
+  font-family: inherit !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  line-height: 1.25 !important;
+  color: inherit !important;
+  vertical-align: middle;
+}
+
+/* Standardized sorting icon behavior */
+.table-sort-icon {
+  width: 14px;
+  height: 14px;
+  min-width: 14px;
+  min-height: 14px;
+  flex-shrink: 0;
+  transition: color 0.15s ease, transform 0.15s ease;
+}
+
+/* Sticky headers maintain standard styling and shadow */
+table:not(.printable-document table):not(.no-standard-header table) thead.sticky th,
+table:not(.printable-document table):not(.no-standard-header table) thead .sticky,
+.pms-sticky-header th {
+  background-color: var(--table-head-bg) !important;
+  border-bottom: 1px solid var(--border) !important;
 }
 
 .data-table thead th + th,
 .leads-table thead th + th {
-  box-shadow: inset 1px 0 0 var(--border-subtle);
+  box-shadow: none;
 }
 
 .th-inner {
@@ -2040,7 +2143,7 @@ img { display: block; max-width: 100%; }
   gap: 6px;
 }
 
-.sort-ico { color: var(--muted); opacity: 0.7; }
+.sort-ico { color: var(--text-secondary); opacity: 0.6; }
 .sort-ico.active { color: var(--primary); opacity: 1; }
 .th-sort-btn {
   background: transparent;
@@ -2048,20 +2151,21 @@ img { display: block; max-width: 100%; }
   padding: 0;
   margin: 0;
   font: inherit;
-  font-size: 0.74rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.015em;
+  text-transform: none;
   color: inherit;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
+  height: 100%;
+  min-height: 44px;
 }
-.th-sort-btn:hover .sort-ico:not(.active) { color: var(--text); opacity: 0.8; }
-/* Up and down arrows stacked, both always visible (leads table). */
-.sort-arrows { display: inline-flex; flex-direction: column; line-height: 0; margin-left: 2px; }
-.sort-arrows .sort-ico + .sort-ico { margin-top: -5px; }
-.sort-arrows .sort-ico:not(.active) { opacity: 0.4; }
+.th-sort-btn:hover .sort-ico:not(.active) { color: var(--text); opacity: 0.9; }
+.sort-arrows { display: inline-flex; flex-direction: column; line-height: 0; margin-left: 4px; }
+.sort-arrows .sort-ico + .sort-ico { margin-top: -4px; }
+.sort-arrows .sort-ico:not(.active) { opacity: 0.5; }
 .th-sort-btn:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: 4px; }
 
 .data-table tbody td, .leads-table tbody td {
@@ -2098,7 +2202,7 @@ img { display: block; max-width: 100%; }
 }
 .row-more:hover { background: var(--soft); }
 
-/* ── Badge / Status ──────────────────────────────────────── */
+/* â”€â”€ Badge / Status â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .badge {
   display: inline-flex;
   align-items: center;
@@ -2118,7 +2222,7 @@ img { display: block; max-width: 100%; }
 .badge-orange { background: rgba(249, 115, 22, 0.16); color: #fb923c; }
 .badge-cyan { background: rgba(6, 182, 212, 0.16); color: var(--info); }
 
-/* ── Modal ───────────────────────────────────────────────── */
+/* â”€â”€ Modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .modal-backdrop {
   position: fixed;
   inset: 0;
@@ -2473,7 +2577,7 @@ img { display: block; max-width: 100%; }
 .input-icon-wrap input[type="date"]::-webkit-calendar-picker-indicator,
 .input-icon-wrap input[type="time"]::-webkit-calendar-picker-indicator { opacity: 0; position: absolute; top: 0; right: 0; width: 34px; height: 100%; margin: 0; cursor: pointer; }
 
-/* Help text under a create-lead field — always its own grid row, never
+/* Help text under a create-lead field "” always its own grid row, never
    squeezed beside the input. */
 .lead-create-field .input-icon-wrap { display: block; }
 .lead-create-help {
@@ -2671,7 +2775,7 @@ img { display: block; max-width: 100%; }
   }
 }
 
-/* ── Forms ───────────────────────────────────────────────── */
+/* â”€â”€ Forms â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .form-group { display: grid; gap: 6px; }
 .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 .form-row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
@@ -2736,7 +2840,7 @@ img { display: block; max-width: 100%; }
   margin: 0 0 12px;
 }
 
-/* ── Filter Panel ────────────────────────────────────────── */
+/* â”€â”€ Filter Panel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .filter-card {
   background: var(--card);
   border: 1px solid var(--border);
@@ -2819,7 +2923,7 @@ img { display: block; max-width: 100%; }
   margin-top: 18px;
 }
 
-/* ── Dashboard ───────────────────────────────────────────── */
+/* â”€â”€ Dashboard â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .dashboard-view { padding: 0; display: grid; gap: 16px; }
 
 .dashboard-stats {
@@ -3055,7 +3159,7 @@ img { display: block; max-width: 100%; }
 .view-all-link { border: 0; background: transparent; color: var(--primary); font-size: 0.84rem; font-weight: 600; }
 .view-all-link:hover { text-decoration: underline; }
 
-/* ── Leads / CRM Specifics ────────────────────────────────── */
+/* â”€â”€ Leads / CRM Specifics â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .content-grid {
   display: grid;
   grid-template-columns: 280px minmax(0, 1fr);
@@ -3313,7 +3417,7 @@ img { display: block; max-width: 100%; }
 .mail-link { color: var(--primary); }
 .mail-link:hover { text-decoration: underline; }
 
-/* Lead No. column (L-001) — blue link like the reference screenshot. */
+/* Lead No. column (L-001) "” blue link like the reference screenshot. */
 .lead-no-btn {
   border: 0;
   background: transparent;
@@ -3332,7 +3436,7 @@ img { display: block; max-width: 100%; }
 
 .pager-wrap { margin-top: 10px; }
 
-/* ── Leads table: screenshot format (row actions + hover tooltips) ── */
+/* â”€â”€ Leads table: screenshot format (row actions + hover tooltips) â”€â”€ */
 .screenshot-table thead th { text-transform: none; letter-spacing: 0; font-weight: 600; }
 
 .lead-row-actions { white-space: nowrap; vertical-align: middle; }
@@ -3388,7 +3492,7 @@ img { display: block; max-width: 100%; }
 }
 .activity-menu button:hover { background: var(--soft); }
 
-/* ── Leads row ⋮ menu (floating, portal-rendered) ────────────── */
+/* â”€â”€ Leads row â‹® menu (floating, portal-rendered) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .lead-row-menu {
   position: fixed;
   z-index: 90;
@@ -3641,7 +3745,7 @@ tr:hover .lead-pin-btn {
   transform: translateX(-50%) translateY(0);
 }
 
-/* ── Sort By popover (screenshot format) ─────────────────── */
+/* â”€â”€ Sort By popover (screenshot format) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .sort-popover-wrap {
   position: relative;
   display: inline-flex;
@@ -3809,7 +3913,7 @@ tr:hover .lead-pin-btn {
   gap: 8px;
 }
 
-/* ── Grid-view table (bordered screenshot format) ──────────── */
+/* â”€â”€ Grid-view table (bordered screenshot format) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .grid-table-card .leads-table thead th + th { box-shadow: none; }
 
 .grid-table-card .leads-table thead th {
@@ -3833,12 +3937,14 @@ tr:hover .lead-pin-btn {
   font-size: 0.84rem;
 }
 .grid-table-card .leads-table thead th {
-  background: #edf4ff;
-  color: #092957;
-  border-color: #142033;
-  padding: 13px 12px;
+  background: var(--table-head-bg);
+  color: var(--text-secondary);
+  border-color: var(--border);
+  height: 44px;
+  padding: 0 12px;
+  font-size: 12px;
   font-weight: 600;
-  white-space: nowrap;
+  line-height: 1.25;
 }
 .grid-table-card .leads-table tbody td {
   color: #092957;
@@ -3855,7 +3961,7 @@ tr:hover .lead-pin-btn {
   text-overflow: ellipsis;
 }
 
-/* ── Tile-view lead cards (screenshot format) ──────────────── */
+/* â”€â”€ Tile-view lead cards (screenshot format) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .lead-tile-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));
@@ -4005,7 +4111,7 @@ tr:hover .lead-pin-btn {
   color: var(--muted);
 }
 
-/* ── Compact lead grid view ──────────────────────────────── */
+/* â”€â”€ Compact lead grid view â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .lead-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr));
@@ -4657,7 +4763,7 @@ tr:hover .lead-pin-btn {
   .lead-tile-card { padding: 14px; }
 }
 
-/* ── Leads Map view (screenshot format) ────────────────────── */
+/* â”€â”€ Leads Map view (screenshot format) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .leads-map-page {
   display: flex;
   flex-direction: column;
@@ -5113,7 +5219,7 @@ tr:hover .lead-pin-btn {
   border: 0;
 }
 
-/* ── Shared Section Layout ────────────────────────────────── */
+/* â”€â”€ Shared Section Layout â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .section-wrap {
   padding: 14px 16px;
   display: grid;
@@ -5140,7 +5246,7 @@ tr:hover .lead-pin-btn {
   margin: 4px 0 0;
 }
 
-/* ── Loading / Empty / Error States ──────────────────────── */
+/* â”€â”€ Loading / Empty / Error States â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .loading-wrap {
   display: flex;
   align-items: center;
@@ -5182,7 +5288,7 @@ tr:hover .lead-pin-btn {
   color: #ffffff !important;
 }
 
-/* ── Toast ───────────────────────────────────────────────── */
+/* â”€â”€ Toast â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .toast {
   position: fixed;
   bottom: 20px;
@@ -5204,7 +5310,7 @@ tr:hover .lead-pin-btn {
   to { transform: translateY(0); opacity: 1; }
 }
 
-/* ── Search Bar (in-page) ────────────────────────────────── */
+/* â”€â”€ Search Bar (in-page) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .search-bar {
   display: flex;
   align-items: center;
@@ -5230,7 +5336,7 @@ tr:hover .lead-pin-btn {
   box-shadow: 0 0 0 3px var(--primary-subtle);
 }
 
-/* ── Print Styles (from ERP) ─────────────────────────────── */
+/* â”€â”€ Print Styles (from ERP) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 @media print {
   @page { size: A4 portrait; margin: 10mm 15mm; }
 
@@ -5308,7 +5414,7 @@ tr:hover .lead-pin-btn {
   table, tr, td, th { page-break-inside: avoid !important; }
 }
 
-/* ── Utilities ───────────────────────────────────────────── */
+/* â”€â”€ Utilities â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 /* Horizontal swipe strips (breadcrumbs, tab bars) without a visible bar. */
 @utility scrollbar-none {
   scrollbar-width: none;
@@ -5326,7 +5432,7 @@ tr:hover .lead-pin-btn {
   .rounded { border-radius: var(--radius); }
 }
 
-/* ── Sleek Custom Scrollbars ─────────────────────────────── */
+/* â”€â”€ Sleek Custom Scrollbars â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .custom-scrollbar::-webkit-scrollbar {
   width: 5px;
   height: 5px;
@@ -5347,7 +5453,7 @@ tr:hover .lead-pin-btn {
 }
 
 
-/* ── KPI cards (components/ui/KpiCard.jsx) ─────────────────
+/* â”€â”€ KPI cards (components/ui/KpiCard.jsx) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
    Theme-driven surface; --kpi-accent is set per card from its tone. */
 @layer components {
   .kpi-card {
@@ -5366,7 +5472,7 @@ tr:hover .lead-pin-btn {
 }
 
 
-/* ── Global ERP Responsive & Adaptive Design System ───────── */
+/* â”€â”€ Global ERP Responsive & Adaptive Design System â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 :root {
   --fluid-h1: clamp(1.25rem, 1.1rem + 0.75vw, 1.625rem);
   --fluid-h2: clamp(1.1rem, 0.95rem + 0.6vw, 1.375rem);
@@ -5517,7 +5623,7 @@ textarea:focus::placeholder {
   opacity: 0 !important;
 }
 
-/* ── PMS Loom & Production Section Styling ──────────────────────────────── */
+/* â”€â”€ PMS Loom & Production Section Styling â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .pms-screen {
   width: 100%;
   max-width: 100%;

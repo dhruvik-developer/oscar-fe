@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useAppStore } from "../../../stores/appStore";
 import { usePerformanceStore } from "../../../stores/performanceStore";
 import { DataTable } from "../../../components/hrms/DataTable";
@@ -15,8 +15,15 @@ import MasterSourceLink from "../../../components/common/MasterSourceLink";
 export default function Indicators() {
   const showToast = useAppStore((s) => s.showToast);
   const employees = useAppStore((s) => s.employees) || [];
+  const storeDepartments = useAppStore((s) => s.departments) || [];
+  const storeLocations = useAppStore((s) => s.locations) || [];
+  const storeDesignations = useAppStore((s) => s.designations) || [];
 
-  const { indicators, addIndicator, updateIndicator, deleteIndicator } = usePerformanceStore();
+  const { indicators, addIndicator, updateIndicator, deleteIndicator, hydrate } = usePerformanceStore();
+
+  useEffect(() => {
+    hydrate?.();
+  }, [hydrate]);
 
   const [search, setSearch] = useState("");
   const [branch, setBranch] = useState("All");
@@ -113,22 +120,30 @@ export default function Indicators() {
       setErrors(e);
       return;
     }
+    const payload = {
+      ...form,
+      weight: Number(form.weight),
+      rating: form.rating ? Number(form.rating) : 4.0,
+      addedBy: "Ayesha Khan",
+    };
     if (editRow) {
-      updateIndicator(editRow.id, {
-        ...form,
-        weight: Number(form.weight),
-      });
-      showToast("Indicator updated successfully.");
-      setEditRow(null);
+      updateIndicator(editRow.id, payload)
+        .then(() => {
+          showToast("Indicator updated successfully.");
+          setEditRow(null);
+        })
+        .catch((err) => {
+          showToast(err?.message || "Failed to update indicator", "error");
+        });
     } else {
-      addIndicator({
-        ...form,
-        weight: Number(form.weight),
-        rating: 4.0,
-        addedBy: "Ayesha Khan",
-      });
-      showToast("Indicator created successfully.");
-      setAddOpen(false);
+      addIndicator(payload)
+        .then(() => {
+          showToast("Indicator created successfully.");
+          setAddOpen(false);
+        })
+        .catch((err) => {
+          showToast(err?.message || "Failed to create indicator", "error");
+        });
     }
   }
 
@@ -223,30 +238,35 @@ export default function Indicators() {
     },
   ];
 
-  const branchOpts = [
-    { value: "All", label: "All Branches" },
-    { value: "New York", label: "New York" },
-    { value: "London", label: "London" },
-    { value: "Dubai", label: "Dubai" },
-  ];
-  const deptOpts = [
-    { value: "All", label: "All Departments" },
-    { value: "Engineering", label: "Engineering" },
-    { value: "Design", label: "Design" },
-    { value: "Marketing", label: "Marketing" },
-    { value: "HR", label: "HR" },
-    { value: "Finance", label: "Finance" },
-    { value: "Operations", label: "Operations" },
-  ];
-  const desigOpts = [
-    { value: "All", label: "All Designations" },
-    { value: "Senior Engineer", label: "Senior Engineer" },
-    { value: "Tech Lead", label: "Tech Lead" },
-    { value: "Product Designer", label: "Product Designer" },
-    { value: "DevOps Engineer", label: "DevOps Engineer" },
-    { value: "Analyst", label: "Analyst" },
-    { value: "HR Manager", label: "HR Manager" },
-  ];
+  const branchOpts = useMemo(() => {
+    const names = new Set(["New York", "London", "Dubai"]);
+    storeLocations.forEach((l) => { if (l?.name) names.add(l.name); });
+    indicators.forEach((i) => { if (i?.branch) names.add(i.branch); if (i?.location) names.add(i.location); });
+    return [
+      { value: "All", label: "All Branches" },
+      ...Array.from(names).map((name) => ({ value: name, label: name })),
+    ];
+  }, [storeLocations, indicators]);
+
+  const deptOpts = useMemo(() => {
+    const names = new Set(["Engineering", "Design", "Marketing", "HR", "Finance", "Operations"]);
+    storeDepartments.forEach((d) => { if (d?.name) names.add(d.name); });
+    indicators.forEach((i) => { if (i?.department) names.add(i.department); });
+    return [
+      { value: "All", label: "All Departments" },
+      ...Array.from(names).map((name) => ({ value: name, label: name })),
+    ];
+  }, [storeDepartments, indicators]);
+
+  const desigOpts = useMemo(() => {
+    const names = new Set(["Senior Engineer", "Tech Lead", "Product Designer", "DevOps Engineer", "Analyst", "HR Manager"]);
+    storeDesignations.forEach((d) => { if (d?.name) names.add(d.name); });
+    indicators.forEach((i) => { if (i?.designation) names.add(i.designation); });
+    return [
+      { value: "All", label: "All Designations" },
+      ...Array.from(names).map((name) => ({ value: name, label: name })),
+    ];
+  }, [storeDesignations, indicators]);
   const ratingOpts = [
     { value: "All", label: "All Ratings" },
     { value: "4", label: "4★ & up" },
@@ -514,7 +534,7 @@ export default function Indicators() {
                 <span className="text-slate-400 text-[11px] block">Current Rating</span>
                 <span className="font-bold text-slate-900 flex items-center gap-1">
                   <Star size={12} className="text-amber-500 fill-amber-400" />
-                  {viewRow.rating.toFixed(1)} / 5.0
+                  {(Number(viewRow.rating) || 4.0).toFixed(1)} / 5.0
                 </span>
               </div>
               <div>
@@ -556,9 +576,12 @@ export default function Indicators() {
             <Button
               variant="danger"
               onClick={() => {
-                if (deleteRow) deleteIndicator(deleteRow.id);
+                if (deleteRow) {
+                  deleteIndicator(deleteRow.id)
+                    .then(() => showToast("Indicator deleted successfully."))
+                    .catch((err) => showToast(err?.message || "Failed to delete indicator", "error"));
+                }
                 setDeleteRow(null);
-                showToast("Indicator deleted successfully.");
               }}
             >
               Delete Indicator

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { modal } from '../../context/ModalContext';
 import { useERP } from '../../context/ERPContext';
 import { DataTable } from '../../components/ui/DataTable';
 import { StatCard } from '../../components/ui/StatCard';
@@ -77,14 +78,14 @@ export const PaymentOutPage = ({ embedded = false }) => {
             // no PO link on payments, so the PO is recorded in the notes.
             const po = purchaseOrders.find((p) => p.id === selectedPoId);
             const vendorId = selectedVendorId || po?.vendorId;
-            if (!vendorId) { alert('Select the supplier receiving the advance.'); return; }
+            if (!vendorId) { await modal.warning('Select the supplier receiving the advance.', 'Supplier Required'); return; }
             payload = {
                 vendorId,
                 notes: po ? `Advance against ${po.poNumber}` : undefined,
             };
         } else {
             const bill = purchaseBills.find((b) => b.id === selectedBillId);
-            if (!bill) { alert('Select the vendor bill being paid.'); return; }
+            if (!bill) { await modal.warning('Select the vendor bill being paid.', 'Bill Required'); return; }
             payload = { vendorId: bill.vendorId, billId: bill.id };
         }
         setSaving(true);
@@ -277,12 +278,12 @@ export const PaymentOutPage = ({ embedded = false }) => {
               type="button"
               disabled={saving}
               onClick={async () => {
-                if (!advanceBillId) { alert('Select a vendor bill with an open balance.'); return; }
+                if (!advanceBillId) { await modal.warning('Select a vendor bill with an open balance.', 'Bill Required'); return; }
                 const b = purchaseBills.find((x) => x.id === advanceBillId);
                 const maxAdv = getVendorAdvanceBalance(b?.vendorId);
                 const bal = getBillOutstanding(advanceBillId).balanceDue;
                 const amt = Math.min(Number(advanceApplyAmt) || 0, maxAdv, bal);
-                if (!(amt > 0)) { alert('Enter an amount to apply.'); return; }
+                if (!(amt > 0)) { await modal.warning('Enter an amount to apply.', 'Amount Required'); return; }
                 setSaving(true);
                 try {
                   await applyVendorAdvanceToBill(advanceBillId, amt);

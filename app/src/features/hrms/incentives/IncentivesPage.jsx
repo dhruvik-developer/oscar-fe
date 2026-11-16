@@ -664,7 +664,7 @@ export default function IncentivesPage() {
                 rows="3"
                 value={holdReason}
                 onChange={(e) => setHoldReason(e.target.value)}
-                placeholder="e.g. Pending party payment for Invoice #INV-204"
+                placeholder="e.g. Pending party payment for Invoice INV-204"
                 className="w-full mt-1.5 p-2.5 bg-soft border border-border rounded-lg text-sm text-text focus:outline-none focus:ring-1 focus:ring-red-500"
               />
             </div>

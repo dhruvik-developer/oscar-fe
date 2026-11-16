@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import {
   FlaskConical,
   Plus,
@@ -219,22 +220,30 @@ export default function SampleListPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-slate-200">
         <div>
+          {/* Breadcrumb */}
+          <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 mb-2 overflow-x-auto whitespace-nowrap text-[12px] font-medium text-slate-500 scrollbar-none">
+            <Link to="/dashboard" className="transition-colors hover:text-slate-700">Dashboard</Link>
+            <span className="shrink-0 text-slate-300">›</span>
+            <Link to="/inventory" className="transition-colors hover:text-slate-700">Inventory</Link>
+            <span className="shrink-0 text-slate-300">›</span>
+            <span className="font-semibold text-slate-900">Sample Management</span>
+          </nav>
           <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
+            <h1 className="text-[19px] sm:text-[21px] font-extrabold tracking-tight text-slate-900 flex items-center gap-2">
               <FlaskConical className="w-7 h-7 text-indigo-600" />
               Sampling Register & Expense
             </h1>
             <PageInfoButton title="Sample Register & Expense" />
           </div>
-          <p className="text-sm text-slate-500 mt-1">
+          <p className="text-[13px] text-slate-500 mt-0.5">
             Track fabric swatches, cuts, and hangers issued to parties with automatic inventory deduction and expense booking.
           </p>
         </div>
         <button
           onClick={() => setShowIssueModal(true)}
-          className="inline-flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm rounded-lg shadow-sm transition-colors"
+          className="h-9 px-3 rounded-lg bg-blue-600 text-white font-semibold text-xs inline-flex items-center gap-1 cursor-pointer"
         >
-          <Plus className="w-4 h-4" /> Issue New Sample
+          <Plus size={14} /> Issue New Sample
         </button>
       </div>
 

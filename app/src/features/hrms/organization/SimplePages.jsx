@@ -1,3 +1,4 @@
+import { modal } from '../../../context/ModalContext';
 import { useState } from "react";
 import { useAppStore } from "../../../stores/appStore";
 import { Badge } from "../../../components/hrms/Badge";
@@ -40,16 +41,27 @@ export function Designations() {
         subtitle="Define roles and hierarchy"
         guide={hrmsGuides.designations}
         actions={
-          <button onClick={() => {
-    const t = prompt("Title");
+          <button onClick={async () => {
+    const t = await modal.prompt({
+      title: "Add Designation",
+      label: "Designation Title",
+      placeholder: "e.g. Senior Software Engineer",
+      required: true
+    });
     if (t) setRows([...rows, { title: t, level: "L3", dept: "General", count: 0 }]);
   }} className="px-5 py-2.5 bg-navy text-white rounded-xl text-[13.5px] font-medium">Add Designation</button>
         }
       />
       <div className="bg-white border border-bdr rounded-xl shadow-sm overflow-x-auto">
         <table className="w-full min-w-[640px] lg:min-w-0 text-left"><thead className="bg-off border-b border-bdr text-[11px] uppercase text-muted"><tr><SortableTh sort={sort} sortKey="title" className="py-3 px-5">Title</SortableTh><SortableTh sort={sort} sortKey="level" className="py-3 px-5">Level</SortableTh><SortableTh sort={sort} sortKey="dept" className="py-3 px-5">Department</SortableTh><SortableTh sort={sort} sortKey="count" className="py-3 px-5">Employees</SortableTh><th className="py-3 px-5 text-right">Actions</th></tr></thead>
-          <tbody className="divide-y divide-bdr/40 text-[13px]">{sort.rows.map((r) => <tr key={r.title} className="hover:bg-off/60"><td className="py-4 px-5 font-medium">{r.title}</td><td className="py-4 px-5"><span className={`px-2.5 py-1 rounded-full text-[11px] border ${r.level === "L6" ? "bg-navy text-white border-navy" : "bg-off border-bdr"}`}>{r.level}</span></td><td className="py-4 px-5">{r.dept}</td><td className="py-4 px-5">{r.count}</td><td className="py-4 px-5 text-right flex justify-end gap-1"><button onClick={() => showToast("Edit " + r.title)} className="p-1.5 hover:bg-off rounded-lg"><span className="material-symbols-outlined text-[18px] text-muted">edit</span></button><button onClick={() => {
-    if (confirm("Delete " + r.title + "?")) setRows(rows.filter((x) => x.title !== r.title));
+          <tbody className="divide-y divide-bdr/40 text-[13px]">{sort.rows.map((r) => <tr key={r.title} className="hover:bg-off/60"><td className="py-4 px-5 font-medium">{r.title}</td><td className="py-4 px-5"><span className={`px-2.5 py-1 rounded-full text-[11px] border ${r.level === "L6" ? "bg-navy text-white border-navy" : "bg-off border-bdr"}`}>{r.level}</span></td><td className="py-4 px-5">{r.dept}</td><td className="py-4 px-5">{r.count}</td><td className="py-4 px-5 text-right flex justify-end gap-1"><button onClick={() => showToast("Edit " + r.title)} className="p-1.5 hover:bg-off rounded-lg"><span className="material-symbols-outlined text-[18px] text-muted">edit</span></button><button onClick={async () => {
+    const confirmed = await modal.deleteConfirm({
+      title: "Delete Designation?",
+      message: `Are you sure you want to delete designation "${r.title}"?`,
+      itemName: r.title,
+      confirmText: "Delete Designation"
+    });
+    if (confirmed) setRows(rows.filter((x) => x.title !== r.title));
   }} className="p-1.5 hover:bg-off rounded-lg"><span className="material-symbols-outlined text-[18px] text-muted">delete</span></button></td></tr>)}</tbody>
         </table>
       </div>

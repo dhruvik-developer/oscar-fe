@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { modal } from '../../context/ModalContext';
 import { PenTool, Printer, ShieldCheck, Truck, X } from 'lucide-react';
 import { useERP } from '../../context/ERPContext';
 import { api } from '../../services/api';
@@ -60,7 +61,8 @@ export function PrintLorryReceiptModal({ isOpen, onClose, tripId }) {
   };
 
   const clearSignature = async (key) => {
-    if (!window.confirm('Remove this signature?')) return;
+    const ok = await modal.deleteConfirm('Remove this signature?', 'Remove Signature');
+    if (!ok) return;
     try {
       await saveSignature(key, null);
     } catch (err) {

@@ -1,4 +1,5 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
+import { modal } from '../../context/ModalContext';
 import { Link, useNavigate } from 'react-router-dom';
 import { useERP } from '../../context/ERPContext';
 import { StatusBadge } from '../../components/ui/StatusBadge';
@@ -423,9 +424,10 @@ export const VendorBillsPage = () => {
     }
   };
 
-  const handleDelete = (bill) => {
+  const handleDelete = async (bill) => {
     if (!bill) return;
-    if (!window.confirm(`Delete vendor bill ${bill.vendorBillNumber || ''}? This cannot be undone.`)) return;
+    const ok = await modal.deleteConfirm(`Delete vendor bill ${bill.vendorBillNumber || ''}? This cannot be undone.`, 'Delete Vendor Bill');
+    if (!ok) return;
     cancelVendorBill(bill.id);
     if (selectedId === bill.id) setSelectedId(null);
   };

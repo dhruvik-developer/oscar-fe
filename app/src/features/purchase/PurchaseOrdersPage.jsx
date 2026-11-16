@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { modal } from '../../context/ModalContext';
 import { TablePagination } from '../../components/ui/TablePagination';
 import { useERP } from '../../context/ERPContext';
 import { StatusBadge } from '../../components/ui/StatusBadge';
@@ -51,6 +52,7 @@ import { PoDetailsModal } from './PoDetailsModal';
 import { PoMovementHistoryModal } from './PoMovementHistoryModal';
 import { PoDeleteConfirmModal } from './PoDeleteConfirmModal';
 import { PurchaseOverviewDashboard } from './PurchaseOverviewDashboard';
+import { PurchaseAnalyticsPage } from './PurchaseAnalyticsPage';
 
 const purchaseOrderGuide = {
     title: 'Purchase Orders',
@@ -104,10 +106,10 @@ function VendorInfoCard({ vendor }) {
         <span className="text-emerald-700 font-mono text-[10px] bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">Terms: {vendor.paymentTerms || 'Net 30'}</span>
       </div>
       <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-slate-600 text-[10px]">
-        <span>Code: <strong>{vendor.code || '—'}</strong></span>
-        <span>POC: <strong>{vendor.contactPerson || '—'}</strong></span>
-        <span>Email: {vendor.email || '—'}</span>
-        <span>Phone: {vendor.phone || '—'}</span>
+        <span>Code: <strong>{vendor.code || '"”'}</strong></span>
+        <span>POC: <strong>{vendor.contactPerson || '"”'}</strong></span>
+        <span>Email: {vendor.email || '"”'}</span>
+        <span>Phone: {vendor.phone || '"”'}</span>
         {(vendor.gstin || vendor.gstNumber || vendor.gst) && <span>GST No: <strong>{vendor.gstin || vendor.gstNumber || vendor.gst}</strong></span>}
       </div>
     </div>
@@ -333,7 +335,7 @@ export const PurchaseOrdersPage = () => {
                 ? rows.filter((b) => saved.some((x) => x.batchId === b.batchId)).map((b) => ({ ...b, qty: Number(saved.find((x) => x.batchId === b.batchId).qty) }))
                 : rows);
         } catch (err) {
-            alert(err?.message || 'Could not load the batches of this PO.');
+            await modal.error(err?.message || 'Could not load the batches of this PO.', 'PO Batches Error');
         }
     };
     const [yarnRows, setYarnRows] = useState([]);
@@ -360,8 +362,8 @@ export const PurchaseOrdersPage = () => {
     const location = useLocation();
     const [searchParams, setSearchParams] = useSearchParams();
 
-    // ── Tab state (uses URL search param ?tab=overview|orders) ──
-    const activeTab = ['overview', 'orders'].includes(searchParams.get('tab'))
+    // â”€â”€ Tab state (uses URL search param ?tab=overview|orders) â”€â”€
+    const activeTab = ['overview', 'orders', 'analytics'].includes(searchParams.get('tab'))
       ? searchParams.get('tab')
       : 'overview';
     const setActiveTab = (tab) => {
@@ -611,29 +613,29 @@ export const PurchaseOrdersPage = () => {
         e.preventDefault();
         const validLines = orderLines.filter((it) => it.itemId && Number(it.qty) > 0 && Number(it.rate) > 0);
         if (fabricFlow === FABRIC_FLOW_C) {
-            if (!sourcePoId) { alert('Select the grey fabric PO.'); return; }
-            if (!(Number(dyeingRate) > 0)) { alert('Enter the Dyeing Rate.'); return; }
+            if (!sourcePoId) { await modal.warning('Select the grey fabric PO.', 'Grey PO Required'); return; }
+            if (!(Number(dyeingRate) > 0)) { await modal.warning('Enter the Dyeing Rate.', 'Dyeing Rate Required'); return; }
             const over = dyeBatches.find((b) => Number(b.qty) > Number(b.availableToSend));
-            if (over) { alert(`${over.batchCode} has only ${over.availableToSend} available.`); return; }
-            if (dyeBatches.some((b) => !(Number(b.qty) > 0))) { alert('Enter the quantity of every batch, or remove it.'); return; }
+            if (over) { await modal.warning(`${over.batchCode} has only ${over.availableToSend} available.`, 'Batch Exceeded'); return; }
+            if (dyeBatches.some((b) => !(Number(b.qty) > 0))) { await modal.warning('Enter the quantity of every batch, or remove it.', 'Batch Quantity Required'); return; }
         }
-        if (!purchaseType && !fabricFlow) { alert('Select how the fabric reaches OSCAR.'); return; }
+        if (!purchaseType && !fabricFlow) { await modal.warning('Select how the fabric reaches OSCAR.', 'Fabric Flow Required'); return; }
         let flowExtras = {};
         if (fabricFlow) {
             const built = fabricFlowPayload({ flow: fabricFlow, dyeingMillId, dyeingColourName: dyeingColour.name, dyeingColourHex: dyeingColour.hex, dyeingRate, yarnRows, costRows });
-            if (built.error) { alert(built.error); return; }
+            if (built.error) { await modal.warning(built.error, 'Flow Validation Error'); return; }
             flowExtras = built.payload;
             if (fabricFlow === FABRIC_FLOW_C) {
                 flowExtras = { ...flowExtras, sourcePurchaseOrderId: sourcePoId, dyeingBatches: validLines.map((it) => ({ batchId: it.batchId })) };
             }
         }
-        if (projectMode === 'project' && !projectId) { alert('Select the project, or choose General Stock.'); return; }
-        if (!selectedVendorId) { alert('Vendor is required.'); return; }
-        if (!poDate) { alert('PO Date is required.'); return; }
-        if (!expectedDate) { alert('Expected Delivery is required.'); return; }
-        if (validLines.length === 0) { alert('Add at least one fabric line with quantity and rate.'); return; }
+        if (projectMode === 'project' && !projectId) { await modal.warning('Select the project, or choose General Stock.', 'Project Required'); return; }
+        if (!selectedVendorId) { await modal.warning('Vendor is required.', 'Vendor Required'); return; }
+        if (!poDate) { await modal.warning('PO Date is required.', 'PO Date Required'); return; }
+        if (!expectedDate) { await modal.warning('Expected Delivery is required.', 'Expected Delivery Required'); return; }
+        if (validLines.length === 0) { await modal.warning('Add at least one fabric line with quantity and rate.', 'Lines Required'); return; }
         const vend = vendors.find((v) => v.id === selectedVendorId);
-        if (!vend) { alert('Vendor is required.'); return; }
+        if (!vend) { await modal.warning('Vendor is required.', 'Vendor Required'); return; }
         const normalizedLines = validLines.map((it) => ({
             ...it,
             itemId: it.itemId,
@@ -666,7 +668,7 @@ export const PurchaseOrdersPage = () => {
                 }
                 handleCloseCreateModal();
             } catch (err) {
-                alert(err?.message || 'Could not update purchase order.');
+                await modal.error(err?.message || 'Could not update purchase order.', 'PO Update Error');
             } finally {
                 setSaving(false);
             }
@@ -712,7 +714,7 @@ export const PurchaseOrdersPage = () => {
             loadPoLifecycle(id, selectedPo?.poNumber);
             setActiveTimelineSlide('daily_production_entry');
         } catch (err) {
-            showToast?.(`Production not started — ${err?.message || 'server error'}`);
+            showToast?.(`Production not started "” ${err?.message || 'server error'}`);
         }
     };
     const recordGrnForPo = (po) => navigate('/purchase/receipts', { state: { grnForPo: po.id } });
@@ -984,7 +986,7 @@ export const PurchaseOrdersPage = () => {
         return docs;
     };
 
-    // ── Oscar workflow helpers (meter-based fabric procurement) ──────────────
+    // â”€â”€ Oscar workflow helpers (meter-based fabric procurement) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // Dropdown merges Fabric-kind items + Fabric master, so 12 fabrics show
     // even if one source is empty. Backend seeds both permanently.
     const fabricItems = useMemo(
@@ -1056,7 +1058,7 @@ export const PurchaseOrdersPage = () => {
     const getPoLines = (po) => po.items || po.lineItems || [];
     const getPoFabric = (po) => {
       const l = getPoLines(po)[0];
-      return l?.name || l?.description || '—';
+      return l?.name || l?.description || '"”';
     };
     const getPoQty = (po) => getPoLines(po).reduce((s, l) => s + (Number(l.qty) || 0), 0);
     const getPoRate = (po) => Number(getPoLines(po)[0]?.rate) || 0;
@@ -1224,7 +1226,7 @@ export const PurchaseOrdersPage = () => {
     }, [filtered, page, pageSize]);
 
     const vendorOptions = useMemo(() => [...new Set(purchaseOrders.map((p) => p.vendor).filter(Boolean))], [purchaseOrders]);
-    const fabricOptions = useMemo(() => [...new Set(purchaseOrders.map((p) => getPoFabric(p)).filter((f) => f && f !== '—'))], [purchaseOrders]);
+    const fabricOptions = useMemo(() => [...new Set(purchaseOrders.map((p) => getPoFabric(p)).filter((f) => f && f !== '"”'))], [purchaseOrders]);
 
     const statusCounts = useMemo(() => {
       const c = { Draft: 0, 'Pending Approval': 0, Approved: 0, 'In Production': 0, 'Partially Received': 0, 'Fully Received': 0 };
@@ -1234,25 +1236,6 @@ export const PurchaseOrdersPage = () => {
       });
       return c;
     }, [purchaseOrders, purchaseBills]);
-
-    const recentRows = useMemo(() => {
-      if (purchaseOrders.length) {
-        return [...purchaseOrders].slice(-5).reverse().map((p) => ({
-          id: p.id,
-          po: p.poNumber,
-          supplier: p.vendor,
-          fabric: getPoFabric(p),
-          qty: getPoQty(p),
-          qtyText: poQtyText(p),
-          date: formatDateDDMMYYYY(p.date),
-          exp: formatDateDDMMYYYY(p.expectedDate),
-          status: getOscarStatus(p),
-          value: formatCurrency(p.amount ?? p.total ?? 0),
-          raw: p,
-        }));
-      }
-      return [];
-    }, [purchaseOrders, purchaseBills, units]);
 
     const fabricTotals = useMemo(() => {
       const map = {};
@@ -1384,11 +1367,12 @@ export const PurchaseOrdersPage = () => {
         }
       />
 
-      {/* ── Tab Navigation ──────────────────────────────────────────────── */}
+      {/* â”€â”€ Tab Navigation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <div className="flex items-center gap-0 overflow-x-auto rounded-xl border border-[#e2eaf5] bg-white p-1 shadow-[0_1px_2px_rgba(16,42,82,0.05)]">
         {[
-          { key: 'overview', label: 'Overview Dashboard', icon: '📊' },
-          { key: 'orders', label: 'All Purchase Orders', icon: '📋' },
+          { key: 'overview', label: 'Overview Dashboard', icon: 'ðŸ“Š' },
+          { key: 'orders', label: 'All Purchase Orders', icon: 'ðŸ“‹' },
+          { key: 'analytics', label: 'Purchase Analytics', icon: 'ðŸ“ˆ' },
         ].map(tab => (
           <button
             key={tab.key}
@@ -1406,7 +1390,7 @@ export const PurchaseOrdersPage = () => {
         ))}
       </div>
 
-      {/* ── Overview Dashboard Tab ──────────────────────────────────────── */}
+      {/* â”€â”€ Overview Dashboard Tab â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       {activeTab === 'overview' && (
         <PurchaseOverviewDashboard
           purchaseOrders={purchaseOrders}
@@ -1425,8 +1409,10 @@ export const PurchaseOrdersPage = () => {
           poReceivedText={poReceivedText}
           statusCounts={statusCounts}
           fabricTotals={fabricTotals}
-          recentRows={recentRows}
           onViewAllOrders={() => setActiveTab('orders')}
+          onViewAllVendors={() => navigate('/parties?type=Vendor')}
+          onViewAllDeliveries={() => navigate('/purchase/deliveries')}
+          onViewAllPending={() => setActiveTab('orders')}
           onManageReceipts={() => navigate('/purchase/receipts')}
           onRecordGrn={handleRecordGrnFromDashboard}
           onCreatePo={handleOpenCreateModal}
@@ -1436,7 +1422,22 @@ export const PurchaseOrdersPage = () => {
         />
       )}
 
-      {/* ── All Purchase Orders Tab ─────────────────────────────────────── */}
+      {/* â”€â”€ Purchase Analytics Tab â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {activeTab === 'analytics' && (
+        <PurchaseAnalyticsPage
+          purchaseOrders={purchaseOrders}
+          formatCurrency={formatCurrency}
+          formatDateDDMMYYYY={formatDateDDMMYYYY}
+          getOscarStatus={getOscarStatus}
+          getPoLines={getPoLines}
+          getPoQty={getPoQty}
+          getPoReceivedQty={getPoReceivedQty}
+          getPoFabric={getPoFabric}
+          formatQty={formatQty}
+        />
+      )}
+
+      {/* â”€â”€ All Purchase Orders Tab â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       {activeTab === 'orders' && (<>
 
       {/* KPI cards */}
@@ -1508,10 +1509,10 @@ export const PurchaseOrdersPage = () => {
                 <article className="grid gap-3 rounded-xl border border-[#cbdcf3] bg-[#f1f6ff] p-3 shadow-[0_2px_5px_rgba(28,66,120,0.07)] transition-colors hover:bg-[#edf4ff] md:grid-cols-2 xl:grid-cols-[minmax(195px,0.95fr)_minmax(410px,1.8fr)_minmax(250px,1.1fr)]">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                      <h4 className="break-all font-mono text-[13px] font-extrabold text-[#17294e]">{p.poNumber || '—'}</h4>
+                      <h4 className="break-all font-mono text-[13px] font-extrabold text-[#17294e]">{p.poNumber || '"”'}</h4>
                       <span className="text-[10px] font-medium text-slate-500">PO date {formatDateDDMMYYYY(p.date)}</span>
                     </div>
-                    <p className="mt-1 truncate text-[11.5px] font-bold text-slate-700" title={p.vendor || ''}>{p.vendor || '—'}</p>
+                    <p className="mt-1 truncate text-[11.5px] font-bold text-slate-700" title={p.vendor || ''}>{p.vendor || '"”'}</p>
                     <p className="mt-0.5 truncate text-[11px] font-medium text-slate-600" title={getPoFabric(p)}>{getPoFabric(p)}</p>
                     <div className="mt-2 flex flex-wrap items-center gap-1.5">
                       {(p.fabricFlow || purchaseTypeOf(p) === PURCHASE_TYPE_GREY) && (
@@ -1620,9 +1621,9 @@ export const PurchaseOrdersPage = () => {
                     >
                       <div className="mb-2 flex items-center justify-between gap-2">
                         <h5 className="text-[11.5px] font-extrabold text-[#17294e]">
-                          Linked Batches — {p.poNumber || 'Purchase Order'} ({expandedBatchesLoading ? '…' : expandedBatches.length})
+                          Linked Batches "” {p.poNumber || 'Purchase Order'} ({expandedBatchesLoading ? '"¦' : expandedBatches.length})
                         </h5>
-                        {expandedBatchesLoading && <span className="text-[10px] font-medium text-slate-500">Loading linked batches…</span>}
+                        {expandedBatchesLoading && <span className="text-[10px] font-medium text-slate-500">Loading linked batches"¦</span>}
                       </div>
 
                       {/* PO Summary KPI Banner */}
@@ -1701,9 +1702,9 @@ export const PurchaseOrdersPage = () => {
                         </p>
                       ) : (
                         <div className="overflow-x-auto rounded-lg border border-[#d8e4f4] bg-white">
-                          <table className="w-full min-w-[1200px] border-collapse text-left text-[10.5px]">
-                            <thead className="bg-[#edf4ff] text-[9px] font-bold uppercase tracking-wide text-slate-500">
-                              <tr>
+                          <table className="w-full min-w-[1200px] border-collapse text-left text-xs">
+                            <thead className="table-head-std">
+                              <tr className="table-head-row-std">
                                 {[
                                   'Batch Number',
                                   'Receipt / GRN Number',
@@ -1718,7 +1719,7 @@ export const PurchaseOrdersPage = () => {
                                   'Stock Status',
                                   'Actions'
                                 ].map((heading) => (
-                                  <th key={heading} className="whitespace-nowrap px-2.5 py-2">{heading}</th>
+                                  <th key={heading}>{heading}</th>
                                 ))}
                               </tr>
                             </thead>
@@ -1756,15 +1757,15 @@ export const PurchaseOrdersPage = () => {
                                 const receiptDates = batch.receiptDates || [];
                                 const receiptDateLabel = receiptDates.length
                                   ? receiptDates.map((date) => formatDateDDMMYYYY(date)).join(', ')
-                                  : '—';
+                                  : '"”';
                                 const openBatch = () => navigate(`/inventory/batches/${encodeURIComponent(batch.batchCode)}`);
 
                                 return (
                                   <tr key={batch.id || batch.batchCode} className="text-slate-700 hover:bg-blue-50/40">
                                     {/* 1. Batch Number */}
-                                    <td className="whitespace-nowrap px-2.5 py-2 font-mono font-bold text-blue-700">{batch.batchCode || '—'}</td>
+                                    <td className="whitespace-nowrap px-2.5 py-2 font-mono font-bold text-blue-700">{batch.batchCode || '"”'}</td>
                                     {/* 2. Receipt / GRN Number */}
-                                    <td className="px-2.5 py-2 font-mono text-[10px]">{(batch.receiptNumbers || []).join(', ') || batch.sourceDocumentNumber || '—'}</td>
+                                    <td className="px-2.5 py-2 font-mono text-[10px]">{(batch.receiptNumbers || []).join(', ') || batch.sourceDocumentNumber || '"”'}</td>
                                     {/* 3. Receipt Date */}
                                     <td className="whitespace-nowrap px-2.5 py-2 text-[10px]" title={receiptDateLabel}>{receiptDateLabel}</td>
                                     {/* 4. Received Quantity */}
@@ -1912,7 +1913,7 @@ export const PurchaseOrdersPage = () => {
                 <FabricFlowCards value={fabricFlow} onChange={chooseFabricFlow} />
                 {fabricFlow && (
                   <div className="mt-2 rounded-lg bg-slate-50 px-2.5 py-2 space-y-1">
-                    <p className="text-[11px] text-slate-600"><strong>After approval:</strong> one batch is created for every actual receipt — never for the ordered quantity.</p>
+                    <p className="text-[11px] text-slate-600"><strong>After approval:</strong> one batch is created for every actual receipt "” never for the ordered quantity.</p>
                     <FabricFlowSteps flow={fabricFlow} />
                   </div>
                 )}
@@ -1997,28 +1998,28 @@ export const PurchaseOrdersPage = () => {
                 <DyeingOrderLines sources={greySources} sourcePoId={sourcePoId} onSource={(id) => loadGreyBatches(id)} rows={dyeBatches} onRows={setDyeBatches} rate={dyeingRate} onRate={setDyeingRate} />
               ) : (
               <div>
-                <label className="font-semibold text-slate-700 block mb-2">PO Item — Grey Fabric</label>
+                <label className="font-semibold text-slate-700 block mb-2">PO Item "” Grey Fabric</label>
                 <div className="border border-slate-200 rounded-xl overflow-x-auto">
                   <table className="w-full min-w-[720px] text-left text-[12px]">
-                    <thead>
-                      <tr className="bg-slate-50 border-b border-slate-200 text-[10.5px] font-bold uppercase tracking-wide text-slate-400">
-                        <th className="px-3 py-2.5 w-10 text-center">#</th>
-                        <th className="px-3 py-2.5">
+                    <thead className="table-head-std">
+                      <tr className="table-head-row-std">
+                        <th className="w-10 text-center">#</th>
+                        <th>
                           <div className="flex items-center justify-between gap-2">
                             <span>Fabric *</span>
                             <MasterSourceLink source="fabricVariants" className="normal-case tracking-normal" />
                           </div>
                         </th>
-                        <th className="px-3 py-2.5 text-center w-32">Order Qty *</th>
-                        <th className="px-3 py-2.5 w-28">
+                        <th className="text-center w-32">Order Qty *</th>
+                        <th className="w-28">
                           <div className="flex items-center justify-between gap-1">
                             <span>UOM *</span>
                             <MasterSourceLink source="uom" label="+ Manage" className="normal-case tracking-normal" />
                           </div>
                         </th>
-                        <th className="px-3 py-2.5 text-right w-36">Rate (₹ / Unit) *</th>
-                        <th className="px-3 py-2.5 text-right w-36">Amount (₹)</th>
-                        <th className="w-12 px-2 py-2.5 text-center"></th>
+                        <th className="text-right w-36">Rate (₹ / Unit) *</th>
+                        <th className="text-right w-36">Amount (₹)</th>
+                        <th className="w-12 text-center"></th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -2030,9 +2031,9 @@ export const PurchaseOrdersPage = () => {
                               <option value="">{fabricLoading ? 'Loading fabric items...' : 'Select fabric...'}</option>
                               {fabricItems.map((f) => {
                                 const qualPart = f.fabricQuality && !f.name.toLowerCase().includes(f.fabricQuality.toLowerCase())
-                                  ? ` — ${f.fabricQuality}`
+                                  ? ` "” ${f.fabricQuality}`
                                   : '';
-                                const gsmPart = f.fabricGsm ? ` • ${f.fabricGsm} GSM` : '';
+                                const gsmPart = f.fabricGsm ? ` "¢ ${f.fabricGsm} GSM` : '';
                                 const uomPart = f.uom ? ` [${f.uom}]` : '';
                                 const skuPart = f.sku ? ` (${f.sku})` : '';
                                 return (
@@ -2053,7 +2054,7 @@ export const PurchaseOrdersPage = () => {
                             />
                           </td>
                           <td className="px-3 py-2"><input type="number" min="0" step="0.01" value={it.rate} onChange={(e) => updateLineItem(idx, 'rate', e.target.value)} placeholder="50" className="w-full border border-slate-300 rounded-lg p-1.5 text-right font-mono"/></td>
-                          <td className="px-3 py-2 text-right font-mono font-bold text-slate-800 whitespace-nowrap">{((Number(it.qty) || 0) * (Number(it.rate) || 0)) > 0 ? formatCurrency((Number(it.qty) || 0) * (Number(it.rate) || 0)) : '—'}</td>
+                          <td className="px-3 py-2 text-right font-mono font-bold text-slate-800 whitespace-nowrap">{((Number(it.qty) || 0) * (Number(it.rate) || 0)) > 0 ? formatCurrency((Number(it.qty) || 0) * (Number(it.rate) || 0)) : '"”'}</td>
                           <td className="px-2 py-2 text-center">
                             {
                               <button type="button" onClick={() => removeLine(idx)} className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg" title="Remove line"><Trash2 size={13}/></button>
@@ -2085,7 +2086,7 @@ export const PurchaseOrdersPage = () => {
 
               {fabricFlow && fabricFlow !== FABRIC_FLOW_C && (
                 <div>
-                  <label className="font-semibold text-slate-700 block mb-2">Costs &amp; Expenses <span className="font-normal text-slate-400">(optional now — add or update on the PO later)</span></label>
+                  <label className="font-semibold text-slate-700 block mb-2">Costs &amp; Expenses <span className="font-normal text-slate-400">(optional now "” add or update on the PO later)</span></label>
                   <OpeningCostsEditor rows={costRows} onChange={setCostRows} flow={fabricFlow} formatCurrency={formatCurrency} />
                 </div>
               )}
@@ -2130,13 +2131,13 @@ export const PurchaseOrdersPage = () => {
               </div>
               <div className="flex flex-wrap lg:flex-nowrap justify-end gap-2 pt-3 border-t border-slate-200">
                 <button type="button" onClick={handleCloseCreateModal} className="px-3 py-1.5 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-100 font-medium">Cancel</button>
-                <button type="submit" disabled={saving} className="px-4 py-1.5 bg-[#1F2E4A] hover:bg-[#152033] text-white rounded-lg font-bold shadow-sm disabled:opacity-60">{saving ? 'Saving…' : (editingPo ? 'Update Purchase Order' : 'Save & Issue Purchase Order')}</button>
+                <button type="submit" disabled={saving} className="px-4 py-1.5 bg-[#1F2E4A] hover:bg-[#152033] text-white rounded-lg font-bold shadow-sm disabled:opacity-60">{saving ? 'Saving"¦' : (editingPo ? 'Update Purchase Order' : 'Save & Issue Purchase Order')}</button>
               </div>
             </form>
           </div>
         </div>)}
 
-      {/* ── Three-Dot Action Menu ── */}
+      {/* â”€â”€ Three-Dot Action Menu â”€â”€ */}
       {actionMenuTarget && (
         <PoActionMenu
           po={actionMenuTarget.po}
@@ -2165,8 +2166,14 @@ export const PurchaseOrdersPage = () => {
           onMatchVendorBill={(po) => setBillMatchModalPo(po)}
           onMovementHistory={(po) => setMovementHistoryPo(po)}
           onPrint={(po) => setPrintPoTarget(po)}
-          onCancelPo={(po) => {
-            if (window.confirm(`Are you sure you want to cancel Purchase Order ${po.poNumber}?`)) {
+          onCancelPo={async (po) => {
+            const ok = await modal.confirm({
+              title: 'Cancel Purchase Order',
+              message: `Are you sure you want to cancel Purchase Order ${po.poNumber}?`,
+              confirmLabel: 'Cancel Order',
+              iconType: 'warning',
+            });
+            if (ok) {
               cancelPurchaseOrder(po.id);
             }
           }}
@@ -2174,7 +2181,7 @@ export const PurchaseOrdersPage = () => {
         />
       )}
 
-      {/* ── View PO Details Modal ── */}
+      {/* â”€â”€ View PO Details Modal â”€â”€ */}
       {detailsModalPo && (
         <PoDetailsModal
           po={detailsModalPo}
@@ -2187,7 +2194,7 @@ export const PurchaseOrdersPage = () => {
         />
       )}
 
-      {/* ── Receive Goods (GRN) Compact Modal ── */}
+      {/* â”€â”€ Receive Goods (GRN) Compact Modal â”€â”€ */}
       {grnModalPo && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-2 sm:p-4 animate-in fade-in">
           <div className="bg-white border border-slate-200 shadow-2xl rounded-2xl w-full max-w-5xl max-h-[95vh] sm:max-h-[92vh] overflow-y-auto flex flex-col p-4 sm:p-6 text-xs">
@@ -2205,7 +2212,7 @@ export const PurchaseOrdersPage = () => {
         </div>
       )}
 
-      {/* ── Perform QC Compact Modal ── */}
+      {/* â”€â”€ Perform QC Compact Modal â”€â”€ */}
       {qcModalPo && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-2 sm:p-4 animate-in fade-in">
           <div className="bg-white border border-slate-200 shadow-2xl rounded-2xl w-full max-w-5xl max-h-[95vh] sm:max-h-[92vh] overflow-y-auto flex flex-col p-4 sm:p-6 text-xs">
@@ -2227,7 +2234,7 @@ export const PurchaseOrdersPage = () => {
 
       {dyeingPo && <ReceiveDyedFabricDrawer po={dyeingPo} onClose={() => setDyeingPo(null)} onSaved={() => refreshCollections?.(['purchaseOrders'])} />}
 
-      {/* ── Pay Vendor Bill Modal Workspace ── */}
+      {/* â”€â”€ Pay Vendor Bill Modal Workspace â”€â”€ */}
       {billMatchModalPo && (
         <PayVendorBillModal
           po={billMatchModalPo}
@@ -2240,7 +2247,7 @@ export const PurchaseOrdersPage = () => {
         />
       )}
 
-      {/* ── Movement History Modal ── */}
+      {/* â”€â”€ Movement History Modal â”€â”€ */}
       {movementHistoryPo && (
         <PoMovementHistoryModal
           po={movementHistoryPo}
@@ -2251,7 +2258,7 @@ export const PurchaseOrdersPage = () => {
         />
       )}
 
-      {/* ── Delete Confirmation Dialog ── */}
+      {/* â”€â”€ Delete Confirmation Dialog â”€â”€ */}
       {deleteConfirmPo && (
         <PoDeleteConfirmModal
           po={deleteConfirmPo}

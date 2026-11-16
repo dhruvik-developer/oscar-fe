@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { modal } from '../../../context/ModalContext';
 import {
   Users,
   Search,
@@ -279,7 +280,7 @@ export default function BrokerCommissionPage() {
   const handleCreateLeadSubmit = async (e) => {
     e.preventDefault();
     if (!leadFormData.customerName.trim() || !leadFormData.brokerId) {
-      alert('Please enter customer/company name and select a broker.');
+      await modal.warning('Please enter customer/company name and select a broker.', 'Missing Information');
       return;
     }
     try {
@@ -330,7 +331,7 @@ export default function BrokerCommissionPage() {
       fetchBrokerLeads();
       fetchAnalytics();
     } catch (err) {
-      alert(err?.response?.data?.message || err?.message || 'Failed to create broker lead.');
+      await modal.error(err?.response?.data?.message || err?.message || 'Failed to create broker lead.', 'Lead Error');
     } finally {
       setLeadCreating(false);
     }
@@ -340,7 +341,7 @@ export default function BrokerCommissionPage() {
   const handleCreateBrokerSubmit = async (e) => {
     e.preventDefault();
     if (!brokerFormData.name.trim()) {
-      alert('Broker name is required.');
+      await modal.warning('Broker name is required.', 'Missing Name');
       return;
     }
     try {
@@ -368,7 +369,7 @@ export default function BrokerCommissionPage() {
       fetchBrokers();
       fetchAnalytics();
     } catch (err) {
-      alert(err?.response?.data?.message || err?.message || 'Failed to create broker.');
+      await modal.error(err?.response?.data?.message || err?.message || 'Failed to create broker.', 'Broker Error');
     } finally {
       setBrokerCreating(false);
     }
@@ -384,7 +385,7 @@ export default function BrokerCommissionPage() {
       fetchStatement();
       fetchAnalytics();
     } catch (err) {
-      alert(err?.response?.data?.message || err?.message || 'Approval failed.');
+      await modal.error(err?.response?.data?.message || err?.message || 'Approval failed.', 'Approval Error');
     } finally {
       setActionBusyId(null);
     }
@@ -399,7 +400,7 @@ export default function BrokerCommissionPage() {
       fetchStatement();
       fetchAnalytics();
     } catch (err) {
-      alert(err?.response?.data?.message || err?.message || 'Status change failed.');
+      await modal.error(err?.response?.data?.message || err?.message || 'Status change failed.', 'Status Error');
     } finally {
       setActionBusyId(null);
     }
@@ -424,11 +425,11 @@ export default function BrokerCommissionPage() {
     const amountNum = parseFloat(payAmount);
     const outstanding = Math.max(0, (Number(selectedComm.commission_amount) || 0) - (Number(selectedComm.paid_amount) || 0));
     if (isNaN(amountNum) || amountNum <= 0) {
-      alert('Please enter a valid payout amount greater than zero.');
+      await modal.warning('Please enter a valid payout amount greater than zero.', 'Invalid Payout Amount');
       return;
     }
     if (amountNum > outstanding) {
-      alert(`Payout amount (₹${amountNum.toLocaleString()}) cannot exceed outstanding balance (₹${outstanding.toLocaleString()}).`);
+      await modal.warning(`Payout amount (₹${amountNum.toLocaleString()}) cannot exceed outstanding balance (₹${outstanding.toLocaleString()}).`, 'Exceeds Balance');
       return;
     }
 
@@ -447,7 +448,7 @@ export default function BrokerCommissionPage() {
       fetchStatement();
       fetchAnalytics();
     } catch (err) {
-      alert(err?.payload?.message || err?.response?.data?.message || err?.message || 'Payment recording failed.');
+      await modal.error(err?.payload?.message || err?.response?.data?.message || err?.message || 'Payment recording failed.', 'Payment Error');
     } finally {
       setPaySubmitting(false);
     }

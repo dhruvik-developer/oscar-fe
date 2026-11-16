@@ -50,6 +50,7 @@ import { PoActionMenu } from './PoActionMenu';
 import { PoDetailsModal } from './PoDetailsModal';
 import { PoMovementHistoryModal } from './PoMovementHistoryModal';
 import { PoDeleteConfirmModal } from './PoDeleteConfirmModal';
+import { PurchaseOverviewDashboard } from './PurchaseOverviewDashboard';
 
 const purchaseOrderGuide = {
     title: 'Purchase Orders',
@@ -292,6 +293,8 @@ export const PurchaseOrdersPage = () => {
     const [actionMenuTarget, setActionMenuTarget] = useState(null);
     const [dyeingPo, setDyeingPo] = useState(null);
     const [expandedPoId, setExpandedPoId] = useState(null);
+    // PO card that should be visually highlighted (dashboard "Record GRN" deep link).
+    const [highlightedPoId, setHighlightedPoId] = useState(null);
     const [expandedBatches, setExpandedBatches] = useState([]);
     const [expandedPoGroup, setExpandedPoGroup] = useState(null);
     const [expandedBatchesLoading, setExpandedBatchesLoading] = useState(false);
@@ -354,6 +357,19 @@ export const PurchaseOrdersPage = () => {
     const [dateFrom, setDateFrom] = useState('');
     const [dateTo, setDateTo] = useState('');
 
+    const location = useLocation();
+    const [searchParams, setSearchParams] = useSearchParams();
+
+    // ── Tab state (uses URL search param ?tab=overview|orders) ──
+    const activeTab = ['overview', 'orders'].includes(searchParams.get('tab'))
+      ? searchParams.get('tab')
+      : 'overview';
+    const setActiveTab = (tab) => {
+      const next = new URLSearchParams(searchParams);
+      next.set('tab', tab);
+      setSearchParams(next, { replace: true });
+    };
+
     useEffect(() => {
       if (!expandedPoId) {
         setExpandedBatches([]);
@@ -387,9 +403,6 @@ export const PurchaseOrdersPage = () => {
 
       return () => { cancelled = true; };
     }, [expandedPoId, expandedBatchesReload]);
-
-    const location = useLocation();
-    const [searchParams, setSearchParams] = useSearchParams();
 
     React.useEffect(() => {
         const qcPoId = searchParams.get('qcPoId') || location.state?.qcPoId;
@@ -1296,6 +1309,7 @@ export const PurchaseOrdersPage = () => {
     const renderMoreActionsButton = (p) => (
       <button
         type="button"
+        id={`po-actions-${p.id}`}
         aria-label={`Actions for ${p.poNumber || 'PO'}`}
         aria-expanded={actionMenuTarget?.po?.id === p.id}
         onClick={(e) => {
@@ -1318,6 +1332,43 @@ export const PurchaseOrdersPage = () => {
       setExpandedPoId((current) => current === poId ? null : poId);
     };
 
+    // Dashboard → "Record GRN in Orders Tab": land on the All Purchase Orders tab
+    // with the relevant pending / partially received PO expanded, highlighted and
+    // scrolled into view, and open that PO's action menu so the Goods Receipt
+    // entry is immediately available. Only the PO handed over by the dashboard is
+    // ever expanded or highlighted.
+    const handleRecordGrnFromDashboard = (po) => {
+        setActiveTab('orders');
+        if (!po?.id) return;
+
+        // Filters can hide the target PO; clear them only when that happens.
+        const targetId = String(po.id);
+        if (!paginatedOrders.some((p) => String(p.id) === targetId)) {
+            setQuery('');
+            setStatusFilter('All');
+            setTypeFilter('All');
+            setVendorFilter('All');
+            setFabricFilter('All');
+            setDateFrom('');
+            setDateTo('');
+            setPage(1);
+        }
+
+        setExpandedPoId(po.id);
+        setHighlightedPoId(po.id);
+        // Let the tab switch and the expanded row render before measuring.
+        window.setTimeout(() => {
+            document.getElementById(`po-card-${po.id}`)?.scrollIntoView({ behavior: 'auto', block: 'center' });
+            // PoActionMenu closes itself on any outside scroll event, so wait for
+            // the scrollIntoView event to be dispatched before opening it.
+            window.setTimeout(() => {
+                const rect = document.getElementById(`po-actions-${po.id}`)?.getBoundingClientRect();
+                if (rect) setActionMenuTarget({ po, anchorRect: rect });
+            }, 250);
+            window.setTimeout(() => setHighlightedPoId(null), 2600);
+        }, 80);
+    };
+
     return (
     <div className="-m-3 md:-m-5 bg-[#edf3fc] p-3 md:p-5 space-y-4 min-h-[calc(100vh-62px)]">
       <PageHeader
@@ -1333,9 +1384,64 @@ export const PurchaseOrdersPage = () => {
         }
       />
 
+      {/* ── Tab Navigation ──────────────────────────────────────────────── */}
+      <div className="flex items-center gap-0 overflow-x-auto rounded-xl border border-[#e2eaf5] bg-white p-1 shadow-[0_1px_2px_rgba(16,42,82,0.05)]">
+        {[
+          { key: 'overview', label: 'Overview Dashboard', icon: '📊' },
+          { key: 'orders', label: 'All Purchase Orders', icon: '📋' },
+        ].map(tab => (
+          <button
+            key={tab.key}
+            type="button"
+            onClick={() => setActiveTab(tab.key)}
+            className={`flex shrink-0 items-center gap-1.5 rounded-lg px-4 py-2 text-[12.5px] font-semibold transition-all ${
+              activeTab === tab.key
+                ? 'bg-[#2563eb] text-white shadow-sm'
+                : 'text-slate-600 hover:bg-slate-100 hover:text-[#17294e]'
+            }`}
+          >
+            <span>{tab.icon}</span>
+            <span>{tab.label}</span>
+          </button>
+        ))}
+      </div>
+
+      {/* ── Overview Dashboard Tab ──────────────────────────────────────── */}
+      {activeTab === 'overview' && (
+        <PurchaseOverviewDashboard
+          purchaseOrders={purchaseOrders}
+          purchaseBills={purchaseBills}
+          vendorBills={vendorBills}
+          paymentOuts={paymentOuts}
+          formatCurrency={formatCurrency}
+          formatDateDDMMYYYY={formatDateDDMMYYYY}
+          units={units}
+          getOscarStatus={getOscarStatus}
+          getPoLines={getPoLines}
+          getPoQty={getPoQty}
+          getPoReceivedQty={getPoReceivedQty}
+          getPoFabric={getPoFabric}
+          poQtyText={poQtyText}
+          poReceivedText={poReceivedText}
+          statusCounts={statusCounts}
+          fabricTotals={fabricTotals}
+          recentRows={recentRows}
+          onViewAllOrders={() => setActiveTab('orders')}
+          onManageReceipts={() => navigate('/purchase/receipts')}
+          onRecordGrn={handleRecordGrnFromDashboard}
+          onCreatePo={handleOpenCreateModal}
+          formatQty={formatQty}
+          sumByUnit={sumByUnit}
+          formatUnitTotals={formatUnitTotals}
+        />
+      )}
+
+      {/* ── All Purchase Orders Tab ─────────────────────────────────────── */}
+      {activeTab === 'orders' && (<>
+
       {/* KPI cards */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <Kpi icon={ShoppingCart} value={totalPoValue ? formatCurrency(totalPoValue) : '₹0.00'} label="Total PO Value" trend="" iconBg="#e8f1fd" iconColor="#2563eb" wave="#cfe3fd" arrowBg="#f2f7ff" arrowColor="#2563eb" />
+        <Kpi icon={ShoppingCart} value={totalPoValue ? formatCurrency(totalPoValue, { compact: true }) : '₹0.00'} label="Total PO Value" trend="" iconBg="#e8f1fd" iconColor="#2563eb" wave="#cfe3fd" arrowBg="#f2f7ff" arrowColor="#2563eb" />
         <Kpi icon={FileText} value={`${openPoCount} Orders`} label="Open POs" trend="" iconBg="#e8f1fd" iconColor="#2563eb" wave="#c9ecdf" arrowBg="#f2f7ff" arrowColor="#2563eb" />
         <Kpi icon={Clock} value={`${draftPoCount} Order${draftPoCount === 1 ? '' : 's'}`} label="Draft POs" trend="" iconBg="#fdf3e0" iconColor="#d97706" wave="#fbe5bd" arrowBg="#fff8ec" arrowColor="#d97706" />
         <Kpi icon={Package} value={receivedQtyTotals.length ? formatUnitTotals(receivedQtyTotals, { units }) : '0'} label="Received Quantity" trend="" iconBg="#e8f1fd" iconColor="#2563eb" wave="#dcd6fb" arrowBg="#f2f7ff" arrowColor="#2563eb" />
@@ -1390,7 +1496,15 @@ export const PurchaseOrdersPage = () => {
             const isMenuOpen = actionMenuTarget?.po?.id === p.id;
 
             return (
-              <div key={p.id} className="overflow-hidden rounded-xl">
+              <div
+                key={p.id}
+                id={`po-card-${p.id}`}
+                className={`overflow-hidden rounded-xl transition-shadow duration-300 ${
+                  highlightedPoId === p.id
+                    ? 'ring-2 ring-blue-500 shadow-[0_0_0_4px_rgba(37,99,235,0.18)]'
+                    : ''
+                }`}
+              >
                 <article className="grid gap-3 rounded-xl border border-[#cbdcf3] bg-[#f1f6ff] p-3 shadow-[0_2px_5px_rgba(28,66,120,0.07)] transition-colors hover:bg-[#edf4ff] md:grid-cols-2 xl:grid-cols-[minmax(195px,0.95fr)_minmax(410px,1.8fr)_minmax(250px,1.1fr)]">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
@@ -1769,110 +1883,7 @@ export const PurchaseOrdersPage = () => {
         />
       </div>
 
-      {/* bottom row */}
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
-        <div className="rounded-xl border border-[#e2eaf5] bg-white p-4 shadow-[0_1px_2px_rgba(16,42,82,0.05)] xl:col-span-4">
-          <div className="mb-3 flex items-center justify-between gap-2">
-            <h3 className="text-[13.5px] font-extrabold text-[#17294e]">PO Status Overview</h3>
-            <div className="relative">
-              <select value={statusMonth} onChange={(e) => setStatusMonth(e.target.value)} className="appearance-none rounded-lg border border-slate-200 bg-white py-1.5 pl-3 pr-8 text-[11.5px] font-semibold text-slate-600 outline-none">
-                <option>This Month</option>
-                <option>Last Month</option>
-                <option>This Quarter</option>
-              </select>
-              <ChevronDown size={13} className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
-            </div>
-          </div>
-          <div className="flex gap-1.5">
-            <div className="flex w-7 flex-col justify-between py-1 text-right text-[9px] font-semibold text-slate-400">
-              {[40, 30, 20, 10, 0].map((t) => <span key={t}>{t}</span>)}
-            </div>
-            <div className="relative flex-1">
-              <div className="absolute inset-0 flex flex-col justify-between">{[0, 1, 2, 3, 4].map((i) => <div key={i} className="border-t border-slate-100" />)}</div>
-              <div className="relative flex h-44 items-end justify-around gap-2 px-2">
-                {barDefs.map((b) => (
-                  <div key={b.k} className="flex h-full w-12 flex-col items-center justify-end gap-1.5">
-                    <div className="w-10 rounded-t-[4px]" style={{ height: `${Math.max(4, (statusCounts[b.k] / maxBar) * 100)}%`, background: b.color }} />
-                    <span className="text-[10px] font-medium text-slate-500">{b.k}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="rounded-xl border border-[#e2eaf5] bg-white p-4 shadow-[0_1px_2px_rgba(16,42,82,0.05)] xl:col-span-4">
-          <div className="mb-3 flex items-center justify-between gap-2">
-            <h3 className="text-[13.5px] font-extrabold text-[#17294e]">Fabric-wise Purchase Qty</h3>
-          </div>
-          {fabricTotals.length > 0 ? (
-            <div className="flex items-center gap-5">
-              <div
-                className="h-36 w-36 shrink-0 rounded-full relative"
-                style={{
-                  background: `conic-gradient(${fabricTotals.map((f, i) => {
-                    const colors = ['#3b82f6', '#60a5fa', '#93c5fd', '#c7d2fe', '#a5b4fc', '#7dd3fc'];
-                    const total = fabricTotals.reduce((s, x) => s + x.qty, 0);
-                    const start = fabricTotals.slice(0, i).reduce((s, x) => s + x.qty, 0) / total * 360;
-                    const end = start + (f.qty / total) * 360;
-                    return `${colors[i % colors.length]} ${start}deg ${end}deg`;
-                  }).join(', ')})`,
-                }}
-              >
-                <div className="absolute inset-0 m-auto h-20 w-20 rounded-full bg-white flex flex-col items-center justify-center">
-                  <p className="text-[13px] font-extrabold text-[#17294e] leading-none">{fabricTotals.reduce((s, x) => s + x.qty, 0).toLocaleString('en-IN')}</p>
-                  <p className="text-[9px] font-medium text-slate-400 mt-0.5">Total Ordered</p>
-                </div>
-              </div>
-              <ul className="space-y-2 text-[11.5px]">
-                {fabricTotals.map((f, i) => {
-                  const colors = ['#3b82f6', '#60a5fa', '#93c5fd', '#c7d2fe', '#a5b4fc', '#7dd3fc'];
-                  const total = fabricTotals.reduce((s, x) => s + x.qty, 0);
-                  return (
-                    <li key={f.name} className="flex items-center gap-2">
-                      <span className="h-2 w-2 rounded-full" style={{ background: colors[i % colors.length] }} />
-                      <span className="font-medium text-slate-600">{f.name}</span>
-                      <span className="font-mono text-slate-800 font-bold">{f.qty.toLocaleString('en-IN')} ({Math.round((f.qty / total) * 100)}%)</span>
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
-          ) : (
-            <p className="text-[12px] text-slate-400 py-8 text-center">No fabric purchases recorded yet.</p>
-          )}
-        </div>
-
-        <div className="rounded-xl border border-[#e2eaf5] bg-white p-4 shadow-[0_1px_2px_rgba(16,42,82,0.05)] xl:col-span-4">
-          <div className="mb-2 flex items-center justify-between gap-2">
-            <h3 className="text-[13.5px] font-extrabold text-[#17294e]">Recent Purchase Orders</h3>
-            <button className="text-[11px] font-bold text-blue-600 hover:underline">View All</button>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[480px] border-collapse text-left text-[12px]">
-              <thead>
-                <tr className="text-[10.5px] font-bold uppercase tracking-wide text-slate-400">
-                  {['PO Number', 'Vendor', 'Fabric', 'Qty', 'Amount', 'Status'].map((h) => (
-                    <th key={h} className="px-2 py-2">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-50">
-                {recentRows.map((r, i) => (
-                  <tr key={r.id || r.po || i} className="hover:bg-slate-50/60">
-                    <td className="px-2 py-2.5 font-mono text-[11.5px] font-bold text-blue-600">{r.po}</td>
-                    <td className="px-2 py-2.5 font-medium text-slate-600">{r.supplier}</td>
-                    <td className="px-2 py-2.5 text-slate-600">{r.fabric || '—'}</td>
-                    <td className="px-2 py-2.5 font-mono text-slate-700 whitespace-nowrap">{r.qtyText || (r.qty != null ? formatQty(r.qty, 'Mtr') : '—')}</td>
-                    <td className="px-2 py-2.5 font-mono font-bold text-slate-700 whitespace-nowrap">{r.value}</td>
-                    <td className="px-2 py-2.5"><span className={`inline-block rounded-md border px-2 py-0.5 text-[10.5px] font-bold ${STATUS_PILL[r.status] || STATUS_PILL.Draft}`}>{r.status}</span></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
+</>)}
 
       {/* Create PO Modal */}
       {showAddModal && (

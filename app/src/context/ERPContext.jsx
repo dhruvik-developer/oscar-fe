@@ -3828,7 +3828,7 @@ export const ERPProvider = ({ children, }) => {
         }
         showToast(`Vendor bill marked as ${status}.`);
     };
-    // ── Vendor Bills (manual entry, backend contract: /purchase/vendor-bills/) ──
+    // ── Vendor Bills (backend contract: /purchase/vendor-bills/) ──
     // Server-first: the vendor's own invoice number is typed by the user; the
     // server computes subtotal / GST / total. Throws on failure.
     const addVendorBill = async (bill) => {

@@ -26,7 +26,7 @@ function numIN(val) {
 }
 
 /**
- * `createOnly` is the Pay Vendor Bill workspace's manual entry: always a new
+ * `createOnly` is the Pay Vendor Bill workspace: always a new
  * bill, nothing assumed from the PO, and matching left for after it is saved.
  * `billableLines`, `poSummary` and `vendor` then come from the po-details API.
  */

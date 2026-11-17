@@ -135,8 +135,10 @@ const statusStyles = {
 
 export default function IndividualAttendance() {
   const setToast = useAppStore((s) => s.setToast || s.showToast);
+  const currentUser = useAppStore((s) => s.currentUser);
   const storeEmployees = useAppStore((s) => s.employees || []);
   const storeRecords = useAttendanceStore((s) => s.records || []);
+  const todayPunch = useAttendanceStore((s) => s.todayPunch);
   const updateStoreRecord = useAttendanceStore((s) => s.updateRecord);
 
   const employeesList = useMemo(() => {
@@ -150,6 +152,7 @@ export default function IndividualAttendance() {
           id: e.id || e.empId || e.employeeId,
           empId: e.empId || e.employeeCode || "",
           name: e.name,
+          email: e.email || "",
           designation: e.designation || e.role || "Employee",
           dept: e.department || e.dept || "—",
           manager: e.manager || e.reportingManager || "—",
@@ -162,12 +165,42 @@ export default function IndividualAttendance() {
     return Array.from(map.values()).sort((a, b) => (a.name || "").localeCompare(b.name || ""));
   }, [storeEmployees]);
 
+  const findUserEmployeeId = useCallback(() => {
+    if (!employeesList.length) return "";
+    const matched = employeesList.find((e) => {
+      const matchUuid = (currentUser?.employeeUuid && e.id === currentUser.employeeUuid) ||
+                        (currentUser?.employee_id && e.id === currentUser.employee_id) ||
+                        (currentUser?.employeeId && (e.id === currentUser.employeeId || e.empId === currentUser.employeeId));
+      if (matchUuid) return true;
+      const matchPunch = todayPunch?.employee?.id && (e.id === todayPunch.employee.id || e.empId === todayPunch.employee.employeeCode);
+      if (matchPunch) return true;
+      const matchName = currentUser?.name && e.name?.trim().toLowerCase() === currentUser.name.trim().toLowerCase();
+      if (matchName) return true;
+      const matchEmail = currentUser?.email && e.email && e.email.trim().toLowerCase() === currentUser.email.trim().toLowerCase();
+      if (matchEmail) return true;
+      const matchId = currentUser?.id && e.id === currentUser.id;
+      if (matchId) return true;
+      return false;
+    });
+    return matched ? matched.id : employeesList[0].id;
+  }, [employeesList, currentUser, todayPunch?.employee]);
+
   const now = new Date();
-  const [selectedEmpId, setSelectedEmpId] = useState(() => employeesList[0]?.id || "");
+  const [selectedEmpId, setSelectedEmpId] = useState(() => findUserEmployeeId());
   const [selectedMonth, setSelectedMonth] = useState(MONTHS[now.getMonth()]);
   const [selectedYear, setSelectedYear] = useState(String(now.getFullYear()));
   const [viewMode, setViewMode] = useState("Table");
   const [tableAllMonthsTab, setTableAllMonthsTab] = useState("Summary"); // "Summary" | "Records"
+
+  // Automatically select the logged-in user's employee when employees or currentUser resolves
+  useEffect(() => {
+    if (employeesList.length > 0) {
+      if (!selectedEmpId || !employeesList.some((e) => e.id === selectedEmpId)) {
+        const defaultId = findUserEmployeeId();
+        if (defaultId) setSelectedEmpId(defaultId);
+      }
+    }
+  }, [employeesList, selectedEmpId, findUserEmployeeId]);
 
   const [localEdits, setLocalEdits] = useState({});
   const [editItem, setEditItem] = useState(null);
@@ -231,6 +264,7 @@ export default function IndividualAttendance() {
           checkIn: d.checkIn,
           checkOut: d.checkOut,
           hours: d.hours,
+          workingHours: d.hours,
           overtimeHours: d.overtimeHours,
           remark: d.remark,
           notes: d.remark,
@@ -251,10 +285,29 @@ export default function IndividualAttendance() {
   }, [fetchMonthRecords]);
 
   useEffect(() => {
+    if (currentEmp?.id) {
+      useAttendanceStore.getState().fetchTodayPunch?.(currentEmp.id);
+    }
+  }, [currentEmp?.id]);
+
+  useEffect(() => {
     if (!storeRecords || storeRecords.length === 0) {
       useAttendanceStore.getState().refreshAttendance?.();
     }
   }, []);
+
+  const isSelectedEmpActiveToday = useMemo(() => {
+    if (!currentEmp?.id || !todayPunch) return false;
+    const matchId = todayPunch.employee?.id === currentEmp.id ||
+      todayPunch.employee?.employeeCode === (currentEmp.empId || currentEmp.employeeCode);
+    const matchUser = currentUser && (
+      currentUser.employeeUuid === currentEmp.id ||
+      currentUser.employee_id === currentEmp.id ||
+      currentUser.employeeId === currentEmp.id ||
+      (currentUser.name && currentEmp.name && currentUser.name.trim().toLowerCase() === currentEmp.name.trim().toLowerCase())
+    );
+    return Boolean((matchId || matchUser) && (todayPunch.isPunchedIn || todayPunch.firstPunch || todayPunch.dayCompleted || todayPunch.status === "Working" || todayPunch.attendanceStatus));
+  }, [currentEmp, todayPunch, currentUser]);
 
   const sourceRecords = useMemo(() => {
     if (!monthRecords) return storeRecords || [];
@@ -464,12 +517,35 @@ export default function IndividualAttendance() {
       let workHours = "—";
       let shift = "General";
       let remarks = "";
+      let breakDuration = "-";
+      let lateMinutes = "-";
 
-      if (record) {
+      if (isToday && isSelectedEmpActiveToday) {
+        status = todayPunch.isOnBreak
+          ? "On Break"
+          : todayPunch.isWorking
+          ? (todayPunch.attendanceStatus || (todayPunch.lateMinutes > 0 ? "Late" : "Present"))
+          : todayPunch.dayCompleted
+          ? (todayPunch.attendanceStatus || (todayPunch.lateMinutes > 0 ? "Late" : "Present"))
+          : (record?.status || "Present");
+        checkIn = formatTimeDisplay(todayPunch.firstIn || todayPunch.firstPunch || record?.checkIn);
+        checkOut = todayPunch.dayCompleted
+          ? formatTimeDisplay(todayPunch.lastOut || todayPunch.lastPunch)
+          : (record?.checkOut && record.checkOut !== "—" ? formatTimeDisplay(record.checkOut) : "—");
+        workHours = todayPunch.isPunchedIn
+          ? (todayPunch.formattedWorkingTime || "00h 00m")
+          : (record?.workHours || "—");
+        breakDuration = todayPunch.totalBreakMinutes > 0 ? `${todayPunch.totalBreakMinutes}m` : (record?.breakDuration || "-");
+        lateMinutes = todayPunch.lateMinutes > 0 ? `${todayPunch.lateMinutes}m` : (record?.lateMinutes || "-");
+        shift = record?.shift || "General";
+        remarks = record?.remarks || (todayPunch.isOnBreak ? "Currently on Break" : todayPunch.isWorking ? "Currently Working" : "");
+      } else if (record) {
         status = record.status || "Present";
         checkIn = record.checkIn;
         checkOut = record.checkOut;
         workHours = record.workHours;
+        breakDuration = record.breakDuration || "-";
+        lateMinutes = record.lateMinutes || "-";
         shift = record.shift || "General";
         remarks = record.remarks;
       } else if (isSunday) {
@@ -495,8 +571,8 @@ export default function IndividualAttendance() {
         checkIn,
         checkOut,
         workHours,
-        breakDuration: record?.breakDuration || ((record?.totalBreakMinutes || record?.total_break_minutes) ? `${record.totalBreakMinutes || record.total_break_minutes}m` : "-"),
-        lateMinutes: record?.lateMinutes || ((record?.lateMinutes || record?.late_minutes) ? `${record.lateMinutes || record.late_minutes}m` : "-"),
+        breakDuration: breakDuration || record?.breakDuration || ((record?.totalBreakMinutes || record?.total_break_minutes) ? `${record.totalBreakMinutes || record.total_break_minutes}m` : "-"),
+        lateMinutes: lateMinutes || record?.lateMinutes || ((record?.lateMinutes || record?.late_minutes) ? `${record.lateMinutes || record.late_minutes}m` : "-"),
         shift,
         status,
         remarks,
@@ -504,11 +580,12 @@ export default function IndividualAttendance() {
     }
 
     return rows;
-  }, [selectedMonth, selectedYear, records, recordsByDay]);
+  }, [selectedMonth, selectedYear, records, recordsByDay, isSelectedEmpActiveToday, todayPunch]);
 
+  const isCurrentMonthView = selectedMonth === MONTHS[now.getMonth()] && selectedYear === String(now.getFullYear());
   const [recPage, setRecPage] = useState(1);
   const [recPageSize, setRecPageSize] = useState(10);
-  const [dailyPage, setDailyPage] = useState(1);
+  const [dailyPage, setDailyPage] = useState(() => (isCurrentMonthView ? Math.ceil(now.getDate() / 10) : 1));
   const [dailyPageSize, setDailyPageSize] = useState(10);
 
   useEffect(() => {
@@ -516,7 +593,9 @@ export default function IndividualAttendance() {
   }, [selectedYear, recPageSize]);
 
   useEffect(() => {
-    setDailyPage(1);
+    const curNow = new Date();
+    const isCur = selectedMonth === MONTHS[curNow.getMonth()] && selectedYear === String(curNow.getFullYear());
+    setDailyPage(isCur ? Math.ceil(curNow.getDate() / dailyPageSize) : 1);
   }, [selectedMonth, selectedYear, dailyPageSize]);
 
   const paginatedRecords = useMemo(() => {
@@ -631,15 +710,31 @@ export default function IndividualAttendance() {
   }, [selectedMonth, selectedYear, recordsByDay]);
 
   const stats = useMemo(() => {
+    let present = 0;
+    let absent = 0;
+    let late = 0;
+    let halfDay = 0;
+    let leave = 0;
+    let wfh = 0;
+
+    monthDailyRows.forEach((r) => {
+      if (r.status === "Present") present++;
+      else if (r.status === "Absent") absent++;
+      else if (r.status === "Late") late++;
+      else if (r.status === "Half Day") halfDay++;
+      else if (r.status === "On Leave") leave++;
+      else if (r.status === "WFH") wfh++;
+    });
+
     return {
-      present: records.filter((r) => r.status === "Present").length,
-      absent: records.filter((r) => r.status === "Absent").length,
-      late: records.filter((r) => r.status === "Late").length,
-      halfDay: records.filter((r) => r.status === "Half Day").length,
-      leave: records.filter((r) => r.status === "On Leave").length,
-      wfh: records.filter((r) => r.status === "WFH").length,
+      present,
+      absent,
+      late,
+      halfDay,
+      leave,
+      wfh,
     };
-  }, [records]);
+  }, [monthDailyRows]);
 
   const handlePrevMonth = () => {
     const currentIdx = MONTHS.indexOf(selectedMonth);
@@ -1137,7 +1232,7 @@ export default function IndividualAttendance() {
         ) : (
           <div className="ind-card ind-main-card">
             <div className="ind-table-toolbar">
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
                 <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#111827" }}>
                   Daily Attendance List — {selectedMonth} {selectedYear}
                 </h3>
@@ -1145,6 +1240,17 @@ export default function IndividualAttendance() {
                   <span style={{ fontSize: 11, fontWeight: 700, background: "#dbeafe", color: "#2563eb", padding: "2px 8px", borderRadius: 999 }}>
                     Current Month
                   </span>
+                )}
+                {isCurrentMonthView && (
+                  <button
+                    type="button"
+                    onClick={() => setDailyPage(Math.ceil(now.getDate() / dailyPageSize))}
+                    className="ind-btn-edit"
+                    style={{ fontSize: 11, fontWeight: 600, color: "#2563eb", background: "#eff6ff", borderColor: "#bfdbfe" }}
+                    title="Jump to Today's record"
+                  >
+                    Jump to Today (Day {now.getDate()})
+                  </button>
                 )}
               </div>
               <button

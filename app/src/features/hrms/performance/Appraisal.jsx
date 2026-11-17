@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { useAppStore } from "../../../stores/appStore";
 import { usePerformanceStore, getRatingScaleTier, calculateWeightedScore } from "../../../stores/performanceStore";
 import { RATING_SCALES as ratingScales } from "../../../services/performanceScales";
@@ -8,10 +8,8 @@ import { StatusBadge } from "../../../components/hrms/StatusBadge";
 import { Modal } from "../../../components/hrms/Modal";
 import { Drawer } from "../../../components/hrms/Drawer";
 import { Button } from "../../../components/hrms/Button";
-import { Avatar } from "../../../components/hrms/Avatar";
-import PageHeader from "../../../components/ui/PageHeader";
+import PageInfoButton from "../../../components/common/PageInfoButton";
 import { hrmsGuides } from "../../../data/hrms/hrmsGuides";
-import MasterSourceLink from "../../../components/common/MasterSourceLink";
 import {
   Eye,
   Pencil,
@@ -30,14 +28,20 @@ import {
   History,
   Info,
   HelpCircle,
+  FileText,
+  Printer,
+  TrendingUp,
 } from "lucide-react";
+import PerformanceReportModal from "./PerformanceReportModal";
+import UserInitials from "../../../components/common/UserInitials";
+import { createEmployeePromotion, createEmployeeAward } from "../../../services/upgradeService";
 
 export default function Appraisal() {
   const showToast = useAppStore((s) => s.showToast);
   const employees = useAppStore((s) => s.employees) || [];
+  const currentUser = useAppStore((s) => s.currentUser);
 
   const {
-    hydrate,
     appraisals,
     cycles,
     role,
@@ -55,11 +59,6 @@ export default function Appraisal() {
     syncRatingToProfile,
   } = usePerformanceStore();
 
-  // Hydrate on mount
-  useEffect(() => {
-    hydrate?.();
-  }, [hydrate]);
-
   // Active Tab: 'active' | 'history'
   const [tab, setTab] = useState("active");
 
@@ -69,6 +68,11 @@ export default function Appraisal() {
   const [deptFilter, setDeptFilter] = useState("All");
   const [statusFilter, setStatusFilter] = useState("All");
   const [stageFilter, setStageFilter] = useState("All");
+  const [empFilter, setEmpFilter] = useState("All");
+
+  // Performance Report State
+  const [perfReportOpen, setPerfReportOpen] = useState(false);
+  const [selectedPerfAppraisal, setSelectedPerfAppraisal] = useState(null);
 
   // Modals & Drawers
   const [addOpen, setAddOpen] = useState(false);
@@ -97,35 +101,158 @@ export default function Appraisal() {
   const [hrApproveRow, setHrApproveRow] = useState(null);
   const [hrComments, setHrComments] = useState("Calibrated across department benchmarks and approved.");
 
+  // Performance Lifecycle Promotion & Award Actions
+  const [promoModalRow, setPromoModalRow] = useState(null);
+  const [promoForm, setPromoForm] = useState({ new_designation: '', new_salary: '', effective_date: new Date().toISOString().slice(0, 10), notes: '' });
+  const [awardModalRow, setAwardModalRow] = useState(null);
+  const [awardForm, setAwardForm] = useState({ award_name: 'Performance Excellence Award', cash_reward: '5000', citation: '', presentation_date: new Date().toISOString().slice(0, 10) });
+  const [aiReviewSummary, setAiReviewSummary] = useState(null);
+
+  function handleOpenPromotion(r) {
+    const matchedEmp = employees.find((e) => e.name?.toLowerCase() === r.employee?.toLowerCase());
+    setPromoModalRow(r);
+    setPromoForm({
+      new_designation: r.designation || matchedEmp?.designation || '',
+      new_salary: String(matchedEmp?.standardSalary || matchedEmp?.salary || ''),
+      effective_date: new Date().toISOString().slice(0, 10),
+      notes: `Promoted following appraisal review in ${r.cycle} (Rating: ${Number(r.rating || 4.5).toFixed(1)}/5).`,
+    });
+  }
+
+  async function handleSavePromotion(e) {
+    e.preventDefault();
+    if (!promoModalRow) return;
+    try {
+      const matchedEmp = employees.find((e) => e.name?.toLowerCase() === promoModalRow.employee?.toLowerCase());
+      await createEmployeePromotion({
+        employeeId: matchedEmp?.id || promoModalRow.employeeId || promoModalRow.id,
+        employeeName: promoModalRow.employee,
+        previous_designation: promoModalRow.designation,
+        new_designation: promoForm.new_designation,
+        previous_salary: Number(matchedEmp?.standardSalary || matchedEmp?.salary || 0),
+        new_salary: Number(promoForm.new_salary || 0),
+        effective_date: promoForm.effective_date,
+        notes: promoForm.notes,
+      });
+      showToast(`Promotion recorded for ${promoModalRow.employee} to ${promoForm.new_designation}. Synced to lifecycle!`);
+      setPromoModalRow(null);
+    } catch (err) {
+      showToast("Failed to record promotion: " + (err?.message || "Server error"), "error");
+    }
+  }
+
+  function handleOpenAward(r) {
+    setAwardModalRow(r);
+    setAwardForm({
+      award_name: `Top Performer - ${r.cycle || 'Quarterly Review'}`,
+      cash_reward: '5000',
+      citation: `Honored for outstanding appraisal rating of ${Number(r.rating || 4.5).toFixed(1)}/5 in ${r.cycle}.`,
+      presentation_date: new Date().toISOString().slice(0, 10),
+    });
+  }
+
+  async function handleSaveAward(e) {
+    e.preventDefault();
+    if (!awardModalRow) return;
+    try {
+      const matchedEmp = employees.find((e) => e.name?.toLowerCase() === awardModalRow.employee?.toLowerCase());
+      const cash = parseFloat(awardForm.cash_reward) || 0;
+      await createEmployeeAward({
+        employeeId: matchedEmp?.id || awardModalRow.employeeId || awardModalRow.id,
+        employeeName: awardModalRow.employee,
+        award_name: awardForm.award_name,
+        category: "Excellence",
+        gift_amount: cash,
+        cash_reward: cash,
+        citation: awardForm.citation,
+        award_date: awardForm.presentation_date,
+      });
+      showToast(`Excellence award recorded for ${awardModalRow.employee}! Synced to payroll.`);
+      setAwardModalRow(null);
+    } catch (err) {
+      showToast("Failed to record award: " + (err?.message || "Server error"), "error");
+    }
+  }
+
+  function handleGenerateAiInsights(r) {
+    const rating = Number(r.rating || 4.0);
+    let summary = "";
+    let roadmap = "";
+    if (rating >= 4.5) {
+      summary = `Exceptional performer in ${r.cycle}. Demonstrates mastery in cross-functional execution and milestone ownership. Calibration score of ${rating.toFixed(1)}/5 places this employee in the top 10th percentile.`;
+      roadmap = `Strong candidate for immediate career step-up to senior/lead designation, accompanied by compensation increment and mentorship of junior engineers.`;
+    } else if (rating >= 4.0) {
+      summary = `Strong and dependable performer in ${r.cycle}. Consistently met core KPI weights and demonstrated high initiative across sprint deliverables.`;
+      roadmap = `Recommend targeted leadership training and expanded ownership of strategic client initiatives to prepare for promotion next appraisal cycle.`;
+    } else {
+      summary = `Satisfactory alignment with core responsibilities in ${r.cycle}. Delivers expected outputs with room for accelerated domain velocity.`;
+      roadmap = `Establish bi-weekly coaching cadence and structured technical objectives to support performance enhancement.`;
+    }
+    setAiReviewSummary({ employee: r.employee, rating, summary, roadmap, cycle: r.cycle });
+  }
+
+  const employeeViewName = simulatedEmployeeName || currentUser?.name || "";
+  const managerViewName = simulatedManagerName || currentUser?.name || "";
+  const activeCycleName = String(cycles.find((c) => c.status === "Active")?.name || "")
+    .replace("Performance Cycle", "")
+    .replace("Appraisal Cycle", "")
+    .trim();
+
   // Add/Edit Form State
   const [form, setForm] = useState({
     employee: "",
-    cycle: "Q4 2024",
+    employeeId: "",
+    cycle: "",
+    cycleId: "",
     reviewer: "",
+    managerId: "",
     rating: 4.0,
     status: "Draft",
     stage: "Self Review",
-    due: "15 Nov 2024",
-    department: "Engineering",
-    designation: "Senior Engineer",
+    due: "",
+    department: "",
+    designation: "",
   });
   const [formErrors, setFormErrors] = useState({});
+
+  function openAddModal() {
+    const defaultCycle = cycles.find((c) => c.status === "Active") || cycles[0];
+    const defaultEmp = uniqueEmployeeList[0] || employees[0];
+    const dueStr = defaultCycle?.periodEnd || defaultCycle?.endDate || new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10);
+    setForm({
+      employee: defaultEmp?.name || "",
+      employeeId: defaultEmp?.id || "",
+      cycle: defaultCycle?.name || activeCycleName || "Performance Cycle",
+      cycleId: defaultCycle?.id || "",
+      reviewer: "",
+      managerId: "",
+      rating: 4.0,
+      status: "Draft",
+      stage: "Self Review",
+      due: dueStr,
+      department: defaultEmp?.department || "",
+      designation: defaultEmp?.designation || "",
+    });
+    setFormErrors({});
+    setAddOpen(true);
+  }
 
   // Filter appraisals based on role and tab
   const filtered = useMemo(() => {
     return appraisals.filter((r) => {
-      // History tab: completed appraisals. Active tab: ongoing appraisals.
+      // History tab filter: only Completed/Archived appraisals or previous cycles
       if (tab === "history") {
-        if (r.status !== "Completed") return false;
+        if (r.status !== "Completed" && r.cycle === activeCycleName) return false;
       } else {
-        if (r.status === "Completed") return false;
+        // Active tab: exclude old completed records from prior cycles
+        if (r.status === "Completed" && r.cycle !== activeCycleName) return false;
       }
 
       // Role filter simulation
       if (role === "Employee") {
-        if (String(r.employee ?? '').toLowerCase() !== simulatedEmployeeName.toLowerCase()) return false;
+        if (String(r.employee ?? '').toLowerCase() !== employeeViewName.toLowerCase()) return false;
       } else if (role === "Manager") {
-        if (String(r.reviewer ?? '').toLowerCase() !== simulatedManagerName.toLowerCase()) return false;
+        if (String(r.reviewer ?? '').toLowerCase() !== managerViewName.toLowerCase()) return false;
       }
 
       if (search && !`${r.employee} ${r.cycle} ${r.reviewer} ${r.department}`.toLowerCase().includes(search.toLowerCase())) return false;
@@ -133,19 +260,36 @@ export default function Appraisal() {
       if (deptFilter !== "All" && r.department !== deptFilter) return false;
       if (statusFilter !== "All" && r.status !== statusFilter) return false;
       if (stageFilter !== "All" && r.stage !== stageFilter) return false;
+      if (empFilter !== "All" && r.employee !== empFilter) return false;
       return true;
     });
-  }, [appraisals, tab, role, simulatedEmployeeName, simulatedManagerName, search, cycleFilter, deptFilter, statusFilter, stageFilter]);
+  }, [appraisals, tab, role, employeeViewName, managerViewName, activeCycleName, search, cycleFilter, deptFilter, statusFilter, stageFilter, empFilter]);
+
+  const uniqueEmployeeList = useMemo(() => {
+    const seen = new Set();
+    return (employees || []).filter((e) => {
+      const n = (e.name || "").trim();
+      if (!n || seen.has(n.toLowerCase())) return false;
+      seen.add(n.toLowerCase());
+      return true;
+    }).sort((a, b) => a.name.localeCompare(b.name));
+  }, [employees]);
+
+  const empOpts = useMemo(() => [
+    { value: "All", label: "All Employees" },
+    ...[...new Set([...uniqueEmployeeList.map((e) => e.name), ...appraisals.map((a) => a.employee)])]
+      .filter(Boolean)
+      .sort()
+      .map((name) => ({ value: name, label: name })),
+  ], [uniqueEmployeeList, appraisals]);
 
   // Sync to Employee Profile
   function handleSyncToProfile(r) {
     const success = syncRatingToProfile(r.id);
-    const ratingVal = Number(r?.rating ?? r?.finalRating ?? r?.managerRating ?? r?.selfRating ?? 0);
-    const empName = r?.employee || r?.employeeName || 'Employee';
     if (success) {
-      showToast(`Appraisal rating (${ratingVal.toFixed(1)}/5) synced to ${empName}'s employee profile & bonus record!`);
+      showToast(`Appraisal rating (${r.rating.toFixed(1)}/5) synced to ${r.employee}'s employee profile & bonus record!`);
     } else {
-      showToast(`Rating (${ratingVal.toFixed(1)}/5) recorded for ${empName}.`);
+      showToast(`Rating (${r.rating.toFixed(1)}/5) recorded for ${r.employee}.`);
     }
   }
 
@@ -224,27 +368,27 @@ export default function Appraisal() {
   // Validate Add/Edit Form
   function validateForm() {
     const errs = {};
-    if (!form.employee.trim()) errs.employee = "Employee is required";
-    if (!form.reviewer.trim()) errs.reviewer = "Reviewer is required";
-    if (!form.due.trim()) errs.due = "Due date is required";
+    if (!form.employee?.trim() && !form.employeeId) errs.employee = "Employee is required";
+    if (!form.reviewer?.trim() && !form.managerId) errs.reviewer = "Reviewer is required";
+    if (!form.due?.trim()) errs.due = "Due date is required";
     if (form.rating < 1 || form.rating > 5) errs.rating = "Rating must be between 1.0 and 5.0";
     setFormErrors(errs);
     return Object.keys(errs).length === 0;
   }
 
   // Save Add/Edit
-  async function save() {
+  function save() {
     if (!validateForm()) return;
 
     if (editRow) {
-      await updateAppraisal(editRow.id, form);
+      updateAppraisal(editRow.id, form);
       if (form.status === "Completed") {
         syncRatingToProfile(editRow.id);
       }
       showToast("Appraisal updated successfully.");
       setEditRow(null);
     } else {
-      await addAppraisal(form);
+      addAppraisal(form);
       showToast("Appraisal created successfully.");
       setAddOpen(false);
     }
@@ -258,7 +402,7 @@ export default function Appraisal() {
       sortable: true,
       render: (r) => (
         <div className="flex items-center gap-2.5">
-          <Avatar name={r.employee} size="sm" />
+          <UserInitials name={r.employee} className="w-8 h-8 text-xs" />
           <div>
             <div className="font-semibold text-slate-800 text-[13px]">{r.employee}</div>
             <div className="text-[11px] text-slate-500">{r.designation} • {r.department}</div>
@@ -347,7 +491,7 @@ export default function Appraisal() {
             {r.stage === "Self Review" && (isEmployee || isHR) && (
               <button
                 onClick={() => handleOpenSelfReview(r)}
-                className="px-2 py-1 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-lg text-[11px] font-medium border border-blue-200 transition flex items-center gap-1"
+                className="px-2 py-1 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-xl text-[11px] font-medium border border-blue-200 transition flex items-center gap-1"
                 title="Fill & Submit Self Review"
               >
                 <Send size={11} /> Self Review
@@ -358,14 +502,14 @@ export default function Appraisal() {
               <div className="flex items-center gap-1">
                 <button
                   onClick={() => handleOpenManagerReview(r)}
-                  className="px-2 py-1 bg-amber-50 text-amber-800 hover:bg-amber-100 rounded-lg text-[11px] font-medium border border-amber-200 transition flex items-center gap-1"
+                  className="px-2 py-1 bg-amber-50 text-amber-800 hover:bg-amber-100 rounded-xl text-[11px] font-medium border border-amber-200 transition flex items-center gap-1"
                   title="Manager Evaluation"
                 >
                   <Award size={11} /> Review
                 </button>
                 <button
                   onClick={() => handleOpenReturn(r)}
-                  className="px-1.5 py-1 bg-slate-50 text-slate-600 hover:bg-slate-100 rounded-lg text-[11px] font-medium border border-slate-200 transition flex items-center"
+                  className="px-1.5 py-1 bg-slate-50 text-slate-600 hover:bg-slate-100 rounded-xl text-[11px] font-medium border border-slate-200 transition flex items-center"
                   title="Return to Employee for Revision"
                 >
                   <RotateCcw size={11} />
@@ -380,14 +524,14 @@ export default function Appraisal() {
                     setHrApproveRow(r);
                     setHrComments("Calibrated across department benchmarks and approved.");
                   }}
-                  className="px-2 py-1 bg-purple-50 text-purple-700 hover:bg-purple-100 rounded-lg text-[11px] font-medium border border-purple-200 transition flex items-center gap-1"
+                  className="px-2 py-1 bg-purple-50 text-purple-700 hover:bg-purple-100 rounded-xl text-[11px] font-medium border border-purple-200 transition flex items-center gap-1"
                   title="Calibrate & Approve Appraisal"
                 >
                   <CheckCircle size={11} /> Calibrate
                 </button>
                 <button
                   onClick={() => handleOpenReturn(r)}
-                  className="px-1.5 py-1 bg-slate-50 text-slate-600 hover:bg-slate-100 rounded-lg text-[11px] font-medium border border-slate-200 transition flex items-center"
+                  className="px-1.5 py-1 bg-slate-50 text-slate-600 hover:bg-slate-100 rounded-xl text-[11px] font-medium border border-slate-200 transition flex items-center"
                   title="Return to Manager"
                 >
                   <RotateCcw size={11} />
@@ -398,7 +542,7 @@ export default function Appraisal() {
             {r.stage === "Finalization" && isHR && r.status !== "Completed" && (
               <button
                 onClick={() => handleFinalize(r)}
-                className="px-2 py-1 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-lg text-[11px] font-medium border border-emerald-200 transition flex items-center gap-1"
+                className="px-2 py-1 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-xl text-[11px] font-medium border border-emerald-200 transition flex items-center gap-1"
                 title="Finalize and lock rating"
               >
                 <CheckCircle size={11} /> Finalize
@@ -409,17 +553,29 @@ export default function Appraisal() {
             {r.status === "Completed" && isHR && (
               <button
                 onClick={() => handleSyncToProfile(r)}
-                className="px-2 py-1 bg-slate-50 text-slate-700 hover:bg-slate-100 rounded-lg text-[11px] font-medium border border-[#e2e8f0] transition shadow-2xs"
+                className="px-2 py-1 bg-slate-50 text-slate-700 hover:bg-slate-100 rounded-xl text-[11px] font-medium border border-[#e2e8f0] transition shadow-2xs"
                 title="Sync Rating to Employee Profile & Bonus Record"
               >
                 Sync
               </button>
             )}
 
+            {/* Performance Report */}
+            <button
+              onClick={() => {
+                setSelectedPerfAppraisal(r);
+                setPerfReportOpen(true);
+              }}
+              className="px-2 py-1 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-xl text-[11px] font-medium border border-blue-200 transition flex items-center gap-1"
+              title="Generate Employee Performance Report"
+            >
+              <FileText size={11} /> Report
+            </button>
+
             {/* View Details Drawer */}
             <button
               onClick={() => setViewRow(r)}
-              className="w-7 h-7 rounded-lg hover:bg-slate-100 text-slate-600 grid place-items-center transition"
+              className="w-7 h-7 rounded-xl hover:bg-slate-100 text-slate-600 grid place-items-center transition"
               title="View full appraisal details"
             >
               <Eye size={14} />
@@ -429,10 +585,14 @@ export default function Appraisal() {
             {isHR && (
               <button
                 onClick={() => {
+                  const matchedCycle = cycles.find((cy) => cy.id === r.cycleId || cy.name === r.cycle);
                   setForm({
                     employee: r.employee,
+                    employeeId: r.employeeId || "",
                     cycle: r.cycle,
+                    cycleId: r.cycleId || matchedCycle?.id || "",
                     reviewer: r.reviewer,
+                    managerId: r.managerId || "",
                     rating: r.rating,
                     status: r.status,
                     stage: r.stage || "Self Review",
@@ -443,7 +603,7 @@ export default function Appraisal() {
                   setFormErrors({});
                   setEditRow(r);
                 }}
-                className="w-7 h-7 rounded-lg hover:bg-slate-100 text-slate-600 grid place-items-center transition"
+                className="w-7 h-7 rounded-xl hover:bg-slate-100 text-slate-600 grid place-items-center transition"
                 title="Edit appraisal"
               >
                 <Pencil size={14} />
@@ -454,7 +614,7 @@ export default function Appraisal() {
             {isHR && (
               <button
                 onClick={() => setDeleteRow(r)}
-                className="w-7 h-7 rounded-lg hover:bg-red-50 text-red-600 grid place-items-center transition"
+                className="w-7 h-7 rounded-xl hover:bg-red-50 text-red-600 grid place-items-center transition"
                 title="Delete appraisal"
               >
                 <Trash2 size={14} />
@@ -469,76 +629,73 @@ export default function Appraisal() {
   return (
     <div className="flex flex-col gap-5">
       {/* Header & Role Switcher */}
-      <PageHeader
-        title="Performance Appraisal"
-        subtitle="4-Stage Workflow: Self Review → Manager Review → HR Review → Finalization."
-        guide={hrmsGuides.appraisal}
-        titleExtra={
-          <button
-            onClick={() => setScaleGuideOpen(true)}
-            className="px-2 py-0.5 rounded-full text-[11px] bg-slate-100 text-slate-600 hover:bg-slate-200 transition font-medium flex items-center gap-1"
-            title="View 5-tier rating scale criteria"
-          >
-            <HelpCircle size={12} /> Rating Scale
-          </button>
-        }
-        actions={
-          <>
-            {/* Simulated Role Selector */}
-            <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-[#e2e8f0] shadow-2xs">
-              <span className="text-[11px] font-semibold text-slate-400 px-2">Role:</span>
-              <button
-                onClick={() => setRole("HR")}
-                className={`px-2.5 py-1 rounded-lg text-[12px] font-medium transition ${
-                  role === "HR" ? "bg-primary text-white shadow-2xs" : "text-slate-600 hover:text-slate-900"
-                }`}
-              >
-                HR / Admin
-              </button>
-              <button
-                onClick={() => setRole("Manager")}
-                className={`px-2.5 py-1 rounded-lg text-[12px] font-medium transition ${
-                  role === "Manager" ? "bg-primary text-white shadow-2xs" : "text-slate-600 hover:text-slate-900"
-                }`}
-              >
-                Manager
-              </button>
-              <button
-                onClick={() => setRole("Employee")}
-                className={`px-2.5 py-1 rounded-lg text-[12px] font-medium transition ${
-                  role === "Employee" ? "bg-primary text-white shadow-2xs" : "text-slate-600 hover:text-slate-900"
-                }`}
-              >
-                Employee
-              </button>
-            </div>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <div className="flex flex-wrap lg:flex-nowrap items-center gap-2.5">
+            <h1 className="text-[22px] font-bold text-slate-800">Performance Appraisal</h1>
+            <PageInfoButton guide={hrmsGuides.appraisal} />
+            <button
+              onClick={() => setScaleGuideOpen(true)}
+              className="px-2 py-0.5 rounded-full text-[11px] bg-slate-100 text-slate-600 hover:bg-slate-200 transition font-medium flex items-center gap-1"
+              title="View 5-tier rating scale criteria"
+            >
+              <HelpCircle size={12} /> Rating Scale
+            </button>
+          </div>
+          <p className="text-[13px] text-slate-500 mt-0.5">
+            4-Stage Workflow: Self Review → Manager Review → HR Review → Finalization.
+          </p>
+        </div>
 
-            {/* Add Appraisal Button (Available to HR/Admin) */}
-            {role === "HR" && (
-              <Button
-                onClick={() => {
-                  const firstEmp = employees[0];
-                  setForm({
-                    employee: firstEmp?.name || "",
-                    cycle: cycles.find((c) => c.status === "Active")?.name.replace("Performance Cycle", "").trim() || "Annual Review 2026",
-                    reviewer: employees[1]?.name || firstEmp?.name || "Reviewer",
-                    rating: 4.0,
-                    status: "Draft",
-                    stage: "Self Review",
-                    due: "15 Nov 2024",
-                    department: firstEmp?.department || "Engineering",
-                    designation: firstEmp?.designation || "Senior Specialist",
-                  });
-                  setFormErrors({});
-                  setAddOpen(true);
-                }}
-              >
-                + Add Appraisal
-              </Button>
-            )}
-          </>
-        }
-      />
+        <div className="flex flex-wrap lg:flex-nowrap items-center gap-2.5">
+          {/* Simulated Role Selector */}
+          <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-[#e2e8f0] shadow-2xs">
+            <span className="text-[11px] font-semibold text-slate-400 px-2">Role:</span>
+            <button
+              onClick={() => setRole("HR")}
+              className={`px-2.5 py-1 rounded-lg text-[12px] font-medium transition ${
+                role === "HR" ? "bg-[#16233a] text-white shadow-2xs" : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              HR / Admin
+            </button>
+            <button
+              onClick={() => setRole("Manager")}
+              className={`px-2.5 py-1 rounded-lg text-[12px] font-medium transition ${
+                role === "Manager" ? "bg-[#16233a] text-white shadow-2xs" : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              Manager
+            </button>
+            <button
+              onClick={() => setRole("Employee")}
+              className={`px-2.5 py-1 rounded-lg text-[12px] font-medium transition ${
+                role === "Employee" ? "bg-[#16233a] text-white shadow-2xs" : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              Employee
+            </button>
+          </div>
+
+          <Button
+            variant="outline"
+            onClick={() => {
+              setSelectedPerfAppraisal(null);
+              setPerfReportOpen(true);
+            }}
+          >
+            <FileText size={14} className="text-blue-600 mr-1.5" />
+            Performance Report
+          </Button>
+
+          {/* Add Appraisal Button (Available to HR/Admin) */}
+          {role === "HR" && (
+            <Button onClick={openAddModal}>
+              + Add Appraisal
+            </Button>
+          )}
+        </div>
+      </div>
 
       {/* Tabs: Active Appraisals vs Performance History */}
       <div className="flex items-center justify-between border-b border-[#e2e8f0]">
@@ -553,7 +710,7 @@ export default function Appraisal() {
           >
             Active Appraisals
             <span className="px-1.5 py-0.2 rounded-full text-[11px] bg-blue-50 text-blue-700 font-semibold">
-              {appraisals.filter((a) => a.status !== "Completed").length}
+              {appraisals.filter((a) => a.status !== "Completed" || a.cycle === activeCycleName).length}
             </span>
           </button>
 
@@ -577,8 +734,8 @@ export default function Appraisal() {
         <div className="text-[12px] text-slate-500 hidden sm:flex items-center gap-1">
           <Info size={13} className="text-blue-500" />
           <span>
-            {role === "Employee" && `Showing reviews for employee: ${simulatedEmployeeName}`}
-            {role === "Manager" && `Showing reviews assigned to manager: ${simulatedManagerName}`}
+            {role === "Employee" && `Showing reviews for employee: ${employeeViewName}`}
+            {role === "Manager" && `Showing reviews assigned to manager: ${managerViewName}`}
             {role === "HR" && "Full administrative view across all departments"}
           </span>
         </div>
@@ -589,6 +746,12 @@ export default function Appraisal() {
         search={search}
         onSearch={setSearch}
         selects={[
+          {
+            label: "Employee",
+            value: empFilter,
+            onChange: setEmpFilter,
+            options: empOpts,
+          },
           {
             label: "Cycle",
             value: cycleFilter,
@@ -646,6 +809,7 @@ export default function Appraisal() {
         ]}
         onClear={() => {
           setSearch("");
+          setEmpFilter("All");
           setCycleFilter("All");
           setDeptFilter("All");
           setStatusFilter("All");
@@ -661,7 +825,7 @@ export default function Appraisal() {
         emptyDesc="Try clearing your filters or switch the simulated role perspective."
         emptyAction={
           role === "HR" && (
-            <Button onClick={() => setAddOpen(true)}>+ Add Appraisal</Button>
+            <Button onClick={openAddModal}>+ Add Appraisal</Button>
           )
         }
       />
@@ -691,17 +855,16 @@ export default function Appraisal() {
       >
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <label className="flex flex-col gap-1">
-            <span className="flex items-center justify-between">
-              <span className="text-[11px] font-medium text-slate-500">Employee *</span>
-              <MasterSourceLink source="employees" />
-            </span>
+            <span className="text-[11px] font-medium text-slate-500">Employee *</span>
             <select
-              value={form.employee}
+              value={form.employeeId || form.employee}
               onChange={(e) => {
-                const emp = employees.find((x) => x.name === e.target.value);
+                const val = e.target.value;
+                const emp = uniqueEmployeeList.find((x) => x.id === val || x.name === val);
                 setForm({
                   ...form,
-                  employee: e.target.value,
+                  employee: emp?.name || val,
+                  employeeId: emp?.id || val,
                   department: emp?.department || form.department,
                   designation: emp?.designation || form.designation,
                 });
@@ -711,9 +874,9 @@ export default function Appraisal() {
               }`}
             >
               <option value="">Select Employee</option>
-              {employees.map((e) => (
-                <option key={e.id || e.name} value={e.name}>
-                  {e.name} ({e.department || e.designation})
+              {uniqueEmployeeList.map((e) => (
+                <option key={e.id || e.name} value={e.id || e.name}>
+                  {e.name}{e.department || e.designation ? ` (${e.department || e.designation})` : ""}
                 </option>
               ))}
             </select>
@@ -721,25 +884,68 @@ export default function Appraisal() {
           </label>
 
           <label className="flex flex-col gap-1">
-            <span className="flex items-center justify-between">
-              <span className="text-[11px] font-medium text-slate-500">Reviewer *</span>
-              <MasterSourceLink source="employees" />
-            </span>
+            <span className="text-[11px] font-medium text-slate-500">Review Cycle</span>
             <select
-              value={form.reviewer}
-              onChange={(e) => setForm({ ...form, reviewer: e.target.value })}
+              value={form.cycleId || form.cycle}
+              onChange={(e) => {
+                const val = e.target.value;
+                const cyc = cycles.find((c) => c.id === val || c.name === val);
+                setForm({
+                  ...form,
+                  cycleId: cyc?.id || val,
+                  cycle: cyc?.name || val,
+                  due: cyc?.periodEnd || cyc?.endDate || form.due,
+                });
+              }}
+              className="h-9 px-3 bg-white border border-[#e2e8f0] rounded-xl text-[13px]"
+            >
+              {cycles.length === 0 && <option value="">Default Performance Cycle</option>}
+              {cycles.map((c) => (
+                <option key={c.id || c.name} value={c.id || c.name}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="flex flex-col gap-1">
+            <span className="text-[11px] font-medium text-slate-500">Reviewer *</span>
+            <select
+              value={form.managerId || form.reviewer}
+              onChange={(e) => {
+                const val = e.target.value;
+                const rev = uniqueEmployeeList.find((x) => x.id === val || x.name === val);
+                setForm({
+                  ...form,
+                  reviewer: rev?.name || val,
+                  managerId: rev?.id || val,
+                });
+              }}
               className={`h-9 px-3 bg-white border rounded-xl text-[13px] ${
                 formErrors.reviewer ? "border-red-500" : "border-[#e2e8f0]"
               }`}
             >
               <option value="">Select Reviewer</option>
-              {employees.map((e) => (
-                <option key={e.id || e.name} value={e.name}>
-                  {e.name} ({e.designation})
+              {uniqueEmployeeList.map((e) => (
+                <option key={e.id || e.name} value={e.id || e.name}>
+                  {e.name}{e.designation ? ` (${e.designation})` : ""}
                 </option>
               ))}
             </select>
             {formErrors.reviewer && <span className="text-[11px] text-red-500">{formErrors.reviewer}</span>}
+          </label>
+
+          <label className="flex flex-col gap-1">
+            <span className="text-[11px] font-medium text-slate-500">Initial Rating (1.0 - 5.0)</span>
+            <input
+              type="number"
+              step={0.1}
+              min={1}
+              max={5}
+              value={form.rating}
+              onChange={(e) => setForm({ ...form, rating: Number(e.target.value) })}
+              className="h-9 px-3 bg-white border border-[#e2e8f0] rounded-xl text-[13px]"
+            />
           </label>
 
           <label className="flex flex-col gap-1">
@@ -774,27 +980,13 @@ export default function Appraisal() {
             </select>
           </label>
 
-          <label className="flex flex-col gap-1">
-            <span className="text-[11px] font-medium text-slate-500">Initial Rating (1.0 - 5.0)</span>
-            <input
-              type="number"
-              step={0.1}
-              min={1}
-              max={5}
-              value={form.rating}
-              onChange={(e) => setForm({ ...form, rating: Number(e.target.value) })}
-              className="h-9 px-3 bg-white border border-[#e2e8f0] rounded-xl text-[13px]"
-            />
-          </label>
-
-          <label className="flex flex-col gap-1">
+          <label className="flex flex-col gap-1 sm:col-span-2">
             <span className="text-[11px] font-medium text-slate-500">Due Date *</span>
             <input
-              type="text"
+              type="date"
               value={form.due}
               onChange={(e) => setForm({ ...form, due: e.target.value })}
-              placeholder="e.g. 15 Nov 2024"
-              className="h-9 px-3 bg-white border border-[#e2e8f0] rounded-xl text-[13px]"
+              className="h-9 px-3 bg-white border border-[#e2e8f0] rounded-xl text-[13px] cursor-pointer"
             />
           </label>
         </div>
@@ -1111,11 +1303,48 @@ export default function Appraisal() {
         subtitle={`${viewRow?.designation} • ${viewRow?.department} (${viewRow?.cycle})`}
         footer={
           <div className="flex items-center justify-between w-full">
-            {role === "HR" && viewRow?.status === "Completed" && (
-              <Button onClick={() => handleSyncToProfile(viewRow)}>
-                Sync to Profile
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setSelectedPerfAppraisal(viewRow);
+                  setPerfReportOpen(true);
+                }}
+              >
+                <FileText size={14} className="text-blue-600 mr-1.5" />
+                Performance Report
               </Button>
-            )}
+              {role === "HR" && (
+                <>
+                  <Button
+                    variant="outline"
+                    onClick={() => handleOpenPromotion(viewRow)}
+                  >
+                    <TrendingUp size={14} className="text-blue-600 mr-1.5" />
+                    Promote
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => handleOpenAward(viewRow)}
+                  >
+                    <Award size={14} className="text-amber-600 mr-1.5" />
+                    Award
+                  </Button>
+                </>
+              )}
+              <Button
+                variant="outline"
+                onClick={() => handleGenerateAiInsights(viewRow)}
+              >
+                <Sparkles size={14} className="text-indigo-600 mr-1.5" />
+                AI Review
+              </Button>
+              {role === "HR" && viewRow?.status === "Completed" && (
+                <Button onClick={() => handleSyncToProfile(viewRow)}>
+                  Sync to Profile
+                </Button>
+              )}
+            </div>
             <Button variant="secondary" onClick={() => setViewRow(null)}>
               Close
             </Button>
@@ -1322,8 +1551,8 @@ export default function Appraisal() {
             </Button>
             <Button
               variant="danger"
-              onClick={async () => {
-                if (deleteRow) await deleteAppraisal(deleteRow.id);
+              onClick={() => {
+                if (deleteRow) deleteAppraisal(deleteRow.id);
                 setDeleteRow(null);
                 showToast("Appraisal deleted successfully.");
               }}
@@ -1336,6 +1565,200 @@ export default function Appraisal() {
         <p className="text-[13px] text-slate-600">
           Are you sure you want to delete the appraisal for <b>{deleteRow?.employee}</b> ({deleteRow?.cycle})? This action cannot be undone.
         </p>
+      </Modal>
+
+      {/* Performance & Appraisal Report Modal */}
+      <PerformanceReportModal
+        isOpen={perfReportOpen}
+        onClose={() => setPerfReportOpen(false)}
+        appraisal={selectedPerfAppraisal}
+      />
+
+      {/* ── Career Promotion Modal ────────────────────────────── */}
+      <Modal
+        isOpen={!!promoModalRow}
+        onClose={() => setPromoModalRow(null)}
+        title={`Promote Employee — ${promoModalRow?.employee}`}
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setPromoModalRow(null)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSavePromotion}>
+              Confirm Promotion & Update Lifecycle
+            </Button>
+          </>
+        }
+      >
+        {promoModalRow && (
+          <form onSubmit={handleSavePromotion} className="flex flex-col gap-3.5 text-[13px]">
+            <div className="p-3 bg-blue-50/70 border border-blue-200 rounded-xl text-blue-900 text-xs">
+              Promoting <b>{promoModalRow.employee}</b> directly based on appraisal review rating of <b>{Number(promoModalRow.rating || 4.5).toFixed(1)}/5</b>.
+              This records a career promotion and updates compensation in the employee directory and payroll.
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <label className="flex flex-col gap-1">
+                <span className="text-[11.5px] font-semibold text-slate-700">Current Designation</span>
+                <input
+                  type="text"
+                  readOnly
+                  value={promoModalRow.designation || "Staff"}
+                  className="p-2.5 bg-slate-100 border border-[#e2e8f0] rounded-xl text-slate-500 font-medium"
+                />
+              </label>
+
+              <label className="flex flex-col gap-1">
+                <span className="text-[11.5px] font-semibold text-slate-700">Promoted Designation *</span>
+                <input
+                  type="text"
+                  required
+                  value={promoForm.new_designation}
+                  onChange={(e) => setPromoForm({ ...promoForm, new_designation: e.target.value })}
+                  placeholder="e.g. Senior Software Engineer"
+                  className="p-2.5 bg-white border border-[#e2e8f0] rounded-xl text-slate-800"
+                />
+              </label>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <label className="flex flex-col gap-1">
+                <span className="text-[11.5px] font-semibold text-slate-700">Revised Salary (Monthly CTC)</span>
+                <input
+                  type="number"
+                  value={promoForm.new_salary}
+                  onChange={(e) => setPromoForm({ ...promoForm, new_salary: e.target.value })}
+                  placeholder="e.g. 60000"
+                  className="p-2.5 bg-white border border-[#e2e8f0] rounded-xl text-slate-800 font-mono"
+                />
+              </label>
+
+              <label className="flex flex-col gap-1">
+                <span className="text-[11.5px] font-semibold text-slate-700">Effective Date *</span>
+                <input
+                  type="date"
+                  required
+                  value={promoForm.effective_date}
+                  onChange={(e) => setPromoForm({ ...promoForm, effective_date: e.target.value })}
+                  className="p-2.5 bg-white border border-[#e2e8f0] rounded-xl text-slate-800"
+                />
+              </label>
+            </div>
+
+            <label className="flex flex-col gap-1">
+              <span className="text-[11.5px] font-semibold text-slate-700">Justification & Notes</span>
+              <textarea
+                rows={2}
+                value={promoForm.notes}
+                onChange={(e) => setPromoForm({ ...promoForm, notes: e.target.value })}
+                className="p-2.5 bg-white border border-[#e2e8f0] rounded-xl text-slate-800 text-xs"
+              />
+            </label>
+          </form>
+        )}
+      </Modal>
+
+      {/* ── Spot Award Modal ──────────────────────────────────── */}
+      <Modal
+        isOpen={!!awardModalRow}
+        onClose={() => setAwardModalRow(null)}
+        title={`Grant Performance Award — ${awardModalRow?.employee}`}
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setAwardModalRow(null)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveAward}>
+              Present Award & Push to Payroll
+            </Button>
+          </>
+        }
+      >
+        {awardModalRow && (
+          <form onSubmit={handleSaveAward} className="flex flex-col gap-3.5 text-[13px]">
+            <div className="p-3 bg-amber-50/70 border border-amber-200 rounded-xl text-amber-900 text-xs">
+              Grant spot excellence award to <b>{awardModalRow.employee}</b>. Cash reward is automatically included in the upcoming payroll run as an earning bonus.
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <label className="flex flex-col gap-1">
+                <span className="text-[11.5px] font-semibold text-slate-700">Award Title *</span>
+                <input
+                  type="text"
+                  required
+                  value={awardForm.award_name}
+                  onChange={(e) => setAwardForm({ ...awardForm, award_name: e.target.value })}
+                  className="p-2.5 bg-white border border-[#e2e8f0] rounded-xl text-slate-800"
+                />
+              </label>
+
+              <label className="flex flex-col gap-1">
+                <span className="text-[11.5px] font-semibold text-slate-700">Cash Prize / Reward (₹)</span>
+                <input
+                  type="number"
+                  value={awardForm.cash_reward}
+                  onChange={(e) => setAwardForm({ ...awardForm, cash_reward: e.target.value })}
+                  placeholder="5000"
+                  className="p-2.5 bg-white border border-[#e2e8f0] rounded-xl text-slate-800 font-mono"
+                />
+              </label>
+            </div>
+
+            <label className="flex flex-col gap-1">
+              <span className="text-[11.5px] font-semibold text-slate-700">Official Citation</span>
+              <textarea
+                rows={2}
+                value={awardForm.citation}
+                onChange={(e) => setAwardForm({ ...awardForm, citation: e.target.value })}
+                className="p-2.5 bg-white border border-[#e2e8f0] rounded-xl text-slate-800 text-xs"
+              />
+            </label>
+          </form>
+        )}
+      </Modal>
+
+      {/* ── AI Review Insights Modal ──────────────────────────── */}
+      <Modal
+        isOpen={!!aiReviewSummary}
+        onClose={() => setAiReviewSummary(null)}
+        title={`AI Performance Evaluation — ${aiReviewSummary?.employee}`}
+        footer={
+          <Button onClick={() => setAiReviewSummary(null)}>
+            Done
+          </Button>
+        }
+      >
+        {aiReviewSummary && (
+          <div className="flex flex-col gap-4 text-xs">
+            <div className="p-3.5 bg-gradient-to-r from-blue-900 via-indigo-900 to-purple-900 text-white rounded-2xl flex items-center justify-between">
+              <div>
+                <span className="text-[11px] text-blue-200 uppercase font-bold tracking-wider">Calibration Grade</span>
+                <div className="text-xl font-bold flex items-center gap-1.5 mt-0.5">
+                  <Star size={16} className="text-amber-400 fill-amber-400" />
+                  <span>{aiReviewSummary.rating.toFixed(1)} / 5.0</span>
+                </div>
+              </div>
+              <div className="text-right">
+                <span className="text-[11px] text-blue-200">Cycle</span>
+                <div className="font-semibold text-sm">{aiReviewSummary.cycle}</div>
+              </div>
+            </div>
+
+            <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl space-y-1.5">
+              <span className="font-bold text-slate-800 flex items-center gap-1.5">
+                <Sparkles size={14} className="text-blue-600" /> Executive Evaluation Summary
+              </span>
+              <p className="text-slate-600 leading-relaxed text-[12px]">{aiReviewSummary.summary}</p>
+            </div>
+
+            <div className="p-3.5 bg-emerald-50/60 border border-emerald-200 rounded-2xl space-y-1.5">
+              <span className="font-bold text-emerald-900 flex items-center gap-1.5">
+                <TrendingUp size={14} className="text-emerald-600" /> Career Growth & Promotion Roadmap
+              </span>
+              <p className="text-emerald-800 leading-relaxed text-[12px]">{aiReviewSummary.roadmap}</p>
+            </div>
+          </div>
+        )}
       </Modal>
     </div>
   );

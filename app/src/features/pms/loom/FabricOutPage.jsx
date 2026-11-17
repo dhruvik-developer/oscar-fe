@@ -18,6 +18,7 @@ import { Button } from '../../../components/ui/Button';
 import TablePagination from '../../../components/ui/TablePagination';
 import { loomService } from '../../../services/loomService';
 import { formatNum, preventNegativeInput } from '../utils/loomCalculations';
+import { partiesService, jobworkService } from '../../../services/domainServices';
 import { useERP } from '../../../context/ERPContext';
 import { ConfirmModal } from '../../../components/ui/ConfirmModal';
 import CompanySelector from './components/CompanySelector';
@@ -29,6 +30,8 @@ export default function FabricOutPage() {
   const [deleteConfirmId, setDeleteConfirmId] = useState(null);
   const [factories, setFactories] = useState([]);
   const [qualities, setQualities] = useState([]);
+  const [dyeingParties, setDyeingParties] = useState([]);
+  const [jobWorkOrders, setJobWorkOrders] = useState([]);
   const [selectedFactoryId, setSelectedFactoryId] = useState('');
   const [dispatches, setDispatches] = useState([]);
   const [dispatchPage, setDispatchPage] = useState(1);
@@ -55,20 +58,28 @@ export default function FabricOutPage() {
   const [oMeters, setOMeters] = useState('');
   const [oDest, setODest] = useState('Dyeing mill');
   const [oDestName, setODestName] = useState('');
+  const [dyeingMillParty, setDyeingMillParty] = useState('');
+  const [jobWorkOrder, setJobWorkOrder] = useState('');
   const [oChallan, setOChallan] = useState('');
   const [oVehicle, setOVehicle] = useState('');
 
   const loadInitial = async () => {
     try {
-      const [fRes, qRes] = await Promise.all([
+      const [fRes, qRes, pRes, jwoRes] = await Promise.all([
         loomService.getFactories(),
         loomService.getQualities(),
+        partiesService.getParties().catch(() => []),
+        jobworkService.getOrders().catch(() => []),
       ]);
       const fList = Array.isArray(fRes) ? fRes : fRes?.results || [];
       const qList = Array.isArray(qRes) ? qRes : qRes?.results || [];
+      const pList = Array.isArray(pRes) ? pRes : pRes?.results || [];
+      const jwoList = Array.isArray(jwoRes) ? jwoRes : jwoRes?.results || [];
 
       setFactories(fList);
       setQualities(qList);
+      setDyeingParties(pList.filter((p) => !p.party_type || p.party_type.toLowerCase() === 'vendor' || p.party_type.toLowerCase() === 'supplier' || p.type?.toLowerCase() === 'vendor'));
+      setJobWorkOrders(jwoList);
 
       if (fList.length && !selectedFactoryId) setSelectedFactoryId(fList[0].id);
       if (qList.length) setOQuality(qList[0].id);
@@ -131,6 +142,8 @@ export default function FabricOutPage() {
         meters: Number(oMeters),
         dest: oDest,
         dest_name: oDest === 'Godown' ? '' : oDestName,
+        dyeing_mill_party: oDest === 'Dyeing mill' ? (dyeingMillParty || null) : null,
+        job_work_order: oDest === 'Dyeing mill' ? (jobWorkOrder || null) : null,
         challan: oChallan,
         vehicle: oVehicle,
       });
@@ -139,6 +152,9 @@ export default function FabricOutPage() {
       setOTaka('');
       setOChallan('');
       setOVehicle('');
+      setDyeingMillParty('');
+      setJobWorkOrder('');
+      setODestName('');
       fetchFactoryDispatches();
     } catch (err) {
       showToast(err?.payload?.detail || 'Failed to record dispatch', 'error');
@@ -294,7 +310,13 @@ export default function FabricOutPage() {
             <label className="pms-label">Destination</label>
             <select
               value={oDest}
-              onChange={(e) => setODest(e.target.value)}
+              onChange={(e) => {
+                setODest(e.target.value);
+                if (e.target.value !== 'Dyeing mill') {
+                  setDyeingMillParty('');
+                  setJobWorkOrder('');
+                }
+              }}
               className="pms-select w-full cursor-pointer"
             >
               <option value="Dyeing mill">Dyeing mill</option>
@@ -302,17 +324,81 @@ export default function FabricOutPage() {
               <option value="Other factory">Other factory</option>
             </select>
           </div>
-          <div>
-            <label className="pms-label">Mill / Party Name</label>
-            <input
-              type="text"
-              placeholder="e.g. Shree Dyeing"
-              value={oDestName}
-              disabled={oDest === 'Godown'}
-              onChange={(e) => setODestName(e.target.value)}
-              className="pms-input w-full disabled:opacity-50"
-            />
-          </div>
+          {oDest === 'Dyeing mill' ? (
+            <>
+              <div>
+                <label className="pms-label flex items-center justify-between">
+                  <span>Dyeing Mill (Party)</span>
+                  <span className="text-[10px] text-blue-600 dark:text-blue-400 font-normal">Parties</span>
+                </label>
+                <select
+                  value={dyeingMillParty}
+                  onChange={(e) => {
+                    const selId = e.target.value;
+                    setDyeingMillParty(selId);
+                    const party = dyeingParties.find((p) => String(p.id) === String(selId));
+                    if (party) setODestName(party.name);
+                  }}
+                  className="pms-select w-full cursor-pointer"
+                >
+                  <option value="">-- Select Mill Party --</option>
+                  {dyeingParties.map((p) => (
+                    <option key={p.id} value={p.id}>{p.name} {p.gstin ? `(${p.gstin})` : ''}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="pms-label flex items-center justify-between">
+                  <span>Linked JWO</span>
+                  <span className="text-[10px] text-purple-600 dark:text-purple-400 font-normal">Job Work</span>
+                </label>
+                <select
+                  value={jobWorkOrder}
+                  onChange={(e) => {
+                    const selId = e.target.value;
+                    setJobWorkOrder(selId);
+                    const jwo = jobWorkOrders.find((j) => String(j.id) === String(selId));
+                    if (jwo) {
+                      if (!dyeingMillParty && jwo.vendor) setDyeingMillParty(jwo.vendor);
+                      if (!oDestName && (jwo.vendor_name || jwo.vendor_details?.name)) {
+                        setODestName(jwo.vendor_name || jwo.vendor_details?.name);
+                      }
+                    }
+                  }}
+                  className="pms-select w-full cursor-pointer"
+                >
+                  <option value="">-- None / Manual JWO --</option>
+                  {jobWorkOrders.map((j) => (
+                    <option key={j.id} value={j.id}>
+                      {j.order_number || j.order_no || `JWO #${j.id}`} {j.vendor_name ? `- ${j.vendor_name}` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="pms-label">Destination Name</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Shree Dyeing"
+                  value={oDestName}
+                  onChange={(e) => setODestName(e.target.value)}
+                  className="pms-input w-full"
+                />
+              </div>
+            </>
+          ) : (
+            <div>
+              <label className="pms-label">Destination Name</label>
+              <input
+                type="text"
+                placeholder="e.g. Central Godown"
+                value={oDestName}
+                disabled={oDest === 'Godown'}
+                onChange={(e) => setODestName(e.target.value)}
+                className="pms-input w-full disabled:opacity-50"
+              />
+            </div>
+          )}
           <div>
             <label className="pms-label">Challan No</label>
             <input
@@ -467,7 +553,21 @@ export default function FabricOutPage() {
                   <td className="py-2 px-2.5 sm:py-2.5 sm:px-3 text-right font-mono">{d.taka}</td>
                   <td className="py-2 px-2.5 sm:py-2.5 sm:px-3 text-right font-mono font-bold">{formatNum(d.meters)}</td>
                   <td className="py-2 px-2.5 sm:py-2.5 sm:px-3 font-medium text-slate-700 dark:text-slate-300">{d.dest}</td>
-                  <td className="py-2 px-2.5 sm:py-2.5 sm:px-3 text-slate-600 dark:text-slate-400">{d.dest_name || '—'}</td>
+                  <td className="py-2 px-2.5 sm:py-2.5 sm:px-3 text-slate-600 dark:text-slate-400">
+                    <div className="flex flex-col gap-0.5">
+                      <span>{d.dest_name || '—'}</span>
+                      {d.dyeing_mill_party_name && (
+                        <span className="inline-flex items-center gap-1 text-[10px] text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40 px-1.5 py-0.2 rounded border border-blue-200 dark:border-blue-900/50 w-fit">
+                          Vendor: {d.dyeing_mill_party_name}
+                        </span>
+                      )}
+                      {d.job_work_order_number && (
+                        <span className="inline-flex items-center gap-1 text-[10px] text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-950/40 px-1.5 py-0.2 rounded border border-purple-200 dark:border-purple-900/50 w-fit font-mono">
+                          JWO #{d.job_work_order_number}
+                        </span>
+                      )}
+                    </div>
+                  </td>
                   <td className="py-2 px-2.5 sm:py-2.5 sm:px-3 font-mono font-semibold text-blue-600">{d.challan || '—'}</td>
                   <td className="py-2 px-2.5 sm:py-2.5 sm:px-3 text-center">
                     <button

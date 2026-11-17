@@ -1,9 +1,28 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Layers, Plus, Trash2, Edit2, Check, RefreshCw, Cpu, Package, Factory, Users } from 'lucide-react';
+import {
+  Layers,
+  Plus,
+  Trash2,
+  Edit2,
+  Check,
+  RefreshCw,
+  Cpu,
+  Package,
+  Factory,
+  Users,
+  Building2,
+  Warehouse,
+  UserCheck,
+  Briefcase,
+  ExternalLink,
+  Link2,
+} from 'lucide-react';
 import PageHeader from '../../../components/ui/PageHeader';
 import { Button } from '../../../components/ui/Button';
 import TablePagination from '../../../components/ui/TablePagination';
 import { loomService } from '../../../services/loomService';
+import { inventoryService, partiesService, hrmsService } from '../../../services/domainServices';
+import api from '../../../services/api';
 import { qc, formatNum, preventNegativeInput } from '../utils/loomCalculations';
 import { useERP } from '../../../context/ERPContext';
 import { ConfirmModal } from '../../../components/ui/ConfirmModal';
@@ -19,6 +38,12 @@ export default function LoomMastersPage() {
   const [factories, setFactories] = useState([]);
   const [coords, setCoords] = useState([]);
   const [selectedFactoryId, setSelectedFactoryId] = useState('');
+
+  // Master connections state
+  const [masterQualities, setMasterQualities] = useState([]);
+  const [masterWarehouses, setMasterWarehouses] = useState([]);
+  const [masterJobWorkers, setMasterJobWorkers] = useState([]);
+  const [masterEmployees, setMasterEmployees] = useState([]);
 
   const [qualPage, setQualPage] = useState(1);
   const [qualPageSize, setQualPageSize] = useState(10);
@@ -46,12 +71,22 @@ export default function LoomMastersPage() {
 
   // Form states
   const [qForm, setQForm] = useState({
-    name: '', warp_yarn: '', ends: 4872, crimp: 5, weft_yarn: '', reed: 84, reed_w: 58, ppi: 56, wastage: 8, pick_charge: 0.15,
+    name: '',
+    fabric_quality: '',
+    warp_yarn: '',
+    ends: 4872,
+    crimp: 5,
+    weft_yarn: '',
+    reed: 84,
+    reed_w: 58,
+    ppi: 56,
+    wastage: 8,
+    pick_charge: 0.15,
   });
   const [yForm, setYForm] = useState({ name: '', denier: '', kg_per_bag: 25, rate: 0, note: '' });
-  const [fForm, setFForm] = useState({ name: '', coord: '' });
+  const [fForm, setFForm] = useState({ name: '', coord: '', factory_type: 'in_house', warehouse: '', job_worker_party: '' });
   const [mForm, setMForm] = useState({ from_no: 1, to_no: 18, reed: 84 });
-  const [cForm, setCForm] = useState({ name: '', phone: '' });
+  const [cForm, setCForm] = useState({ name: '', phone: '', employee: '' });
 
   const yarnMap = useMemo(() => {
     const map = {};
@@ -62,21 +97,35 @@ export default function LoomMastersPage() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [yRes, qRes, fRes, cRes] = await Promise.all([
+      const [yRes, qRes, fRes, cRes, mqRes, locRes, partRes, empRes] = await Promise.all([
         loomService.getYarns(),
         loomService.getQualities(),
         loomService.getFactories(),
         loomService.getCoordinators(),
+        api.get('/inventory/fabric-qualities/').catch(() => []),
+        inventoryService.getLocations().catch(() => []),
+        partiesService.getParties().catch(() => []),
+        hrmsService.getEmployees().catch(() => []),
       ]);
       const yList = Array.isArray(yRes) ? yRes : yRes?.results || [];
       const qList = Array.isArray(qRes) ? qRes : qRes?.results || [];
       const fList = Array.isArray(fRes) ? fRes : fRes?.results || [];
       const cList = Array.isArray(cRes) ? cRes : cRes?.results || [];
 
+      const mqList = Array.isArray(mqRes) ? mqRes : mqRes?.results || [];
+      const locList = Array.isArray(locRes) ? locRes : locRes?.results || [];
+      const partList = Array.isArray(partRes) ? partRes : partRes?.results || [];
+      const empList = Array.isArray(empRes) ? empRes : empRes?.results || [];
+
       setYarns(yList);
       setQualities(qList);
       setFactories(fList);
       setCoords(cList);
+
+      setMasterQualities(mqList);
+      setMasterWarehouses(locList.filter((l) => l.type === 'Warehouse' || l.type === 'Godown' || !l.type));
+      setMasterJobWorkers(partList);
+      setMasterEmployees(empList);
 
       if (yList.length && !qForm.warp_yarn) {
         setQForm((prev) => ({ ...prev, warp_yarn: yList[0].id, weft_yarn: yList[1]?.id || yList[0].id }));
@@ -119,9 +168,12 @@ export default function LoomMastersPage() {
       return;
     }
     try {
-      await loomService.createQuality(qForm);
+      await loomService.createQuality({
+        ...qForm,
+        fabric_quality: qForm.fabric_quality || null,
+      });
       showToast('Fabric quality added', 'success');
-      setQForm((prev) => ({ ...prev, name: '' }));
+      setQForm((prev) => ({ ...prev, name: '', fabric_quality: '' }));
       loadData();
     } catch (err) {
       showToast(err?.payload?.detail || 'Failed to add quality', 'error');
@@ -191,9 +243,14 @@ export default function LoomMastersPage() {
       return;
     }
     try {
-      await loomService.createFactory(fForm);
+      await loomService.createFactory({
+        ...fForm,
+        coord: fForm.coord || null,
+        warehouse: fForm.factory_type === 'in_house' ? (fForm.warehouse || null) : null,
+        job_worker_party: fForm.factory_type === 'job_work' ? (fForm.job_worker_party || null) : null,
+      });
       showToast('Factory unit registered', 'success');
-      setFForm({ name: '', coord: '' });
+      setFForm({ name: '', coord: '', factory_type: 'in_house', warehouse: '', job_worker_party: '' });
       loadData();
     } catch (err) {
       showToast('Failed to add factory', 'error');
@@ -260,9 +317,12 @@ export default function LoomMastersPage() {
       return;
     }
     try {
-      await loomService.createCoordinator(cForm);
+      await loomService.createCoordinator({
+        ...cForm,
+        employee: cForm.employee || null,
+      });
       showToast('Loom coordinator added', 'success');
-      setCForm({ name: '', phone: '' });
+      setCForm({ name: '', phone: '', employee: '' });
       loadData();
     } catch (err) {
       showToast('Failed to add coordinator', 'error');
@@ -320,7 +380,37 @@ export default function LoomMastersPage() {
               Add Technical Quality (The Spec that Drives Calculations)
             </h3>
             <form onSubmit={handleAddQuality} className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3 items-end">
-              <div>
+              <div className="col-span-1 sm:col-span-2">
+                <label className="pms-label flex items-center justify-between">
+                  <span>Link Textile Master (Optional)</span>
+                  <span className="text-[10px] text-blue-600 dark:text-blue-400 font-normal">Connects to Quality Master</span>
+                </label>
+                <select
+                  value={qForm.fabric_quality}
+                  onChange={(e) => {
+                    const selId = e.target.value;
+                    const selItem = masterQualities.find((mq) => String(mq.id) === String(selId));
+                    setQForm((prev) => ({
+                      ...prev,
+                      fabric_quality: selId,
+                      name: selItem ? (selItem.name || selItem.quality_name || prev.name) : prev.name,
+                      reed: selItem?.reed ? Number(selItem.reed) : prev.reed,
+                      reed_w: selItem?.reed_space || selItem?.width ? Number(selItem.reed_space || selItem.width) : prev.reed_w,
+                      ppi: selItem?.picks || selItem?.ppi ? Number(selItem.picks || selItem.ppi) : prev.ppi,
+                      ends: selItem?.total_ends ? Number(selItem.total_ends) : prev.ends,
+                    }));
+                  }}
+                  className="pms-select w-full cursor-pointer"
+                >
+                  <option value="">-- Manual Spec / Unlinked --</option>
+                  {masterQualities.map((mq) => (
+                    <option key={mq.id} value={mq.id}>
+                      {mq.name || mq.quality_name || `Quality #${mq.id}`} {mq.reed ? `(${mq.reed}x${mq.picks || mq.ppi || ''})` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="col-span-1 sm:col-span-3">
                 <label className="pms-label">Quality Name</label>
                 <input
                   type="text"
@@ -495,7 +585,14 @@ export default function LoomMastersPage() {
                   {paginatedQualities.map((q) => (
                     <tr key={q.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50">
                       <td className="py-2 px-2.5 sm:py-2.5 sm:px-3 font-bold text-slate-800 dark:text-slate-200 sticky left-0 bg-white dark:bg-slate-900 z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">
-                        {q.name}
+                        <div className="flex items-center gap-1.5">
+                          <span>{q.name}</span>
+                          {q.fabric_quality_name && (
+                            <span className="inline-flex items-center gap-1 text-[10px] text-blue-600 dark:text-blue-400 font-normal bg-blue-50 dark:bg-blue-950/40 px-1.5 py-0.5 rounded border border-blue-200 dark:border-blue-900/50">
+                              <Link2 size={10} /> Textile: {q.fabric_quality_name}
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="py-2 px-2.5 sm:py-2.5 sm:px-3 text-slate-600 dark:text-slate-400">{q.warp_yarn_name}</td>
                       <td className="py-2 px-2.5 sm:py-2.5 sm:px-3 text-right font-mono">{q.ends}</td>
@@ -700,9 +797,11 @@ export default function LoomMastersPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 sm:gap-4">
             {/* Create Factory */}
             <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 sm:p-5 shadow-2xs">
-              <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 tracking-tight mb-3">Add Factory Unit</h3>
-              <form onSubmit={handleAddFactory} className="flex flex-wrap sm:flex-nowrap gap-2.5 sm:gap-3 items-end">
-                <div className="flex-1 min-w-[140px]">
+              <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 tracking-tight mb-3">
+                Add Factory Unit (Weaving Shed / Unit)
+              </h3>
+              <form onSubmit={handleAddFactory} className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-end">
+                <div>
                   <label className="pms-label">Factory Name</label>
                   <input
                     type="text"
@@ -713,22 +812,70 @@ export default function LoomMastersPage() {
                     required
                   />
                 </div>
-                <div className="w-full sm:w-44">
+                <div>
+                  <label className="pms-label">Factory Type</label>
+                  <select
+                    value={fForm.factory_type}
+                    onChange={(e) => setFForm({ ...fForm, factory_type: e.target.value })}
+                    className="pms-select w-full cursor-pointer"
+                  >
+                    <option value="in_house">In-House Shed (Self-Owned)</option>
+                    <option value="job_work">Contract Job-Worker (Outside Shed)</option>
+                  </select>
+                </div>
+                {fForm.factory_type === 'in_house' ? (
+                  <div>
+                    <label className="pms-label flex items-center justify-between">
+                      <span>Warehouse / Godown</span>
+                      <span className="text-[10px] text-blue-600 dark:text-blue-400 font-normal">Inventory Location</span>
+                    </label>
+                    <select
+                      value={fForm.warehouse}
+                      onChange={(e) => setFForm({ ...fForm, warehouse: e.target.value })}
+                      className="pms-select w-full cursor-pointer"
+                    >
+                      <option value="">-- Select Inventory Location --</option>
+                      {masterWarehouses.map((w) => (
+                        <option key={w.id} value={w.id}>{w.name} {w.code ? `(${w.code})` : ''}</option>
+                      ))}
+                    </select>
+                  </div>
+                ) : (
+                  <div>
+                    <label className="pms-label flex items-center justify-between">
+                      <span>Job-Worker Party</span>
+                      <span className="text-[10px] text-blue-600 dark:text-blue-400 font-normal">Parties Master</span>
+                    </label>
+                    <select
+                      value={fForm.job_worker_party}
+                      onChange={(e) => setFForm({ ...fForm, job_worker_party: e.target.value })}
+                      className="pms-select w-full cursor-pointer"
+                    >
+                      <option value="">-- Select Vendor / Job-Worker --</option>
+                      {masterJobWorkers.map((p) => (
+                        <option key={p.id} value={p.id}>{p.name} {p.gstin ? `(${p.gstin})` : ''}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+                <div>
                   <label className="pms-label">Coordinator</label>
                   <select
                     value={fForm.coord}
                     onChange={(e) => setFForm({ ...fForm, coord: e.target.value })}
                     className="pms-select w-full cursor-pointer"
                   >
-                    <option value="">Select...</option>
+                    <option value="">Select Coordinator...</option>
                     {coords.map((c) => (
                       <option key={c.id} value={c.id}>{c.name}</option>
                     ))}
                   </select>
                 </div>
-                <button type="submit" className="pms-btn-emerald">
-                  <Plus size={16} /> Add Factory
-                </button>
+                <div className="col-span-full flex justify-end pt-1">
+                  <button type="submit" className="pms-btn-emerald">
+                    <Plus size={16} /> Add Factory
+                  </button>
+                </div>
               </form>
             </div>
 
@@ -781,9 +928,38 @@ export default function LoomMastersPage() {
           {/* Machine Inventory by Factory */}
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 sm:p-5 shadow-2xs">
             <div className="flex flex-wrap justify-between items-center gap-2 mb-3">
-              <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 tracking-tight">
-                Loom Inventory by Factory
-              </h3>
+              <div>
+                <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 tracking-tight">
+                  Loom Inventory by Factory
+                </h3>
+                {selectedFactory && (
+                  <div className="flex flex-wrap items-center gap-2 mt-1 text-xs">
+                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded font-medium ${
+                      selectedFactory.factory_type === 'job_work'
+                        ? 'bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800'
+                        : 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
+                    }`}>
+                      <Factory size={11} />
+                      {selectedFactory.factory_type === 'job_work' ? 'Contract Job-Worker' : 'In-House Shed'}
+                    </span>
+                    {selectedFactory.warehouse_name && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                        <Warehouse size={11} /> Inventory: {selectedFactory.warehouse_name}
+                      </span>
+                    )}
+                    {selectedFactory.job_worker_party_name && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
+                        <Briefcase size={11} /> Vendor: {selectedFactory.job_worker_party_name}
+                      </span>
+                    )}
+                    {selectedFactory.coord_name && (
+                      <span className="text-slate-500 dark:text-slate-400">
+                        Coordinator: <b className="text-slate-700 dark:text-slate-300">{selectedFactory.coord_name}</b>
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
               <div className="flex items-center gap-2">
                 <CompanySelector
                   factories={factories}
@@ -842,6 +1018,35 @@ export default function LoomMastersPage() {
             <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 tracking-tight mb-3">Add Factory Coordinator</h3>
             <form onSubmit={handleAddCoord} className="space-y-3">
               <div>
+                <label className="pms-label flex items-center justify-between">
+                  <span>Link HRMS Employee (Optional)</span>
+                  <span className="text-[10px] text-blue-600 dark:text-blue-400 font-normal">HRMS Roster</span>
+                </label>
+                <select
+                  value={cForm.employee}
+                  onChange={(e) => {
+                    const empId = e.target.value;
+                    const emp = masterEmployees.find((m) => String(m.id) === String(empId));
+                    setCForm((prev) => ({
+                      ...prev,
+                      employee: empId,
+                      name: emp ? (emp.full_name || `${emp.first_name || ''} ${emp.last_name || ''}`.trim() || emp.name) : prev.name,
+                      phone: emp?.phone || emp?.mobile || prev.phone,
+                    }));
+                  }}
+                  className="pms-select w-full cursor-pointer"
+                >
+                  <option value="">-- Manual / External Coordinator --</option>
+                  {masterEmployees.map((emp) => (
+                    <option key={emp.id} value={emp.id}>
+                      {emp.employee_code || emp.code ? `[${emp.employee_code || emp.code}] ` : ''}
+                      {emp.full_name || `${emp.first_name || ''} ${emp.last_name || ''}`.trim() || emp.name}
+                      {emp.designation ? ` - ${emp.designation}` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
                 <label className="pms-label">Coordinator Name</label>
                 <input
                   type="text"
@@ -879,6 +1084,7 @@ export default function LoomMastersPage() {
                 <thead className="bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-semibold border-b border-slate-200 dark:border-slate-700">
                   <tr>
                     <th className="py-2 px-2.5 sm:py-2.5 sm:px-3">Name</th>
+                    <th className="py-2 px-2.5 sm:py-2.5 sm:px-3">HRMS Employee</th>
                     <th className="py-2 px-2.5 sm:py-2.5 sm:px-3">Phone</th>
                     <th className="py-2 px-2.5 sm:py-2.5 sm:px-3">Assigned Factories</th>
                   </tr>
@@ -889,6 +1095,15 @@ export default function LoomMastersPage() {
                     return (
                       <tr key={c.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50">
                         <td className="py-2 px-2.5 sm:py-2.5 sm:px-3 font-bold text-slate-800 dark:text-slate-200">{c.name}</td>
+                        <td className="py-2 px-2.5 sm:py-2.5 sm:px-3">
+                          {c.employee_details ? (
+                            <span className="inline-flex items-center gap-1 text-[11px] text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/40 px-2 py-0.5 rounded border border-blue-200 dark:border-blue-900/50">
+                              <UserCheck size={11} /> {c.employee_details.code || c.employee_details.employee_code || ''} {c.employee_details.name || ''}
+                            </span>
+                          ) : (
+                            <span className="text-slate-400 text-[11px]">Unlinked</span>
+                          )}
+                        </td>
                         <td className="py-2 px-2.5 sm:py-2.5 sm:px-3 text-slate-500">{c.phone || '-'}</td>
                         <td className="py-2 px-2.5 sm:py-2.5 sm:px-3 text-slate-600 dark:text-slate-400">{assigned}</td>
                       </tr>
@@ -896,7 +1111,7 @@ export default function LoomMastersPage() {
                   })}
                   {!coords.length && (
                     <tr>
-                      <td colSpan={3} className="py-8 text-center text-slate-400">
+                      <td colSpan={4} className="py-8 text-center text-slate-400">
                         No coordinators registered yet.
                       </td>
                     </tr>

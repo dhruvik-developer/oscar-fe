@@ -1861,8 +1861,8 @@ export const ERPProvider = ({ children, }) => {
     const updateParty = (id, updates) => {
         setParties((prev) => prev.map((p) => {
             if (p.id === id || p.code === id) {
-                let nextBalance = p.balance;
-                if (updates.openingBalance !== undefined) {
+                let nextBalance = updates.balance !== undefined ? Number(updates.balance) : p.balance;
+                if (updates.openingBalance !== undefined && updates.balance === undefined) {
                     const oldOpening = Number(p.openingBalance ?? p.opening_balance ?? 0) || 0;
                     const newOpening = Number(updates.openingBalance) || 0;
                     const diff = newOpening - oldOpening;
@@ -1872,6 +1872,14 @@ export const ERPProvider = ({ children, }) => {
             }
             return p;
         }));
+        if (updates.balance !== undefined) {
+            setCustomers((prev) => prev.map((c) => (c.id === id || c.code === id)
+                ? { ...c, balance: Number(updates.balance) }
+                : c));
+            setVendors((prev) => prev.map((v) => (v.id === id || v.code === id)
+                ? { ...v, balance: Number(updates.balance) }
+                : v));
+        }
         if (updates.openingBalanceType !== undefined || updates.openingBalance !== undefined) {
             setCustomers((prev) => prev.map((c) => (c.id === id || c.code === id)
                 ? { ...c, openingBalance: updates.openingBalance ?? c.openingBalance, openingBalanceType: updates.openingBalanceType ?? c.openingBalanceType }
@@ -3235,12 +3243,36 @@ export const ERPProvider = ({ children, }) => {
                     return inv;
                 }));
             }
-            if (newPay.customer) {
+            if (newPay.customer && (newPay.invoiceNumber || newPay.invoiceId)) {
                 setCustomers((prev) => prev.map((c) => String(c.name ?? '').toLowerCase() === newPay.customer?.toLowerCase() || (newPay.customerId && c.id === newPay.customerId)
                     ? { ...c, balance: Math.max(0, c.balance - payAmt) }
                     : c));
+            } else if (newPay.customer) {
+                // Advance receipt without invoice: increases customer advance balance
+                setCustomers((prev) => prev.map((c) => String(c.name ?? '').toLowerCase() === newPay.customer?.toLowerCase() || (newPay.customerId && c.id === newPay.customerId)
+                    ? { ...c, balance: (Number(c.balance) || 0) + payAmt, openingBalanceType: c.openingBalanceType || 'Advance' }
+                    : c));
+                setParties((prev) => prev.map((p) => String(p.name ?? '').toLowerCase() === newPay.customer?.toLowerCase() || (newPay.customerId && p.id === newPay.customerId)
+                    ? { ...p, balance: (Number(p.balance) || 0) + payAmt, openingBalanceType: p.openingBalanceType || 'Advance' }
+                    : p));
             }
             setBankAccounts((prev) => prev.map((acc, idx) => idx === 0 ? { ...acc, balance: acc.balance + payAmt } : acc));
+            // In local-only mode, record a Journal Entry so Accounts section (Day Book / GL) shows it
+            const newJE = {
+                id: `je-pay-${Date.now()}`,
+                entryNumber: `JE-PAY-${Date.now().toString().slice(-5)}`,
+                date: newPay.date,
+                entryType: 'Receipt',
+                narration: `Customer advance receipt from ${newPay.customer} - ${newPay.reference}`,
+                totalDebit: payAmt,
+                totalCredit: payAmt,
+                status: 'Posted',
+                lines: [
+                    { id: `jel-${Date.now()}-1`, account: newPay.mode === 'Cash' ? '1010 - Cash on Hand' : '1020 - Operating Bank Account', debit: payAmt, credit: 0, party: newPay.customer },
+                    { id: `jel-${Date.now()}-2`, account: '2020 - Client Advances & Deposits', debit: 0, credit: payAmt, party: newPay.customer },
+                ]
+            };
+            setJournalEntries((prev) => [newJE, ...prev]);
         } else {
             refreshCollections(['paymentIns', 'invoices', 'journalEntries', 'parties', 'bankAccounts']);
         }

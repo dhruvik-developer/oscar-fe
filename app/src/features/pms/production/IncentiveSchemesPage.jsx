@@ -244,7 +244,7 @@ export default function IncentiveSchemesPage() {
   const handlePostCalc = async (id) => {
     try {
       await productionService.postIncentiveCalculation(id);
-      showToast('Incentive calculation posted to payroll', 'success');
+      showToast('Incentive calculation posted to GL & HRMS employee payslip', 'success');
       loadCalculations();
     } catch (err) {
       showToast(describeApiError(err), 'error');
@@ -468,6 +468,7 @@ export default function IncentiveSchemesPage() {
                     <th className="py-3 px-4">Period</th>
                     <th className="py-3 px-4 text-right">Net Sales</th>
                     <th className="py-3 px-4 text-right">Incentive Amt</th>
+                    <th className="py-3 px-4 text-center">HRMS Payroll</th>
                     <th className="py-3 px-4 text-center">Status</th>
                     <th className="py-3 px-4 text-right">Actions</th>
                   </tr>
@@ -475,13 +476,13 @@ export default function IncentiveSchemesPage() {
                 <tbody className="divide-y divide-[#dce5f4]">
                   {loadingCalcs ? (
                     <tr>
-                      <td colSpan={7} className="py-12 text-center text-slate-400">
+                      <td colSpan={8} className="py-12 text-center text-slate-400">
                         Loading incentive calculations…
                       </td>
                     </tr>
                   ) : calculations.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="py-12 text-center text-slate-400">
+                      <td colSpan={8} className="py-12 text-center text-slate-400">
                         No incentive calculations found. Select a scheme and click "Run Calc" to generate one.
                       </td>
                     </tr>
@@ -506,6 +507,15 @@ export default function IncentiveSchemesPage() {
                           {formatINR(c.incentive_amount)}
                         </td>
                         <td className="py-3 px-4 text-center">
+                          {c.payslipNumber ? (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-purple-700 bg-purple-50 px-2 py-0.5 rounded border border-purple-200 font-mono">
+                              Payslip: {c.payslipNumber}
+                            </span>
+                          ) : (
+                            <span className="text-[10px] text-slate-400">Auto on Post</span>
+                          )}
+                        </td>
+                        <td className="py-3 px-4 text-center">
                           <span
                             className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
                               STATUS_PILLS[c.status] || 'bg-slate-100 text-slate-700'
@@ -528,8 +538,9 @@ export default function IncentiveSchemesPage() {
                               <button
                                 onClick={() => handlePostCalc(c.id)}
                                 className="px-2 py-1 bg-purple-600 hover:bg-purple-700 text-white rounded text-[11px] font-bold cursor-pointer"
+                                title="Post directly into General Ledger and sync into Employee Payslip"
                               >
-                                Post GL
+                                Post GL & Payroll
                               </button>
                             )}
                             {c.status === 'Posted' && (

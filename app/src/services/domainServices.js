@@ -516,6 +516,18 @@ export const productionService = {
   getDailyEntries: (query) => api.get('/production/daily-entries/', { query }),
   getInstructionProgress: (id) => api.get(`/production/instructions/${id}/progress/`),
   checkInstructionThreeWayMatch: (id, data) => api.post(`/production/instructions/${id}/three-way-match/`, data),
+  // Incentive Schemes & Calculations
+  getIncentiveSchemes: (query) => api.get('/production/incentive-schemes/', { query }),
+  getIncentiveScheme: (id) => api.get(`/production/incentive-schemes/${id}/`),
+  createIncentiveScheme: (data) => api.post('/production/incentive-schemes/', data),
+  updateIncentiveScheme: (id, data) => api.patch(`/production/incentive-schemes/${id}/`, data),
+  calculateIncentive: (id, data) => api.post(`/production/incentive-schemes/${id}/calculate/`, data),
+  getIncentiveCalculations: (query) => api.get('/production/incentive-calcs/', { query }),
+  getIncentiveCalculation: (id) => api.get(`/production/incentive-calcs/${id}/`),
+  approveIncentiveCalculation: (id) => api.post(`/production/incentive-calcs/${id}/approve/`),
+  postIncentiveCalculation: (id) => api.post(`/production/incentive-calcs/${id}/post-to-ledger/`),
+  payIncentiveCalculation: (id, data) => api.post(`/production/incentive-calcs/${id}/pay/`, data),
+  reverseIncentiveCalculation: (id, data) => api.post(`/production/incentive-calcs/${id}/reverse/`, data),
 };
 
 export const accountingService = {

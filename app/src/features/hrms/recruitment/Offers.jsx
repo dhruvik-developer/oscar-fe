@@ -3,6 +3,7 @@ import { useRecruitmentStore } from "../../../stores/recruitmentStore";
 import { useAppStore } from "../../../stores/appStore";
 import { useNavigate, useLocation } from "react-router-dom";
 import PageHeader from "../../../components/ui/PageHeader";
+import KpiCard from "../../../components/ui/KpiCard";
 import { DataTable } from "../../../components/hrms/DataTable";
 import { Modal } from "../../../components/hrms/Modal";
 import { Button } from "../../../components/hrms/Button";

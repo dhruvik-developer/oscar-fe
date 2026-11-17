@@ -218,7 +218,7 @@ export default function QCWorkPage() {
       <PageHeader
         title="QC Work"
         subtitle="Every lot that needs quality check. A lot stays on this list — only its status changes. Click the button on a row to do its next step."
-        breadcrumb={[{ label: 'Dashboard', path: '/dashboard' }, { label: 'Inventory', path: '/inventory' }, { label: 'QC Work' }]}
+        breadcrumb={[{ label: 'Inventory', path: '/inventory' }, { label: 'QC Work' }]}
         actions={<Link to="/inventory/qc/advanced" className="h-9 px-3 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-600 hover:bg-slate-50 inline-flex items-center gap-1.5"><ListChecks size={14} /> Detailed QC screens</Link>}
       />
 

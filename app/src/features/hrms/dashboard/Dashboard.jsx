@@ -3,6 +3,7 @@ import { pushHrmsSettings, pullHrmsSettings, pullHrmsDashboard } from "../../../
 import { pullAuditTrail } from "../../../services/auditTrail";
 import {
   UserCheck,
+  Users,
   Plane,
   Briefcase,
   UserPlus,
@@ -37,6 +38,7 @@ import { useAppStore } from "../../../stores/appStore";
 import { useAssetStore } from "../../../stores/assetStore";
 import AnalyticsVolumeChart from "./AnalyticsVolumeChart";
 import PageHeader from "../../../components/ui/PageHeader";
+import KpiCard from "../../../components/ui/KpiCard";
 import { hrmsGuides } from "../../../data/hrms/hrmsGuides";
 
 const MODULE_META = {
@@ -443,27 +445,37 @@ export default function HRMSDashboard() {
 
       {/* Live Server Stats KPI Summary */}
       {serverStats && (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12, marginBottom: 16 }}>
-          <div className="hrms-card" style={{ padding: "12px 16px" }}>
-            <div style={{ fontSize: 12, color: "#64748b", fontWeight: 500 }}>Active Headcount</div>
-            <div style={{ fontSize: 20, fontWeight: 700, color: "#0f172a", marginTop: 4 }}>{serverStats.headcount ?? "--"}</div>
-          </div>
-          <div className="hrms-card" style={{ padding: "12px 16px" }}>
-            <div style={{ fontSize: 12, color: "#64748b", fontWeight: 500 }}>On Leave Today</div>
-            <div style={{ fontSize: 20, fontWeight: 700, color: "#d97706", marginTop: 4 }}>{serverStats.onLeaveToday ?? 0}</div>
-          </div>
-          <div className="hrms-card" style={{ padding: "12px 16px" }}>
-            <div style={{ fontSize: 12, color: "#64748b", fontWeight: 500 }}>Pending Leaves</div>
-            <div style={{ fontSize: 20, fontWeight: 700, color: "#3b82f6", marginTop: 4 }}>{serverStats.pendingLeaveRequests ?? 0}</div>
-          </div>
-          <div className="hrms-card" style={{ padding: "12px 16px" }}>
-            <div style={{ fontSize: 12, color: "#64748b", fontWeight: 500 }}>Open Positions</div>
-            <div style={{ fontSize: 20, fontWeight: 700, color: "#10b981", marginTop: 4 }}>{serverStats.openPositions ?? 0}</div>
-          </div>
-          <div className="hrms-card" style={{ padding: "12px 16px" }}>
-            <div style={{ fontSize: 12, color: "#64748b", fontWeight: 500 }}>Attrition Rate</div>
-            <div style={{ fontSize: 20, fontWeight: 700, color: "#ef4444", marginTop: 4 }}>{serverStats.attritionRatePct != null ? `${serverStats.attritionRatePct}%` : "--"}</div>
-          </div>
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3.5 mb-4">
+          <KpiCard
+            label="Active Headcount"
+            value={serverStats.headcount ?? "--"}
+            icon={Users}
+            index={0}
+          />
+          <KpiCard
+            label="On Leave Today"
+            value={serverStats.onLeaveToday ?? 0}
+            icon={Plane}
+            index={1}
+          />
+          <KpiCard
+            label="Pending Leaves"
+            value={serverStats.pendingLeaveRequests ?? 0}
+            icon={Clock}
+            index={2}
+          />
+          <KpiCard
+            label="Open Positions"
+            value={serverStats.openPositions ?? 0}
+            icon={Briefcase}
+            index={3}
+          />
+          <KpiCard
+            label="Attrition Rate"
+            value={serverStats.attritionRatePct != null ? `${serverStats.attritionRatePct}%` : "--"}
+            icon={UserCheck}
+            index={4}
+          />
         </div>
       )}
 

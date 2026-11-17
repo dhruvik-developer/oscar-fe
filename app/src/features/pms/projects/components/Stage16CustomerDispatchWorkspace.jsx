@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import KpiCard from '../../../../components/ui/KpiCard';
 import {
   Activity,
   AlertCircle,
@@ -468,69 +469,36 @@ export function Stage16CustomerDispatchWorkspace({
         </div>
       </div>
 
-      {/* 2. SUMMARY KPI CARDS (4 Cards matching Stage 11 & Stage 15 design) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Card 1: QC-Approved Eligible Quantity */}
-        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs hover:border-emerald-300 transition-colors">
-          <div className="flex items-center justify-between text-emerald-600 mb-1.5">
-            <span className="text-xs font-semibold text-slate-600">QC-Approved Eligible Qty</span>
-            <ShieldCheck size={18} />
-          </div>
-          <div className="text-2xl font-bold font-mono text-emerald-700">
-            {n(summary.eligibleForDispatch)} <span className="text-xs font-normal text-slate-500">M</span>
-          </div>
-          <div className="text-[11px] text-slate-500 mt-1 flex items-center justify-between">
-            <span>QC Passed & Customer Stock</span>
-            <span className="font-medium text-emerald-600">Ready</span>
-          </div>
-        </div>
-
-        {/* Card 2: Already Dispatched Quantity */}
-        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs hover:border-blue-300 transition-colors">
-          <div className="flex items-center justify-between text-blue-600 mb-1.5">
-            <span className="text-xs font-semibold text-slate-600">Already Dispatched</span>
-            <Truck size={18} />
-          </div>
-          <div className="text-2xl font-bold font-mono text-blue-700">
-            {n(summary.alreadyDispatched)} <span className="text-xs font-normal text-slate-500">M</span>
-          </div>
-          <div className="text-[11px] text-slate-500 mt-1 flex items-center justify-between">
-            <span>{challans.length} Delivery Challans</span>
-            <span className="font-medium text-blue-600">{dispatchPct}% fulfilled</span>
-          </div>
-        </div>
-
-        {/* Card 3: Remaining Pending Dispatch */}
-        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs hover:border-amber-300 transition-colors">
-          <div className="flex items-center justify-between text-amber-600 mb-1.5">
-            <span className="text-xs font-semibold text-slate-600">Pending Dispatch</span>
-            <Clock size={18} />
-          </div>
-          <div className="text-2xl font-bold font-mono text-amber-700">
-            {n(summary.pendingDispatch)} <span className="text-xs font-normal text-slate-500">M</span>
-          </div>
-          <div className="text-[11px] text-slate-500 mt-1 flex items-center justify-between">
-            <span>Target Req: {n(targetReq)} M</span>
-            <span className="font-medium text-amber-600">
-              {summary.pendingDispatch === 0 ? 'Full' : 'Incomplete'}
-            </span>
-          </div>
-        </div>
-
-        {/* Card 4: QC Hold / Rejected Quantity */}
-        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs hover:border-rose-300 transition-colors">
-          <div className="flex items-center justify-between text-rose-600 mb-1.5">
-            <span className="text-xs font-semibold text-slate-600">QC Hold / Rejected</span>
-            <AlertTriangle size={18} />
-          </div>
-          <div className="text-2xl font-bold font-mono text-rose-700">
-            {n(summary.qcHoldRejectedQty)} <span className="text-xs font-normal text-slate-500">M</span>
-          </div>
-          <div className="text-[11px] text-slate-500 mt-1 flex items-center justify-between">
-            <span>Stage 15 Hold/Reject</span>
-            <span className="font-medium text-rose-600">Blocked</span>
-          </div>
-        </div>
+      {/* 2. SUMMARY KPI CARDS (4 Cards) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+        <KpiCard
+          index={0}
+          label="QC-Approved Eligible Qty"
+          value={`${n(summary.eligibleForDispatch)} M`}
+          icon={ShieldCheck}
+          sub="QC Passed & Customer Stock · Ready"
+        />
+        <KpiCard
+          index={1}
+          label="Already Dispatched"
+          value={`${n(summary.alreadyDispatched)} M`}
+          icon={Truck}
+          sub={`${challans.length} Delivery Challans · ${dispatchPct}% fulfilled`}
+        />
+        <KpiCard
+          index={2}
+          label="Pending Dispatch"
+          value={`${n(summary.pendingDispatch)} M`}
+          icon={Clock}
+          sub={`Target Req: ${n(targetReq)} M · ${summary.pendingDispatch === 0 ? 'Full' : 'Incomplete'}`}
+        />
+        <KpiCard
+          index={3}
+          label="QC Hold / Rejected"
+          value={`${n(summary.qcHoldRejectedQty)} M`}
+          icon={AlertTriangle}
+          sub="Stage 15 Hold/Reject · Blocked"
+        />
       </div>
 
       {/* 3. TABS NAVIGATION & WORKSPACE CONTAINER */}

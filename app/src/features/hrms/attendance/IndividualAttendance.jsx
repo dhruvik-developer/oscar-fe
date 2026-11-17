@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
-import { ChevronRight, ChevronLeft, X } from "lucide-react";
+import { ChevronRight, ChevronLeft, X, CheckCircle2, XCircle, Clock, Clock3, Calendar, Home } from "lucide-react";
+import KpiCard from "../../../components/ui/KpiCard";
 import { useAppStore } from "../../../stores/appStore";
 import { useAttendanceStore } from "../../../stores/attendanceStore";
 import { pullIndividualAttendance, HRMS_RESOURCES, isServerId } from "../../../services/hrmsSync";
@@ -895,31 +896,43 @@ export default function IndividualAttendance() {
       </div>
 
       {/* Stats Cards Row (6 Cards) */}
-      <div className="ind-stats-grid">
-        <div className="ind-stat-card">
-          <span className="ind-stat-label">PRESENT DAYS</span>
-          <span className="ind-stat-val">{stats.present}</span>
-        </div>
-        <div className="ind-stat-card">
-          <span className="ind-stat-label">ABSENT DAYS</span>
-          <span className="ind-stat-val">{stats.absent}</span>
-        </div>
-        <div className="ind-stat-card">
-          <span className="ind-stat-label">LATE DAYS</span>
-          <span className="ind-stat-val">{stats.late}</span>
-        </div>
-        <div className="ind-stat-card">
-          <span className="ind-stat-label">HALF DAYS</span>
-          <span className="ind-stat-val">{stats.halfDay}</span>
-        </div>
-        <div className="ind-stat-card">
-          <span className="ind-stat-label">LEAVE DAYS</span>
-          <span className="ind-stat-val">{stats.leave}</span>
-        </div>
-        <div className="ind-stat-card">
-          <span className="ind-stat-label">WFH DAYS</span>
-          <span className="ind-stat-val">{stats.wfh}</span>
-        </div>
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3.5 mb-4">
+        <KpiCard
+          label="Present Days"
+          value={stats.present}
+          icon={CheckCircle2}
+          color="green"
+        />
+        <KpiCard
+          label="Absent Days"
+          value={stats.absent}
+          icon={XCircle}
+          color="pink"
+        />
+        <KpiCard
+          label="Late Days"
+          value={stats.late}
+          icon={Clock}
+          color="orange"
+        />
+        <KpiCard
+          label="Half Days"
+          value={stats.halfDay}
+          icon={Clock3}
+          color="purple"
+        />
+        <KpiCard
+          label="Leave Days"
+          value={stats.leave}
+          icon={Calendar}
+          color="blue"
+        />
+        <KpiCard
+          label="WFH Days"
+          value={stats.wfh}
+          icon={Home}
+          color="teal"
+        />
       </div>
 
       {/* Table or Calendar View */}

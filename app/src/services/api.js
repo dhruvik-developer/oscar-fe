@@ -149,7 +149,11 @@ async function fetchWithTimeout(url, config, timeoutMs, externalSignal) {
   }
 
   try {
-    return await fetch(url, { ...config, signal: controller.signal });
+    return await fetch(url, {
+      cache: 'no-cache',
+      ...config,
+      signal: controller.signal,
+    });
   } finally {
     clearTimeout(timer);
   }
@@ -171,12 +175,13 @@ async function parseBodySafe(response) {
 
 function normalizeEndpoint(endpoint) {
   if (!endpoint) return '/';
-  let ep = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
-  // Ensure trailing slash for DRF unless it has a query or extension
-  if (!ep.endsWith('/') && !ep.includes('?') && !ep.includes('.')) {
-    ep = `${ep}/`;
+  let [path, search] = endpoint.split('?');
+  if (!path.startsWith('/')) path = `/${path}`;
+  // Ensure trailing slash for DRF unless it has a file extension
+  if (!path.endsWith('/') && !path.includes('.')) {
+    path = `${path}/`;
   }
-  return ep;
+  return search !== undefined ? `${path}?${search}` : path;
 }
 
 export async function apiClient(
@@ -231,7 +236,7 @@ export async function apiClient(
     config.body = JSON.stringify(data);
   }
 
-  const isAuthEndpoint = normalizedEp === '/auth/login/' || normalizedEp === '/auth/refresh/';
+  const isAuthEndpoint = normalizedEp === '/auth/login/' || normalizedEp === '/auth/refresh/' || normalizedEp.startsWith('/public/');
   let didRefresh = false;
   let attempt = 0;
   const run = async () => {

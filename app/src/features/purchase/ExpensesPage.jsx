@@ -168,11 +168,11 @@ export const ExpensesPage = () => {
           </Button>}/>
 
       {/* Expenses KPI Stat Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard label="Total Operating Expenses" value={formatCurrency(totalSpent)} icon={DollarSign} highlight />
-        <StatCard label="Expense Vouchers" value={`${expenses.length} Vouchers`} icon={Receipt} />
-        <StatCard label="Avg Expense Cost" value={formatCurrency(avgExpense)} icon={TrendingDown} />
-        <StatCard label="Active Cost Centers" value={`${categoriesCount} Categories`} icon={Tag} />
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+        <StatCard index={0} label="Total Operating Expenses" value={formatCurrency(totalSpent)} icon={DollarSign} highlight />
+        <StatCard index={1} label="Expense Vouchers" value={`${expenses.length} Vouchers`} icon={Receipt} />
+        <StatCard index={2} label="Avg Expense Cost" value={formatCurrency(avgExpense)} icon={TrendingDown} />
+        <StatCard index={3} label="Active Cost Centers" value={`${categoriesCount} Categories`} icon={Tag} />
       </div>
 
       <DataTable title="Operational Overheads & Disbursed Vouchers" columns={columns} data={expenses} keyExtractor={(e) => e.id} searchPlaceholder="Search payee, voucher #, or category..." searchFilter={(e, term) => String(e.expenseNumber ?? '').toLowerCase().includes(term) ||

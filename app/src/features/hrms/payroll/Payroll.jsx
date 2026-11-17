@@ -27,6 +27,8 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { useAppStore } from "../../../stores/appStore";
+import KpiCard from "../../../components/ui/KpiCard";
+import { Wallet, Banknote, Coins } from "lucide-react";
 import {
   usePayrollStore,
   WORKFLOW_STAGES,
@@ -923,68 +925,40 @@ export default function Payroll() {
       {activeTab === "overall" && !hasRows && emptyState}
       {activeTab === "overall" && hasRows && (
         <div className="flex flex-col gap-6">
-          {/* Top KPI Cards - Advanced Salary Matrix */}
+          {/* Top KPI Cards - Standard OSCAR ERP Pastel Cards */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="bg-white border border-bdr rounded-2xl p-4.5 shadow-xs flex flex-col justify-between">
-              <span className="text-[12px] font-semibold text-slate-500 uppercase tracking-wide">
-                Total Standard Budget
-              </span>
-              <div className="text-[26px] font-extrabold text-slate-900 mt-2 leading-none">
-                {formatINR(overallStats.totalStandard)}
-              </div>
-              <span className="text-[12px] text-muted mt-2">Agreed monthly salary · {overallStats.totalHeadcount} staff</span>
-            </div>
-
-            <div className="bg-white border border-bdr rounded-2xl p-4.5 shadow-xs flex flex-col justify-between">
-              <span className="text-[12px] font-semibold text-blue-700 uppercase tracking-wide">
-                Total Earned Salary
-              </span>
-              <div className="text-[26px] font-extrabold text-blue-950 mt-2 leading-none">
-                {formatINR(overallStats.totalEarned)}
-              </div>
-              <div className="flex items-center gap-2 mt-2">
-                <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-blue-600 rounded-full"
-                    style={{
-                      width: `${Math.min(100, Math.round((overallStats.totalEarned / (overallStats.totalStandard || 1)) * 100))}%`,
-                    }}
-                  />
-                </div>
-                <span className="text-[11px] text-blue-700 font-semibold">
-                  {Math.round((overallStats.totalEarned / (overallStats.totalStandard || 1)) * 100)}%
-                </span>
-              </div>
-              {overallStats.totalAttendanceDeduction > 0 && (
-                <span className="text-[11px] text-rose-600 block mt-1 font-medium">
-                  -{formatINR(overallStats.totalAttendanceDeduction)} attendance deduction
-                </span>
-              )}
-            </div>
-
-            <div className="bg-white border border-bdr rounded-2xl p-4.5 shadow-xs flex flex-col justify-between">
-              <span className="text-[12px] font-semibold text-rose-700 uppercase tracking-wide">
-                Advances &amp; Deductions
-              </span>
-              <div className="text-[26px] font-extrabold text-rose-950 mt-2 leading-none">
-                {formatINR(overallStats.totalAdvance + overallStats.totalDeductions)}
-              </div>
-              <span className="text-[12px] text-muted mt-2">
-                Advance: {formatINR(overallStats.totalAdvance)} • Deductions: {formatINR(overallStats.totalDeductions)}
-              </span>
-            </div>
-
-            <div className="bg-white border border-bdr rounded-2xl p-4.5 shadow-xs flex flex-col justify-between">
-              <span className="text-[12px] font-semibold text-emerald-700 uppercase tracking-wide">
-                Net Payable
-              </span>
-              <div className="text-[26px] font-extrabold text-emerald-950 mt-2 leading-none">
-                {formatINR(overallStats.totalRemaining)}
-              </div>
-              <span className="text-[12px] text-emerald-700 mt-2 font-medium">
-                {overallStats.paidCount} Paid • {overallStats.totalHeadcount - overallStats.paidCount} Pending
-              </span>
-            </div>
+            <KpiCard
+              label="Total Standard Budget"
+              value={formatINR(overallStats.totalStandard)}
+              sub={`Agreed budget · ${overallStats.totalHeadcount} staff`}
+              icon={Wallet}
+              tone="blue"
+              index={0}
+            />
+            <KpiCard
+              label="Total Earned Salary"
+              value={formatINR(overallStats.totalEarned)}
+              sub={`${Math.round((overallStats.totalEarned / (overallStats.totalStandard || 1)) * 100)}% of total budget`}
+              icon={Banknote}
+              tone="purple"
+              index={1}
+            />
+            <KpiCard
+              label="Advances & Deductions"
+              value={formatINR(overallStats.totalAdvance + overallStats.totalDeductions)}
+              sub={`Adv: ${formatINR(overallStats.totalAdvance)} · Ded: ${formatINR(overallStats.totalDeductions)}`}
+              icon={Coins}
+              tone="orange"
+              index={2}
+            />
+            <KpiCard
+              label="Net Payable"
+              value={formatINR(overallStats.totalRemaining)}
+              sub={`${overallStats.paidCount} Paid · ${overallStats.totalHeadcount - overallStats.paidCount} Pending`}
+              icon={CheckCircle2}
+              tone="green"
+              index={3}
+            />
           </div>
 
           {/* Month-End Lifecycle Flow Strip */}

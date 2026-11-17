@@ -302,11 +302,11 @@ export const ValuationAgeingPage = () => {
             <div className="bg-rose-50 border border-rose-200 text-rose-700 rounded-xl px-4 py-3 text-sm">{valuationError}</div>
           )}
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <StatCard label="Total Inventory Value" value={loadingValuation ? '…' : formatCurrency(aggs?.totalValuation || 0, { noDecimals: true })} icon={DollarSign}/>
-            <StatCard label="0-30 Days" value={loadingValuation ? '…' : formatCurrency(bucketValue('0-30'), { noDecimals: true })}/>
-            <StatCard label="31-90 Days" value={loadingValuation ? '…' : formatCurrency(bucketValue('31-60') + bucketValue('61-90'), { noDecimals: true })}/>
-            <StatCard label="Over 90 Days" value={loadingValuation ? '…' : formatCurrency(aggs?.staleValuation || 0, { noDecimals: true })}/>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+            <StatCard index={0} label="Total Inventory Value" value={loadingValuation ? '…' : formatCurrency(aggs?.totalValuation || 0, { noDecimals: true })} icon={DollarSign}/>
+            <StatCard index={1} label="0-30 Days" value={loadingValuation ? '…' : formatCurrency(bucketValue('0-30'), { noDecimals: true })}/>
+            <StatCard index={2} label="31-90 Days" value={loadingValuation ? '…' : formatCurrency(bucketValue('31-60') + bucketValue('61-90'), { noDecimals: true })}/>
+            <StatCard index={3} label="Over 90 Days" value={loadingValuation ? '…' : formatCurrency(aggs?.staleValuation || 0, { noDecimals: true })}/>
           </div>
 
           <div className="flex flex-nowrap items-center gap-2 border-b border-[#CED4DA] pb-2 text-xs overflow-x-auto lg:overflow-visible whitespace-nowrap lg:whitespace-normal scrollbar-none">
@@ -353,19 +353,22 @@ export const ValuationAgeingPage = () => {
             <div className="bg-rose-50 border border-rose-200 text-rose-700 rounded-xl px-4 py-3 text-sm">{ageingError}</div>
           )}
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
             <StatCard
+              index={0}
               label="Total Stock Holding"
               value={loadingAgeing ? '…' : `${Number(ageingData?.summary?.totalQty || 0).toLocaleString()} meters`}
               icon={Package}
             />
             <StatCard
+              index={1}
               label="Total Carrying Value"
               value={loadingAgeing ? '…' : formatCurrency(ageingData?.summary?.totalValue || 0)}
               icon={DollarSign}
               tone="blue"
             />
             <StatCard
+              index={2}
               label="Total Rolls / Takas"
               value={loadingAgeing ? '…' : Number(ageingData?.summary?.totalTakas || 0).toLocaleString()}
               icon={Layers}

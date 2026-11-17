@@ -109,32 +109,37 @@ export default function SupplierReconciliationPage() {
       />
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
         <StatCard
+          index={0}
           label="Total Ordered"
           value={`${numIN(summary.totalOrderedQty || 0)} m`}
           icon={Boxes}
           tone="slate"
         />
         <StatCard
+          index={1}
           label="Total Received"
           value={`${numIN(summary.totalReceivedQty || 0)} m`}
           icon={PackageCheck}
           tone="emerald"
         />
         <StatCard
+          index={2}
           label="Total Billed"
           value={`${numIN(summary.totalBilledQty || 0)} m`}
           icon={Receipt}
           tone="blue"
         />
         <StatCard
+          index={3}
           label="Total Returned"
           value={`${numIN(summary.totalReturnedQty || 0)} m`}
           icon={RotateCcw}
           tone="amber"
         />
         <StatCard
+          index={4}
           label="Discrepancies"
           value={String(summary.discrepancies || 0)}
           icon={AlertTriangle}

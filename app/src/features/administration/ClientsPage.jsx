@@ -350,12 +350,12 @@ export function ClientsPage() {
 
       {loadError && <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">Unable to load clients: {loadError}</div>}
       {loading && <p role="status" className="text-sm text-slate-500">Loading clients...</p>}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-        <KpiCard label="Total Clients" value={stats.total} icon={Users} tone="blue" />
-        <KpiCard label="Active Clients" value={stats.active} icon={UserCheck} tone="emerald" />
-        <KpiCard label="Clients with Deals" value={stats.withDeals} icon={Handshake} tone="sky" />
-        <KpiCard label="Clients with Projects" value={stats.withProjects} icon={Folder} tone="amber" />
-        <KpiCard label="Dual Partners" value={stats.dualPartners} icon={Building2} tone="orange" />
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3.5">
+        <KpiCard index={0} label="Total Clients" value={stats.total} icon={Users} tone="blue" />
+        <KpiCard index={1} label="Active Clients" value={stats.active} icon={UserCheck} tone="emerald" />
+        <KpiCard index={2} label="Clients with Deals" value={stats.withDeals} icon={Handshake} tone="sky" />
+        <KpiCard index={3} label="Clients with Projects" value={stats.withProjects} icon={Folder} tone="amber" />
+        <KpiCard index={4} label="Dual Partners" value={stats.dualPartners} icon={Building2} tone="orange" />
       </div>
 
       <div className="bg-white border border-slate-200 rounded-2xl p-3.5 shadow-2xs flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">

@@ -9,7 +9,7 @@ import {
   Clock, CheckCircle2, Package, Maximize2, Minimize2, Trash2, Ban, MapPin,
   ShoppingCart, FileText, Search, Filter, MoreVertical, ChevronDown, FileSpreadsheet,
   Truck, Factory, Info, PackageCheck, Layers, ShieldCheck, Warehouse, FileCheck2, CreditCard, Receipt,
-  Building2, Calendar, Sparkles, QrCode, Eye, RefreshCw, AlertCircle,
+  Building2, Calendar, Sparkles, QrCode, Eye, RefreshCw, AlertCircle, LayoutDashboard,
 } from 'lucide-react';
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { toISODate } from '../../utils/dateUtils';
@@ -52,7 +52,7 @@ import { PoDetailsModal } from './PoDetailsModal';
 import { PoMovementHistoryModal } from './PoMovementHistoryModal';
 import { PoDeleteConfirmModal } from './PoDeleteConfirmModal';
 import { PurchaseOverviewDashboard } from './PurchaseOverviewDashboard';
-import { PurchaseAnalyticsPage } from './PurchaseAnalyticsPage';
+
 
 const purchaseOrderGuide = {
     title: 'Purchase Orders',
@@ -362,8 +362,8 @@ export const PurchaseOrdersPage = () => {
     const location = useLocation();
     const [searchParams, setSearchParams] = useSearchParams();
 
-    // â”€â”€ Tab state (uses URL search param ?tab=overview|orders) â”€â”€
-    const activeTab = ['overview', 'orders', 'analytics'].includes(searchParams.get('tab'))
+    // ──── Tab state (uses URL search param ?tab=overview|orders) ────
+    const activeTab = ['overview', 'orders'].includes(searchParams.get('tab'))
       ? searchParams.get('tab')
       : 'overview';
     const setActiveTab = (tab) => {
@@ -986,7 +986,7 @@ export const PurchaseOrdersPage = () => {
         return docs;
     };
 
-    // â”€â”€ Oscar workflow helpers (meter-based fabric procurement) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ──── Oscar workflow helpers (meter-based fabric procurement) ────────────────────────────
     // Dropdown merges Fabric-kind items + Fabric master, so 12 fabrics show
     // even if one source is empty. Backend seeds both permanently.
     const fabricItems = useMemo(
@@ -1367,12 +1367,11 @@ export const PurchaseOrdersPage = () => {
         }
       />
 
-      {/* â”€â”€ Tab Navigation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {/* ──── Tab Navigation ──────────────────────────────────────────────────────────────────────────────────────────────── */}
       <div className="flex items-center gap-0 overflow-x-auto rounded-xl border border-[#e2eaf5] bg-white p-1 shadow-[0_1px_2px_rgba(16,42,82,0.05)]">
         {[
-          { key: 'overview', label: 'Overview Dashboard', icon: 'ðŸ“Š' },
-          { key: 'orders', label: 'All Purchase Orders', icon: 'ðŸ“‹' },
-          { key: 'analytics', label: 'Purchase Analytics', icon: 'ðŸ“ˆ' },
+          { key: 'overview', label: 'Overview Dashboard', Icon: LayoutDashboard },
+          { key: 'orders', label: 'All Purchase Orders', Icon: ClipboardList },
         ].map(tab => (
           <button
             key={tab.key}
@@ -1384,13 +1383,13 @@ export const PurchaseOrdersPage = () => {
                 : 'text-slate-600 hover:bg-slate-100 hover:text-[#17294e]'
             }`}
           >
-            <span>{tab.icon}</span>
+            <tab.Icon size={14} className={activeTab === tab.key ? 'text-white' : 'text-slate-500'} />
             <span>{tab.label}</span>
           </button>
         ))}
       </div>
 
-      {/* â”€â”€ Overview Dashboard Tab â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {/* ──── Overview Dashboard Tab ──────────────────────────────────────────────────────────────────────────────── */}
       {activeTab === 'overview' && (
         <PurchaseOverviewDashboard
           purchaseOrders={purchaseOrders}
@@ -1422,22 +1421,7 @@ export const PurchaseOrdersPage = () => {
         />
       )}
 
-      {/* â”€â”€ Purchase Analytics Tab â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
-      {activeTab === 'analytics' && (
-        <PurchaseAnalyticsPage
-          purchaseOrders={purchaseOrders}
-          formatCurrency={formatCurrency}
-          formatDateDDMMYYYY={formatDateDDMMYYYY}
-          getOscarStatus={getOscarStatus}
-          getPoLines={getPoLines}
-          getPoQty={getPoQty}
-          getPoReceivedQty={getPoReceivedQty}
-          getPoFabric={getPoFabric}
-          formatQty={formatQty}
-        />
-      )}
-
-      {/* â”€â”€ All Purchase Orders Tab â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {/* ──── All Purchase Orders Tab ────────────────────────────────────────────────────────────────────────────── */}
       {activeTab === 'orders' && (<>
 
       {/* KPI cards */}
@@ -2137,7 +2121,7 @@ export const PurchaseOrdersPage = () => {
           </div>
         </div>)}
 
-      {/* â”€â”€ Three-Dot Action Menu â”€â”€ */}
+      {/* ──── Three-Dot Action Menu ──── */}
       {actionMenuTarget && (
         <PoActionMenu
           po={actionMenuTarget.po}
@@ -2181,7 +2165,7 @@ export const PurchaseOrdersPage = () => {
         />
       )}
 
-      {/* â”€â”€ View PO Details Modal â”€â”€ */}
+      {/* ──── View PO Details Modal ──── */}
       {detailsModalPo && (
         <PoDetailsModal
           po={detailsModalPo}
@@ -2194,7 +2178,7 @@ export const PurchaseOrdersPage = () => {
         />
       )}
 
-      {/* â”€â”€ Receive Goods (GRN) Compact Modal â”€â”€ */}
+      {/* ──── Receive Goods (GRN) Compact Modal ──── */}
       {grnModalPo && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-2 sm:p-4 animate-in fade-in">
           <div className="bg-white border border-slate-200 shadow-2xl rounded-2xl w-full max-w-5xl max-h-[95vh] sm:max-h-[92vh] overflow-y-auto flex flex-col p-4 sm:p-6 text-xs">
@@ -2212,7 +2196,7 @@ export const PurchaseOrdersPage = () => {
         </div>
       )}
 
-      {/* â”€â”€ Perform QC Compact Modal â”€â”€ */}
+      {/* ──── Perform QC Compact Modal ──── */}
       {qcModalPo && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-2 sm:p-4 animate-in fade-in">
           <div className="bg-white border border-slate-200 shadow-2xl rounded-2xl w-full max-w-5xl max-h-[95vh] sm:max-h-[92vh] overflow-y-auto flex flex-col p-4 sm:p-6 text-xs">
@@ -2234,7 +2218,7 @@ export const PurchaseOrdersPage = () => {
 
       {dyeingPo && <ReceiveDyedFabricDrawer po={dyeingPo} onClose={() => setDyeingPo(null)} onSaved={() => refreshCollections?.(['purchaseOrders'])} />}
 
-      {/* â”€â”€ Pay Vendor Bill Modal Workspace â”€â”€ */}
+      {/* ──── Pay Vendor Bill Modal Workspace ──── */}
       {billMatchModalPo && (
         <PayVendorBillModal
           po={billMatchModalPo}
@@ -2247,7 +2231,7 @@ export const PurchaseOrdersPage = () => {
         />
       )}
 
-      {/* â”€â”€ Movement History Modal â”€â”€ */}
+      {/* ──── Movement History Modal ──── */}
       {movementHistoryPo && (
         <PoMovementHistoryModal
           po={movementHistoryPo}
@@ -2258,7 +2242,7 @@ export const PurchaseOrdersPage = () => {
         />
       )}
 
-      {/* â”€â”€ Delete Confirmation Dialog â”€â”€ */}
+      {/* ──── Delete Confirmation Dialog ──── */}
       {deleteConfirmPo && (
         <PoDeleteConfirmModal
           po={deleteConfirmPo}

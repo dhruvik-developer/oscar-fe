@@ -27,16 +27,16 @@ function display(kind, value) {
 export function OverviewKpiStrip({ kpis = {} }) {
   return (
     <section
-      className="grid gap-3 grid-cols-1 sm:grid-cols-2 md:grid-cols-4 xl:grid-cols-7"
+      className="grid gap-3.5 grid-cols-1 sm:grid-cols-2 md:grid-cols-4 xl:grid-cols-7"
       aria-label="PMS key metrics"
     >
-      {TILES.map(({ key, label, icon: Icon, tone, kind }) => (
+      {TILES.map(({ key, label, icon: Icon, tone, kind }, i) => (
         <KpiCard
           key={key}
           label={label}
           value={display(kind, kpis[key])}
           icon={Icon}
-          tone={tone}
+          index={i}
           sub={key === 'totalProjects' ? `${kpis.inProgressProjects ?? 0} In Progress` : undefined}
         />
       ))}

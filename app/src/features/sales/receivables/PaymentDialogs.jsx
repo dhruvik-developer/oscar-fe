@@ -21,7 +21,7 @@ function ErrorLine({ message }) {
 }
 
 // ── Record a customer receipt, allocated across open invoices with integrated discounts ──
-export function RecordPaymentModal({ isOpen, onClose, onSaved, presetCustomerId, presetInvoiceId }) {
+export function RecordPaymentModal({ isOpen, onClose, onSaved, presetCustomerId, presetInvoiceId, presetCustomerName }) {
   const can = useCan();
   const canGrantDiscount = can('approve_payment_discount');
 
@@ -40,13 +40,15 @@ export function RecordPaymentModal({ isOpen, onClose, onSaved, presetCustomerId,
   });
   const [alloc, setAlloc] = useState({});
   const [discounts, setDiscounts] = useState({}); // { [invoiceId]: { enabled: boolean, amount: string, type: string, reason: string } }
+  const [existingAdvance, setExistingAdvance] = useState(0);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [idemKey, setIdemKey] = useState(newIdempotencyKey);
 
   useEffect(() => {
     if (!isOpen) return;
-    setCustomerId(presetCustomerId || '');
+    const initialCustId = presetCustomerId || '';
+    setCustomerId(initialCustId);
     setForm({
       date: today(),
       amount: '',
@@ -60,14 +62,30 @@ export function RecordPaymentModal({ isOpen, onClose, onSaved, presetCustomerId,
     setDiscounts({});
     setError('');
     setIdemKey(newIdempotencyKey());
-    partiesService.getCustomers({ page_size: 200 }).then((b) => setCustomers(rows(b))).catch(() => setCustomers([]));
+    partiesService.getCustomers({ page_size: 200 }).then((b) => {
+      const list = rows(b);
+      setCustomers(list);
+      if (!initialCustId && presetCustomerName) {
+        const found = list.find((c) => c.name?.toLowerCase() === presetCustomerName.toLowerCase());
+        if (found) setCustomerId(found.id);
+      }
+    }).catch(() => setCustomers([]));
     receivablesService.getBankAccounts().then((b) => {
       const list = rows(b).filter((a) => a.isActive !== false);
       setBanks(list);
       const preferred = list.find((a) => a.isDefault) || list[0];
       if (preferred) setForm((f) => ({ ...f, bankAccountId: f.bankAccountId || preferred.id }));
     }).catch(() => setBanks([]));
-  }, [isOpen, presetCustomerId]);
+  }, [isOpen, presetCustomerId, presetCustomerName]);
+
+  useEffect(() => {
+    if (!customerId) { setExistingAdvance(0); }
+    else {
+      receivablesService.getCustomerAdvanceBalance(customerId)
+        .then((b) => setExistingAdvance(num(b?.advanceBalance || 0)))
+        .catch(() => setExistingAdvance(0));
+    }
+  }, [customerId]);
 
   useEffect(() => {
     if (!isOpen || !customerId) { setOpenInvoices([]); return; }
@@ -274,6 +292,11 @@ export function RecordPaymentModal({ isOpen, onClose, onSaved, presetCustomerId,
               onChange={(e) => { setCustomerId(e.target.value); setAlloc({}); setDiscounts({}); }}
             >
               <option value="">Choose a customer…</option>
+              {customerId && !customers.some((c) => String(c.id) === String(customerId)) && (
+                <option value={customerId}>
+                  {presetCustomerName || 'Selected Customer'}
+                </option>
+              )}
               {customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
           </div>
@@ -503,37 +526,50 @@ export function RecordPaymentModal({ isOpen, onClose, onSaved, presetCustomerId,
 
         {/* Live Multi-Invoice Settlement Summary Card */}
         {openInvoices.length > 0 && (
-          <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-2">
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-2.5">
             <div className="flex items-center justify-between border-b border-slate-200/80 pb-2">
               <span className="text-[11.5px] font-bold text-slate-700 uppercase tracking-wider">Settlement Summary</span>
-              <span className="text-[11px] text-slate-500">
-                Total Customer Outstanding: <strong className="font-mono text-slate-800">{money(totalCustomerOutstanding)}</strong>
-              </span>
-            </div>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs pt-0.5">
-              <div className="bg-white p-2 rounded-lg border border-slate-200/80">
-                <span className="text-[10.5px] text-slate-500 block">Total Cash Received</span>
-                <span className="font-mono font-bold text-slate-900 text-[13px]">{money(amount)}</span>
-                {unallocated > 0.005 ? (
-                  <span className="text-[10px] text-indigo-600 block mt-0.5">+{money(unallocated)} as Advance</span>
-                ) : (
-                  <span className="text-[10px] text-slate-400 block mt-0.5">Debited to Bank/Cash</span>
+              <div className="flex items-center gap-3 text-[11px] text-slate-500">
+                {existingAdvance > 0 && (
+                  <span className="text-indigo-600 font-medium bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded">
+                    Existing Advance: <strong className="font-mono">{money(existingAdvance)}</strong>
+                  </span>
                 )}
+                <span>
+                  Total Customer Outstanding: <strong className="font-mono text-slate-800">{money(totalCustomerOutstanding)}</strong>
+                </span>
               </div>
-              <div className="bg-white p-2 rounded-lg border border-slate-200/80">
-                <span className="text-[10.5px] text-slate-500 block">Cash Allocated</span>
-                <span className="font-mono font-bold text-slate-900 text-[13px]">{money(allocated)}</span>
-                <span className="text-[10px] text-emerald-600 block mt-0.5">Allocated to Invoices</span>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 text-xs pt-0.5">
+              <div className="bg-white p-2 rounded-lg border border-slate-200 shadow-2xs">
+                <span className="text-[10.5px] text-slate-500 block font-medium">Total Cash Received</span>
+                <span className="font-mono font-bold text-slate-900 text-[13px] block mt-0.5">{money(amount)}</span>
+                <span className="text-[9.5px] text-slate-400 block mt-0.5">Debited to Bank/Cash</span>
               </div>
-              <div className="bg-white p-2 rounded-lg border border-amber-200/80 bg-amber-50/20">
-                <span className="text-[10.5px] text-amber-800 font-medium block">Total Discount Granted</span>
-                <span className="font-mono font-bold text-amber-700 text-[13px]">{money(totalDiscount)}</span>
-                <span className="text-[10px] text-amber-600 block mt-0.5">Credit Note Reduction</span>
+              <div className="bg-white p-2 rounded-lg border border-slate-200 shadow-2xs">
+                <span className="text-[10.5px] text-slate-500 block font-medium">Cash Allocated</span>
+                <span className="font-mono font-bold text-slate-900 text-[13px] block mt-0.5">{money(allocated)}</span>
+                <span className="text-[9.5px] text-emerald-600 block mt-0.5">Applied to Invoices</span>
               </div>
-              <div className="bg-white p-2 rounded-lg border border-emerald-200/80 bg-emerald-50/20">
-                <span className="text-[10.5px] text-emerald-800 font-medium block">Total Settled</span>
-                <span className="font-mono font-bold text-emerald-700 text-[13px]">{money(totalSettled)}</span>
-                <span className="text-[10px] text-slate-500 block mt-0.5">Remaining O/S: {money(remainingCustomerOutstanding)}</span>
+              <div className="bg-white p-2 rounded-lg border border-amber-200 bg-amber-50/20 shadow-2xs">
+                <span className="text-[10.5px] text-amber-800 block font-medium">Total Discount Granted</span>
+                <span className="font-mono font-bold text-amber-700 text-[13px] block mt-0.5">{money(totalDiscount)}</span>
+                <span className="text-[9.5px] text-amber-600 block mt-0.5">Credit Note Reduction</span>
+              </div>
+              <div className="bg-white p-2 rounded-lg border border-emerald-200 bg-emerald-50/20 shadow-2xs">
+                <span className="text-[10.5px] text-emerald-800 block font-medium">Total Invoice Settled</span>
+                <span className="font-mono font-bold text-emerald-700 text-[13px] block mt-0.5">{money(totalSettled)}</span>
+                <span className="text-[9.5px] text-emerald-600 block mt-0.5">Cash + Discount</span>
+              </div>
+              <div className={`bg-white p-2 rounded-lg border shadow-2xs ${unallocated > 0.005 ? 'border-indigo-300 bg-indigo-50/30' : 'border-slate-200'}`}>
+                <span className={`text-[10.5px] block font-medium ${unallocated > 0.005 ? 'text-indigo-900 font-semibold' : 'text-slate-500'}`}>Customer Advance</span>
+                <span className={`font-mono font-bold text-[13px] block mt-0.5 ${unallocated > 0.005 ? 'text-indigo-700' : 'text-slate-900'}`}>{money(Math.max(0, unallocated))}</span>
+                <span className={`text-[9.5px] block mt-0.5 ${unallocated > 0.005 ? 'text-indigo-600 font-medium' : 'text-slate-400'}`}>Unallocated Balance</span>
+              </div>
+              <div className="bg-white p-2 rounded-lg border border-slate-200 shadow-2xs">
+                <span className="text-[10.5px] text-slate-500 block font-medium">Remaining Outstanding</span>
+                <span className="font-mono font-bold text-slate-700 text-[13px] block mt-0.5">{money(remainingCustomerOutstanding)}</span>
+                <span className="text-[9.5px] text-slate-400 block mt-0.5">Customer Balance Due</span>
               </div>
             </div>
           </div>

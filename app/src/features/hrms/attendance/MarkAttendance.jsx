@@ -38,6 +38,7 @@ import {
 import { useAppStore } from "../../../stores/appStore";
 import { useAttendanceStore } from "../../../stores/attendanceStore";
 import { hrmsSync } from "../../../services/hrmsSync";
+import KpiCard from "../../../components/ui/KpiCard";
 import { api } from "../../../services/api";
 import { Badge } from "../../../components/hrms/Badge";
 import { PageInfoButton } from "../../../components/common/PageInfoButton";
@@ -846,61 +847,34 @@ function TeamMarkAttendance() {
 
       {/* KPI Stat Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
-        {/* Card 1: Total Employees */}
-        <div className="bg-white border border-bdr rounded-2xl p-4 shadow-xs hover:border-slate-300 transition-all">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-muted">Total Roster</span>
-            <span className="w-8 h-8 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600">
-              <Users size={16} />
-            </span>
-          </div>
-          <div className="text-[24px] font-extrabold text-slate-900 leading-none">{counts.total}</div>
-          <p className="text-[11.5px] text-muted mt-1.5 flex items-center gap-1">Active team members</p>
-        </div>
-
-        {/* Card 2: From Punches */}
-        <div className="bg-white border border-bdr rounded-2xl p-4 shadow-xs hover:border-emerald-300 transition-all">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-muted">From Punches</span>
-            <span className="w-8 h-8 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600">
-              <Fingerprint size={16} />
-            </span>
-          </div>
-          <div className="text-[24px] font-extrabold text-emerald-700 leading-none">{counts.punched}</div>
-          <p className="text-[11.5px] text-emerald-700 font-medium mt-1.5 flex items-center gap-1">
-            <Check size={12} /> Biometric auto-synced
-          </p>
-        </div>
-
-        {/* Card 3: Marked */}
-        <div className="bg-white border border-bdr rounded-2xl p-4 shadow-xs hover:border-indigo-300 transition-all">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-muted">Marked Today</span>
-            <span className="w-8 h-8 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600">
-              <CheckCircle2 size={16} />
-            </span>
-          </div>
-          <div className="text-[24px] font-extrabold text-slate-900 leading-none">{counts.marked}</div>
-          <p className="text-[11.5px] text-muted mt-1.5">
-            {counts.total > 0 ? `${Math.round((counts.marked / counts.total) * 100)}% registered` : "No roster records"}
-          </p>
-        </div>
-
-        {/* Card 4: Not Marked Yet */}
-        <div className="bg-white border border-bdr rounded-2xl p-4 shadow-xs hover:border-amber-300 transition-all">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-muted">Not Marked Yet</span>
-            <span className="w-8 h-8 rounded-xl bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-600">
-              <AlertCircle size={16} />
-            </span>
-          </div>
-          <div className={`text-[24px] font-extrabold leading-none ${counts.notMarked > 0 ? "text-amber-700" : "text-slate-900"}`}>
-            {counts.notMarked}
-          </div>
-          <p className="text-[11.5px] text-amber-700 font-medium mt-1.5">
-            {counts.notMarked > 0 ? "Pending punch" : "All employees marked!"}
-          </p>
-        </div>
+        <KpiCard
+          label="Total Roster"
+          value={counts.total}
+          icon={Users}
+          color="blue"
+          sub="Active team members"
+        />
+        <KpiCard
+          label="From Punches"
+          value={counts.punched}
+          icon={Fingerprint}
+          color="green"
+          sub="✓ Biometric auto-synced"
+        />
+        <KpiCard
+          label="Marked Today"
+          value={counts.marked}
+          icon={CheckCircle2}
+          color="purple"
+          sub={counts.total > 0 ? `${Math.round((counts.marked / counts.total) * 100)}% registered` : "No roster records"}
+        />
+        <KpiCard
+          label="Not Marked Yet"
+          value={counts.notMarked}
+          icon={AlertCircle}
+          color="orange"
+          sub={counts.notMarked > 0 ? "Pending punch" : "All employees marked!"}
+        />
       </div>
 
       {/* Filter and Control Toolbar */}

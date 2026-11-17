@@ -42,17 +42,42 @@ export function PageHeader({ title, subtitle, breadcrumb, guide, actions, titleE
 
   const pathname = safeString(location?.pathname, '/');
   const pathParts = pathname.split('/').filter(Boolean);
+
+  // Treat ".../dashboard" as the module root (e.g. /crm/dashboard -> CRM).
+  const trailParts = pathParts.length > 1 && pathParts[pathParts.length - 1] === 'dashboard'
+    ? pathParts.slice(0, -1)
+    : pathParts;
+
   const defaultBreadcrumbs = [
-    { label: 'Dashboard', path: '/dashboard' },
     ...(PARENT_SECTION[pathParts[0]] ? [PARENT_SECTION[pathParts[0]]] : []),
-    ...pathParts.map((part, index) => ({
+    ...trailParts.map((part, index) => ({
       label: segmentLabel(part),
-      path: `/${pathParts.slice(0, index + 1).join('/')}`,
-      isCurrent: index === pathParts.length - 1,
+      path: `/${trailParts.slice(0, index + 1).join('/')}`,
+      isCurrent: index === trailParts.length - 1,
     })),
   ];
 
-  const activeBreadcrumb = breadcrumb || defaultBreadcrumbs;
+  const normalize = (items) => {
+    if (!Array.isArray(items) || items.length === 0) return items || [];
+    let list = items.map((item) => ({
+      ...item,
+      label: safeString(item?.label || item?.name, 'Section'),
+    }));
+    // Remove global Dashboard prefix; module dashboards become the module itself.
+    if (list.length > 1 && list[0].label.trim().toLowerCase() === 'dashboard') {
+      list = list.slice(1);
+    }
+    // Drop duplicate or redundant labels (e.g. repeated module/page names).
+    const deduped = [];
+    for (const item of list) {
+      const prev = deduped[deduped.length - 1];
+      if (prev && prev.label.trim().toLowerCase() === item.label.trim().toLowerCase()) continue;
+      deduped.push(item);
+    }
+    return deduped.map((item, index) => ({ ...item, isCurrent: index === deduped.length - 1 }));
+  };
+
+  const activeBreadcrumb = normalize(breadcrumb || defaultBreadcrumbs);
 
   return (
     <div className="flex flex-col gap-2 pb-2">

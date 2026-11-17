@@ -49,7 +49,7 @@ function fmtINR(n) {
 }
 
 function fmtDate(d) {
-  if (!d) return 'â€”';
+  if (!d) return '—';
   const parts = String(d).slice(0, 10).split('-');
   return parts.length === 3 ? `${parts[2]}-${parts[1]}-${parts[0]}` : d;
 }
@@ -217,7 +217,7 @@ export function FinalJobWorkPoInlineSlide({
   }, [piId, po?.id]);
 
   // Derived Summary Quantities
-  const originalPoNumber = po?.poNumber || completionData?.orderReference || 'â€”';
+  const originalPoNumber = po?.poNumber || completionData?.orderReference || '—';
   const originalPoDate = po?.date || '';
   const originalPoRate = po?.items?.[0]?.rate || 0;
   const originalPoQty = Number(po?.items?.[0]?.qty || completionData?.orderQty || 0);
@@ -396,7 +396,7 @@ export function FinalJobWorkPoInlineSlide({
               Supplier / Vendor
             </span>
             <strong className="text-slate-900 text-[13px] block mt-0.5">
-              {vendorName || 'â€”'}
+              {vendorName || '—'}
             </strong>
             <span className="text-[11px] text-slate-500 flex items-center gap-1 mt-0.5">
               <MapPin size={11} className="text-slate-400" /> Maharashtra
@@ -409,7 +409,7 @@ export function FinalJobWorkPoInlineSlide({
               Fabric Quality
             </span>
             <strong className="text-slate-900 text-[13px] block mt-0.5">
-              {fabricQuality || 'â€”'}
+              {fabricQuality || '—'}
             </strong>
           </div>
 
@@ -573,7 +573,7 @@ export function FinalJobWorkPoInlineSlide({
                     onChange={(e) => setVendorName(e.target.value)}
                     className="w-full px-3 py-2 border border-slate-200 rounded-lg text-slate-800 font-semibold bg-white appearance-none pr-8 shadow-2xs"
                   >
-                    <option value={vendorName}>{vendorName || 'â€”'}</option>
+                    <option value={vendorName}>{vendorName || '—'}</option>
                   </select>
                   <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                 </div>
@@ -592,7 +592,7 @@ export function FinalJobWorkPoInlineSlide({
                     onChange={(e) => setFabricQuality(e.target.value)}
                     className="w-full px-3 py-2 border border-slate-200 rounded-lg text-slate-800 font-semibold bg-white appearance-none pr-8 shadow-2xs"
                   >
-                    <option value={fabricQuality}>{fabricQuality || 'â€”'}</option>
+                    <option value={fabricQuality}>{fabricQuality || '—'}</option>
                   </select>
                   <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                 </div>
@@ -1086,7 +1086,7 @@ export function FinalJobWorkPoInlineSlide({
                 </div>
                 <div className="space-y-1">
                   <div><span className="text-slate-500">Original PO Reference:</span> <strong className="font-mono text-slate-900">{originalPoNumber}</strong></div>
-                  <div><span className="text-slate-500">Production Instruction:</span> <strong className="font-mono text-slate-900">{propInstruction?.instruction_number || completionData?.piNo || 'â€”'}</strong></div>
+                  <div><span className="text-slate-500">Production Instruction:</span> <strong className="font-mono text-slate-900">{propInstruction?.instruction_number || completionData?.piNo || '—'}</strong></div>
                   <div><span className="text-slate-500">Completion Verification:</span> <strong className="text-emerald-700 font-bold">Approved ({fmtM(physicallyVerifiedQty)} Mtr)</strong></div>
                   <div><span className="text-slate-500">Expected Completion:</span> <strong className="text-slate-900">{fmtDate(expectedCompletionDate)}</strong></div>
                 </div>
@@ -1145,7 +1145,7 @@ export function FinalJobWorkPoInlineSlide({
                 <div className="flex flex-col justify-end items-end text-right">
                   <div className="border-b border-slate-300 w-48 mb-1 pb-1">
                     <SignatureSlot doc={poSigs} signatory="authorized" label="Authorized Signatory" modalType="authorized" className="h-10"
-                      defaultName={currentUser?.name || ''} defaultDesignation="Authorized Signatory â€” Commercial Operations" />
+                      defaultName={currentUser?.name || ''} defaultDesignation="Authorized Signatory — Commercial Operations" />
                   </div>
                   <span className="font-bold text-slate-900">Authorized Signatory</span>
                   <span className="text-[10px] text-slate-400">OSCAR ERP Commercial Operations</span>

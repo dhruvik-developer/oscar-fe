@@ -157,13 +157,13 @@ export default function CustomerPaymentsPage() {
         )}
       />
 
-      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
-        <KpiCard label="Total outstanding" value={money(k.totalOutstanding)} icon={Wallet} tone="blue" />
-        <KpiCard label="Due payments" value={money(k.dueAmount)} sub={`${k.dueCount || 0} invoice(s) not yet due`} icon={Clock} tone="amber" />
-        <KpiCard label="Overdue payments" value={money(k.overdueAmount)} sub={`${k.overdueCount || 0} invoice(s)`} icon={AlertTriangle} tone="rose" onClick={() => { setTab('invoices'); setInvFilters({ ...EMPTY_FILTERS, status: 'Overdue' }); }} />
-        <KpiCard label="Received payments" value={money(k.receivedAmount)} sub={`${k.receivedCount || 0} receipt(s)`} icon={IndianRupee} tone="emerald" />
-        <KpiCard label="Pending discount requests" value={String(k.pendingDiscountCount || 0)} sub={`${money(k.pendingDiscountAmount)} requested`} icon={BadgePercent} tone="indigo" onClick={() => { setTab('discounts'); setReqFilters({ ...EMPTY_FILTERS, status: 'Submitted' }); }} />
-        <KpiCard label="Approved discounts" value={money(k.approvedDiscountAmount)} sub={`${k.approvedDiscountCount || 0} approved`} icon={CheckCircle2} tone="teal" />
+      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3.5">
+        <KpiCard index={0} label="Total outstanding" value={money(k.totalOutstanding)} icon={Wallet} tone="blue" />
+        <KpiCard index={1} label="Due payments" value={money(k.dueAmount)} sub={`${k.dueCount || 0} invoice(s) not yet due`} icon={Clock} tone="amber" />
+        <KpiCard index={2} label="Overdue payments" value={money(k.overdueAmount)} sub={`${k.overdueCount || 0} invoice(s)`} icon={AlertTriangle} tone="rose" onClick={() => { setTab('invoices'); setInvFilters({ ...EMPTY_FILTERS, status: 'Overdue' }); }} />
+        <KpiCard index={3} label="Received payments" value={money(k.receivedAmount)} sub={`${k.receivedCount || 0} receipt(s)`} icon={IndianRupee} tone="emerald" />
+        <KpiCard index={4} label="Pending discount requests" value={String(k.pendingDiscountCount || 0)} sub={`${money(k.pendingDiscountAmount)} requested`} icon={BadgePercent} tone="indigo" onClick={() => { setTab('discounts'); setReqFilters({ ...EMPTY_FILTERS, status: 'Submitted' }); }} />
+        <KpiCard index={5} label="Approved discounts" value={money(k.approvedDiscountAmount)} sub={`${k.approvedDiscountCount || 0} approved`} icon={CheckCircle2} tone="teal" />
       </div>
 
       {error && <p role="alert" className="text-[13px] text-rose-700 bg-rose-50 border border-rose-200 rounded-lg px-3 py-2">{error}</p>}
@@ -293,6 +293,7 @@ export default function CustomerPaymentsPage() {
         onClose={() => setPayFor(null)}
         presetCustomerId={payFor?.customerId}
         presetInvoiceId={payFor?.invoiceId}
+        presetCustomerName={payFor?.customerName}
         onSaved={refreshAll}
       />
       <DiscountRequestDrawer requestId={openRequestId} onClose={() => setOpenRequestId(null)} onChanged={refreshAll} />

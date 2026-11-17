@@ -2,7 +2,8 @@ import CrmKpiCard from '../common/CrmKpiCard';
 import PageHeader from "../../../components/ui/PageHeader";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Users, UserPlus, Clock, TrendingUp, DollarSign, Search, Mail, Phone, CalendarDays, FileText, ClipboardList, Video, Send } from "lucide-react";
+import { Users, UserPlus, Clock, TrendingUp, DollarSign, Search, Mail, Phone, CalendarDays, FileText, ClipboardList, Video, Send, CheckCircle2, ArrowRight, AlertTriangle, Building2, RotateCcw, PhoneCall } from "lucide-react";
+import { toISODate, getCurrentISODate } from "../../../utils/dateUtils";
 import { useCrmStore } from "../../../stores/crmStore";
 import { initials, describeError, pullDashboard as pullCrmDashboard } from "../../../services/crmSync";
 import { useERP } from "../../../context/ERPContext";
@@ -11,6 +12,7 @@ import { CRM_TEAM_MEMBERS } from "../../../services/leadStageAutomation";
 import { completeTaskWithOutcome, resolveLeadForTask, NEXT_ACTION_LABELS } from "../../../services/taskCompletionService";
 import CompleteTaskModal from "../tasks/CompleteTaskModal";
 import CreateLeadModal from "../leads/CreateLeadModal";
+import LogCallModal from "./LogCallModal";
 import { runLeadStageAutomation } from "../../../services/leadStageAutomation";
 import { emitCrmEvent, CRM_EVENT_TYPES } from "../../../services/crmEventNotifications";
 import { buildLeadPayload } from "../leads/leadPayload";
@@ -27,6 +29,59 @@ function text(value) {
   return String(value ?? '').toLowerCase();
 }
 
+function getTaskBucket(t, todayISO) {
+  if (t?.status === 'Completed') return 'Completed';
+  const isoDue = toISODate(t?.dueDate || t?.due);
+  if (!isoDue) return 'Upcoming';
+  if (isoDue < todayISO) return 'Overdue';
+  if (isoDue === todayISO) return 'Today';
+  return 'Upcoming';
+}
+
+function getPriorityScore(t, todayISO) {
+  if (t?.status === 'Completed') return 4;
+  const bucket = getTaskBucket(t, todayISO);
+  if (bucket === 'Overdue') return 1;
+  if (bucket === 'Today') return 2;
+  return 3;
+}
+
+function formatDueDate(value) {
+  if (!value) return '—';
+  const iso = toISODate(value);
+  if (!iso) return String(value);
+  const [y, m, d] = iso.split('-');
+  const dateObj = new Date(`${iso}T00:00:00`);
+  if (isNaN(dateObj.getTime())) return `${d}-${m}-${y}`;
+  return dateObj.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+function getPriorityStyle(priority) {
+  const p = String(priority || 'Medium').toLowerCase();
+  if (p === 'urgent') return { label: 'Urgent', color: '#dc2626', dot: '#dc2626' };
+  if (p === 'high') return { label: 'High', color: '#ea580c', dot: '#ea580c' };
+  if (p === 'low') return { label: 'Low', color: '#059669', dot: '#059669' };
+  return { label: 'Medium', color: '#d97706', dot: '#d97706' };
+}
+
+function getTaskIconComponent(task) {
+  const title = String(task?.title || '').toLowerCase();
+  const icon = String(task?.icon || '').toLowerCase();
+  if (icon === 'phone' || title.includes('call') || title.includes('phone')) return Phone;
+  if (icon === 'email' || title.includes('email') || title.includes('mail')) return Mail;
+  if (icon === 'video' || title.includes('meeting') || title.includes('meet') || title.includes('zoom')) return Video;
+  if (title.includes('proposal') || title.includes('quote') || title.includes('invoice') || title.includes('review')) return FileText;
+  return ClipboardList;
+}
+
+const DASHBOARD_TASK_LIMIT = 8;
+const TASK_TABS = [
+  { id: 'All', label: 'All Tasks', countKey: 'All' },
+  { id: 'Overdue', label: 'Overdue', countKey: 'Overdue' },
+  { id: 'Today', label: 'Today', countKey: 'Today' },
+  { id: 'Upcoming', label: 'Upcoming', countKey: 'Upcoming' },
+];
+
 function splitLeadName(full) {
   const text = full || "";
   const open = text.indexOf("(");
@@ -37,17 +92,19 @@ function splitLeadName(full) {
   return { lead: text, company: "" };
 }
 function normalizeTask(t) {
-  const parts = splitLeadName(t.lead);
+  if (!t) return {};
+  const parts = splitLeadName(t.lead || t.leadName);
   return {
+    ...t,
     id: t.id,
-    title: t.title,
-    lead: parts.lead || t.lead,
-    company: parts.company,
-    due: t.dueDate,
-    dueDate: t.dueDate,
-    priority: t.priority,
-    status: t.status,
-    owner: t.owner
+    title: t.title || 'Untitled Task',
+    lead: parts.lead || t.lead || t.leadName || '—',
+    company: parts.company || t.company || '',
+    due: t.dueDate || t.due,
+    dueDate: t.dueDate || t.due,
+    priority: t.priority || 'Medium',
+    status: t.status || 'Open',
+    owner: t.owner || t.assigneeName || 'Unassigned'
   };
 }
 function avatarColor(name) {
@@ -104,6 +161,7 @@ export default function DashboardView() {
   const [isCreateLeadOpen, setIsCreateLeadOpen] = useState(false);
   const [isCreatingLead, setIsCreatingLead] = useState(false);
   const [createLeadError, setCreateLeadError] = useState('');
+  const [isLogCallOpen, setIsLogCallOpen] = useState(false);
   const [crmDashboardKpis, setCrmDashboardKpis] = useState(null);
   useEffect(() => {
     let active = true;
@@ -156,7 +214,7 @@ export default function DashboardView() {
   const hour = new Date().getHours();
   const greet = hour < 12 ? "Good Morning" : hour < 17 ? "Good Afternoon" : "Good Evening";
   const todayStr = new Date().toLocaleDateString("en-GB", { weekday: "short", day: "2-digit", month: "short", year: "numeric" });
-  const todayISO = new Date().toISOString().slice(0, 10);
+  const todayISO = getCurrentISODate();
   const totalLeads = leads.length;
   const activeLeads = leads.filter((l) => l.status !== "Lost Lead").length;
   const newLeads = leads.filter((l) => l.status === "New").length;
@@ -207,24 +265,72 @@ export default function DashboardView() {
     const a1 = (acc / (totalLeads || 1)) * 360;
     return { ...s, path: describeArc(90, 90, 62, a0, a1 >= 360 ? 359.9 : a1) };
   });
-  const bucket = (t) => {
-    if (t.status === "Completed") return "Upcoming";
-    if (t.dueDate < todayISO) return "Overdue";
-    if (t.dueDate === todayISO) return "Today";
-    return "Upcoming";
-  };
-  const counts = {
-    All: tasks.length,
-    Overdue: tasks.filter((t) => bucket(t) === "Overdue").length,
-    Today: tasks.filter((t) => bucket(t) === "Today").length,
-    Upcoming: tasks.filter((t) => bucket(t) === "Upcoming").length
-  };
-  const filtered = tasks.filter((t) => {
-    const okTab = tab === "All" || bucket(t) === tab;
+  const counts = useMemo(() => {
+    let overdue = 0;
+    let today = 0;
+    let upcoming = 0;
+    for (const raw of tasks) {
+      if (raw.status === 'Completed') continue;
+      const b = getTaskBucket(raw, todayISO);
+      if (b === 'Overdue') overdue++;
+      else if (b === 'Today') today++;
+      else upcoming++;
+    }
+    return {
+      All: tasks.length,
+      Overdue: overdue,
+      Today: today,
+      Upcoming: upcoming,
+    };
+  }, [tasks, todayISO]);
+
+  const sortedFilteredTasks = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const okQ = !q || text(t.title).includes(q) || text(t.lead).includes(q) || text(t.owner).includes(q);
-    return okTab && okQ;
-  });
+    const list = tasks.filter((raw) => {
+      const b = getTaskBucket(raw, todayISO);
+      const okTab =
+        tab === 'All' ||
+        (tab === 'Overdue' && b === 'Overdue') ||
+        (tab === 'Today' && b === 'Today') ||
+        (tab === 'Upcoming' && b === 'Upcoming');
+      if (!okTab) return false;
+
+      if (!q) return true;
+      const t = normalizeTask(raw);
+      return (
+        text(t.title).includes(q) ||
+        text(t.lead).includes(q) ||
+        text(t.company).includes(q) ||
+        text(t.owner).includes(q)
+      );
+    });
+
+    return list.sort((a, b) => {
+      // Prioritize 1. Overdue -> 2. Today -> 3. Upcoming -> 4. Completed
+      const sA = getPriorityScore(a, todayISO);
+      const sB = getPriorityScore(b, todayISO);
+      if (sA !== sB) return sA - sB;
+
+      // Within category, earliest due date first
+      const dateA = toISODate(a.dueDate || a.due) || '9999-99-99';
+      const dateB = toISODate(b.dueDate || b.due) || '9999-99-99';
+      if (dateA !== dateB) return dateA.localeCompare(dateB);
+
+      // Same date, earliest due time
+      const timeA = a.dueTime || '';
+      const timeB = b.dueTime || '';
+      if (timeA && timeB && timeA !== timeB) return timeA.localeCompare(timeB);
+
+      // Priority: Urgent > High > Medium > Low
+      const prioWeight = { Urgent: 0, High: 1, Medium: 2, Low: 3 };
+      const pA = prioWeight[a.priority] ?? 2;
+      const pB = prioWeight[b.priority] ?? 2;
+      return pA - pB;
+    });
+  }, [tasks, tab, query, todayISO]);
+
+  const displayTasks = sortedFilteredTasks.slice(0, DASHBOARD_TASK_LIMIT);
+
   const completeTask = (t) => {
     if (t.status === "Completed") return;
     setCompleteTarget(t);
@@ -236,17 +342,25 @@ export default function DashboardView() {
   const handleCompleteSuccess = () => setCompleteTarget(null);
   const recent = leads.slice(0, 5);
   const CAL_COLORS = ["#2f6fed", "#8b5cf6", "#10b981", "#f59e0b"];
-  const calendar = tasks
-    .filter((t) => t.dueDate === todayISO && t.status !== "Completed")
-    .sort((x, y) => String(x.dueTime || "").localeCompare(String(y.dueTime || "")))
-    .slice(0, 4)
-    .map((t, i) => ({
-      key: t.id || `${t.title}-${i}`,
-      time: t.dueTime || "Today",
-      title: t.lead ? `${t.title} - ${t.lead}` : t.title,
-      sub: t.company || t.owner || "",
-      color: CAL_COLORS[i % CAL_COLORS.length],
-    }));
+  const calendar = useMemo(() => {
+    return tasks
+      .filter((t) => {
+        if (t.status === 'Completed') return false;
+        return toISODate(t.dueDate || t.due) === todayISO;
+      })
+      .sort((x, y) => String(x.dueTime || "").localeCompare(String(y.dueTime || "")))
+      .slice(0, 4)
+      .map((raw, i) => {
+        const t = normalizeTask(raw);
+        return {
+          key: t.id || `${t.title}-${i}`,
+          time: t.dueTime || "Today",
+          title: t.lead ? `${t.title} - ${t.lead}` : t.title,
+          sub: t.company || t.owner || "",
+          color: CAL_COLORS[i % CAL_COLORS.length],
+        };
+      });
+  }, [tasks, todayISO]);
   return (
     <div className="grid-cols-1 lg:grid-cols-none" style={{ display: "grid", gap: 14, background: "#f6f9ff", minHeight: "100%" }}>
       <PageHeader
@@ -261,17 +375,16 @@ export default function DashboardView() {
         }
       />
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5 my-4">
-        {kpis.map((k, index) => {
-          return (
-            <CrmKpiCard key={k.label} label={k.label} value={k.value} icon={k.icon} tone={['blue', 'emerald', 'amber', 'purple', 'rose'][index]}>
-              {k.note && (
-                <span className="flex flex-wrap items-center gap-1 text-[11px] font-semibold text-slate-400">
-                  <em className="font-normal not-italic">{k.note}</em>
-                </span>
-              )}
-            </CrmKpiCard>
-          );
-        })}
+        {kpis.map((k, index) => (
+          <CrmKpiCard
+            key={k.label}
+            index={index}
+            label={k.label}
+            value={k.value}
+            icon={k.icon}
+            sub={k.note}
+          />
+        ))}
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]" style={{ gap: 12 }}>
         <div style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 14, padding: 16 }}>
@@ -323,105 +436,510 @@ export default function DashboardView() {
           </div>
         </div>
       </div>
+      {/* My Tasks Section */}
       <div style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 14, padding: 16 }}>
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 lg:gap-0 flex-wrap lg:flex-nowrap">
-          <h3 style={{ margin: 0, fontSize: 14, fontWeight: 800, color: "#0f1f3d" }}>My Tasks</h3>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-            <div className="flex-wrap lg:flex-nowrap" style={{ display: "flex", gap: 6 }}>
-              {["All", "Overdue", "Today", "Upcoming"].map((t) => (
-                <button key={t} type="button" onClick={() => setTab(t)} style={{ border: "1px solid", borderColor: tab === t ? "#2f6fed" : "#e2e8f0", background: tab === t ? "#eef4ff" : "#fff", color: tab === t ? "#2f6fed" : "#64748b", borderRadius: 8, padding: "6px 10px", fontSize: 12, fontWeight: 700 }}>
-                  {t} ({counts[t]})
-                </button>
-              ))}
-            </div>
-            <span style={{ display: "flex", alignItems: "center", gap: 6, border: "1px solid #e2e8f0", borderRadius: 8, padding: "6px 10px", fontSize: 12, color: "#64748b" }}>
-              <Search size={14} /> <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search tasks..." style={{ border: 0, outline: 0, fontSize: 12, width: 110 }} />
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 flex-wrap lg:flex-nowrap">
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            <h3 style={{ margin: 0, fontSize: 15, fontWeight: 800, color: "#0f1f3d" }}>My Tasks</h3>
+            <span style={{ fontSize: 11, fontWeight: 700, color: "#64748b", background: "#f1f5f9", padding: "3px 8px", borderRadius: 6 }}>
+              Showing {displayTasks.length} of {sortedFilteredTasks.length} prioritized
             </span>
           </div>
+
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            <div className="flex-wrap sm:flex-nowrap" style={{ display: "flex", gap: 6 }}>
+              {TASK_TABS.map((t) => {
+                const isSelected = tab === t.id;
+                const count = counts[t.countKey] || 0;
+                const isOverdueTab = t.id === 'Overdue';
+                const isTodayTab = t.id === 'Today';
+                return (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => setTab(t.id)}
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 6,
+                      border: "1px solid",
+                      borderColor: isSelected
+                        ? "#2f6fed"
+                        : isOverdueTab && count > 0
+                        ? "#fecaca"
+                        : isTodayTab && count > 0
+                        ? "#fde68a"
+                        : "#e2e8f0",
+                      background: isSelected
+                        ? "#eef4ff"
+                        : "#ffffff",
+                      color: isSelected
+                        ? "#2f6fed"
+                        : isOverdueTab && count > 0
+                        ? "#dc2626"
+                        : isTodayTab && count > 0
+                        ? "#b45309"
+                        : "#64748b",
+                      borderRadius: 8,
+                      padding: "6px 11px",
+                      fontSize: 12,
+                      fontWeight: isSelected ? 800 : 600,
+                      cursor: "pointer",
+                      transition: "all 0.15s ease",
+                    }}
+                  >
+                    <span>{t.label}</span>
+                    <span
+                      style={{
+                        borderRadius: 99,
+                        padding: "1px 6px",
+                        fontSize: 11,
+                        fontWeight: 800,
+                        background: isSelected
+                          ? "#2f6fed"
+                          : isOverdueTab && count > 0
+                          ? "#fee2e2"
+                          : isTodayTab && count > 0
+                          ? "#fef3c7"
+                          : "#f1f5f9",
+                        color: isSelected
+                          ? "#ffffff"
+                          : isOverdueTab && count > 0
+                          ? "#b91c1c"
+                          : isTodayTab && count > 0
+                          ? "#92400e"
+                          : "#64748b",
+                      }}
+                    >
+                      {count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            <span style={{ display: "flex", alignItems: "center", gap: 6, border: "1px solid #e2e8f0", borderRadius: 8, padding: "5px 10px", fontSize: 12, color: "#64748b", background: "#fff" }}>
+              <Search size={14} />
+              <input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search tasks..."
+                style={{ border: 0, outline: 0, fontSize: 12, width: 110, background: "transparent" }}
+              />
+            </span>
+
+            <Link
+              to="/crm/tasks"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 5,
+                fontSize: 12,
+                fontWeight: 700,
+                color: "#2f6fed",
+                textDecoration: "none",
+                padding: "6px 12px",
+                borderRadius: 8,
+                background: "#eef4ff",
+                border: "1px solid #dbeafe",
+                whiteSpace: "nowrap",
+              }}
+            >
+              <span>View All Tasks</span>
+              <span style={{ background: "#2f6fed", color: "#fff", borderRadius: 99, padding: "1px 6px", fontSize: 11, fontWeight: 800 }}>{counts.All}</span>
+              <ArrowRight size={13} />
+            </Link>
+          </div>
         </div>
-        <div style={{ overflowX: "auto", marginTop: 10 }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, minWidth: 900 }}>
+
+        <div style={{ overflowX: "auto", marginTop: 12 }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, minWidth: 860 }}>
             <thead>
-              <tr style={{ textAlign: "left", color: "#94a3b8", fontSize: 11, textTransform: "uppercase", letterSpacing: 0.4 }}>
-                <th style={{ padding: "8px" }}>Task</th>
-                <th style={{ padding: "8px" }}>Related Lead</th>
-                <th style={{ padding: "8px" }}>Due Date</th>
-                <th style={{ padding: "8px" }}>Priority</th>
-                <th style={{ padding: "8px" }}>Status</th>
-                <th style={{ padding: "8px" }}>Assigned To</th>
-                <th style={{ padding: "8px", textAlign: "right" }}>Action</th>
+              <tr style={{ textAlign: "left", color: "#94a3b8", fontSize: 11, textTransform: "uppercase", letterSpacing: 0.5, borderBottom: "1px solid #eef2f7" }}>
+                <th style={{ padding: "8px 10px" }}>Task</th>
+                <th style={{ padding: "8px 10px" }}>Related Lead / Customer</th>
+                <th style={{ padding: "8px 10px" }}>Due Date</th>
+                <th style={{ padding: "8px 10px" }}>Priority</th>
+                <th style={{ padding: "8px 10px" }}>Status</th>
+                <th style={{ padding: "8px 10px" }}>Assigned Employee</th>
+                <th style={{ padding: "8px 10px", textAlign: "right" }}>Action</th>
               </tr>
             </thead>
             <tbody>
-              {filtered.map((t) => {
-                const b = bucket(t);
-                const overdue = b === "Overdue";
-                const pColor = t.priority === "High" || t.priority === "Urgent" ? "#ef4444" : t.priority === "Medium" ? "#f59e0b" : "#10b981";
-                const sBg = t.status === "Completed" ? "#dcfce7" : overdue ? "#fee2e2" : b === "Today" ? "#fef3c7" : "#eef4ff";
-                const sFg = t.status === "Completed" ? "#15803d" : overdue ? "#b91c1c" : b === "Today" ? "#b45309" : "#2f6fed";
-                return (
-                  <tr key={t.id} style={{ borderTop: "1px solid #eef2f7" }}>
-                    <td style={{ padding: "10px 8px", fontWeight: 700, color: "#0f1f3d" }}>
-                      <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <span style={{ width: 28, height: 28, borderRadius: 8, background: "#eef4ff", display: "grid", placeItems: "center", color: "#2f6fed" }}>
-                          <Phone size={14} />
-                        </span> {t.title}
+              {displayTasks.length === 0 ? (
+                <tr>
+                  <td colSpan={7} style={{ padding: "36px 16px", textAlign: "center", color: "#64748b" }}>
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
+                      <CheckCircle2 size={32} color="#10b981" />
+                      <span style={{ fontSize: 13, fontWeight: 700, color: "#1e293b" }}>
+                        {tab === "Overdue"
+                          ? "No overdue tasks! You're caught up."
+                          : tab === "Today"
+                          ? "No tasks due today."
+                          : tab === "Upcoming"
+                          ? "No upcoming tasks scheduled."
+                          : "No tasks found matching your filter."}
                       </span>
-                      {t.status === "Completed" && (t.completionOutcome || t.nextAction || t.completedBy) && (
-                        <span style={{ display: "block", fontSize: 10, color: "#15803d", fontWeight: 700, marginTop: 3 }}>
-                          {t.completionOutcome ? "Outcome: " + t.completionOutcome : ""}
-                          {t.nextAction ? " · Next: " + (NEXT_ACTION_LABELS[t.nextAction] || t.nextAction) : ""}
-                          {t.completedBy ? " · by " + t.completedBy : ""}
-                        </span>
+                      {tab !== "All" && (
+                        <button
+                          type="button"
+                          onClick={() => setTab("All")}
+                          style={{
+                            marginTop: 4,
+                            fontSize: 12,
+                            color: "#2f6fed",
+                            fontWeight: 700,
+                            background: "none",
+                            border: "none",
+                            cursor: "pointer",
+                            textDecoration: "underline",
+                          }}
+                        >
+                          View all tasks ({counts.All})
+                        </button>
                       )}
-                    </td>
-                    <td style={{ padding: "10px 8px", color: "#334155" }}>{t.lead}<br /><span style={{ color: "#94a3b8", fontSize: 11 }}>{t.company}</span></td>
-                    <td style={{ padding: "10px 8px", color: overdue ? "#dc2626" : "#475569", fontWeight: overdue ? 700 : 400 }}>{t.due}</td>
-                    <td style={{ padding: "10px 8px" }}>
-                      <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontWeight: 700, color: pColor }}>
-                        <span style={{ width: 7, height: 7, borderRadius: 99, background: pColor }} /> {t.priority}
-                      </span>
-                    </td>
-                    <td style={{ padding: "10px 8px" }}>
-                      <span style={{ background: sBg, color: sFg, borderRadius: 99, padding: "4px 10px", fontSize: 11, fontWeight: 800 }}>{t.status === "Completed" ? "Completed" : b}</span>
-                    </td>
-                    <td style={{ padding: "10px 8px", color: "#334155", fontWeight: 600 }}>
-                      <span style={{ display: "flex", alignItems: "center", gap: 7 }}>
-                        <span style={{ width: 26, height: 26, borderRadius: 99, background: avatarColor(t.owner), color: "#fff", display: "grid", placeItems: "center", fontSize: 10, fontWeight: 800 }}>{initials(t.owner)}</span>
-                        {t.owner}
-                      </span>
-                    </td>
-                    <td style={{ padding: "10px 8px", textAlign: "right" }}>
-                      {(() => {
-                        const isDone = t.status === "Completed";
-                        return (
-                          <button
-                            type="button"
-                            onClick={() => completeTask(t)}
-                            disabled={isDone}
-                            title={isDone ? "Task is completed" : "Click to complete task"}
+                    </div>
+                  </td>
+                </tr>
+              ) : (
+                displayTasks.map((raw) => {
+                  const t = normalizeTask(raw);
+                  const b = getTaskBucket(raw, todayISO);
+                  const isOverdue = b === "Overdue";
+                  const isToday = b === "Today";
+                  const isDone = raw.status === "Completed";
+                  const prio = getPriorityStyle(t.priority);
+                  const IconComp = getTaskIconComponent(t);
+
+                  const statusConfig = isDone
+                    ? { bg: "#dcfce7", fg: "#15803d", border: "#bbf7d0", label: "Completed" }
+                    : isOverdue
+                    ? { bg: "#fee2e2", fg: "#b91c1c", border: "#fecaca", label: "Overdue" }
+                    : isToday
+                    ? { bg: "#fef3c7", fg: "#b45309", border: "#fde68a", label: "Today" }
+                    : { bg: "#eff6ff", fg: "#2563eb", border: "#dbeafe", label: "Upcoming" };
+
+                  return (
+                    <tr
+                      key={t.id}
+                      style={{
+                        borderTop: "1px solid #f1f5f9",
+                        transition: "background 0.15s ease",
+                      }}
+                      onMouseEnter={(e) => { e.currentTarget.style.background = "#f8fafc"; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+                    >
+                      {/* Task Title */}
+                      <td style={{ padding: "9px 10px", fontWeight: 700, color: "#0f1f3d", maxWidth: 260 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <span
                             style={{
-                              border: isDone ? "1px solid #16a34a" : "1px solid #dc2626",
-                              color: isDone ? "#15803d" : "#dc2626",
-                              background: isDone ? "#f0fdf4" : "#fef2f2",
+                              width: 28,
+                              height: 28,
                               borderRadius: 8,
-                              padding: "6px 14px",
-                              fontSize: 12,
-                              fontWeight: 800,
-                              cursor: isDone ? "default" : "pointer",
-                              transition: "all 0.15s ease",
+                              background: isOverdue ? "#fef2f2" : "#eef4ff",
+                              color: isOverdue ? "#dc2626" : "#2f6fed",
+                              display: "grid",
+                              placeItems: "center",
+                              flexShrink: 0,
                             }}
                           >
-                            {isDone ? "Done" : "Complete"}
+                            <IconComp size={14} />
+                          </span>
+                          <span
+                            style={{
+                              fontSize: 12,
+                              lineHeight: 1.3,
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              whiteSpace: "nowrap",
+                            }}
+                            title={t.title}
+                          >
+                            {t.title}
+                          </span>
+                        </div>
+                        {isDone && (raw.completionOutcome || raw.nextAction || raw.completedBy) && (
+                          <div style={{ fontSize: 10, color: "#15803d", fontWeight: 700, marginTop: 2, paddingLeft: 36 }}>
+                            {raw.completionOutcome ? "Outcome: " + raw.completionOutcome : ""}
+                            {raw.nextAction ? " · Next: " + (NEXT_ACTION_LABELS[raw.nextAction] || raw.nextAction) : ""}
+                            {raw.completedBy ? " · by " + raw.completedBy : ""}
+                          </div>
+                        )}
+                      </td>
+
+                      {/* Related Lead / Customer */}
+                      <td style={{ padding: "9px 10px", color: "#334155", maxWidth: 200 }}>
+                        {t.leadId ? (
+                          <Link
+                            to={`/crm/leads/${t.leadId}`}
+                            style={{
+                              display: "block",
+                              fontWeight: 700,
+                              color: "#1e293b",
+                              textDecoration: "none",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              whiteSpace: "nowrap",
+                            }}
+                            onMouseEnter={(e) => { e.currentTarget.style.color = "#2f6fed"; }}
+                            onMouseLeave={(e) => { e.currentTarget.style.color = "#1e293b"; }}
+                          >
+                            {t.lead}
+                          </Link>
+                        ) : (
+                          <span
+                            style={{
+                              display: "block",
+                              fontWeight: 700,
+                              color: "#1e293b",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            {t.lead}
+                          </span>
+                        )}
+                        {t.company && (
+                          <span
+                            style={{
+                              display: "block",
+                              color: "#64748b",
+                              fontSize: 11,
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            {t.company}
+                          </span>
+                        )}
+                      </td>
+
+                      {/* Due Date */}
+                      <td style={{ padding: "9px 10px", whiteSpace: "nowrap" }}>
+                        {isOverdue ? (
+                          <span
+                            style={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: 4,
+                              color: "#dc2626",
+                              fontWeight: 700,
+                              fontSize: 11,
+                              background: "#fef2f2",
+                              border: "1px solid #fecaca",
+                              borderRadius: 6,
+                              padding: "2px 7px",
+                            }}
+                          >
+                            <AlertTriangle size={12} color="#dc2626" />
+                            {formatDueDate(t.dueDate)}
+                          </span>
+                        ) : isToday ? (
+                          <span
+                            style={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: 4,
+                              color: "#b45309",
+                              fontWeight: 700,
+                              fontSize: 11,
+                              background: "#fffbeb",
+                              border: "1px solid #fde68a",
+                              borderRadius: 6,
+                              padding: "2px 7px",
+                            }}
+                          >
+                            <Clock size={12} color="#b45309" />
+                            Today{t.dueTime ? ` (${t.dueTime})` : ""}
+                          </span>
+                        ) : (
+                          <span
+                            style={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: 4,
+                              color: "#475569",
+                              fontSize: 11,
+                              background: "#f8fafc",
+                              border: "1px solid #e2e8f0",
+                              borderRadius: 6,
+                              padding: "2px 7px",
+                            }}
+                          >
+                            <CalendarDays size={12} color="#94a3b8" />
+                            {formatDueDate(t.dueDate)}
+                          </span>
+                        )}
+                      </td>
+
+                      {/* Priority */}
+                      <td style={{ padding: "9px 10px", whiteSpace: "nowrap" }}>
+                        <span
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 5,
+                            fontWeight: 700,
+                            fontSize: 11,
+                            color: prio.color,
+                          }}
+                        >
+                          <span style={{ width: 7, height: 7, borderRadius: 99, background: prio.dot }} />
+                          {prio.label}
+                        </span>
+                      </td>
+
+                      {/* Status */}
+                      <td style={{ padding: "9px 10px", whiteSpace: "nowrap" }}>
+                        <span
+                          style={{
+                            background: statusConfig.bg,
+                            color: statusConfig.fg,
+                            border: `1px solid ${statusConfig.border}`,
+                            borderRadius: 99,
+                            padding: "3px 8px",
+                            fontSize: 11,
+                            fontWeight: 700,
+                            letterSpacing: 0.2,
+                            display: "inline-block",
+                          }}
+                        >
+                          {statusConfig.label}
+                        </span>
+                      </td>
+
+                      {/* Assigned Employee */}
+                      <td style={{ padding: "9px 10px", color: "#334155", fontWeight: 600, whiteSpace: "nowrap" }}>
+                        <span style={{ display: "flex", alignItems: "center", gap: 7 }}>
+                          <span
+                            style={{
+                              width: 24,
+                              height: 24,
+                              borderRadius: 99,
+                              background: avatarColor(t.owner),
+                              color: "#fff",
+                              display: "grid",
+                              placeItems: "center",
+                              fontSize: 10,
+                              fontWeight: 800,
+                              flexShrink: 0,
+                            }}
+                          >
+                            {initials(t.owner)}
+                          </span>
+                          <span
+                            style={{
+                              fontSize: 12,
+                              maxWidth: 130,
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                            }}
+                            title={t.owner}
+                          >
+                            {t.owner}
+                          </span>
+                        </span>
+                      </td>
+
+                      {/* Action */}
+                      <td style={{ padding: "9px 10px", textAlign: "right", whiteSpace: "nowrap" }}>
+                        {isDone ? (
+                          <span
+                            style={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: 4,
+                              border: "1px solid #bbf7d0",
+                              color: "#16a34a",
+                              background: "#f0fdf4",
+                              borderRadius: 7,
+                              padding: "4px 9px",
+                              fontSize: 11,
+                              fontWeight: 700,
+                            }}
+                          >
+                            <CheckCircle2 size={12} /> Done
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => completeTask(raw)}
+                            title="Click to complete task"
+                            style={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: 5,
+                              border: "1px solid #2f6fed",
+                              color: "#2f6fed",
+                              background: "#f0f5ff",
+                              borderRadius: 7,
+                              padding: "4px 10px",
+                              fontSize: 11,
+                              fontWeight: 800,
+                              cursor: "pointer",
+                              transition: "all 0.15s ease",
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.background = "#2f6fed";
+                              e.currentTarget.style.color = "#fff";
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.background = "#f0f5ff";
+                              e.currentTarget.style.color = "#2f6fed";
+                            }}
+                          >
+                            <CheckCircle2 size={12} /> Complete
                           </button>
-                        );
-                      })()}
-                    </td>
-                  </tr>
-                );
-              })}
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
             </tbody>
           </table>
+        </div>
+
+        {/* Compact Footer with Summary & Link to Task Management */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            padding: "10px 12px",
+            background: "#f8fafc",
+            borderTop: "1px solid #eef2f7",
+            borderBottomLeftRadius: 10,
+            borderBottomRightRadius: 10,
+            marginTop: 8,
+            flexWrap: "wrap",
+            gap: 8,
+          }}
+        >
+          <span style={{ fontSize: 11, color: "#64748b", fontWeight: 600 }}>
+            Showing {displayTasks.length} of {sortedFilteredTasks.length} tasks
+            {sortedFilteredTasks.length !== counts.All ? ` in "${tab}" (${counts.All} total in CRM)` : ""}
+            {" · "}
+            <span style={{ color: "#94a3b8" }}>Order: Overdue &rarr; Today &rarr; Upcoming</span>
+          </span>
+          <Link
+            to="/crm/tasks"
+            style={{
+              fontSize: 12,
+              fontWeight: 700,
+              color: "#2f6fed",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 5,
+              textDecoration: "none",
+            }}
+          >
+            <span>Open Task Management ({counts.All})</span>
+            <ArrowRight size={13} />
+          </Link>
         </div>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-[repeat(auto-fit,minmax(280px,1fr))]" style={{ gap: 12 }}>
@@ -478,27 +996,20 @@ export default function DashboardView() {
             <button type="button" onClick={() => { setCreateLeadError(''); setIsCreateLeadOpen(true); }} style={{ display: "grid", gap: 6, placeItems: "center", border: "1px solid #eef2f7", borderRadius: 12, padding: "12px 6px", fontSize: 11, fontWeight: 700, color: "#334155", background: "none", cursor: "pointer", width: "100%" }}>
               <span style={{ width: 34, height: 34, borderRadius: 10, background: "#eef4ff", color: "#2f6fed", display: "grid", placeItems: "center" }}><UserPlus size={17} /></span> Add Lead
             </button>
-            <Link to="/crm/tasks" style={{ display: "grid", gap: 6, placeItems: "center", border: "1px solid #eef2f7", borderRadius: 12, padding: "12px 6px", fontSize: 11, fontWeight: 700, color: "#334155" }}>
-              <span style={{ width: 34, height: 34, borderRadius: 10, background: "#ecfdf5", color: "#10b981", display: "grid", placeItems: "center" }}><ClipboardList size={17} /></span> Add Task
+            <Link to="/crm/deals" style={{ display: "grid", gap: 6, placeItems: "center", border: "1px solid #eef2f7", borderRadius: 12, padding: "12px 6px", fontSize: 11, fontWeight: 700, color: "#334155" }}>
+              <span style={{ width: 34, height: 34, borderRadius: 10, background: "#ecfdf5", color: "#10b981", display: "grid", placeItems: "center" }}><TrendingUp size={17} /></span> Deals
             </Link>
             <Link to="/crm/tasks" style={{ display: "grid", gap: 6, placeItems: "center", border: "1px solid #eef2f7", borderRadius: 12, padding: "12px 6px", fontSize: 11, fontWeight: 700, color: "#334155" }}>
-              <span style={{ width: 34, height: 34, borderRadius: 10, background: "#f5efff", color: "#8b5cf6", display: "grid", placeItems: "center" }}><Video size={17} /></span> Meeting
+              <span style={{ width: 34, height: 34, borderRadius: 10, background: "#f5efff", color: "#8b5cf6", display: "grid", placeItems: "center" }}><ClipboardList size={17} /></span> Tasks
             </Link>
-            <Link to="/crm/leads" style={{ display: "grid", gap: 6, placeItems: "center", border: "1px solid #eef2f7", borderRadius: 12, padding: "12px 6px", fontSize: 11, fontWeight: 700, color: "#334155" }}>
-              <span style={{ width: 34, height: 34, borderRadius: 10, background: "#fff7e8", color: "#d97706", display: "grid", placeItems: "center" }}><Send size={17} /></span> Send Email
+            <button type="button" onClick={() => setIsLogCallOpen(true)} style={{ display: "grid", gap: 6, placeItems: "center", border: "1px solid #eef2f7", borderRadius: 12, padding: "12px 6px", fontSize: 11, fontWeight: 700, color: "#334155", background: "none", cursor: "pointer", width: "100%" }}>
+              <span style={{ width: 34, height: 34, borderRadius: 10, background: "#fffbeb", color: "#d97706", display: "grid", placeItems: "center" }}><PhoneCall size={17} /></span> Log Call
+            </button>
+            <Link to="/crm/leads/lost" style={{ display: "grid", gap: 6, placeItems: "center", border: "1px solid #eef2f7", borderRadius: 12, padding: "12px 6px", fontSize: 11, fontWeight: 700, color: "#334155" }}>
+              <span style={{ width: 34, height: 34, borderRadius: 10, background: "#fef2f2", color: "#e11d48", display: "grid", placeItems: "center" }}><RotateCcw size={17} /></span> Lost Leads
             </Link>
-            {/* [Quotation & Proforma Invoice modules are commented out]
-            <Link to="/sales/quotations" style={{ display: "grid", gap: 6, placeItems: "center", border: "1px solid #eef2f7", borderRadius: 12, padding: "12px 6px", fontSize: 11, fontWeight: 700, color: "#334155" }}>
-              <span style={{ width: 34, height: 34, borderRadius: 10, background: "#eef4ff", color: "#2f6fed", display: "grid", placeItems: "center" }}><FileText size={17} /></span> Quotation
-            </Link>
-            */}
-          </div>
-          <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-            <Link to="/crm/leads" style={{ flex: 1, textAlign: "center", background: "#0f1f3d", color: "#fff", borderRadius: 9, padding: "9px 0", fontSize: 12, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
-              <Mail size={14} /> Email
-            </Link>
-            <Link to="/crm/deals" style={{ flex: 1, textAlign: "center", background: "var(--card)", border: "1px solid var(--border)", color: "#0f1f3d", borderRadius: 9, padding: "9px 0", fontSize: 12, fontWeight: 800 }}>
-              Deals
+            <Link to="/crm/customers" style={{ display: "grid", gap: 6, placeItems: "center", border: "1px solid #eef2f7", borderRadius: 12, padding: "12px 6px", fontSize: 11, fontWeight: 700, color: "#334155" }}>
+              <span style={{ width: 34, height: 34, borderRadius: 10, background: "#f0f9ff", color: "#0284c7", display: "grid", placeItems: "center" }}><Building2 size={17} /></span> Customers
             </Link>
           </div>
         </div>
@@ -518,6 +1029,10 @@ export default function DashboardView() {
         onCancel={handleCompleteSuccess}
         onComplete={handleComplete}
         onSuccess={handleCompleteSuccess}
+      />
+      <LogCallModal
+        isOpen={isLogCallOpen}
+        onClose={() => setIsLogCallOpen(false)}
       />
     </div>
   );

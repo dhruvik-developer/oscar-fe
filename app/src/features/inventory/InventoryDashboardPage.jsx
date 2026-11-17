@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import { inventoryService } from '../../services/domainServices';
 import PageInfoButton from '../../components/ui/PageInfoButton';
+import KpiCard from '../../components/ui/KpiCard';
 
 // Helper for Indian Currency Formatting
 function formatINR(val) {
@@ -444,84 +445,29 @@ export function InventoryDashboardPage() {
 
       {/* ── ROW 1: 6 TOP METRIC TILES ──────────────────────────────────────── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3.5">
-        {cards.map((card) => {
-          const Icon = card.icon;
-          const isUp = card.change >= 0;
+        {cards.map((card, idx) => {
+          const primaryVal = loading ? (
+            <div className="h-6 w-24 bg-slate-200/60 rounded animate-pulse" />
+          ) : card.byUom?.length ? (
+            <span className="text-[15px]">{card.byUom.map((u) => formatQty(u.qty, u.uom)).join(' + ')}</span>
+          ) : (
+            formatQty(card.qty, card.uom)
+          );
+
+          const hasChange = card.change !== 0;
           return (
-            <div
+            <KpiCard
               key={card.id}
-              className="bg-white rounded-xl border border-slate-200/90 shadow-[0_1px_3px_rgba(15,23,42,0.04)] p-3.5 flex flex-col justify-between hover:shadow-md transition-shadow"
-            >
-              <div>
-                {/* Header: Icon + Title */}
-                <div className="flex items-center gap-2.5 mb-2.5">
-                  <span
-                    className="grid h-8 w-8 shrink-0 place-items-center rounded-lg shadow-2xs"
-                    style={{ background: card.iconBg, color: card.iconColor }}
-                  >
-                    <Icon size={17} />
-                  </span>
-                  <div className="flex items-center justify-between flex-1 min-w-0">
-                    <span
-                      className="text-xs font-bold text-slate-700 truncate"
-                      title={card.title}
-                    >
-                      {card.title}
-                    </span>
-                    {card.info && (
-                      <span title={card.info} className="text-slate-300 hover:text-slate-500 cursor-help">
-                        <Info size={12} />
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                {/* Primary Metric: Quantity */}
-                <div className="text-lg sm:text-[19px] font-extrabold tracking-tight text-slate-900 leading-none">
-                  {loading ? (
-                    <div className="h-6 w-24 bg-slate-100 rounded animate-pulse" />
-                  ) : (
-                    card.byUom?.length
-                      // Several units in view: show each unit, never one summed figure.
-                      ? <span className="text-[15px]">{card.byUom.map((u) => formatQty(u.qty, u.uom)).join(' + ')}</span>
-                      : formatQty(card.qty, card.uom)
-                  )}
-                </div>
-
-                {/* Secondary Metric: Valuation INR */}
-                <div className="text-xs font-semibold text-slate-500 mt-1">
-                  {loading ? (
-                    <div className="h-3.5 w-16 bg-slate-100 rounded animate-pulse mt-1" />
-                  ) : (
-                    formatINR(card.val)
-                  )}
-                </div>
-              </div>
-
-              {/* Trend Badge */}
-              <div className="mt-3 pt-2 border-t border-slate-100 flex items-center gap-1 text-[11px] font-bold">
-                {card.change !== 0 ? (
-                  <>
-                    {isUp ? (
-                      <TrendingUp size={12} className="text-emerald-600" />
-                    ) : (
-                      <TrendingDown size={12} className="text-rose-500" />
-                    )}
-                    <span className={isUp ? 'text-emerald-600' : 'text-rose-500'}>
-                      {isUp ? '+' : ''}
-                      {card.change.toFixed(1)}%
-                    </span>
-                    {card.changeLabel && (
-                      <span className="text-slate-400 font-normal ml-0.5">
-                        {card.changeLabel}
-                      </span>
-                    )}
-                  </>
-                ) : (
-                  <span className="text-slate-400 font-medium">0.0% vs last month</span>
-                )}
-              </div>
-            </div>
+              index={idx}
+              title={card.title}
+              value={primaryVal}
+              icon={card.icon}
+              sub={!loading && card.val ? formatINR(card.val) : undefined}
+              change={hasChange ? `${card.change >= 0 ? '+' : ''}${card.change.toFixed(1)}%` : undefined}
+              trend={card.change > 0 ? 'up' : card.change < 0 ? 'down' : undefined}
+              trendPeriod={card.changeLabel || (hasChange ? 'vs last month' : undefined)}
+              loading={loading}
+            />
           );
         })}
       </div>

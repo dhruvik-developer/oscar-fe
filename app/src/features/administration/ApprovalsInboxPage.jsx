@@ -220,43 +220,11 @@ export default function ApprovalsInboxPage() {
       </PageHeader>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center gap-3">
-          <div className="p-2.5 rounded-lg bg-amber-50 text-amber-600">
-            <Clock className="w-6 h-6" />
-          </div>
-          <div>
-            <div className="text-2xl font-bold text-slate-800">{kpis.pending}</div>
-            <div className="text-xs text-slate-500 font-medium">Pending Approvals</div>
-          </div>
-        </div>
-        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center gap-3">
-          <div className="p-2.5 rounded-lg bg-emerald-50 text-emerald-600">
-            <CheckCircle className="w-6 h-6" />
-          </div>
-          <div>
-            <div className="text-2xl font-bold text-slate-800">{kpis.approved}</div>
-            <div className="text-xs text-slate-500 font-medium">Approved Records</div>
-          </div>
-        </div>
-        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center gap-3">
-          <div className="p-2.5 rounded-lg bg-rose-50 text-rose-600">
-            <XCircle className="w-6 h-6" />
-          </div>
-          <div>
-            <div className="text-2xl font-bold text-slate-800">{kpis.rejected}</div>
-            <div className="text-xs text-slate-500 font-medium">Rejected Records</div>
-          </div>
-        </div>
-        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center gap-3">
-          <div className="p-2.5 rounded-lg bg-indigo-50 text-indigo-600">
-            <Sliders className="w-6 h-6" />
-          </div>
-          <div>
-            <div className="text-2xl font-bold text-slate-800">{kpis.totalRules}</div>
-            <div className="text-xs text-slate-500 font-medium">Active Approval Rules</div>
-          </div>
-        </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+        <KpiCard index={0} label="Pending Approvals" value={kpis.pending} icon={Clock} sub="Awaiting decision" />
+        <KpiCard index={1} label="Approved Records" value={kpis.approved} icon={CheckCircle} sub="Authorized workflows" />
+        <KpiCard index={2} label="Rejected Records" value={kpis.rejected} icon={XCircle} sub="Declined requests" />
+        <KpiCard index={3} label="Active Approval Rules" value={kpis.totalRules} icon={Sliders} sub="Configured approval tiers" />
       </div>
 
       {/* Tabs */}

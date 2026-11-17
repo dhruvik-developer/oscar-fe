@@ -279,15 +279,15 @@ export const CashBankPage = () => {
 
       {activeTab === 'accounts' && (
         <>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
             <Kpi
               label="Total Liquidity"
               value={balances ? formatINR(balances.aggregates?.totalBalance) : '—'}
-              tone="text-slate-900"
+              index={0}
               note={balancesError ? 'Balances unavailable' : 'Sum of ledger balances (server)'}
             />
-            <Kpi label="Bank & Cash Accounts" value={banksLoading ? '—' : String(banks.length)} />
-            <Kpi label="Transfers Recorded" value={transfers ? String(transfers.count ?? 0) : '—'} />
+            <Kpi label="Bank & Cash Accounts" value={banksLoading ? '—' : String(banks.length)} index={1} />
+            <Kpi label="Transfers Recorded" value={transfers ? String(transfers.count ?? 0) : '—'} index={2} />
           </div>
           <ErrorState message={balancesError ? `Balances could not be loaded — ${balancesError}` : ''} onRetry={loadBalances} />
 

@@ -27,10 +27,30 @@ import {
   ExternalLink,
 } from 'lucide-react';
 import { salesService, crmService, accountingService } from '../../../services/domainServices';
+import { PageHeader } from '../../../components/common/PageHeader';
+import { Button } from '../../../components/ui/Button';
 import PageInfoButton from '../../../components/ui/PageInfoButton';
 import TablePagination from '../../../components/ui/TablePagination';
 import MasterSourceLink from '../../../components/common/MasterSourceLink';
 import KpiCard from '../../../components/ui/KpiCard';
+
+const brokerGuide = {
+  title: 'Broker Lead & Commission Hub',
+  subtitle: 'Complete lifecycle from Broker Master → Lead Register → Document Pipeline Attribution → Commission Accrual & Payout.',
+  purpose: 'The Broker Lead & Commission Hub manages the entire lifecycle of third-party sales brokers, from broker onboarding and lead attribution to automatic commission accruals linked to customer collections, invoice settlements, and voucher payouts.',
+  keyTerms: [
+    { term: 'Broker Master', definition: 'Central record of certified intermediaries with negotiated commission percentages and KYC details.' },
+    { term: 'Attributed Lead', definition: 'Sales inquiries and CRM leads tied to a specific broker who introduced the buyer.' },
+    { term: 'Accrued Commission', definition: 'Brokerage earned and calculated automatically when payment receipts are applied to orders.' },
+    { term: 'Payable Balance', definition: 'Approved commission amounts cleared and ready for accounting payout disbursements.' },
+  ],
+  tips: [
+    'Commissions accrue automatically as customer payments settle corresponding sales invoices.',
+    'Use Broker Balances & Statements to track lifetime billings, paid-outs, and current ledger liabilities.',
+    'Filter by individual broker to see itemized statement ledgers and export statements.',
+  ],
+  workflow: ['Broker Master Onboarded', 'Lead Attributed to Broker', 'Sales Order & Invoice Converted', 'Customer Payment Collected', 'Commission Accrued & Disbursed'],
+};
 
 export default function BrokerCommissionPage() {
   // Navigation tabs: 'leads' (default) | 'register' | 'statement' | 'analytics'
@@ -602,160 +622,158 @@ export default function BrokerCommissionPage() {
 
   return (
     <div className="space-y-6">
-      {/* Top Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-200">
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-              <Users className="w-7 h-7 text-indigo-600" />
-              Broker Lead & Commission Hub
-            </h1>
-            <PageInfoButton title="Broker Lead & Commission Management" />
+      {/* Top Header matching Delivery Challan */}
+      <PageHeader
+        title="Broker Lead & Commission Hub"
+        subtitle="Complete lifecycle from Broker Master → Lead Register → Document Pipeline Attribution → Commission Accrual & Payout."
+        guide={brokerGuide}
+        breadcrumb={[
+          { label: 'Sales', path: '/sales' },
+          { label: 'Broker Commissions', isCurrent: true },
+        ]}
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              variant="secondary"
+              icon={Building2}
+              onClick={() => setShowCreateBrokerModal(true)}
+            >
+              Add Broker Master
+            </Button>
+            <Button
+              icon={Plus}
+              onClick={() => setShowCreateLeadModal(true)}
+            >
+              Create Lead with Broker
+            </Button>
           </div>
-          <p className="text-sm text-slate-500 mt-1">
-            Complete lifecycle from Broker Master → Lead Register → Document Pipeline Attribution → Commission Accrual & Payout.
-          </p>
-        </div>
-
-        {/* Action Buttons */}
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => setShowCreateBrokerModal(true)}
-            className="px-3.5 py-2 text-xs font-semibold text-slate-700 bg-white border border-slate-300 rounded-lg shadow-sm hover:bg-slate-50 transition-colors flex items-center gap-1.5"
-          >
-            <Building2 size={14} className="text-slate-500" />
-            + Add Broker Master
-          </button>
-          <button
-            onClick={() => setShowCreateLeadModal(true)}
-            className="px-4 py-2 text-xs font-semibold text-white bg-indigo-600 rounded-lg shadow hover:bg-indigo-700 transition-colors flex items-center gap-1.5"
-          >
-            <Plus size={15} />
-            Create Lead with Broker
-          </button>
-        </div>
-      </div>
+        }
+      />
 
       {/* KPI Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3.5">
         <KpiCard
           label="Broker Leads"
           value={summaryStats.totalLeads}
           sub={`${summaryStats.activeLeads} in pipeline`}
           icon={Users}
-          tone="indigo"
+          index={0}
         />
         <KpiCard
           label="Accrued Brokerage"
           value={`₹${summaryStats.accrued.toLocaleString()}`}
           sub="Earned from customer collections"
           icon={IndianRupee}
-          tone="blue"
+          index={1}
         />
         <KpiCard
           label="Approved / Payable"
           value={`₹${summaryStats.payable.toLocaleString()}`}
           sub="Ready for payout voucher"
           icon={CheckCircle2}
-          tone="sky"
+          index={2}
         />
         <KpiCard
           label="Total Paid Out"
           value={`₹${summaryStats.paid.toLocaleString()}`}
           sub="Disbursed to brokers"
           icon={TrendingUp}
-          tone="emerald"
+          index={3}
         />
         <KpiCard
           label="Outstanding Balance"
           value={`₹${summaryStats.pendingBalance.toLocaleString()}`}
           sub="Net liability"
           icon={Clock}
-          tone="amber"
+          index={4}
         />
         <KpiCard
           label="Conversion Rate"
           value={analyticsData?.conversionRate !== undefined ? `${analyticsData.conversionRate}%` : '25.0%'}
           sub="Deals won vs leads"
           icon={Percent}
-          tone="purple"
+          index={0}
         />
       </div>
 
       {/* Navigation Tabs */}
-      <div className="flex border-b border-slate-200">
+      <div className="flex items-center gap-1 border-b border-border text-xs overflow-x-auto whitespace-nowrap scrollbar-none">
         <button
           onClick={() => setActiveTab('leads')}
-          className={`py-3 px-5 text-sm font-semibold border-b-2 flex items-center gap-2 transition-colors ${
+          className={`px-4 py-2.5 text-xs font-semibold border-b-2 flex items-center gap-2 transition-colors shrink-0 ${
             activeTab === 'leads'
-              ? 'border-indigo-600 text-indigo-600'
+              ? 'border-primary text-primary font-bold'
               : 'border-transparent text-slate-500 hover:text-slate-800'
           }`}
         >
-          <Layers size={16} />
+          <Layers size={15} />
           Automatic Lead Register
-          <span className="ml-1 px-2 py-0.5 rounded-full text-xs bg-indigo-50 text-indigo-600">
+          <span className={`ml-1 px-2 py-0.5 rounded-full text-[11px] font-semibold ${
+            activeTab === 'leads' ? 'bg-primary/10 text-primary' : 'bg-slate-100 text-slate-600'
+          }`}>
             {filteredLeads.length}
           </span>
         </button>
         <button
           onClick={() => setActiveTab('register')}
-          className={`py-3 px-5 text-sm font-semibold border-b-2 flex items-center gap-2 transition-colors ${
+          className={`px-4 py-2.5 text-xs font-semibold border-b-2 flex items-center gap-2 transition-colors shrink-0 ${
             activeTab === 'register'
-              ? 'border-indigo-600 text-indigo-600'
+              ? 'border-primary text-primary font-bold'
               : 'border-transparent text-slate-500 hover:text-slate-800'
           }`}
         >
-          <FileText size={16} />
+          <FileText size={15} />
           Commission Register (Customer Collections)
-          <span className="ml-1 px-2 py-0.5 rounded-full text-xs bg-slate-100 text-slate-700">
+          <span className={`ml-1 px-2 py-0.5 rounded-full text-[11px] font-semibold ${
+            activeTab === 'register' ? 'bg-primary/10 text-primary' : 'bg-slate-100 text-slate-600'
+          }`}>
             {filteredCommissions.length}
           </span>
         </button>
         <button
           onClick={() => setActiveTab('statement')}
-          className={`py-3 px-5 text-sm font-semibold border-b-2 flex items-center gap-2 transition-colors ${
+          className={`px-4 py-2.5 text-xs font-semibold border-b-2 flex items-center gap-2 transition-colors shrink-0 ${
             activeTab === 'statement'
-              ? 'border-indigo-600 text-indigo-600'
+              ? 'border-primary text-primary font-bold'
               : 'border-transparent text-slate-500 hover:text-slate-800'
           }`}
         >
-          <IndianRupee size={16} />
+          <IndianRupee size={15} />
           Broker Balances & Statement
         </button>
         <button
           onClick={() => setActiveTab('analytics')}
-          className={`py-3 px-5 text-sm font-semibold border-b-2 flex items-center gap-2 transition-colors ${
+          className={`px-4 py-2.5 text-xs font-semibold border-b-2 flex items-center gap-2 transition-colors shrink-0 ${
             activeTab === 'analytics'
-              ? 'border-indigo-600 text-indigo-600'
+              ? 'border-primary text-primary font-bold'
               : 'border-transparent text-slate-500 hover:text-slate-800'
           }`}
         >
-          <TrendingUp size={16} />
+          <TrendingUp size={15} />
           Broker Performance & Analytics
         </button>
       </div>
 
       {/* Global Filter Bar (for Leads, Register, and Statement) */}
       {activeTab !== 'analytics' && (
-        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4">
-          <div className="relative w-full md:w-80">
-            <Search className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
+        <div className="bg-card p-3 rounded-xl border border-border shadow-2xs flex flex-col sm:flex-row items-center justify-between gap-3">
+          <div className="relative w-full sm:w-80">
+            <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
             <input
               type="text"
               placeholder={activeTab === 'leads' ? 'Search by lead #, party, broker, fabric...' : 'Search commissions...'}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              className="w-full h-9 pl-9 pr-3 text-xs bg-card border border-border rounded-lg text-text placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-primary"
             />
           </div>
 
-          <div className="flex items-center gap-3 w-full md:w-auto">
+          <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
             {/* Broker Dropdown Filter */}
             <select
               value={selectedBrokerId}
               onChange={(e) => setSelectedBrokerId(e.target.value)}
-              className="px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium text-slate-700"
+              className="h-9 px-3 bg-card border border-border rounded-lg text-xs font-medium text-text focus:outline-none focus:ring-1 focus:ring-primary"
             >
               <option value="">All Brokers</option>
               {brokersList.map((b) => (
@@ -770,7 +788,7 @@ export default function BrokerCommissionPage() {
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium text-slate-700"
+                className="h-9 px-3 bg-card border border-border rounded-lg text-xs font-medium text-text focus:outline-none focus:ring-1 focus:ring-primary"
               >
                 <option value="">All Pipeline Stages</option>
                 <option value="New Lead">New Lead</option>
@@ -784,7 +802,7 @@ export default function BrokerCommissionPage() {
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium text-slate-700"
+                className="h-9 px-3 bg-card border border-border rounded-lg text-xs font-medium text-text focus:outline-none focus:ring-1 focus:ring-primary"
               >
                 <option value="">All Commission Statuses</option>
                 <option value="Awaiting Collection">Awaiting Collection</option>
@@ -805,10 +823,10 @@ export default function BrokerCommissionPage() {
                   setSelectedBrokerId('');
                   setStatusFilter('');
                 }}
-                className="p-2 text-slate-500 hover:text-slate-800 border border-slate-200 rounded-lg hover:bg-slate-50"
+                className="h-9 w-9 flex items-center justify-center text-slate-400 hover:text-slate-700 border border-border rounded-lg hover:bg-soft transition-colors cursor-pointer"
                 title="Clear Filters"
               >
-                <X size={16} />
+                <X size={15} />
               </button>
             )}
           </div>
@@ -819,20 +837,20 @@ export default function BrokerCommissionPage() {
       {/* TAB 1: AUTOMATIC LEAD REGISTER */}
       {/* ───────────────────────────────────────────────────────────── */}
       {activeTab === 'leads' && (
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="table-card bg-card rounded-xl border border-border shadow-xs overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm border-collapse">
-              <thead>
-                <tr className="bg-slate-50/75 border-b border-slate-200 text-xs font-semibold text-slate-600 uppercase tracking-wider">
-                  <th className="py-3 px-4">Lead # & Date</th>
-                  <th className="py-3 px-4">Broker</th>
-                  <th className="py-3 px-4">Customer / Party</th>
-                  <th className="py-3 px-4">Fabric & Volume</th>
-                  <th className="py-3 px-4 text-right">Estimated Value</th>
-                  <th className="py-3 px-4 text-center">Agreed Terms</th>
-                  <th className="py-3 px-4 text-center">Pipeline Stage</th>
-                  <th className="py-3 px-4 text-center">Commission Status</th>
-                  <th className="py-3 px-4 text-center">Actions</th>
+            <table className="w-full text-left border-collapse">
+              <thead className="table-head-std sticky top-0 z-10 shadow-xs">
+                <tr className="table-head-row-std border-b border-border bg-table-head text-text-secondary font-semibold text-xs h-11">
+                  <th className="th-std h-11 px-3 align-middle text-xs font-semibold whitespace-nowrap">Lead # & Date</th>
+                  <th className="th-std h-11 px-3 align-middle text-xs font-semibold whitespace-nowrap">Broker</th>
+                  <th className="th-std h-11 px-3 align-middle text-xs font-semibold whitespace-nowrap">Customer / Party</th>
+                  <th className="th-std h-11 px-3 align-middle text-xs font-semibold whitespace-nowrap">Fabric & Volume</th>
+                  <th className="th-std h-11 px-3 align-middle text-xs font-semibold whitespace-nowrap text-right">Estimated Value</th>
+                  <th className="th-std h-11 px-3 align-middle text-xs font-semibold whitespace-nowrap text-center">Agreed Terms</th>
+                  <th className="th-std h-11 px-3 align-middle text-xs font-semibold whitespace-nowrap text-center">Pipeline Stage</th>
+                  <th className="th-std h-11 px-3 align-middle text-xs font-semibold whitespace-nowrap text-center">Commission Status</th>
+                  <th className="th-std h-11 px-3 align-middle text-xs font-semibold whitespace-nowrap text-center">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -861,19 +879,19 @@ export default function BrokerCommissionPage() {
                 ) : (
                   pagedLeads.map((l) => (
                     <tr key={l.id} className="hover:bg-slate-50/75 transition-colors">
-                      <td className="py-3 px-4">
+                      <td className="py-2.5 px-3 text-xs align-middle text-text">
                         <div className="font-semibold text-slate-900">{l.leadNumber}</div>
                         <div className="text-xs text-slate-400">{l.leadDate || 'Today'}</div>
                       </td>
-                      <td className="py-3 px-4">
+                      <td className="py-2.5 px-3 text-xs align-middle text-text">
                         <div className="font-semibold text-slate-800">{l.brokerName}</div>
                         <div className="text-xs text-indigo-600 font-medium">{l.brokerCode}</div>
                       </td>
-                      <td className="py-3 px-4">
+                      <td className="py-2.5 px-3 text-xs align-middle text-text">
                         <div className="font-semibold text-slate-800">{l.customerName}</div>
                         <div className="text-xs text-slate-400">{l.contactPerson} {l.phone ? `• ${l.phone}` : ''}</div>
                       </td>
-                      <td className="py-3 px-4">
+                      <td className="py-2.5 px-3 text-xs align-middle text-text">
                         <div className="text-slate-800 font-medium">{l.fabricQuality}</div>
                         <div className="text-xs text-slate-500">
                           {l.expectedMeters > 0 ? `${Number(l.expectedMeters).toLocaleString()} m` : ''}
@@ -881,13 +899,13 @@ export default function BrokerCommissionPage() {
                           {l.expectedTakas > 0 ? `${Number(l.expectedTakas).toLocaleString()} takas` : ''}
                         </div>
                       </td>
-                      <td className="py-3 px-4 text-right font-semibold text-slate-900">
+                      <td className="py-2.5 px-3 text-xs align-middle text-text text-right font-semibold text-slate-900">
                         ₹{Number(l.expectedSaleValue || 0).toLocaleString()}
                       </td>
-                      <td className="py-3 px-4 text-center">
+                      <td className="py-2.5 px-3 text-xs align-middle text-text text-center">
                         {renderBasisBadge(l.commissionBasis, l.commissionRate)}
                       </td>
-                      <td className="py-3 px-4 text-center">
+                      <td className="py-2.5 px-3 text-xs align-middle text-text text-center">
                         <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-semibold ${
                           l.stage?.toLowerCase() === 'won'
                             ? 'bg-emerald-100 text-emerald-800'
@@ -898,7 +916,7 @@ export default function BrokerCommissionPage() {
                           {l.stage}
                         </span>
                       </td>
-                      <td className="py-3 px-4 text-center">
+                      <td className="py-2.5 px-3 text-xs align-middle text-text text-center">
                         {renderStatusBadge(l.commissionStatus)}
                         {Number(l.earnedCommission) > 0 && (
                           <div className="text-[11px] font-bold text-emerald-600 mt-0.5">
@@ -906,7 +924,7 @@ export default function BrokerCommissionPage() {
                           </div>
                         )}
                       </td>
-                      <td className="py-3 px-4 text-center">
+                      <td className="py-2.5 px-3 text-xs align-middle text-text text-center">
                         <button
                           onClick={() => setViewLeadDetail(l)}
                           className="px-2.5 py-1 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-md transition-colors inline-flex items-center gap-1"
@@ -935,22 +953,22 @@ export default function BrokerCommissionPage() {
       {/* TAB 2: COMMISSION REGISTER */}
       {/* ───────────────────────────────────────────────────────────── */}
       {activeTab === 'register' && (
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="table-card bg-card rounded-xl border border-border shadow-xs overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm border-collapse">
-              <thead>
-                <tr className="bg-slate-50/75 border-b border-slate-200 text-xs font-semibold text-slate-600 uppercase tracking-wider">
-                  <th className="py-3 px-4">Commission # & Date</th>
-                  <th className="py-3 px-4">Invoice #</th>
-                  <th className="py-3 px-4">Broker Name</th>
-                  <th className="py-3 px-4">Customer Party</th>
-                  <th className="py-3 px-4 text-center">Basis & Rate</th>
-                  <th className="py-3 px-4 text-right">Invoiced Amt</th>
-                  <th className="py-3 px-4 text-right">Accrued Comm.</th>
-                  <th className="py-3 px-4 text-right">Paid Amt</th>
-                  <th className="py-3 px-4 text-right">Balance</th>
-                  <th className="py-3 px-4 text-center">Status</th>
-                  <th className="py-3 px-4 text-center">Actions</th>
+            <table className="w-full text-left border-collapse">
+              <thead className="table-head-std sticky top-0 z-10 shadow-xs">
+                <tr className="table-head-row-std border-b border-border bg-table-head text-text-secondary font-semibold text-xs h-11">
+                  <th className="th-std h-11 px-3 align-middle text-xs font-semibold whitespace-nowrap">Commission # & Date</th>
+                  <th className="th-std h-11 px-3 align-middle text-xs font-semibold whitespace-nowrap">Invoice #</th>
+                  <th className="th-std h-11 px-3 align-middle text-xs font-semibold whitespace-nowrap">Broker Name</th>
+                  <th className="th-std h-11 px-3 align-middle text-xs font-semibold whitespace-nowrap">Customer Party</th>
+                  <th className="th-std h-11 px-3 align-middle text-xs font-semibold whitespace-nowrap text-center">Basis & Rate</th>
+                  <th className="th-std h-11 px-3 align-middle text-xs font-semibold whitespace-nowrap text-right">Invoiced Amt</th>
+                  <th className="th-std h-11 px-3 align-middle text-xs font-semibold whitespace-nowrap text-right">Accrued Comm.</th>
+                  <th className="th-std h-11 px-3 align-middle text-xs font-semibold whitespace-nowrap text-right">Paid Amt</th>
+                  <th className="th-std h-11 px-3 align-middle text-xs font-semibold whitespace-nowrap text-right">Balance</th>
+                  <th className="th-std h-11 px-3 align-middle text-xs font-semibold whitespace-nowrap text-center">Status</th>
+                  <th className="th-std h-11 px-3 align-middle text-xs font-semibold whitespace-nowrap text-center">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -976,14 +994,14 @@ export default function BrokerCommissionPage() {
 
                     return (
                       <tr key={c.id} className="hover:bg-slate-50/75 transition-colors">
-                        <td className="py-3 px-4">
+                        <td className="py-2.5 px-3 text-xs align-middle text-text">
                           <div className="font-semibold text-slate-900">{c.commission_number || `COMM-${c.id?.slice(0, 8)}`}</div>
                           <div className="text-xs text-slate-400">{c.invoice_date || 'N/A'}</div>
                         </td>
                         <td className="py-3 px-4 font-medium text-indigo-600">
                           {c.invoice_number || c.invoiceNumber || 'Direct'}
                         </td>
-                        <td className="py-3 px-4">
+                        <td className="py-2.5 px-3 text-xs align-middle text-text">
                           <div className="font-semibold text-slate-800">{c.broker_name || c.brokerName || c.broker?.name}</div>
                           <div className="text-xs text-slate-400">{c.brokerCode || ''}</div>
                         </td>
@@ -995,25 +1013,25 @@ export default function BrokerCommissionPage() {
                             </div>
                           )}
                         </td>
-                        <td className="py-3 px-4 text-center">
+                        <td className="py-2.5 px-3 text-xs align-middle text-text text-center">
                           {renderBasisBadge(c.commission_type || c.commission_basis, c.rate)}
                         </td>
-                        <td className="py-3 px-4 text-right text-slate-700">
+                        <td className="py-2.5 px-3 text-xs align-middle text-text text-right text-slate-700">
                           ₹{Number(c.invoice_amount || 0).toLocaleString()}
                         </td>
-                        <td className="py-3 px-4 text-right font-semibold text-slate-900">
+                        <td className="py-2.5 px-3 text-xs align-middle text-text text-right font-semibold text-slate-900">
                           ₹{totalComm.toLocaleString()}
                         </td>
-                        <td className="py-3 px-4 text-right text-emerald-700 font-medium">
+                        <td className="py-2.5 px-3 text-xs align-middle text-text text-right text-emerald-700 font-medium">
                           ₹{paidAmt.toLocaleString()}
                         </td>
-                        <td className="py-3 px-4 text-right font-bold text-amber-700">
+                        <td className="py-2.5 px-3 text-xs align-middle text-text text-right font-bold text-amber-700">
                           ₹{balance.toLocaleString()}
                         </td>
-                        <td className="py-3 px-4 text-center">
+                        <td className="py-2.5 px-3 text-xs align-middle text-text text-center">
                           {renderStatusBadge(c.status)}
                         </td>
-                        <td className="py-3 px-4 text-center">
+                        <td className="py-2.5 px-3 text-xs align-middle text-text text-center">
                           <div className="flex items-center justify-center gap-1.5">
                             {c.status === 'Accrued' && (
                               <button
@@ -1112,31 +1130,31 @@ export default function BrokerCommissionPage() {
                 </div>
               )}
 
-              <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-                <div className="p-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
-                  <h3 className="font-semibold text-slate-800 flex items-center gap-2">
-                    <FileText size={16} className="text-indigo-600" />
+              <div className="table-card bg-card rounded-xl border border-border shadow-xs overflow-hidden">
+                <div className="p-3.5 bg-soft border-b border-border flex items-center justify-between">
+                  <h3 className="font-semibold text-text text-xs flex items-center gap-2">
+                    <FileText size={15} className="text-primary" />
                     Ledger Statement Drill-Down
                   </h3>
                   <button
                     onClick={() => setSelectedBrokerId('')}
-                    className="text-xs font-semibold text-indigo-600 hover:underline"
+                    className="text-xs font-semibold text-primary hover:underline cursor-pointer"
                   >
                     Change Broker
                   </button>
                 </div>
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left text-sm border-collapse">
-                    <thead>
-                      <tr className="bg-slate-50/75 border-b border-slate-200 text-xs font-semibold text-slate-600 uppercase tracking-wider">
-                        <th className="p-3">Doc # & Date</th>
-                        <th className="p-3">Party Name</th>
-                        <th className="p-3">Commission Basis</th>
-                        <th className="p-3 text-right">Invoiced Amount</th>
-                        <th className="p-3 text-right">Accrued (₹)</th>
-                        <th className="p-3 text-right">Paid (₹)</th>
-                        <th className="p-3 text-right">Balance (₹)</th>
-                        <th className="p-3 text-center">Status</th>
+                  <table className="w-full text-left border-collapse">
+                    <thead className="table-head-std sticky top-0 z-10 shadow-xs">
+                      <tr className="table-head-row-std border-b border-border bg-table-head text-text-secondary font-semibold text-xs h-11">
+                        <th className="th-std h-11 px-3 align-middle text-xs font-semibold whitespace-nowrap">Doc # & Date</th>
+                        <th className="th-std h-11 px-3 align-middle text-xs font-semibold whitespace-nowrap">Party Name</th>
+                        <th className="th-std h-11 px-3 align-middle text-xs font-semibold whitespace-nowrap">Commission Basis</th>
+                        <th className="th-std h-11 px-3 align-middle text-xs font-semibold whitespace-nowrap text-right">Invoiced Amount</th>
+                        <th className="th-std h-11 px-3 align-middle text-xs font-semibold whitespace-nowrap text-right">Accrued (₹)</th>
+                        <th className="th-std h-11 px-3 align-middle text-xs font-semibold whitespace-nowrap text-right">Paid (₹)</th>
+                        <th className="th-std h-11 px-3 align-middle text-xs font-semibold whitespace-nowrap text-right">Balance (₹)</th>
+                        <th className="th-std h-11 px-3 align-middle text-xs font-semibold whitespace-nowrap text-center">Status</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -1279,32 +1297,32 @@ export default function BrokerCommissionPage() {
                   ) : (
                     analyticsData.brokerStats.map((b) => (
                       <tr key={b.brokerId} className="hover:bg-slate-50/75 transition-colors">
-                        <td className="py-3 px-4">
+                        <td className="py-2.5 px-3 text-xs align-middle text-text">
                           <div className="font-semibold text-slate-800">{b.brokerName}</div>
                           <div className="text-xs text-indigo-600 font-medium">{b.brokerCode}</div>
                         </td>
                         <td className="py-3 px-4 text-slate-600 text-xs">
                           {b.phone}
                         </td>
-                        <td className="py-3 px-4 text-center">
+                        <td className="py-2.5 px-3 text-xs align-middle text-text text-center">
                           {renderBasisBadge(b.commissionType, b.defaultValue)}
                         </td>
                         <td className="py-3 px-4 text-center font-semibold text-slate-800">
                           {b.totalLeads}
                         </td>
-                        <td className="py-3 px-4 text-center">
+                        <td className="py-2.5 px-3 text-xs align-middle text-text text-center">
                           <span className="font-bold text-purple-700">{b.conversionRate}%</span>
                         </td>
-                        <td className="py-3 px-4 text-right font-medium text-slate-800">
+                        <td className="py-2.5 px-3 text-xs align-middle text-text text-right font-medium text-slate-800">
                           ₹{Number(b.invoicedValue || 0).toLocaleString()}
                         </td>
-                        <td className="py-3 px-4 text-right font-semibold text-slate-900">
+                        <td className="py-2.5 px-3 text-xs align-middle text-text text-right font-semibold text-slate-900">
                           ₹{Number(b.accruedCommission || 0).toLocaleString()}
                         </td>
-                        <td className="py-3 px-4 text-right font-medium text-emerald-700">
+                        <td className="py-2.5 px-3 text-xs align-middle text-text text-right font-medium text-emerald-700">
                           ₹{Number(b.paidCommission || 0).toLocaleString()}
                         </td>
-                        <td className="py-3 px-4 text-right font-bold text-amber-700">
+                        <td className="py-2.5 px-3 text-xs align-middle text-text text-right font-bold text-amber-700">
                           ₹{Number(b.pendingBalance || 0).toLocaleString()}
                         </td>
                       </tr>

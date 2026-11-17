@@ -234,10 +234,10 @@ export const QuotationsPage = () => {
         </div>
       )}
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <StatCard label="Total Quotations" value={quotations.length} icon={FileText}/>
-        <StatCard label="Pipeline Value" value={formatCurrency(totalPipeline)}/>
-        <StatCard label="Confirmed Conversion" value={`${quotations.filter((q) => q.status === 'Confirmed' || q.status === 'Invoiced').length} Quotes`} trend={{ positive: true, text: 'Direct SO conversion' }}/>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+        <StatCard index={0} label="Total Quotations" value={quotations.length} icon={FileText}/>
+        <StatCard index={1} label="Pipeline Value" value={formatCurrency(totalPipeline)}/>
+        <StatCard index={2} label="Confirmed Conversion" value={`${quotations.filter((q) => q.status === 'Confirmed' || q.status === 'Invoiced').length} Quotes`} trend={{ positive: true, text: 'Direct SO conversion' }}/>
       </div>
 
       <DataTable title="Quotation Register" data={quotations} columns={columns} keyExtractor={(q) => q.id} searchPlaceholder="Search quotations..." searchFilter={(q, term) => String(q.quoteNumber ?? '').toLowerCase().includes(term) ||

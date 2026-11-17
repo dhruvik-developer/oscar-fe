@@ -4,6 +4,7 @@ import { useAppStore } from "../../../stores/appStore";
 import { Button } from "../../../components/hrms/Button";
 import { useNavigate } from "react-router-dom";
 import PageHeader from "../../../components/ui/PageHeader";
+import KpiCard from "../../../components/ui/KpiCard";
 import {
   UserCheck,
   CheckCircle2,
@@ -111,46 +112,29 @@ export default function Onboarding() {
             count: hired.length,
             sub: "Hired candidates transition",
             icon: Users,
-            color: "text-indigo-600 bg-indigo-50 dark:bg-indigo-950/30 border-indigo-200/60",
           },
           {
             label: "Pending Verification",
             count: Math.max(0, pendingCount),
             sub: "Awaiting documents or IT setup",
             icon: Clock,
-            color: "text-amber-600 bg-amber-50 dark:bg-amber-950/30 border-amber-200/60",
           },
           {
             label: "Fully Inducted",
             count: completedCount,
             sub: "Active in employee directory",
             icon: CheckCircle2,
-            color: "text-emerald-600 bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200/60",
           },
-        ].map((m) => {
-          const Icon = m.icon;
-          return (
-            <div
-              key={m.label}
-              className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl p-4 shadow-xs flex items-center justify-between"
-            >
-              <div>
-                <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                  {m.label}
-                </div>
-                <div className="text-2xl font-bold text-slate-800 dark:text-white mt-1">
-                  {m.count}
-                </div>
-                <div className="text-[11.5px] text-slate-500 dark:text-slate-400 mt-0.5">
-                  {m.sub}
-                </div>
-              </div>
-              <div className={`p-2.5 rounded-xl border ${m.color}`}>
-                <Icon size={20} />
-              </div>
-            </div>
-          );
-        })}
+        ].map((m, idx) => (
+          <KpiCard
+            key={m.label}
+            index={idx}
+            label={m.label}
+            value={m.count}
+            sub={m.sub}
+            icon={m.icon}
+          />
+        ))}
       </div>
 
       {/* Main Content */}

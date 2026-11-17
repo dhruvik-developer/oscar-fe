@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { modal } from '../../context/ModalContext';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Search, CheckCircle2, Receipt, Eye, BadgePercent, IndianRupee, X, Zap, Printer, Clock, AlertCircle, FileText, Plus, Ban, Check, Edit, Lock, ShieldAlert, MapPin, Truck } from 'lucide-react';
@@ -32,7 +32,7 @@ const invoiceGuide = {
     ],
     tips: [
         'Proforma Invoices convert into Draft Sales Invoices, giving you full flexibility to adjust parts and quantities before final commercial posting.',
-        'Use the Ã¢Å¡Â¡ Settle button on unpaid invoices to enter the amount received and generate an official printable receipt voucher.',
+        'Use the ⚡ Settle button on unpaid invoices to enter the amount received and generate an official printable receipt voucher.',
     ],
     workflow: ['Proforma / SO Draft Created', 'Adjust Line Items & Addresses', 'Finalize Commercial Invoice', 'Collect Payment', 'Receipt Voucher Issued'],
 };
@@ -63,6 +63,8 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
         cancelSalesInvoice,
         convertInvoiceToChallan,
         getInvoiceOutstanding,
+        getCustomerAdvanceBalance,
+        applyCustomerAdvanceToInvoice,
         deliveryChallans = [],
         formatCurrency,
         formatDateDDMMYYYY,
@@ -326,7 +328,7 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
         }
     };
 
-    // [Quotation & Proforma Invoice modules are commented out] Ã¢â‚¬" the Source Proforma picker is hidden; kept for later.
+    // [Quotation & Proforma Invoice modules are commented out] — the Source Proforma picker is hidden; kept for later.
     const handlePiSelect = (piId) => {
         setLinkedPiId(piId);
         if (piId !== 'None') {
@@ -567,25 +569,40 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
     };
 
     const handleSettleSaved = (payment) => {
-        refreshCollections(['invoices', 'paymentIns']);
+        refreshCollections(['invoices', 'paymentIns', 'journalEntries', 'parties']);
+        const appliedToInvoice = Number(
+            payment.allocated_amount ??
+            payment.allocatedAmount ??
+            (payment.allocations && payment.allocations.length > 0
+                ? payment.allocations.reduce((s, a) => s + Number(a.amount || 0), 0)
+                : Math.min(Number(payment.amount || 0), Number(settleTarget?.total || payment.amount || 0)))
+        );
+        const customerAdvance = Number(
+            payment.unallocatedAmount ??
+            payment.unallocated_amount ??
+            Math.max(0, Math.round((Number(payment.amount || 0) - appliedToInvoice) * 100) / 100)
+        );
+
         setActiveReceipt({
             id: payment.id,
             receiptNumber: payment.payment_number || payment.receiptNumber,
             invoiceNumber: settleTarget?.invoiceNumber,
             customer: payment.customerName || settleTarget?.customer,
             amount: payment.amount,
+            appliedToInvoice,
+            customerAdvance,
             date: formatDateDDMMYYYY(payment.date),
             paymentMode: payment.mode,
             reference: payment.transactionReference || payment.referenceNumber,
             discounts: payment.discounts || [],
             discountTotal: payment.discountTotal || 0,
-            totalSettled: payment.totalSettled || payment.amount,
+            totalSettled: payment.totalSettled || appliedToInvoice,
         });
         showToast(`Payment receipt ${payment.payment_number || payment.receiptNumber || ''} recorded successfully.`);
         if (selectedInvoice && settleTarget && selectedInvoice.id === settleTarget.id) {
             setSelectedInvoice(prev => prev ? ({
                 ...prev,
-                paidAmount: (Number(prev.paidAmount || prev.amountPaid || 0) + Number(payment.amount || 0)),
+                paidAmount: (Number(prev.paidAmount || prev.amountPaid || 0) + appliedToInvoice),
                 settlementDiscount: (Number(prev.settlementDiscount || 0) + Number(payment.discountTotal || 0)),
             }) : null);
         }
@@ -597,10 +614,6 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
         const outstanding = getInvoiceOutstanding(showPaymentModal.id);
         const maxAllowed = outstanding.balanceDue > 0 ? outstanding.balanceDue : showPaymentModal.total;
         if (payAmount <= 0) return;
-        if (payAmount > maxAllowed) {
-            await modal.warning(`Payment amount cannot exceed outstanding balance (${formatCurrency(maxAllowed)}).`, 'Invalid Amount');
-            return;
-        }
         setIsSubmittingPayment(true);
         try {
             const payment = await addPaymentIn({
@@ -613,12 +626,16 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
                 reference: payRef || `WIRE-${Date.now()}`,
             });
             if (!payment) return;
+            const appliedAmt = Number(payment.allocated_amount ?? payment.allocatedAmount ?? Math.min(payAmount, maxAllowed));
+            const advAmt = Number(payment.unallocatedAmount ?? payment.unallocated_amount ?? Math.max(0, Math.round((payAmount - appliedAmt) * 100) / 100));
             setActiveReceipt({
                 id: payment.id,
                 receiptNumber: payment.receiptNumber || payment.payment_number,
                 invoiceNumber: showPaymentModal.invoiceNumber,
                 customer: showPaymentModal.customer,
                 amount: payment.amount,
+                appliedToInvoice: appliedAmt,
+                customerAdvance: advAmt,
                 date: payment.date,
                 paymentMode: payment.mode,
                 reference: payment.reference || payment.referenceNumber,
@@ -853,11 +870,11 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
             />
 
             {/* Sales Invoices KPI Stat Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <StatCard label="Total Invoiced Value" value={formatCurrency(totalInvoiced)} icon={IndianRupee} />
-                <StatCard label="AR Outstanding Due" value={formatCurrency(totalBalanceDue)} icon={Clock} trend={{ positive: totalBalanceDue === 0, text: totalBalanceDue > 0 ? `${unpaidCount} unpaid/partial` : 'All settled' }} highlight={totalBalanceDue > 0} />
-                <StatCard label="Total Collected" value={formatCurrency(totalCollected)} icon={CheckCircle2} trend={{ positive: true, text: 'Receipts synchronized' }} />
-                <StatCard label="Total Invoices" value={`${invoices.length} Invoices`} icon={FileText} subtext={`${unpaidCount} requiring payment`} />
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+                <StatCard index={0} label="Total Invoiced Value" value={formatCurrency(totalInvoiced)} icon={IndianRupee} />
+                <StatCard index={1} label="AR Outstanding Due" value={formatCurrency(totalBalanceDue)} icon={Clock} trend={{ positive: totalBalanceDue === 0, text: totalBalanceDue > 0 ? `${unpaidCount} unpaid/partial` : 'All settled' }} highlight={totalBalanceDue > 0} />
+                <StatCard index={2} label="Total Collected" value={formatCurrency(totalCollected)} icon={CheckCircle2} trend={{ positive: true, text: 'Receipts synchronized' }} />
+                <StatCard index={3} label="Total Invoices" value={`${invoices.length} Invoices`} icon={FileText} subtext={`${unpaidCount} requiring payment`} />
             </div>
 
             {/* Filter Tabs */}
@@ -928,7 +945,7 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
                                                 </button>
                                             </td>
                                             <td className="py-2.5 px-6 font-semibold text-slate-800">
-                                                {inv.customer}
+                                                {inv.customer || inv.customerName || inv.partyName || customers.find(c => c.id === (inv.customerId || inv.partyId))?.name || parties.find(p => p.id === (inv.customerId || inv.partyId))?.name || '-'}
                                             </td>
                                             <td className="py-2.5 px-6 text-slate-500 font-mono text-[11px]">
                                                 {linkedSalesOrderNumber(inv) || '-'}
@@ -1227,7 +1244,7 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
                             {/* Charges billed on top of the goods */}
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                 <div>
-                                    <label className="text-xs font-semibold text-slate-800 block mb-1.5">Freight Charges (Ã¢"šÂ¹)</label>
+                                    <label className="text-xs font-semibold text-slate-800 block mb-1.5">Freight Charges (₹)</label>
                                     <input
                                         type="number"
                                         min="0"
@@ -1239,7 +1256,7 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
                                     />
                                 </div>
                                 <div>
-                                    <label className="text-xs font-semibold text-slate-800 block mb-1.5">Other Charges (Ã¢"šÂ¹)</label>
+                                    <label className="text-xs font-semibold text-slate-800 block mb-1.5">Other Charges (₹)</label>
                                     <input
                                         type="number"
                                         min="0"
@@ -1337,7 +1354,7 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
                                 </div>
                             </div>
 
-                            {/* E-INVOICE & E-WAY BILL PANEL (Simulated Ã‚§2) */}
+                            {/* E-INVOICE & E-WAY BILL PANEL (Simulated §2) */}
                             <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 text-xs space-y-3">
                                 <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-200">
                                     <div className="flex items-center gap-2">
@@ -1389,8 +1406,8 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
                                                     {selectedInvoice.irn}
                                                 </p>
                                                 <div className="flex justify-between text-[11px] text-slate-500">
-                                                    <span>Ack No: <strong className="text-slate-700 font-mono">{selectedInvoice.ackNo || selectedInvoice.ack_no || 'Ã¢â‚¬"'}</strong></span>
-                                                    <span>Ack Date: <strong className="text-slate-700">{selectedInvoice.ackDate || selectedInvoice.ack_date ? new Date(selectedInvoice.ackDate || selectedInvoice.ack_date).toLocaleDateString() : 'Ã¢â‚¬"'}</strong></span>
+                                                    <span>Ack No: <strong className="text-slate-700 font-mono">{selectedInvoice.ackNo || selectedInvoice.ack_no || '—'}</strong></span>
+                                                    <span>Ack Date: <strong className="text-slate-700">{selectedInvoice.ackDate || selectedInvoice.ack_date ? new Date(selectedInvoice.ackDate || selectedInvoice.ack_date).toLocaleDateString() : '—'}</strong></span>
                                                 </div>
                                                 <div className="pt-1 flex justify-end">
                                                     <button
@@ -1445,7 +1462,7 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
                                                     #{selectedInvoice.ewayBillNumber || selectedInvoice.eway_bill_number}
                                                 </p>
                                                 <div className="flex justify-between text-[11px] text-slate-500">
-                                                    <span>Generated: <strong className="text-slate-700">{selectedInvoice.ewayBillDate || selectedInvoice.eway_bill_date ? new Date(selectedInvoice.ewayBillDate || selectedInvoice.eway_bill_date).toLocaleDateString() : 'Ã¢â‚¬"'}</strong></span>
+                                                    <span>Generated: <strong className="text-slate-700">{selectedInvoice.ewayBillDate || selectedInvoice.eway_bill_date ? new Date(selectedInvoice.ewayBillDate || selectedInvoice.eway_bill_date).toLocaleDateString() : '—'}</strong></span>
                                                     <span>Valid: <strong className="text-slate-700">{selectedInvoice.ewayBillValidUntil || selectedInvoice.eway_bill_valid_until ? new Date(selectedInvoice.ewayBillValidUntil || selectedInvoice.eway_bill_valid_until).toLocaleDateString() : 'Active'}</strong></span>
                                                 </div>
                                             </div>
@@ -1627,7 +1644,7 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
 
                         {finalizeErrorCode === 'CREDIT_LIMIT_EXCEEDED' && creditExposure && (
                             <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-slate-700">
-                                <p className="mb-2 font-bold text-amber-900">Credit-limit review Ã¢â‚¬" {creditExposure.customerName}</p>
+                                <p className="mb-2 font-bold text-amber-900">Credit-limit review - {creditExposure.customerName}</p>
                                 <dl className="space-y-1">
                                     <div className="flex justify-between gap-3"><dt>Credit Limit</dt><dd className="font-semibold">{formatCurrency(creditExposure.creditLimit)}</dd></div>
                                     <div className="flex justify-between gap-3"><dt>Current Outstanding</dt><dd className="font-semibold">{formatCurrency(creditExposure.currentOutstanding)}</dd></div>
@@ -1647,7 +1664,7 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
                                             disabled={finalizingInvoiceId === finalizeModalTarget.id}
                                             className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-lg font-bold text-xs shadow-sm cursor-pointer transition-colors"
                                         >
-                                            {finalizingInvoiceId === finalizeModalTarget.id ? 'Overriding & FinalizingÃ¢â‚¬Â¦' : 'Approve & Finalize (Override Credit Limit)'}
+                                            {finalizingInvoiceId === finalizeModalTarget.id ? 'Overriding & Finalizing…' : 'Approve & Finalize (Override Credit Limit)'}
                                         </button>
                                     </div>
                                 ) : creditApprovalRequest?.status === 'Pending' ? (
@@ -1679,7 +1696,7 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
                                             disabled={requestingCreditApproval || !creditOverrideReason.trim()}
                                             className="rounded-md bg-amber-700 px-3 py-1.5 font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
                                         >
-                                            {requestingCreditApproval ? 'RequestingÃ¢â‚¬Â¦' : 'Request Owner Approval'}
+                                            {requestingCreditApproval ? 'Requesting…' : 'Request Owner Approval'}
                                         </button>
                                     </div>
                                 )}
@@ -1696,7 +1713,7 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
                                     setCreditExposure(null);
                                 }}
                             >
-                                {finalizingInvoiceId === finalizeModalTarget.id ? 'FinalizingÃ¢â‚¬Â¦' : 'Back'}
+                                {finalizingInvoiceId === finalizeModalTarget.id ? 'Finalizing…' : 'Back'}
                             </Button>
                             <button
                                 type="button"
@@ -1704,7 +1721,7 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
                                 disabled={finalizingInvoiceId === finalizeModalTarget.id || creditApprovalRequest?.status === 'Pending'}
                                 className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 disabled:cursor-wait text-white rounded-lg font-bold shadow-sm cursor-pointer"
                             >
-                                {finalizingInvoiceId === finalizeModalTarget.id ? 'FinalizingÃ¢â‚¬Â¦' : 'Finalize Invoice'}
+                                {finalizingInvoiceId === finalizeModalTarget.id ? 'Finalizing…' : 'Finalize Invoice'}
                             </button>
                         </div>
                     </div>
@@ -1847,7 +1864,21 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
             <RecordPaymentModal
                 isOpen={Boolean(settleTarget)}
                 onClose={() => setSettleTarget(null)}
-                presetCustomerId={settleTarget?.customerId}
+                presetCustomerId={
+                    settleTarget?.customerId ||
+                    settleTarget?.partyId ||
+                    settleTarget?.party_id ||
+                    customers.find((c) => c.id === (settleTarget?.customerId || settleTarget?.partyId) || c.name?.toLowerCase() === (settleTarget?.customer || settleTarget?.partyName || settleTarget?.customerName)?.toLowerCase())?.id ||
+                    parties.find((p) => p.id === (settleTarget?.customerId || settleTarget?.partyId) || p.name?.toLowerCase() === (settleTarget?.customer || settleTarget?.partyName || settleTarget?.customerName)?.toLowerCase())?.id
+                }
+                presetCustomerName={
+                    settleTarget?.customer ||
+                    settleTarget?.customerName ||
+                    settleTarget?.partyName ||
+                    customers.find((c) => c.id === (settleTarget?.customerId || settleTarget?.partyId))?.name ||
+                    parties.find((p) => p.id === (settleTarget?.customerId || settleTarget?.partyId))?.name ||
+                    ''
+                }
                 presetInvoiceId={settleTarget?.id}
                 onSaved={handleSettleSaved}
             />

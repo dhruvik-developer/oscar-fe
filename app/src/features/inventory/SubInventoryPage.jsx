@@ -22,6 +22,7 @@ import {
   Boxes,
 } from 'lucide-react';
 import PageHeader from '../../components/ui/PageHeader';
+import KpiCard from '../../components/ui/KpiCard';
 import AppPagination from '../../components/ui/AppPagination';
 import { inventoryService } from '../../services/domainServices';
 import { formatINR, formatNumberIN, describeApiError } from '../accounts/accountingShared';
@@ -342,85 +343,40 @@ export default function SubInventoryPage() {
       {/* Physical Stock Panel */}
       {showPhysical && <PhysicalStockSummary />}
 
-      {/* ── KPI Stat Cards ── */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {/* Card 1: Total Batches */}
-        <div className="bg-white border border-slate-200/80 rounded-xl p-3.5 shadow-2xs">
-          <div className="flex items-center gap-2.5">
-            <div
-              className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
-                activeSub === 'GREY' ? 'bg-stone-100 text-stone-700' : 'bg-sky-100 text-sky-700'
-              }`}
-            >
-              <Package size={16} />
-            </div>
-            <span className="text-[11px] font-semibold text-slate-500 leading-tight">
-              {activeSub === 'GREY' ? 'Total Grey Batches' : 'Total Dyeing Batches'}
-            </span>
-          </div>
-          <div className="mt-2.5">
-            <span className="text-xl font-black text-slate-900 tracking-tight">{kpis.totalBatches}</span>
-            <span className="text-[11px] text-slate-400 block mt-0.5">
-              {kpis.totalTakas} active {kpis.totalTakas === 1 ? 'taka' : 'takas'}
-            </span>
-          </div>
-        </div>
-
-        {/* Card 2: Available Stock */}
-        <div className="bg-white border border-slate-200/80 rounded-xl p-3.5 shadow-2xs">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
-              <CheckCircle2 size={16} />
-            </div>
-            <span className="text-[11px] font-semibold text-slate-500 leading-tight">
-              {activeSub === 'GREY' ? 'Available Grey Stock' : 'Available Dyed Stock'}
-            </span>
-          </div>
-          <div className="mt-2.5">
-            <span className="text-xl font-black text-emerald-700 tracking-tight">
-              {formatNumberIN(kpis.totalAvail)} m
-            </span>
-            <span className="text-[11px] text-slate-400 block mt-0.5">
-              {activeSub === 'GREY' ? 'Ready for processing / sale' : 'Ready for dispatch'}
-            </span>
-          </div>
-        </div>
-
-        {/* Card 3: QC Quarantine */}
-        <div className="bg-white border border-slate-200/80 rounded-xl p-3.5 shadow-2xs">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
-              <Clock size={16} />
-            </div>
-            <span className="text-[11px] font-semibold text-slate-500 leading-tight">In QC Quarantine</span>
-          </div>
-          <div className="mt-2.5">
-            <span className="text-xl font-black text-amber-700 tracking-tight">
-              {formatNumberIN(kpis.totalQcHold)} m
-            </span>
-            <span className="text-[11px] text-slate-400 block mt-0.5">Awaiting inspection clearance</span>
-          </div>
-        </div>
-
-        {/* Card 4: External / Sold */}
-        <div className="bg-white border border-slate-200/80 rounded-xl p-3.5 shadow-2xs">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-violet-50 text-violet-600 flex items-center justify-center shrink-0">
-              {activeSub === 'GREY' ? <Factory size={16} /> : <Warehouse size={16} />}
-            </div>
-            <span className="text-[11px] font-semibold text-slate-500 leading-tight">
-              {activeSub === 'GREY' ? 'At Job Worker / Dyeing' : 'Dispatched / Sold'}
-            </span>
-          </div>
-          <div className="mt-2.5">
-            <span className="text-xl font-black text-slate-800 tracking-tight">
-              {formatNumberIN(activeSub === 'GREY' ? kpis.totalAtWorker : kpis.totalSold)} m
-            </span>
-            <span className="text-[11px] text-slate-400 block mt-0.5">
-              {activeSub === 'GREY' ? 'External processing WIP' : 'Cumulative sales fulfillment'}
-            </span>
-          </div>
-        </div>
+      {/* ── KPI Stat Cards (Standard OSCAR ERP Pastel Cards) ── */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
+        <KpiCard
+          label={activeSub === 'GREY' ? 'Total Grey Batches' : 'Total Dyeing Batches'}
+          value={kpis.totalBatches}
+          sub={`${kpis.totalTakas} active ${kpis.totalTakas === 1 ? 'taka' : 'takas'}`}
+          icon={Package}
+          tone="blue"
+          index={0}
+        />
+        <KpiCard
+          label={activeSub === 'GREY' ? 'Available Grey Stock' : 'Available Dyed Stock'}
+          value={`${formatNumberIN(kpis.totalAvail)} m`}
+          sub={activeSub === 'GREY' ? 'Ready for processing / sale' : 'Ready for dispatch'}
+          icon={CheckCircle2}
+          tone="green"
+          index={1}
+        />
+        <KpiCard
+          label="In QC Quarantine"
+          value={`${formatNumberIN(kpis.totalQcHold)} m`}
+          sub="Awaiting inspection clearance"
+          icon={Clock}
+          tone="orange"
+          index={2}
+        />
+        <KpiCard
+          label={activeSub === 'GREY' ? 'At Job Worker / Dyeing' : 'Dispatched / Sold'}
+          value={`${formatNumberIN(activeSub === 'GREY' ? kpis.totalAtWorker : kpis.totalSold)} m`}
+          sub={activeSub === 'GREY' ? 'External processing WIP' : 'Cumulative sales fulfillment'}
+          icon={activeSub === 'GREY' ? Factory : Warehouse}
+          tone="purple"
+          index={3}
+        />
       </div>
 
       {/* Barcode Scanner Bar */}

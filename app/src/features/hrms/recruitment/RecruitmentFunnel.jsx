@@ -3,6 +3,7 @@ import { useRecruitmentStore } from "../../../stores/recruitmentStore";
 import { useNavigate } from "react-router-dom";
 import { pullRecruitmentFunnel } from "../../../services/hrmsSync";
 import PageHeader from "../../../components/ui/PageHeader";
+import KpiCard from "../../../components/ui/KpiCard";
 import { Button } from "../../../components/hrms/Button";
 import {
   TrendingDown,
@@ -72,56 +73,27 @@ export default function RecruitmentFunnel() {
 
       {/* KPI Cards Strip */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
-        <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl p-4 shadow-xs flex items-center justify-between">
-          <div>
-            <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-              Applications to Hire Conversion
-            </div>
-            <div className="text-2xl font-bold text-slate-800 dark:text-white mt-1">
-              {conversionRate}%
-            </div>
-            <div className="text-[11.5px] text-emerald-600 dark:text-emerald-400 mt-0.5 font-medium">
-              Healthy benchmark (&gt; 10%)
-            </div>
-          </div>
-          <div className="p-2.5 rounded-xl border text-indigo-600 bg-indigo-50 dark:bg-indigo-950/30 border-indigo-200/60">
-            <BarChart2 size={20} />
-          </div>
-        </div>
-
-        <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl p-4 shadow-xs flex items-center justify-between">
-          <div>
-            <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-              Largest Funnel Drop-off
-            </div>
-            <div className="text-lg font-bold text-rose-600 dark:text-rose-400 mt-1">
-              Screening → Interview
-            </div>
-            <div className="text-[11.5px] text-slate-500 dark:text-slate-400 mt-0.5">
-              -35% attrition rate
-            </div>
-          </div>
-          <div className="p-2.5 rounded-xl border text-rose-600 bg-rose-50 dark:bg-rose-950/30 border-rose-200/60">
-            <TrendingDown size={20} />
-          </div>
-        </div>
-
-        <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl p-4 shadow-xs flex items-center justify-between">
-          <div>
-            <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-              Total Hires Completed
-            </div>
-            <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400 mt-1">
-              {counts.Hired} Candidates
-            </div>
-            <div className="text-[11.5px] text-slate-500 dark:text-slate-400 mt-0.5">
-              Across all open roles
-            </div>
-          </div>
-          <div className="p-2.5 rounded-xl border text-emerald-600 bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200/60">
-            <CheckCircle2 size={20} />
-          </div>
-        </div>
+        <KpiCard
+          index={0}
+          label="Applications to Hire Conversion"
+          value={`${conversionRate}%`}
+          icon={BarChart2}
+          sub="Healthy benchmark (> 10%)"
+        />
+        <KpiCard
+          index={1}
+          label="Largest Funnel Drop-off"
+          value="Screening → Interview"
+          icon={TrendingDown}
+          sub="-35% attrition rate"
+        />
+        <KpiCard
+          index={2}
+          label="Total Hires Completed"
+          value={`${counts.Hired} Candidates`}
+          icon={CheckCircle2}
+          sub="Across all open roles"
+        />
       </div>
 
       {/* Visual Funnel Visualization Card */}

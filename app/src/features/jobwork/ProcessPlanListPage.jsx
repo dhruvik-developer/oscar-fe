@@ -700,7 +700,6 @@ export function ProcessPlanForm({
       <PageHeader
         title={title || (isEdit ? `Edit Process Plan — ${form.planNo}` : 'Create Process Plan')}
         breadcrumb={[
-          { label: 'Dashboard', path: '/dashboard' },
           { label: 'PMS', path: '/pms' },
           { label: 'Job Work / Processing' },
           { label: 'Process Plan', path: '/job-work/process-plan' },

@@ -2,6 +2,8 @@ import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Download, ChevronDown, Search, Calendar as CalendarIcon, Pencil, CalendarDays, RefreshCw, AlertTriangle, Info } from "lucide-react";
 import PageHeader from "../../../components/ui/PageHeader";
+import KpiCard from "../../../components/ui/KpiCard";
+import { UserCheck, UserX, Clock, Plane, Laptop, HelpCircle, Timer } from "lucide-react";
 import Modal from "../../../components/ui/Modal";
 import { useAppStore } from "../../../stores/appStore";
 import { useAttendanceStore } from "../../../stores/attendanceStore";
@@ -174,13 +176,13 @@ export default function AttendanceOverview() {
     const total = summary.total || 0;
     const pct = summary.attendancePct ?? 0;
     return [
-      { label: "PRESENT", val: summary.present ?? 0, sub: total ? `${pct}% attendance${summary.halfDay ? ` • ${summary.halfDay} half day` : ""}` : "No employees", dotColor: "#22c55e" },
-      { label: "ABSENT", val: summary.absent ?? 0, sub: "Marked absent", dotColor: "#ef4444" },
-      { label: "LATE", val: summary.late ?? 0, sub: daily ? `Grace ${daily.graceMinutes ?? 0} min` : "—", dotColor: "#f59e0b" },
-      { label: "ON LEAVE", val: summary.onLeave ?? 0, sub: "Approved leave", dotColor: "#3b82f6" },
-      { label: "WFH", val: summary.wfh ?? 0, sub: "Remote", dotColor: "#0ea5e9" },
-      { label: "NOT MARKED", val: summary.notMarked ?? 0, sub: total ? `of ${total} employees` : "—", dotColor: "#94a3b8" },
-      { label: "OVERTIME", val: formatHours(summary.overtimeHours || 0), sub: "This day", dotColor: "#8b5cf6" },
+      { label: "Present", val: summary.present ?? 0, sub: total ? `${pct}% attendance${summary.halfDay ? ` · ${summary.halfDay} half` : ""}` : "No employees", icon: UserCheck, tone: "green" },
+      { label: "Absent", val: summary.absent ?? 0, sub: "Marked absent", icon: UserX, tone: "pink" },
+      { label: "Late", val: summary.late ?? 0, sub: daily ? `Grace ${daily.graceMinutes ?? 0}m` : "—", icon: Clock, tone: "orange" },
+      { label: "On Leave", val: summary.onLeave ?? 0, sub: "Approved leave", icon: Plane, tone: "blue" },
+      { label: "WFH", val: summary.wfh ?? 0, sub: "Remote today", icon: Laptop, tone: "teal" },
+      { label: "Not Marked", val: summary.notMarked ?? 0, sub: total ? `of ${total} staff` : "—", icon: HelpCircle, tone: "purple" },
+      { label: "Overtime", val: formatHours(summary.overtimeHours || 0), sub: "Total this day", icon: Timer, tone: "purple" },
     ];
   }, [summary, daily]);
 
@@ -380,17 +382,18 @@ export default function AttendanceOverview() {
         </div>
       )}
 
-      {/* Stat Cards Row */}
-      <div className="att-stats-grid">
-        {statsData.map((s) => (
-          <div key={s.label} className="att-stat-card">
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <span className="att-stat-label">{s.label}</span>
-              {s.dotColor && <span className="att-stat-dot" style={{ backgroundColor: s.dotColor }} />}
-            </div>
-            <div className="att-stat-val">{loading && !daily ? "…" : s.val}</div>
-            <div className="att-stat-sub">{s.sub}</div>
-          </div>
+      {/* Stat Cards Row - Standard OSCAR ERP Pastel Cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3 mb-4">
+        {statsData.map((s, idx) => (
+          <KpiCard
+            key={s.label}
+            label={s.label}
+            value={loading && !daily ? "…" : s.val}
+            sub={s.sub}
+            icon={s.icon}
+            tone={s.tone}
+            index={idx}
+          />
         ))}
       </div>
 

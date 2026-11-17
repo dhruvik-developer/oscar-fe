@@ -209,10 +209,10 @@ export default function TaskAllocationPage() {
       />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 my-4">
-        <KpiCard label="Total Tasks" value={tasks.length} icon={ClipboardList} tone="blue" />
-        <KpiCard label="Pending" value={tasks.filter((task) => task.status === 'Pending' || task.status === 'Open' || task.status === 'Waiting').length} icon={Clock} tone="amber" />
-        <KpiCard label="In Progress" value={tasks.filter((task) => task.status === 'In Progress').length} icon={Activity} tone="purple" />
-        <KpiCard label="Completed" value={tasks.filter((task) => task.status === 'Completed').length} icon={CheckCircle2} tone="emerald" />
+        <KpiCard index={0} label="Total Tasks" value={tasks.length} icon={ClipboardList} tone="blue" />
+        <KpiCard index={1} label="Pending" value={tasks.filter((task) => task.status === 'Pending' || task.status === 'Open' || task.status === 'Waiting').length} icon={Clock} tone="amber" />
+        <KpiCard index={2} label="In Progress" value={tasks.filter((task) => task.status === 'In Progress').length} icon={Activity} tone="purple" />
+        <KpiCard index={3} label="Completed" value={tasks.filter((task) => task.status === 'Completed').length} icon={CheckCircle2} tone="emerald" />
       </div>
 
       {showFilters && (

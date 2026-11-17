@@ -696,4 +696,14 @@ export async function bulkMarkLeadsLost(ids, payload = {}) {
   return api.post('/crm/leads/bulk-mark-lost/', { ids, ...payload });
 }
 
+export async function reopenLead(leadId, payload = {}) {
+  if (!isBackendEnabled()) return null;
+  return crmSync.act('leads', leadId, 'reopen', payload, { raw: true });
+}
+
+export async function bulkReopenLeads(ids, payload = {}) {
+  if (!isBackendEnabled()) return null;
+  return api.post('/crm/leads/bulk-reopen/', { ids, ...payload });
+}
+
 export default crmSync;

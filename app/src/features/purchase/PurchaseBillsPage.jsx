@@ -375,11 +375,11 @@ export const PurchaseBillsPage = () => {
       <PageHeader title="Purchase Bills & Accounts Payable" subtitle="Supplier invoice intake, line-item inventory replenishment, remaining balance tracking, and vendor disbursements." guide={purchaseBillGuide} />
 
       {/* Purchase Bills KPI Stat Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard label="Total Billed Invoices" value={formatCurrency(totalBilled)} icon={IndianRupee} />
-        <StatCard label="AP Payable Due" value={formatCurrency(totalApOutstanding)} icon={Clock} trend={{ positive: totalApOutstanding === 0, text: totalApOutstanding > 0 ? `${unpaidBillsCount} unpaid bills` : 'All bills cleared' }} highlight={totalApOutstanding > 0} />
-        <StatCard label="Total Disbursed" value={formatCurrency(totalDisbursed)} icon={CheckCircle2} trend={{ positive: true, text: 'Disbursements verified' }} />
-        <StatCard label="Active Bills" value={`${purchaseBills.length} Bills`} icon={FileText} subtext={`${unpaidBillsCount} awaiting payment`} />
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+        <StatCard index={0} label="Total Billed Invoices" value={formatCurrency(totalBilled)} icon={IndianRupee} />
+        <StatCard index={1} label="AP Payable Due" value={formatCurrency(totalApOutstanding)} icon={Clock} trend={{ positive: totalApOutstanding === 0, text: totalApOutstanding > 0 ? `${unpaidBillsCount} unpaid bills` : 'All bills cleared' }} highlight={totalApOutstanding > 0} />
+        <StatCard index={2} label="Total Disbursed" value={formatCurrency(totalDisbursed)} icon={CheckCircle2} trend={{ positive: true, text: 'Disbursements verified' }} />
+        <StatCard index={3} label="Active Bills" value={`${purchaseBills.length} Bills`} icon={FileText} subtext={`${unpaidBillsCount} awaiting payment`} />
       </div>
 
       <DataTable title="Accounts Payable Bills" columns={columns} data={purchaseBills} keyExtractor={(b) => b.id} searchPlaceholder="Search bill #, PO, or vendor..." searchFilter={(b, term) => String(b.billNumber ?? '').toLowerCase().includes(term) ||

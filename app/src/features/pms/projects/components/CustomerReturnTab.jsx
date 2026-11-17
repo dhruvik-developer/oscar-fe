@@ -513,8 +513,9 @@ export function CustomerReturnTab({ project }) {
       )}
 
       {/* 2. Top Summary KPI Cards (8 Cards) */}
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3.5">
         <StatCard
+          index={0}
           label="1. Total Requests"
           value={summary.totalReturnRequests}
           sub="Return authorizations"
@@ -522,6 +523,7 @@ export function CustomerReturnTab({ project }) {
           icon={RotateCcw}
         />
         <StatCard
+          index={1}
           label="2. Pending Inward"
           value={`${n(summary.pendingReturnReceipts)} m`}
           sub="Awaiting warehouse receipt"
@@ -529,6 +531,7 @@ export function CustomerReturnTab({ project }) {
           icon={Truck}
         />
         <StatCard
+          index={2}
           label="3. QC Pending"
           value={`${n(summary.qcPendingQty)} m`}
           sub="Quarantined in QC Hold"
@@ -536,6 +539,7 @@ export function CustomerReturnTab({ project }) {
           icon={Clock}
         />
         <StatCard
+          index={3}
           label="4. QC Accepted"
           value={`${n(summary.qcAcceptedQty)} m`}
           sub="Usable stock passed"
@@ -543,6 +547,7 @@ export function CustomerReturnTab({ project }) {
           icon={ShieldCheck}
         />
         <StatCard
+          index={4}
           label="5. Reprocessing"
           value={`${n(summary.reprocessingQty)} m`}
           sub="Rework & mill re-dyeing"
@@ -550,6 +555,7 @@ export function CustomerReturnTab({ project }) {
           icon={Factory}
         />
         <StatCard
+          index={5}
           label="6. QC Hold"
           value={`${n(summary.qcHoldQty)} m`}
           sub="Under evaluation"
@@ -557,6 +563,7 @@ export function CustomerReturnTab({ project }) {
           icon={AlertTriangle}
         />
         <StatCard
+          index={6}
           label="7. Rejected"
           value={`${n(summary.rejectedQty)} m`}
           sub="Damaged scrap stock"
@@ -564,6 +571,7 @@ export function CustomerReturnTab({ project }) {
           icon={AlertCircle}
         />
         <StatCard
+          index={7}
           label="8. Credit Notes"
           value={formatCurrency(summary.creditNotesIssued)}
           sub={`${summary.creditNotesCount} posted credit note${summary.creditNotesCount !== 1 ? 's' : ''}`}

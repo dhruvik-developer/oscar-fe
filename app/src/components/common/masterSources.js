@@ -25,18 +25,20 @@ export const MASTER_SOURCES = {
   godowns: { to: '/inventory/warehouses?tab=warehouses', menu: 'Inventory → Warehouses' },
 
   // Textile Operations Masters (one page, deep-linked by ?tab=)
-  agencies: { to: '/inventory/masters/textile?tab=agencies', menu: 'Inventory → Textile Operations Masters → Agencies' },
-  processors: { to: '/inventory/masters/textile?tab=processors', menu: 'Inventory → Textile Operations Masters → Processors' },
-  brokers: { to: '/inventory/masters/textile?tab=brokers', menu: 'Inventory → Textile Operations Masters → Brokers' },
   processes: { to: '/inventory/masters/textile?tab=processes', menu: 'Inventory → Textile Operations Masters → Process Master' },
   jobworkRates: { to: '/inventory/masters/textile?tab=jobwork-rates', menu: 'Inventory → Textile Operations Masters → Job-Work Rates' },
   defects: { to: '/inventory/masters/textile?tab=defects', menu: 'Inventory → Textile Operations Masters → Defect Master' },
   lossReasons: { to: '/inventory/masters/textile?tab=loss-reasons', menu: 'Inventory → Textile Operations Masters → Loss Reasons' },
   returnReasons: { to: '/inventory/masters/textile?tab=return-reasons', menu: 'Inventory → Textile Operations Masters → Return Reasons' },
-  vehicles: { to: '/inventory/masters/textile?tab=vehicles', menu: 'Inventory → Textile Operations Masters → Vehicles' },
-  drivers: { to: '/inventory/masters/textile?tab=drivers', menu: 'Inventory → Textile Operations Masters → Drivers' },
-  rateMasters: { to: '/inventory/masters/textile?tab=rate-masters', menu: 'Inventory → Textile Operations Masters → Rate Master' },
-  transporters: { to: '/inventory/masters/textile?tab=transporters', menu: 'Inventory → Textile Operations Masters → Transporters' },
+
+  // Parties & Logistics (re-routed from old master tabs to their actual operational homes)
+  agencies: { to: '/parties', menu: 'Parties Directory' },
+  processors: { to: '/parties', menu: 'Parties Directory' },
+  brokers: { to: '/parties', menu: 'Parties Directory' },
+  vehicles: { to: '/inventory/trips', menu: 'Inventory → Logistics & Tempo Register' },
+  drivers: { to: '/inventory/trips', menu: 'Inventory → Logistics & Tempo Register' },
+  transporters: { to: '/inventory/trips', menu: 'Inventory → Logistics & Tempo Register' },
+  rateMasters: { to: '/inventory/fabric-masters', menu: 'Inventory → Fabric Masters' },
 
   // CRM
   leadTasks: { to: '/crm/leads/tasks-master', menu: 'CRM → Leads → Lead Tasks Master' },

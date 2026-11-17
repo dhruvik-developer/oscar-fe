@@ -337,6 +337,7 @@ export const NAV = [
         ],
       },
       { label: 'Batch Registry', icon: QrCode, to: '/inventory/batches' },
+      { label: 'Batch Profitability', icon: TrendingUp, to: '/inventory/batch-profitability' },
       { label: 'Stock Position', icon: BarChart3, to: '/inventory/stock-position' },
       {
         label: 'QC (Quality Control)', icon: CircleCheck, to: '/inventory/qc/dashboard',
@@ -1120,7 +1121,7 @@ export default function Sidebar() {
             </span>
             <div className="min-w-0">
               <div className="brand-name">{brandName}</div>
-              <div className="brand-tag">PEOPLE | PROCESS | PROGRESS</div>
+
             </div>
           </div>
           {/* Mobile drawer close (below lg only) */}

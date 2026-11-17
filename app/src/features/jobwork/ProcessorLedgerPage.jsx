@@ -127,7 +127,6 @@ export default function ProcessorLedgerPage() {
         title="Processor Fabric Ledger"
         subtitle="Track roll-by-roll grey issues, dyed receipts, approved shrinkage, and running meter balances per job worker."
         breadcrumb={[
-          { label: 'Dashboard', path: '/dashboard' },
           { label: 'PMS', path: '/pms' },
           { label: 'Job Work / Processing', path: '/job-work/orders' },
           { label: 'Processor Ledger' },
@@ -151,7 +150,7 @@ export default function ProcessorLedgerPage() {
       />
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
         <KpiCard
           label="Total Sent (Outward)"
           value={`${numIN(currentSummary.totalSent)} M`}

@@ -31,9 +31,10 @@ export function StatCard(props) {
   const label = rawStat.label || props.label || props.title || '';
   const value = rawStat.value ?? props.value ?? '';
   const iconRaw = rawStat.icon || props.icon;
-  const tone = rawStat.tone || props.tone || props.color || 'blue';
+  const tone = rawStat.tone || props.tone || props.color;
   const rawTrend = rawStat.trend ?? props.trend ?? rawStat.change ?? props.change;
-  const note = rawStat.note || props.note || props.subtitle || props.period || props.subtext || '';
+  const note = rawStat.note || props.note || props.subtitle || props.period || props.subtext || props.sub || rawStat.sub || '';
+  const index = props.index ?? rawStat.index ?? props.paletteIndex ?? rawStat.paletteIndex;
 
   let trendText = null;
   let isUp = true;
@@ -67,12 +68,16 @@ export function StatCard(props) {
       value={value}
       icon={Icon}
       tone={tone}
-      trend={trendText ? `${isUp ? '' : '↓ '}${trendText}` : undefined}
+      index={index}
+      trend={trendText}
+      isPositive={isUp}
       sub={note}
       onClick={props.onClick}
       className={props.className}
       badgeBg={rawStat.badgeBg || props.badgeBg}
       iconColor={rawStat.iconColor || props.iconColor}
+      unit={props.unit || rawStat.unit}
+      loading={props.loading ?? rawStat.loading ?? false}
     />
   );
 }

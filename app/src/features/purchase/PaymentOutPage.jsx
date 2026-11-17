@@ -223,12 +223,12 @@ export const PaymentOutPage = ({ embedded = false }) => {
       )}
 
       {/* Payment Out KPI Stat Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard label="Total Disbursed" value={formatCurrency(totalDisbursed)} icon={DollarSign} />
-        <StatCard label="Total Disbursed Vouchers" value={`${activePayments.length} Vouchers`} icon={Receipt} />
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+        <StatCard index={0} label="Total Disbursed" value={formatCurrency(totalDisbursed)} icon={DollarSign} />
+        <StatCard index={1} label="Total Disbursed Vouchers" value={`${activePayments.length} Vouchers`} icon={Receipt} />
         {/* [PHASE-2D] advance exposure vs applied */}
-        <StatCard label="Advances Released" value={formatCurrency(totalAdvances)} icon={ArrowUpRight} tone="blue" subtext={`${totalAdvanceApplied > 0 ? formatCurrency(totalAdvanceApplied) + ' applied · ' : ''}${formatCurrency(openAdvanceBalance)} open`} />
-        <StatCard label="Electronic Payments" value={`${electronicCount} Electronic`} icon={CheckCircle2} />
+        <StatCard index={2} label="Advances Released" value={formatCurrency(totalAdvances)} icon={ArrowUpRight} tone="blue" subtext={`${totalAdvanceApplied > 0 ? formatCurrency(totalAdvanceApplied) + ' applied · ' : ''}${formatCurrency(openAdvanceBalance)} open`} />
+        <StatCard index={3} label="Electronic Payments" value={`${electronicCount} Electronic`} icon={CheckCircle2} />
       </div>
 
       {/* ── [PHASE-2D] Apply-existing-advance widget: settle a bill from vendor advance balance ── */}

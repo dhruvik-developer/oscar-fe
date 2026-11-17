@@ -1,7 +1,7 @@
 import React from 'react';
 import KpiCard from '../ui/KpiCard';
 
-export function MetricCard({ label, value, sub, icon: Icon, tone = 'blue' }) {
+export function MetricCard({ label, value, sub, icon: Icon, tone, index, ...rest }) {
   return (
     <KpiCard
       label={label}
@@ -9,6 +9,8 @@ export function MetricCard({ label, value, sub, icon: Icon, tone = 'blue' }) {
       sub={sub}
       icon={Icon}
       tone={tone}
+      index={index}
+      {...rest}
     />
   );
 }

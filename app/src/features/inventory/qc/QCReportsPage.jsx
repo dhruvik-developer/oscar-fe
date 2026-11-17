@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import { inventoryService } from '../../../services/domainServices';
 import QCPageHeader from './QCPageHeader';
+import KpiCard from '../../../components/ui/KpiCard';
 
 const fmtQty = (val, fallback = '—') => {
   if (val === null || val === undefined || val === '') return fallback;
@@ -211,59 +212,48 @@ export default function QCReportsPage() {
 
       {/* ── KPI METRICS CARDS ── */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3.5">
-        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-          <div className="flex items-center justify-between text-xs font-medium text-slate-500 mb-1">
-            <span>Audited Receipts</span>
-            <FileText className="w-4 h-4 text-slate-400" />
-          </div>
-          <div className="text-xl font-bold text-slate-900">{summaryKPIs?.totalReceipts ?? 0}</div>
-          <div className="text-[11px] text-slate-400 mt-0.5">GRN & Job Work</div>
-        </div>
-
-        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-          <div className="flex items-center justify-between text-xs font-medium text-slate-500 mb-1">
-            <span>Inspected Fabric</span>
-            <Layers className="w-4 h-4 text-blue-500" />
-          </div>
-          <div className="text-xl font-bold text-slate-900">{fmtQty(summaryKPIs?.totalInspected, '0')} <span className="text-xs font-normal text-slate-500">m</span></div>
-          <div className="text-[11px] text-blue-600 font-medium mt-0.5">{summaryKPIs?.totalReceived ? Math.round(((summaryKPIs?.totalInspected || 0) / summaryKPIs.totalReceived) * 100) : 100}% of received</div>
-        </div>
-
-        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-          <div className="flex items-center justify-between text-xs font-medium text-slate-500 mb-1">
-            <span>Overall Pass Rate</span>
-            <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-          </div>
-          <div className="text-xl font-bold text-emerald-600">{fmtPct(summaryKPIs?.passRate, '0%')}</div>
-          <div className="text-[11px] text-emerald-700 font-medium mt-0.5">Approved usable</div>
-        </div>
-
-        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-          <div className="flex items-center justify-between text-xs font-medium text-slate-500 mb-1">
-            <span>Rejection Rate</span>
-            <XCircle className="w-4 h-4 text-rose-500" />
-          </div>
-          <div className="text-xl font-bold text-rose-600">{fmtPct(summaryKPIs?.rejectionRate, '0%')}</div>
-          <div className="text-[11px] text-rose-600 mt-0.5 font-medium">Scrap & wastage</div>
-        </div>
-
-        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-          <div className="flex items-center justify-between text-xs font-medium text-slate-500 mb-1">
-            <span>Hold / Pending</span>
-            <Clock className="w-4 h-4 text-amber-500" />
-          </div>
-          <div className="text-xl font-bold text-amber-600">{fmtQty(summaryKPIs?.pendingHoldQty, '0')} <span className="text-xs font-normal text-slate-500">m</span></div>
-          <div className="text-[11px] text-amber-700 mt-0.5">Awaiting resolution</div>
-        </div>
-
-        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-          <div className="flex items-center justify-between text-xs font-medium text-slate-500 mb-1">
-            <span>Recovery Rate</span>
-            <RotateCcw className="w-4 h-4 text-indigo-500" />
-          </div>
-          <div className="text-xl font-bold text-indigo-600">{fmtPct(summaryKPIs?.reprocessRecovery, '0%')}</div>
-          <div className="text-[11px] text-indigo-600 font-medium mt-0.5">From reprocessing</div>
-        </div>
+        <KpiCard
+          index={0}
+          label="Audited Receipts"
+          value={summaryKPIs?.totalReceipts ?? 0}
+          icon={FileText}
+          sub="GRN & Job Work"
+        />
+        <KpiCard
+          index={1}
+          label="Inspected Fabric"
+          value={`${fmtQty(summaryKPIs?.totalInspected, '0')} m`}
+          icon={Layers}
+          sub={`${summaryKPIs?.totalReceived ? Math.round(((summaryKPIs?.totalInspected || 0) / summaryKPIs.totalReceived) * 100) : 100}% of received`}
+        />
+        <KpiCard
+          index={2}
+          label="Overall Pass Rate"
+          value={fmtPct(summaryKPIs?.passRate, '0%')}
+          icon={CheckCircle2}
+          sub="Approved usable"
+        />
+        <KpiCard
+          index={3}
+          label="Rejection Rate"
+          value={fmtPct(summaryKPIs?.rejectionRate, '0%')}
+          icon={XCircle}
+          sub="Scrap & wastage"
+        />
+        <KpiCard
+          index={4}
+          label="Hold / Pending"
+          value={`${fmtQty(summaryKPIs?.pendingHoldQty, '0')} m`}
+          icon={Clock}
+          sub="Awaiting resolution"
+        />
+        <KpiCard
+          index={5}
+          label="Recovery Rate"
+          value={fmtPct(summaryKPIs?.reprocessRecovery, '0%')}
+          icon={RotateCcw}
+          sub="From reprocessing"
+        />
       </div>
 
       {/* ── FILTER & SEARCH BAR ── */}

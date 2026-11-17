@@ -999,6 +999,10 @@ export default function DealsPage() {
     useCrmStore.getState().updateRecord('deals', dealId, { stage: targetStage }).catch((err) => {
       console.warn('[CRM Deals] Server stage update error:', err);
     });
+    const movedDeal = deals.find((d) => String(d.id) === String(dealId));
+    if (movedDeal?.leadId && targetStage === 'Lost') {
+      useCrmStore.getState().updateRecord('leads', movedDeal.leadId, { status: 'Lost', isLost: true }).catch(() => {});
+    }
     showNotification(`Deal moved to ${targetStage}`);
   };
 

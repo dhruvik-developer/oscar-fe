@@ -36,7 +36,8 @@ export const CustomersPage = () => {
         balance: 0,
         status: 'Active',
     });
-    const totalOutstanding = customers.reduce((sum, c) => sum + c.balance, 0);
+    const totalOutstanding = customers.filter((c) => c.openingBalanceType === 'Receivable').reduce((sum, c) => sum + (c.balance || 0), 0);
+    const totalAdvances = customers.filter((c) => c.openingBalanceType !== 'Receivable').reduce((sum, c) => sum + (c.balance || 0), 0);
     const columns = [
         {
             header: 'Code',
@@ -74,16 +75,24 @@ export const CustomersPage = () => {
             ),
         },
         {
-            header: 'Receivable Balance',
+            header: 'Balance',
             accessor: 'balance',
             align: 'right',
             width: '14%',
             render: (c) => {
                 const bal = c.balance ?? 0;
+                const isAdvance = c.openingBalanceType !== 'Receivable';
                 return (
-                  <span className={`font-mono font-bold whitespace-nowrap ${bal > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
-                    {formatCurrency(bal)}
-                  </span>
+                  <div className="text-right">
+                    <span className={`font-mono font-bold whitespace-nowrap ${bal > 0 ? (isAdvance ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400') : 'text-text-secondary'}`}>
+                      {formatCurrency(bal)}
+                    </span>
+                    {bal > 0 && (
+                      <span className={`block text-[9.5px] font-semibold ${isAdvance ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
+                        {isAdvance ? 'Advance' : 'Receivable'}
+                      </span>
+                    )}
+                  </div>
                 );
             },
         },
@@ -148,9 +157,10 @@ export const CustomersPage = () => {
             New Customer
           </Button>}/>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard label="Total Customers" value={customers.length} icon={Users}/>
         <StatCard label="Accounts Receivable" value={formatCurrency(totalOutstanding)} icon={DollarSign}/>
+        <StatCard label="Customer Advances" value={formatCurrency(totalAdvances)} icon={DollarSign}/>
         <StatCard label="Active Accounts" value={customers.filter((c) => c.status === 'Active').length} icon={ShieldAlert}/>
       </div>
 

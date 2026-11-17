@@ -1793,6 +1793,7 @@ export const ERPProvider = ({ children, }) => {
             bankName: p.bankName || '',
             accountHolderName: p.accountHolderName || '',
             openingBalance: p.openingBalance ?? 0,
+            openingBalanceType: p.openingBalanceType || (p.type === 'Customer' ? 'Advance' : 'Payable'),
             balance: p.balance ?? (p.openingBalance ?? 0),
             billingAddress: p.billingAddress || {
                 line1: 'Corporate Headquarters',
@@ -1826,6 +1827,8 @@ export const ERPProvider = ({ children, }) => {
                 email: newParty.email,
                 phone: newParty.phone,
                 balance: newParty.balance,
+                openingBalance: newParty.openingBalance,
+                openingBalanceType: newParty.openingBalanceType,
                 creditLimit: newParty.creditLimit ?? 50000,
                 status: newParty.status === 'Inactive' ? 'On Hold' : 'Active',
             }, { persist: false });
@@ -1869,6 +1872,11 @@ export const ERPProvider = ({ children, }) => {
             }
             return p;
         }));
+        if (updates.openingBalanceType !== undefined || updates.openingBalance !== undefined) {
+            setCustomers((prev) => prev.map((c) => (c.id === id || c.code === id)
+                ? { ...c, openingBalance: updates.openingBalance ?? c.openingBalance, openingBalanceType: updates.openingBalanceType ?? c.openingBalanceType }
+                : c));
+        }
         persistUpdate('parties', id, updates, setParties);
         showToast(`Party updated.`);
     };

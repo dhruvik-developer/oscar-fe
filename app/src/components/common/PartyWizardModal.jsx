@@ -111,6 +111,7 @@ const getInitialFormData = (party) => {
             ifscCode: '',
             accountHolderName: '',
             openingBalance: 0,
+            openingBalanceType: 'Advance',
             balance: 0,
             billingAddress: {
                 line1: '',
@@ -167,6 +168,7 @@ const getInitialFormData = (party) => {
         ifscCode: party.ifscCode || '',
         accountHolderName: party.accountHolderName || partyName,
         openingBalance: party.openingBalance ?? 0,
+        openingBalanceType: party.openingBalanceType || party.opening_balance_type || (party.type === 'Vendor' ? 'Payable' : 'Advance'),
         balance: party.balance ?? 0,
         billingAddress: party.billingAddress ? {
             line1: party.billingAddress.line1 || '',
@@ -249,6 +251,12 @@ export const PartyWizardModal = ({ isOpen, onClose, onSave, existingParty = null
                     : (newType === 'Customer' || newType === 'Both') && prev.ledgerAccount === '2010 - Accounts Payable'
                         ? '1210 - Accounts Receivable'
                         : prev.ledgerAccount,
+            openingBalanceType:
+                newType === 'Customer' && prev.openingBalanceType === 'Payable'
+                    ? 'Advance'
+                    : (newType === 'Vendor' || newType === 'Transporter') && prev.openingBalanceType === 'Advance'
+                        ? 'Payable'
+                        : prev.openingBalanceType || (newType === 'Customer' ? 'Advance' : 'Payable'),
         }));
         setErrorMsg('');
     };
@@ -1039,15 +1047,36 @@ export const PartyWizardModal = ({ isOpen, onClose, onSave, existingParty = null
                                     </div>
                                     <div>
                                         <label className="block font-semibold text-muted text-[11px] mb-1">Opening Balance</label>
-                                        <input
-                                            type="number"
-                                            value={formData.openingBalance}
-                                            onChange={(e) => updateField('openingBalance', e.target.value === '' ? '' : parseFloat(e.target.value))}
-                                            className="w-full p-2.5 bg-card border border-border rounded-xl text-xs font-mono font-bold text-text"
-                                            placeholder="0.00"
-                                        />
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                            <input
+                                                type="number"
+                                                value={formData.openingBalance}
+                                                onChange={(e) => updateField('openingBalance', e.target.value === '' ? '' : parseFloat(e.target.value))}
+                                                className="w-full p-2.5 bg-card border border-border rounded-xl text-xs font-mono font-bold text-text"
+                                                placeholder="0.00"
+                                            />
+                                            <select
+                                                value={formData.openingBalanceType || (formData.type === 'Customer' ? 'Advance' : 'Payable')}
+                                                onChange={(e) => updateField('openingBalanceType', e.target.value)}
+                                                className="w-full p-2.5 bg-card border border-border rounded-xl text-xs font-semibold text-text"
+                                            >
+                                                {formData.type === 'Customer' ? (
+                                                    <>
+                                                        <option value="Advance">Advance (Credit)</option>
+                                                        <option value="Receivable">Receivable (Debit)</option>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <option value="Payable">Payable (Credit)</option>
+                                                        <option value="Advance">Advance (Debit)</option>
+                                                    </>
+                                                )}
+                                            </select>
+                                        </div>
                                         <span className="text-[10px] text-muted block mt-1">
-                                            Initial opening balance for this party (reflected in current balance and ledger).
+                                            {formData.type === 'Customer'
+                                                ? 'Opening balance for new customers defaults to Advance (unallocated deposit).'
+                                                : 'Initial opening balance for this party.'}
                                         </span>
                                     </div>
                                 </div>

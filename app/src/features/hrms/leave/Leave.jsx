@@ -1745,11 +1745,15 @@ export default function Leave() {
               type="button"
               className="btn-primary"
               onClick={() => {
+                const matchedEmp = employees.find(
+                  (emp) => emp.name === compOffForm.employeeName || emp.id === compOffForm.employeeName
+                );
                 if (!compOffForm.employeeName) return showToast("Please select an employee", "error");
                 if (!compOffForm.reason.trim()) return showToast("Please enter work justification", "error");
                 requestCompOff({
-                  employee: compOffForm.employeeName,
-                  avatar: null,
+                  employee: matchedEmp?.name || compOffForm.employeeName,
+                  employeeId: matchedEmp?.id || compOffForm.employeeName,
+                  avatar: matchedEmp?.avatar || null,
                   workedDate: compOffForm.workedDate,
                   hoursWorked: Number(compOffForm.hoursWorked),
                   creditDays: Number(compOffForm.creditDays),

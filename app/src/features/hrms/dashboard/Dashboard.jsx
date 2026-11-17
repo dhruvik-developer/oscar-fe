@@ -367,8 +367,6 @@ export default function HRMSDashboard() {
         : lower.includes("headphone") || lower.includes("peripheral") ? "Audio / Peripherals"
         : "Workstation";
 
-      // Filed as an "Other" request for the signed-in employee; HR sees it
-      // under Asset Setup › Employee Requests.
       useAssetStore.getState().addRequest({
         requestType: "Other",
         category,
@@ -380,6 +378,31 @@ export default function HRMSDashboard() {
         .catch((err) => setToast(`Asset request not submitted — ${err?.message || "server error"}`));
     } else {
       setLastSubmittedAssetReqId(null);
+      const employees = useAppStore.getState().employees || [];
+      const me = employees[0];
+      if (me) {
+        if (lower.includes("leave")) {
+          useAppStore.getState().addLeave?.({
+            employee: me.name,
+            employeeId: me.id,
+            type: leaveType.includes("Sick") ? "Sick Leave" : "Casual Leave",
+            startDate: leaveDate,
+            endDate: leaveDate,
+            days: 1,
+            reason: leaveNote.trim() || `Submitted via HRMS Dashboard Quick Request for ${leaveDate}.`,
+            status: "Pending",
+          });
+        } else if (lower.includes("wfh") || lower.includes("attendance")) {
+          useAttendanceStore.getState().addRequest?.({
+            employeeId: me.id,
+            employeeName: me.name,
+            date: leaveDate,
+            requestedStatus: lower.includes("wfh") ? "WFH" : "Present",
+            reason: leaveNote.trim() || `Submitted via Dashboard Quick Request for ${leaveDate}.`,
+            status: "Pending",
+          });
+        }
+      }
     }
 
     pushActivity("You", `requested ${leaveType} for ${leaveDate.split("-").reverse().join("-")}.`, mod);

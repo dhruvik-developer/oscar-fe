@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { lazyStore } from "../services/lazyModules";
-import { writeThrough, pullTracked, hrmsSync, isBackendEnabled, isServerId } from "../services/hrmsSync";
+import { writeThrough, pullTracked, hrmsSync, isBackendEnabled, isServerId, submitAppraisalSelfReview, submitAppraisalManagerReview, returnAppraisalReview } from "../services/hrmsSync";
 import { RATING_SCALES } from "../services/performanceScales";
 import { useAppStore } from "./appStore";
 
@@ -413,6 +413,15 @@ const usePerformanceStoreBase = create((set, get) => ({
       appraisals: s.appraisals.map((a) => (a.id === id ? updated : a)),
     }));
     get().persist();
+
+    if (isBackendEnabled() && isServerId(id)) {
+      submitAppraisalSelfReview(id, {
+        rating: selfRating,
+        comments,
+        strengths,
+        areasForImprovement,
+      }).catch(console.warn);
+    }
   },
 
   // 2. Submit Manager Review (Manager -> HR Review OR return to Employee)
@@ -469,6 +478,16 @@ const usePerformanceStoreBase = create((set, get) => ({
       appraisals: s.appraisals.map((a) => (a.id === id ? updated : a)),
     }));
     get().persist();
+
+    if (isBackendEnabled() && isServerId(id)) {
+      submitAppraisalManagerReview(id, {
+        rating: overallRating,
+        comments,
+        strengths,
+        areasForImprovement,
+        developmentFeedback,
+      }).catch(console.warn);
+    }
   },
 
   // Return Appraisal to previous stage (Manager -> Employee OR HR -> Manager)
@@ -499,6 +518,13 @@ const usePerformanceStoreBase = create((set, get) => ({
       appraisals: s.appraisals.map((a) => (a.id === id ? updated : a)),
     }));
     get().persist();
+
+    if (isBackendEnabled() && isServerId(id)) {
+      returnAppraisalReview(id, {
+        returnToStage,
+        reason,
+      }).catch(console.warn);
+    }
   },
 
   // 3. HR Review & Approval

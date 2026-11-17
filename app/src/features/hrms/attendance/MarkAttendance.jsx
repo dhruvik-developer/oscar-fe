@@ -479,10 +479,12 @@ function TeamMarkAttendance() {
   const [bulkStatus, setBulkStatus] = useState("Present");
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [rowSavingId, setRowSavingId] = useState(null);
 
   const selectAllRef = useRef(null);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (opts = {}) => {
+    const { preserveSelection = false } = opts;
     setLoading(true);
     try {
       try {
@@ -494,7 +496,9 @@ function TeamMarkAttendance() {
       const list = Array.isArray(data?.results) ? data.results : (Array.isArray(data) ? data : []);
       setServerRows(list);
       setEdits({});
-      setChecked({});
+      if (!preserveSelection) {
+        setChecked({});
+      }
       await useAttendanceStore.getState().refreshAttendance();
     } finally {
       setLoading(false);
@@ -656,9 +660,9 @@ function TeamMarkAttendance() {
       checkOut: newStatus === "Absent" ? "" : (r?.checkOut || (newStatus === "Present" ? defaultOut : "")),
     };
     edit(employeeId, patch);
-    setChecked((p) => ({ ...p, [employeeId]: isAttended(newStatus) }));
 
     if (newStatus) {
+      setRowSavingId(employeeId);
       try {
         await api.post("/hrms/attendance/bulk/", {
           date,
@@ -674,10 +678,12 @@ function TeamMarkAttendance() {
         });
         resetEdit(employeeId);
         await useAttendanceStore.getState().refreshAttendance();
-        await load();
+        await load({ preserveSelection: true });
         showToast?.(`Updated status for ${r?.name || "employee"} to ${newStatus}`);
       } catch (err) {
         showToast?.(`Failed to update status — ${err?.payload?.message || err?.message || "try again"}`);
+      } finally {
+        setRowSavingId(null);
       }
     }
   }
@@ -700,6 +706,7 @@ function TeamMarkAttendance() {
       checkOut: outTime,
     };
     edit(employeeId, patch);
+    setRowSavingId(employeeId);
 
     try {
       await api.post("/hrms/attendance/bulk/", {
@@ -716,10 +723,46 @@ function TeamMarkAttendance() {
       });
       resetEdit(employeeId);
       await useAttendanceStore.getState().refreshAttendance();
-      await load();
+      await load({ preserveSelection: true });
       showToast?.(`Marked ${current?.name || "employee"} as ${newStatus}`);
     } catch (err) {
       showToast?.(`Failed to update attendance — ${err?.payload?.message || err?.message || "try again"}`);
+    } finally {
+      setRowSavingId(null);
+    }
+  }
+
+  async function saveSingleRow(employeeId) {
+    const r = rows.find((row) => row.employeeId === employeeId);
+    if (!r) return;
+
+    if (r.checkIn && r.checkOut && r.checkOut <= r.checkIn) {
+      showToast?.(`Cannot save: Check-out (${r.checkOut}) must be after Check-in (${r.checkIn}) for ${r.name || "employee"}.`, "error");
+      return;
+    }
+
+    setRowSavingId(employeeId);
+    try {
+      await api.post("/hrms/attendance/bulk/", {
+        date,
+        records: [
+          {
+            employeeId,
+            checkIn: r.checkIn || null,
+            checkOut: r.checkOut || null,
+            status: r.status || (r.checkIn ? "Present" : "Absent"),
+            remark: r.remark || null,
+          },
+        ],
+      });
+      resetEdit(employeeId);
+      await useAttendanceStore.getState().refreshAttendance();
+      await load({ preserveSelection: true });
+      showToast?.(`Saved attendance for ${r.name || "employee"}`);
+    } catch (err) {
+      showToast?.(`Failed to save attendance — ${err?.payload?.message || err?.message || "try again"}`);
+    } finally {
+      setRowSavingId(null);
     }
   }
 
@@ -1058,6 +1101,34 @@ function TeamMarkAttendance() {
         </div>
       )}
 
+      {/* Unsaved Edits Bar (Displayed when manual edits are made without active bulk selection) */}
+      {dirtyIds.length > 0 && selectedIds.length === 0 && (
+        <div className="bg-amber-50 border border-amber-200/90 rounded-2xl p-3 px-4 shadow-xs flex flex-wrap items-center justify-between gap-3 animate-in fade-in duration-150">
+          <div className="flex items-center gap-2.5">
+            <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse" />
+            <span className="text-xs font-bold text-amber-900">
+              {dirtyIds.length} employee{dirtyIds.length === 1 ? "" : "s"} with unsaved changes
+            </span>
+            <button
+              type="button"
+              onClick={() => setEdits({})}
+              className="text-xs text-amber-700 hover:text-amber-900 underline underline-offset-2 cursor-pointer ml-1"
+            >
+              Discard all
+            </button>
+          </div>
+          <button
+            type="button"
+            onClick={save}
+            disabled={saving}
+            className="h-8 px-4 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold inline-flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors"
+          >
+            {saving ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />}
+            <span>Save All Changes</span>
+          </button>
+        </div>
+      )}
+
       {/* Main Register Table Card */}
       <div className="bg-white border border-bdr rounded-2xl shadow-xs overflow-hidden flex flex-col">
         <div className="overflow-x-auto">
@@ -1253,9 +1324,12 @@ function TeamMarkAttendance() {
                     <td className="py-3 px-3">
                       <div className="relative inline-flex items-center">
                         <select
+                          disabled={rowSavingId === r.employeeId}
                           value={r.status || ""}
                           onChange={(e) => handleStatusChange(r.employeeId, e.target.value)}
                           className={`h-8 pl-3 pr-7 text-xs font-semibold rounded-lg border appearance-none cursor-pointer outline-none transition-all shadow-2xs ${
+                            rowSavingId === r.employeeId ? "opacity-60 cursor-wait" : ""
+                          } ${
                             r.status ? statusStyle.bg : "bg-slate-50 text-slate-500 border-slate-200 hover:border-slate-300"
                           }`}
                         >
@@ -1282,17 +1356,29 @@ function TeamMarkAttendance() {
                     <td className="py-3 pr-4 pl-2 text-right">
                       <div className="inline-flex items-center gap-1.5 justify-end">
                         {dirty && (
-                          <button
-                            type="button"
-                            title="Discard edits for this employee"
-                            onClick={() => resetEdit(r.employeeId)}
-                            className="w-7 h-7 rounded-lg text-amber-700 bg-amber-100/70 hover:bg-amber-200 flex items-center justify-center cursor-pointer transition-colors"
-                          >
-                            <RotateCcw size={13} />
-                          </button>
+                          <>
+                            <button
+                              type="button"
+                              title="Save changes for this employee"
+                              disabled={rowSavingId === r.employeeId}
+                              onClick={() => saveSingleRow(r.employeeId)}
+                              className="w-7 h-7 rounded-lg text-emerald-700 bg-emerald-100 hover:bg-emerald-200 flex items-center justify-center cursor-pointer transition-colors"
+                            >
+                              {rowSavingId === r.employeeId ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />}
+                            </button>
+                            <button
+                              type="button"
+                              title="Discard edits for this employee"
+                              onClick={() => resetEdit(r.employeeId)}
+                              className="w-7 h-7 rounded-lg text-amber-700 bg-amber-100/70 hover:bg-amber-200 flex items-center justify-center cursor-pointer transition-colors"
+                            >
+                              <RotateCcw size={13} />
+                            </button>
+                          </>
                         )}
                         <button
                           type="button"
+                          disabled={rowSavingId === r.employeeId}
                           title={r.status === "Present" ? "Currently marked Present" : "Mark Present"}
                           onClick={() => quickMark(r.employeeId, "Present")}
                           className={`w-7 h-7 rounded-lg border flex items-center justify-center cursor-pointer transition-colors ${
@@ -1305,6 +1391,7 @@ function TeamMarkAttendance() {
                         </button>
                         <button
                           type="button"
+                          disabled={rowSavingId === r.employeeId}
                           title={r.status === "Absent" ? "Currently marked Absent" : "Mark Absent"}
                           onClick={() => quickMark(r.employeeId, "Absent")}
                           className={`w-7 h-7 rounded-lg border flex items-center justify-center cursor-pointer transition-colors ${

@@ -161,15 +161,37 @@ export const HRMS_RESOURCES = {
   // ── people ────────────────────────────────────────────────────────────────
   employees: {
     path: '/hrms/employees/',
-    toApi: (e) => compact({
-      name: e.name,
-      email: e.email || undefined,
-      phone: e.phone || undefined,
-      employeeCode: e.employeeCode || e.empId || undefined,
-      departmentId: e.departmentId || e.department_id || undefined,
-      designationId: e.designationId || e.designation_id || undefined,
-      managerId: e.managerId || e.manager_id || e.reportingManagerId || undefined,
-      locationId: e.locationId || e.location_id || undefined,
+    toApi: (e) => {
+      let deptId = e.departmentId || e.department_id;
+      if (!deptId && (e.department || e.dept)) {
+        const dName = String(e.department || e.dept).toLowerCase().trim();
+        const dList = snapshots.get('departments') || [];
+        const match = dList.find((d) => String(d?.name || '').toLowerCase().trim() === dName);
+        if (match?.id) deptId = match.id;
+      }
+      let desigId = e.designationId || e.designation_id;
+      if (!desigId && (e.designation || e.role)) {
+        const rName = String(e.designation || e.role).toLowerCase().trim();
+        const rList = snapshots.get('designations') || [];
+        const match = rList.find((d) => String(d?.name || d?.title || '').toLowerCase().trim() === rName);
+        if (match?.id) desigId = match.id;
+      }
+      let locId = e.locationId || e.location_id;
+      if (!locId && e.location) {
+        const lName = String(e.location).toLowerCase().trim();
+        const lList = snapshots.get('locations') || [];
+        const match = lList.find((l) => String(l?.name || '').toLowerCase().trim() === lName);
+        if (match?.id) locId = match.id;
+      }
+      return compact({
+        name: e.name,
+        email: e.email || undefined,
+        phone: e.phone || undefined,
+        employeeCode: e.employeeCode || e.empId || undefined,
+        departmentId: deptId || undefined,
+        designationId: desigId || undefined,
+        managerId: e.managerId || e.manager_id || e.reportingManagerId || undefined,
+        locationId: locId || undefined,
       joiningDate: isoOut(e.joiningDate || e.joining || e.doj) || undefined,
       dateOfBirth: isoOut(e.dateOfBirth || e.dob),
       gender: e.gender || undefined,
@@ -178,7 +200,8 @@ export const HRMS_RESOURCES = {
       standardSalary: e.standardSalary !== undefined ? num(e.standardSalary) : (e.standard_salary !== undefined ? num(e.standard_salary) : undefined),
       status: e.status || undefined,
       avatar: e.avatar || undefined,
-    }),
+      });
+    },
     fromApi: (row) => ({
       ...asText(row, [
         'name', 'email', 'phone', 'department', 'designation', 'manager',
@@ -189,6 +212,9 @@ export const HRMS_RESOURCES = {
       // `joiningDate` alias too. `manager` is the manager's name, `managerId`
       // its id (backend) — keep `reportingManager*` aliases for older rows.
       id: row.id,
+      departmentId: row.departmentId || row.department_id || row.department?.id || '',
+      designationId: row.designationId || row.designation_id || row.designation?.id || '',
+      locationId: row.locationId || row.location_id || row.location?.id || '',
       empId: row.employeeCode || row.empId || row.id || '',
       employeeCode: row.employeeCode || '',
       role: row.designation || row.role || '',
@@ -283,8 +309,8 @@ export const HRMS_RESOURCES = {
       leaveTypeId: isServerId(l.leaveTypeId) ? l.leaveTypeId : undefined,
       // Lets the server resolve (or set up) the type when no id is known.
       leaveTypeName: l.leaveTypeName || (isServerId(l.leaveTypeId) ? undefined : l.type) || undefined,
-      fromDate: isoOut(l.fromDate || l.from),
-      toDate: isoOut(l.toDate || l.to),
+      fromDate: isoOut(l.fromDate || l.from || l.startDate),
+      toDate: isoOut(l.toDate || l.to || l.endDate),
       days: l.days !== undefined ? num(l.days) : undefined,
       reason: l.reason || undefined,
       status: l.status || undefined,
@@ -844,7 +870,15 @@ export const publishJob = (id) => hrmsSync.act('jobs', id, 'publish', {});
 export const assignAsset = (id, payload) => hrmsSync.act('assets', id, 'assign', payload);
 export const returnAsset = (id, payload = {}) => hrmsSync.act('assets', id, 'return', payload);
 export const acknowledgePolicy = (id, payload = {}) => hrmsSync.act('policies', id, 'acknowledge', payload);
-export const fetchPolicyAcknowledgements = (id) => api.get('/hrms/policies/' + id + '/acknowledgements/').then(r => r?.data?.items || r?.data || []);
+export const fetchPolicyAcknowledgements = (id) =>
+  api.get('/hrms/policies/' + id + '/acknowledgements/').then((r) => r?.data?.results || r?.data?.items || (Array.isArray(r?.data) ? r.data : []));
+
+export const submitAppraisalSelfReview = (id, payload = {}) =>
+  api.post(`/hrms/performance/appraisals/${id}/self-review/`, payload).then((r) => r.data);
+export const submitAppraisalManagerReview = (id, payload = {}) =>
+  api.post(`/hrms/performance/appraisals/${id}/manager-review/`, payload).then((r) => r.data);
+export const returnAppraisalReview = (id, payload = {}) =>
+  api.post(`/hrms/performance/appraisals/${id}/return/`, payload).then((r) => r.data);
 export const approvePolicy = (id, payload = {}) => hrmsSync.act('policies', id, 'approve', payload);
 export const archivePolicy = (id, payload = {}) => hrmsSync.act('policies', id, 'archive', payload);
 export const submitPolicyForApproval = (id, payload = {}) =>

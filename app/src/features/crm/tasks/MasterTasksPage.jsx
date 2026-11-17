@@ -266,7 +266,7 @@ export default function MasterTasksPage() {
     });
     setFormError('');
     setModalOpen(true);
-    setMenuId(null);
+    setMenu(null);
   }
 
   function submitForm(e) {
@@ -323,7 +323,7 @@ export default function MasterTasksPage() {
   function duplicateTask(id) {
     const src = tasks.find((t) => t.id === id);
     if (!src) return;
-    setMenuId(null);
+    setMenu(null);
     const maxOrder = tasks.reduce((m, t) => Math.max(m, t.order || 0), 0);
     const copy = {
       ...src,
@@ -351,7 +351,7 @@ export default function MasterTasksPage() {
     } else {
       reportFailure(new Error(NOT_SIGNED_IN));
     }
-    setMenuId(null);
+    setMenu(null);
   }
 
   function confirmDelete() {
@@ -362,7 +362,7 @@ export default function MasterTasksPage() {
       reportFailure(new Error(NOT_SIGNED_IN));
     }
     setDeleteId(null);
-    setMenuId(null);
+    setMenu(null);
   }
 
   function priorityPill(priority) {

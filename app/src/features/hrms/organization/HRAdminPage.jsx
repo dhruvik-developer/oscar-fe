@@ -876,20 +876,26 @@ export default function HRAdminPage({ defaultTab }) {
       confirmText: "Remove Holiday"
     });
     if (!confirmed) return;
-    if (true) {
-      setHolidays((prev) => prev.filter((h) => h.id !== id));
-      if (isBackendEnabled()) {
-        hrmsSync.remove('holidays', id).catch(console.warn);
+
+    if (isBackendEnabled()) {
+      try {
+        await hrmsSync.remove('holidays', id);
+      } catch (err) {
+        console.error("Failed to delete holiday from backend:", err);
+        showToast(err?.message || "Failed to remove holiday from backend.");
+        return;
       }
-      const calEvents = useCalendarStore.getState().events;
-      const calMatch = calEvents.find(
-        (e) => e.source_id === id || e.sourceId === id || (e.title || '').toLowerCase() === (name || '').toLowerCase()
-      );
-      if (calMatch?.id) {
-        deleteCalendarEvent?.(calMatch.id);
-      }
-      showToast(`Holiday "${name}" removed`);
     }
+
+    setHolidays((prev) => prev.filter((h) => h.id !== id));
+    const calEvents = useCalendarStore.getState().events;
+    const calMatch = calEvents.find(
+      (e) => e.source_id === id || e.sourceId === id || (e.title || '').toLowerCase() === (name || '').toLowerCase()
+    );
+    if (calMatch?.id) {
+      deleteCalendarEvent?.(calMatch.id);
+    }
+    showToast(`Holiday "${name}" removed`);
   };
 
   // ── Org Settings ───────────────────────────────────────────

@@ -276,6 +276,7 @@ export function StockPositionPage() {
   const [historyModalRecord, setHistoryModalRecord] = useState(null); // View History Audit
   const [isSampleModalOpen, setIsSampleModalOpen] = useState(false); // #10 + Issue Sample
   const [isThresholdModalOpen, setIsThresholdModalOpen] = useState(false);
+  const [reprocessQcModal, setReprocessQcModal] = useState(null);
   const [thresholdInput, setThresholdInput] = useState('');
   const [thresholdEnabled, setThresholdEnabled] = useState(true);
   const [isSavingThreshold, setIsSavingThreshold] = useState(false);
@@ -2600,6 +2601,23 @@ export function StockPositionPage() {
                 </div>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── REPROCESS QC MODAL ── */}
+      {reprocessQcModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-2 sm:p-4 animate-in fade-in">
+          <div className="bg-white border border-slate-200 shadow-2xl rounded-2xl w-full max-w-5xl max-h-[95vh] sm:max-h-[92vh] overflow-y-auto flex flex-col p-4 sm:p-6 text-xs">
+            <GreyQcInlineSlide
+              po={reprocessQcModal.po ? { ...reprocessQcModal.po, isReprocess: true, batchCode: reprocessQcModal.batchCode } : { isReprocess: true, batchCode: reprocessQcModal.batchCode }}
+              initialReceiptId={reprocessQcModal.initialReceiptId}
+              onClose={() => setReprocessQcModal(null)}
+              onQcSaved={() => {
+                setReprocessQcModal(null);
+                fetchData(true);
+              }}
+            />
           </div>
         </div>
       )}

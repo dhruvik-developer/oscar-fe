@@ -52,10 +52,15 @@ const ICON_STYLE = {
 };
 
 /** The master's options, plus `extra` values (e.g. on saved tasks) it no longer lists. */
-function withExtras(options, extra) {
-  const out = [...options];
-  extra.forEach((value) => {
-    if (value && !out.includes(value)) out.push(value);
+function withExtras(options = [], extra = []) {
+  const set = new Set();
+  const out = [];
+  [...(Array.isArray(options) ? options : []), ...(Array.isArray(extra) ? extra : [])].forEach((value) => {
+    const str = typeof value === 'string' ? value.trim() : (value?.name || String(value || '')).trim();
+    if (str && !set.has(str)) {
+      set.add(str);
+      out.push(str);
+    }
   });
   return out;
 }

@@ -746,7 +746,7 @@ export default function MachinesAndBeamsPage() {
                             type="button"
                             onClick={() => {
                               const el = document.getElementById(`target_m_${b.id}`);
-                              handleAssignSpare(b.id, el.value);
+                              handleAssignSpare(b.id, el ? el.value : null);
                             }}
                             className="h-8 px-3 bg-white hover:bg-slate-50 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold shadow-2xs transition cursor-pointer"
                           >

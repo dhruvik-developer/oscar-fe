@@ -18,6 +18,7 @@ import { formatNum, preventNegativeInput, clampNonNegative } from '../utils/loom
 import { useERP } from '../../../context/ERPContext';
 import { ConfirmModal } from '../../../components/ui/ConfirmModal';
 import CompanySelector from './components/CompanySelector';
+import DatePicker from './components/DatePicker';
 
 export default function DailyLoomEntryPage() {
   const { showToast } = useERP();
@@ -219,6 +220,7 @@ export default function DailyLoomEntryPage() {
             <CompanySelector
               factories={factories}
               selectedFactoryId={selectedFactoryId}
+              align="left"
               onSelect={(val) => {
                 setSelectedFactoryId(val);
                 localStorage.setItem('oscar_pms_selected_factory', val);
@@ -226,15 +228,11 @@ export default function DailyLoomEntryPage() {
             />
 
             {/* Date Picker */}
-            <div className="h-[38px] flex items-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 shadow-2xs">
-              <Calendar size={15} className="text-slate-400 shrink-0" />
-              <input
-                type="date"
-                value={dateStr}
-                onChange={(e) => setDateStr(e.target.value)}
-                className="bg-transparent text-xs font-semibold text-slate-800 dark:text-slate-200 outline-none cursor-pointer"
-              />
-            </div>
+            <DatePicker
+              value={dateStr}
+              onChange={setDateStr}
+              align="left"
+            />
 
             {/* Power cut */}
             <div className="h-[38px] flex items-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 shadow-2xs">

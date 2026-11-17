@@ -71,7 +71,7 @@ export default function ProductionDashboardPage() {
       setEmployeeData(eRows);
     } catch (err) {
       console.error('Failed to load production dashboard:', err);
-      setError(err?.response?.data?.detail || err?.message || 'Failed to load production dashboard data.');
+      setError(err?.payload?.message || err?.payload?.detail || err?.message || 'Failed to load production dashboard data.');
     } finally {
       setLoading(false);
       setRefreshing(false);

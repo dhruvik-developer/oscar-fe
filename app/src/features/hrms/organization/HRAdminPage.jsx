@@ -1118,16 +1118,7 @@ export default function HRAdminPage({ defaultTab }) {
             </div>
 
             {/* Contextual Primary Action Button */}
-            {/* Teams action button commented out */}
-            {false && (
-              <button
-                type="button"
-                onClick={handleOpenAddTeam}
-                className="inline-flex items-center gap-2 px-5 py-2.5 bg-navy text-white rounded-xl text-[13.5px] font-medium hover:bg-navy/90 transition shadow-xs cursor-pointer"
-              >
-                <Plus size={16} /> Create Team
-              </button>
-            )}
+            {/* Teams action button removed */}
             {activeTab === "working-days" && (
               <div className="flex items-center gap-2">
                 <button
@@ -1160,16 +1151,7 @@ export default function HRAdminPage({ defaultTab }) {
                 <Plus size={16} /> New Approval Chain
               </button>
             )}
-            {/* Offers action button commented out */}
-            {false && (
-              <button
-                type="button"
-                onClick={() => setIsGenerateOfferModalOpen(true)}
-                className="inline-flex items-center gap-2 px-5 py-2.5 bg-navy text-white rounded-xl text-[13.5px] font-medium hover:bg-navy/90 transition shadow-xs cursor-pointer"
-              >
-                <Plus size={16} /> Generate Offer Letter
-              </button>
-            )}
+            {/* Offers action button removed */}
             {activeTab === "terminations" && (
               <button
                 type="button"

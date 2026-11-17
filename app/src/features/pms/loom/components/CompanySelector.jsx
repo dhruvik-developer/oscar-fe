@@ -10,13 +10,35 @@ export default function CompanySelector({
   selectedFactoryId,
   onSelect,
   className = '',
+  align = 'auto', // 'auto' | 'left' | 'right'
 }) {
   const [open, setOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [menuAlign, setMenuAlign] = useState(align === 'right' ? 'right' : 'left');
   const containerRef = useRef(null);
   const searchInputRef = useRef(null);
 
   const selectedFactory = factories.find((f) => f.id === selectedFactoryId) || factories[0];
+
+  const updateAlignment = () => {
+    if (align === 'left' || align === 'right') {
+      setMenuAlign(align);
+      return;
+    }
+    if (containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect();
+      const dropdownWidth = 320;
+      const spaceOnRight = window.innerWidth - rect.left;
+      const spaceOnLeft = rect.right;
+
+      // If opening to the right would overflow the screen and there is more room on the left
+      if (spaceOnRight < dropdownWidth && spaceOnLeft >= dropdownWidth) {
+        setMenuAlign('right');
+      } else {
+        setMenuAlign('left');
+      }
+    }
+  };
 
   useEffect(() => {
     const handleOutside = (e) => {
@@ -29,6 +51,8 @@ export default function CompanySelector({
     };
 
     if (open) {
+      updateAlignment();
+      window.addEventListener('resize', updateAlignment);
       document.addEventListener('mousedown', handleOutside);
       document.addEventListener('keydown', handleKeyDown);
       // focus search input if factories > 3
@@ -36,13 +60,14 @@ export default function CompanySelector({
         setTimeout(() => searchInputRef.current?.focus(), 50);
       }
       return () => {
+        window.removeEventListener('resize', updateAlignment);
         document.removeEventListener('mousedown', handleOutside);
         document.removeEventListener('keydown', handleKeyDown);
       };
     } else {
       setSearchQuery('');
     }
-  }, [open, factories.length]);
+  }, [open, factories.length, align]);
 
   const filteredFactories = useMemo(() => {
     if (!searchQuery.trim()) return factories;
@@ -55,12 +80,20 @@ export default function CompanySelector({
     );
   }, [factories, searchQuery]);
 
+  const handleToggle = () => {
+    if (!open) {
+      updateAlignment();
+    }
+    setOpen((prev) => !prev);
+  };
+
   return (
-    <div ref={containerRef} className={`relative inline-block ${className}`}>
+    <div ref={containerRef} className={`relative inline-block text-left ${open ? 'z-30' : ''} ${className}`}>
       {/* Modern Trigger Button */}
       <button
         type="button"
-        onClick={() => setOpen((prev) => !prev)}
+        onClick={handleToggle}
+        title={selectedFactory?.name || 'Select Company'}
         className={`h-[38px] flex items-center gap-2 rounded-xl px-3 border transition-all cursor-pointer shadow-2xs select-none ${
           open
             ? 'bg-blue-50/50 dark:bg-slate-800 border-blue-500 ring-2 ring-blue-500/20'
@@ -77,7 +110,7 @@ export default function CompanySelector({
           {selectedFactory?.name || 'Select Company'}
         </span>
         {selectedFactory?.machines_count !== undefined && selectedFactory.machines_count > 0 && (
-          <span className="hidden md:inline-flex items-center text-[10px] font-extrabold px-1.5 py-0.2 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
+          <span className="hidden md:inline-flex items-center text-[10px] font-extrabold px-1.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
             {selectedFactory.machines_count}
           </span>
         )}
@@ -91,7 +124,11 @@ export default function CompanySelector({
 
       {/* Floating Popover Menu */}
       {open && (
-        <div className="absolute right-0 top-full mt-1.5 z-50 w-72 sm:w-80 bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 p-2.5 animate-in fade-in zoom-in-95 duration-150">
+        <div
+          className={`absolute ${
+            menuAlign === 'right' ? 'right-0' : 'left-0'
+          } top-full mt-1.5 z-50 w-72 sm:w-80 max-w-[calc(100vw-2rem)] bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 p-2.5 animate-in fade-in zoom-in-95 duration-150`}
+        >
           {/* Header */}
           <div className="px-2 py-1.5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
             <div className="flex items-center gap-1.5">
@@ -108,7 +145,7 @@ export default function CompanySelector({
           {/* Optional Search if more than 3 factories */}
           {factories.length > 3 && (
             <div className="mt-2 relative">
-              <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+              <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
               <input
                 ref={searchInputRef}
                 type="text"
@@ -121,7 +158,7 @@ export default function CompanySelector({
                 <button
                   type="button"
                   onClick={() => setSearchQuery('')}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer p-0.5"
                 >
                   <X size={12} />
                 </button>
@@ -130,7 +167,7 @@ export default function CompanySelector({
           )}
 
           {/* Factory List */}
-          <div className="mt-2 max-h-64 overflow-y-auto space-y-1 scrollbar-thin">
+          <div className="mt-2 max-h-64 overflow-y-auto space-y-1 scrollbar-thin pr-1">
             {filteredFactories.length === 0 ? (
               <div className="py-6 text-center text-xs text-slate-400">
                 No manufacturing unit matches &ldquo;{searchQuery}&rdquo;
@@ -149,10 +186,10 @@ export default function CompanySelector({
                       onSelect(f.id);
                       setOpen(false);
                     }}
-                    className={`w-full flex items-center justify-between p-2 rounded-xl text-left transition-colors cursor-pointer ${
+                    className={`w-full flex items-center justify-between p-2 rounded-xl text-left transition-colors cursor-pointer border ${
                       isSelected
-                        ? 'bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 font-bold border border-blue-200/50 dark:border-blue-900/40'
-                        : 'hover:bg-slate-50 dark:hover:bg-slate-800/60 text-slate-700 dark:text-slate-200 font-medium'
+                        ? 'bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 font-bold border-blue-200/50 dark:border-blue-900/40'
+                        : 'border-transparent hover:bg-slate-50 dark:hover:bg-slate-800/60 text-slate-700 dark:text-slate-200 font-medium'
                     }`}
                   >
                     <div className="flex items-center gap-2.5 min-w-0">

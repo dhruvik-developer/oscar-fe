@@ -9,7 +9,7 @@ import { AddEditStageModal } from './components/AddEditStageModal';
 import { PmsToast } from '../components/PmsToast';
 
 /**
- * StageConfigPage (/pms/stages) — the dynamic stage configurator.
+ * StageConfigPage (/pms/settings) — the dynamic stage configurator.
  *
  * This list is the single definition of the execution pipeline: creating a
  * project instantiates its stages from the active templates here, in this

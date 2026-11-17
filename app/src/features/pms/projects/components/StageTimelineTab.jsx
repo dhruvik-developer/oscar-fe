@@ -28,9 +28,6 @@ import { StageVendorProductionWorkspace } from './StageVendorProductionWorkspace
 export function StageTimelineTab({
   project,
   stageConfigs = [],
-  onStart,
-  onManageTasks,
-  onSubmit,
   onHandoff,
   onDeleteStage,
   onSyncPipeline,

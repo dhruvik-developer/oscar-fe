@@ -251,13 +251,16 @@ export function recalcProject(project, now = Date.now(), atRiskThresholdPct = 70
  * Sidebar nav counters, derived purely so components can memoize on the raw
  * slices rather than on a fresh object handed back by a store selector.
  */
-export function computeNavBadges(projects = [], currentUserId = null) {
+export function computeNavBadges(projects = [], currentUserId = null, now = Date.now()) {
   let pmsActiveCount = 0;
   let pmsDelayedCount = 0;
   let pmsMyTasksPending = 0;
 
   for (const p of projects) {
-    if (p.status === "Delayed") pmsDelayedCount += 1;
+    const hasDelayedOrOverdueStage = (p.stages ?? []).some(
+      (stage) => stage.delayDetails?.isDelayed || stage.status === "Delayed" || isStageOverdue(stage, now)
+    );
+    if (p.status === "Delayed" || hasDelayedOrOverdueStage) pmsDelayedCount += 1;
     if (p.status !== "Completed" && p.status !== "Draft") pmsActiveCount += 1;
 
     for (const stage of p.stages ?? []) {
@@ -280,7 +283,8 @@ export function computeNavBadges(projects = [], currentUserId = null) {
 // "at risk" is measured per stage at a 70%/50% cut rather than via
 // settings.atRiskThresholdPct.
 
-export const DASHBOARD_AT_RISK_ELAPSED_PCT = 70;
+export const DEFAULT_AT_RISK_THRESHOLD_PCT = 70;
+export const DASHBOARD_AT_RISK_ELAPSED_PCT = DEFAULT_AT_RISK_THRESHOLD_PCT;
 export const DASHBOARD_AT_RISK_COMPLETION_PCT = 50;
 
 const ACTIVE_STATUSES = new Set(["In Progress", "At Risk", "Delayed"]);
@@ -293,10 +297,11 @@ export function isStageOverdue(stage, now = Date.now()) {
 }
 
 /** A started, unfinished stage burning its window faster than its progress. */
-export function isStageAtRisk(stage, now = Date.now()) {
+export function isStageAtRisk(stage, now = Date.now(), thresholdPct) {
   if (!stage || stage.status === "Completed" || !stage.startDateTime) return false;
+  const elapsedThreshold = thresholdPct ?? (typeof usePmsStore === 'function' ? usePmsStore.getState?.()?.settings?.atRiskThresholdPct : null) ?? DEFAULT_AT_RISK_THRESHOLD_PCT;
   return (
-    computeElapsedPct(stage, now) > DASHBOARD_AT_RISK_ELAPSED_PCT &&
+    computeElapsedPct(stage, now) > elapsedThreshold &&
     computeStageCompletionPct(stage) < DASHBOARD_AT_RISK_COMPLETION_PCT
   );
 }

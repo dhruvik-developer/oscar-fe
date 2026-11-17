@@ -5,6 +5,12 @@ export const PAYMENT_MODES = ['Bank Transfer', 'UPI', 'Cheque', 'Cash', 'Card', 
 
 export const INVOICE_STATUSES = ['Unpaid', 'Partially Paid', 'Paid', 'Due', 'Overdue'];
 export const DISCOUNT_STATUSES = ['Draft', 'Submitted', 'Under Review', 'Approved', 'Rejected', 'Cancelled'];
+export const DISCOUNT_TYPES = [
+  'Early Payment Discount',
+  'Special Discount',
+  'Settlement Discount',
+  'Other Approved Discount',
+];
 
 const inr = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 });
 

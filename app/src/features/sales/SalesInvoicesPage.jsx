@@ -13,7 +13,7 @@ const invoiceGuide = {
         { term: 'Payment Receipt / Voucher', definition: 'An official acknowledgement proving that full or partial payment has been collected and posted to the General Ledger.' },
     ],
     tips: [
-        'Use the ⚡ Settle button on unpaid invoices to record payment and generate an official printable receipt voucher in 1 click.',
+        'Use the ⚡ Settle button on unpaid invoices to enter the amount received and generate an official printable receipt voucher.',
         'Link an invoice to a Sales Order to pull all verified line items automatically.',
     ],
     workflow: ['Sales Order Dispatched', 'Tax Invoice Issued', 'Payment Received', 'Receipt Voucher Issued', 'AR Balance Cleared'],

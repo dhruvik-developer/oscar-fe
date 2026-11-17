@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { modal } from '../../../context/ModalContext';
 import { Link } from 'react-router-dom';
 import {
   Package,
@@ -230,7 +231,7 @@ export default function QCDashboardPage({ defaultTab = 'All' }) {
       await fetchDashboard();
       setSelectedRecord(null);
     } catch (err) {
-      alert('Could not update QC disposition: ' + (err.message || 'Server error'));
+      await modal.error('Could not update QC disposition: ' + (err.message || 'Server error'), 'QC Disposition Error');
     } finally {
       setUpdatingDisposition(false);
     }

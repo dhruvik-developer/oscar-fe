@@ -898,7 +898,7 @@ function TeamMarkAttendance() {
             {counts.notMarked}
           </div>
           <p className="text-[11.5px] text-amber-700 font-medium mt-1.5">
-            {counts.notMarked > 0 ? "Pending punch or manual entry" : "All employees marked!"}
+            {counts.notMarked > 0 ? "Pending punch" : "All employees marked!"}
           </p>
         </div>
       </div>

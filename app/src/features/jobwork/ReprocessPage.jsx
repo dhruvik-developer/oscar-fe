@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { modal } from '../../context/ModalContext';
 import { useNavigate } from 'react-router-dom';
 import {
   CheckCircle2,
@@ -282,12 +283,13 @@ export default function ReprocessPage() {
   };
 
   const handleDelete = async (r) => {
-    if (!window.confirm(`Delete reprocess ${r.no}?`)) return;
+    const ok = await modal.deleteConfirm(`Delete reprocess ${r.no}?`, 'Delete Reprocess');
+    if (!ok) return;
     try {
       await deleteJWORow(r.jwoId, 'reprocesses', r.id);
       await reload();
     } catch (err) {
-      window.alert(errorMessage(err, 'Could not delete the reprocess record.'));
+      await modal.error(errorMessage(err, 'Could not delete the reprocess record.'), 'Reprocess Delete Error');
     }
   };
 

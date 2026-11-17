@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { modal } from '../../context/ModalContext';
 import { useNavigate } from 'react-router-dom';
 import { Eye, MoreHorizontal, Pencil, Plus, Trash2, X } from 'lucide-react';
 import { numIN, toDDMMYYYY, purgeLegacyJobWorkCache } from './jobWorkOrdersStore';
@@ -144,7 +145,7 @@ export default function JobWorkOutwardPage() {
       await reload();
     } catch (err) {
       setDeleteConfirm((prev) => ({ ...prev, loading: false }));
-      window.alert(errorMessage(err, 'Could not delete the outward challan.'));
+      await modal.error(errorMessage(err, 'Could not delete the outward challan.'), 'Outward Delete Error');
     }
   };
 

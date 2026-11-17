@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { modal } from '../../context/ModalContext';
 import { TablePagination } from '../../components/ui/TablePagination';
 import { useERP } from '../../context/ERPContext';
 import { StatusBadge } from '../../components/ui/StatusBadge';
@@ -25,6 +26,7 @@ import {
   Building2,
   RefreshCw,
   Search,
+  RotateCcw,
 } from 'lucide-react';
 import api from '../../services/api';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -35,7 +37,7 @@ import { ReceiptTypeNotice } from './DyeingColourField';
 
 const goodsReceiptGuide = {
   title: 'Goods Receipt Notes (GRN)',
-  subtitle: 'Physical intake verification, roll/taka breakdown, 3-way matching (PO ⇄ GRN ⇄ Bill), and QC checkpoint.',
+  subtitle: 'Physical intake verification, roll/taka breakdown, 3-way matching (PO â‡„ GRN â‡„ Bill), and QC checkpoint.',
   purpose: 'Every purchase order and delivery from suppliers/mills is received through physical GRN verification. This screen captures taka rolls per line, compares received meters against ordered PO meterage, records shortage/excess, and routes goods to QC inspection before stock release.',
   keyTerms: [
     { term: 'GRN (Goods Receipt Note)', definition: 'The physical intake document capturing roll-by-roll actual meters, kg, width, and lot numbers.' },
@@ -67,7 +69,7 @@ export const GoodsReceiptPage = () => {
   const lineUnit = (it) => it.uom || it.unit || 'MTR';
   const unitTotals = (lines, qtyOf) => formatUnitTotals(sumByUnit(lines, { qty: qtyOf, uom: lineUnit, units }), { units });
 
-  // Tab state: 'receipts' (completed GRN register) | 'orders' (POs awaiting intake) | 'pending' (bills awaiting receipt)
+  // Tab state: 'receipts' (completed GRN register) | 'pending' (bills awaiting receipt)
   const [activeTab, setActiveTab] = useState('receipts');
   const [grnList, setGrnList] = useState([]);
   const [totalGrnCount, setTotalGrnCount] = useState(0);
@@ -128,7 +130,11 @@ export const GoodsReceiptPage = () => {
     }
   }, []);
 
+  // StrictMode runs this effect twice on mount; a ref survives between the two.
+  const initialLoadDone = useRef(false);
   useEffect(() => {
+    if (initialLoadDone.current) return;
+    initialLoadDone.current = true;
     fetchGrns();
     if (typeof refreshCollections === 'function') {
       refreshCollections(['purchaseOrders', 'purchaseBills']);
@@ -192,7 +198,7 @@ export const GoodsReceiptPage = () => {
   const pendingQtyText = useMemo(() => {
     if (allPendingLines.length === 0) return '0 MTR';
     const formatted = unitTotals(allPendingLines, (it) => Number(it.qty) || 0);
-    return !formatted || formatted === '—' ? '0 MTR' : formatted;
+    return !formatted || formatted === '"”' ? '0 MTR' : formatted;
   }, [allPendingLines, unitTotals]);
 
   const pendingValue = useMemo(() => {
@@ -272,7 +278,7 @@ export const GoodsReceiptPage = () => {
     fetchGrns();
   };
 
-  // ── Standalone GRN Form Handlers (Phase 2.2) ──
+  // â”€â”€ Standalone GRN Form Handlers (Phase 2.2) â”€â”€
   const openStandaloneModal = (prefill = {}) => {
     setStandaloneError('');
     setStandaloneSuccess('');
@@ -521,10 +527,16 @@ export const GoodsReceiptPage = () => {
     }));
   };
 
-  const handleAutoSplitTakas = (lineId) => {
+  const handleAutoSplitTakas = async (lineId) => {
     const line = standaloneForm.lines.find((l) => l.id === lineId);
     if (!line) return;
-    const countStr = window.prompt(`How many rolls to split ${line.receivedQty} meters into?`, '');
+    const countStr = await modal.prompt({
+      title: 'Auto-Split Rolls',
+      message: `How many rolls to split ${line.receivedQty} meters into?`,
+      defaultValue: '',
+      placeholder: 'e.g. 4',
+      confirmLabel: 'Split Rolls',
+    });
     const count = parseInt(countStr, 10);
     if (!count || count <= 0) return;
 
@@ -611,23 +623,80 @@ export const GoodsReceiptPage = () => {
     }
   };
 
+  const [grnSupplierFilter, setGrnSupplierFilter] = useState('All');
+  const [grnQcFilter, setGrnQcFilter] = useState('All');
+  const [grnDateFrom, setGrnDateFrom] = useState('');
+  const [grnDateTo, setGrnDateTo] = useState('');
+
+  const supplierOptions = useMemo(() => {
+    return [...new Set(grnList.map((g) => g.vendorName).filter(Boolean))].sort();
+  }, [grnList]);
+
+  const qcStatusOptions = useMemo(() => {
+    const defaultStatuses = ['Approved', 'Pending', 'Rejected'];
+    const fromData = grnList.map((g) => g.qc_status || g.qcStatus).filter(Boolean);
+    return [...new Set([...defaultStatuses, ...fromData])];
+  }, [grnList]);
+
+  const hasActiveFilters = Boolean(
+    grnSearch.trim() ||
+    grnSupplierFilter !== 'All' ||
+    grnQcFilter !== 'All' ||
+    grnDateFrom ||
+    grnDateTo
+  );
+
+  const resetFilters = () => {
+    setGrnSearch('');
+    setGrnSupplierFilter('All');
+    setGrnQcFilter('All');
+    setGrnDateFrom('');
+    setGrnDateTo('');
+  };
+
   const filteredGrnList = useMemo(() => {
-    if (!grnSearch.trim()) return grnList;
-    const q = grnSearch.toLowerCase();
-    return grnList.filter((g) =>
-      (g.grn_number || '').toLowerCase().includes(q) ||
-      (g.vendorName || '').toLowerCase().includes(q) ||
-      (g.supplier_challan_no || '').toLowerCase().includes(q) ||
-      (g.poNumber || '').toLowerCase().includes(q)
-    );
-  }, [grnList, grnSearch]);
+    return grnList.filter((g) => {
+      // 1. Search filter
+      if (grnSearch.trim()) {
+        const q = grnSearch.toLowerCase().trim();
+        const matchesSearch =
+          (g.grn_number || '').toLowerCase().includes(q) ||
+          (g.vendorName || '').toLowerCase().includes(q) ||
+          (g.supplier_challan_no || '').toLowerCase().includes(q) ||
+          (g.poNumber || '').toLowerCase().includes(q);
+        if (!matchesSearch) return false;
+      }
+
+      // 2. Supplier filter
+      if (grnSupplierFilter !== 'All') {
+        if ((g.vendorName || '') !== grnSupplierFilter) return false;
+      }
+
+      // 3. QC Status filter
+      if (grnQcFilter !== 'All') {
+        const qc = g.qc_status || g.qcStatus || 'Pending';
+        if (qc !== grnQcFilter) return false;
+      }
+
+      // 4. Date range filter
+      if (grnDateFrom || grnDateTo) {
+        const d = (g.receipt_date || '').slice(0, 10);
+        if (d) {
+          if (grnDateFrom && d < grnDateFrom) return false;
+          if (grnDateTo && d > grnDateTo) return false;
+        }
+      }
+
+      return true;
+    });
+  }, [grnList, grnSearch, grnSupplierFilter, grnQcFilter, grnDateFrom, grnDateTo]);
 
   const [grnPage, setGrnPage] = useState(1);
   const [grnPageSize, setGrnPageSize] = useState(25);
 
   useEffect(() => {
     setGrnPage(1);
-  }, [grnSearch]);
+  }, [grnSearch, grnSupplierFilter, grnQcFilter, grnDateFrom, grnDateTo]);
 
   const paginatedGrnList = useMemo(() => {
     const start = (grnPage - 1) * grnPageSize;
@@ -640,16 +709,6 @@ export const GoodsReceiptPage = () => {
         title="Goods Receipt Notes (GRN)"
         subtitle="Physical intake verification, roll/taka capture, and 3-way matching"
         guide={goodsReceiptGuide}
-        actions={
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => openStandaloneModal()}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3.5 py-2 text-xs font-semibold text-white shadow-xs hover:bg-blue-700 transition"
-            >
-              <Plus size={14} /> New GRN Intake
-            </button>
-          </div>
-        }
       />
 
       {/* KPI Cards */}
@@ -660,8 +719,6 @@ export const GoodsReceiptPage = () => {
           icon={Truck}
           tone="amber"
           note={pendingPOs.length > 0 ? `${pendingPOs.length} POs pending intake` : undefined}
-          onClick={() => setActiveTab('orders')}
-          className="cursor-pointer hover:shadow-md transition"
         />
         <StatCard
           label="Pending Qty"
@@ -697,18 +754,6 @@ export const GoodsReceiptPage = () => {
         >
           Completed GRN Register ({totalGrnDisplayCount})
         </button>
-        {pendingPOs.length > 0 && (
-          <button
-            onClick={() => setActiveTab('orders')}
-            className={`pb-2.5 text-xs font-semibold border-b-2 transition ${
-              activeTab === 'orders'
-                ? 'border-blue-600 text-blue-700'
-                : 'border-transparent text-slate-500 hover:text-slate-800'
-            }`}
-          >
-            Orders Awaiting Receipt ({pendingPOs.length})
-          </button>
-        )}
         {pendingReceipts.length > 0 && (
           <button
             onClick={() => setActiveTab('pending')}
@@ -726,20 +771,74 @@ export const GoodsReceiptPage = () => {
       {/* TAB 1: Completed GRN Register */}
       {activeTab === 'receipts' && (
         <div className="space-y-4">
-          <div className="flex items-center justify-between gap-3 bg-white p-3 rounded-xl border border-[#dce5f4] shadow-xs">
-            <div className="relative w-72">
-              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input
-                type="text"
-                placeholder="Search GRN, Supplier, Challan..."
-                value={grnSearch}
-                onChange={(e) => setGrnSearch(e.target.value)}
-                className="w-full pl-9 pr-3 py-1.5 text-xs rounded-lg border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:border-blue-500"
-              />
+          <div className="flex flex-wrap items-center justify-between gap-2.5 bg-white p-3 rounded-xl border border-[#dce5f4] shadow-xs">
+            <div className="flex flex-wrap items-center gap-2 flex-1">
+              <div className="relative min-w-[200px] max-w-xs flex-1">
+                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Search GRN, Supplier, Challan, PO..."
+                  value={grnSearch}
+                  onChange={(e) => setGrnSearch(e.target.value)}
+                  className="w-full pl-9 pr-3 py-1.5 text-xs rounded-lg border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:border-blue-500"
+                />
+              </div>
+
+              <select
+                value={grnSupplierFilter}
+                onChange={(e) => setGrnSupplierFilter(e.target.value)}
+                className="py-1.5 px-2.5 text-xs rounded-lg border border-slate-200 bg-white font-medium text-slate-700 outline-none focus:border-blue-500 cursor-pointer"
+              >
+                <option value="All">All Suppliers</option>
+                {supplierOptions.map((s) => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
+
+              <select
+                value={grnQcFilter}
+                onChange={(e) => setGrnQcFilter(e.target.value)}
+                className="py-1.5 px-2.5 text-xs rounded-lg border border-slate-200 bg-white font-medium text-slate-700 outline-none focus:border-blue-500 cursor-pointer"
+              >
+                <option value="All">All QC Status</option>
+                {qcStatusOptions.map((st) => (
+                  <option key={st} value={st}>{st}</option>
+                ))}
+              </select>
+
+              <div className="flex items-center gap-1.5">
+                <input
+                  type="date"
+                  value={grnDateFrom}
+                  onChange={(e) => setGrnDateFrom(e.target.value)}
+                  className="py-1.5 px-2 text-xs rounded-lg border border-slate-200 bg-white text-slate-700 outline-none focus:border-blue-500"
+                  title="Receipt Date From"
+                />
+                <span className="text-slate-400 text-xs">to</span>
+                <input
+                  type="date"
+                  value={grnDateTo}
+                  onChange={(e) => setGrnDateTo(e.target.value)}
+                  className="py-1.5 px-2 text-xs rounded-lg border border-slate-200 bg-white text-slate-700 outline-none focus:border-blue-500"
+                  title="Receipt Date To"
+                />
+              </div>
+
+              {hasActiveFilters && (
+                <button
+                  type="button"
+                  onClick={resetFilters}
+                  className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-lg transition cursor-pointer"
+                  title="Reset all filters"
+                >
+                  <RotateCcw size={12} /> Reset
+                </button>
+              )}
             </div>
+
             <button
               onClick={fetchGrns}
-              className="p-1.5 text-slate-500 hover:text-slate-800 rounded-lg hover:bg-slate-100 border border-slate-200"
+              className="p-1.5 text-slate-500 hover:text-slate-800 rounded-lg hover:bg-slate-100 border border-slate-200 cursor-pointer"
               title="Refresh"
             >
               <RefreshCw size={13} className={loadingGrns ? 'animate-spin' : ''} />
@@ -754,15 +853,15 @@ export const GoodsReceiptPage = () => {
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200 uppercase tracking-wider text-[11px]">
-                    <tr>
-                      <th className="px-4 py-3">GRN #</th>
-                      <th className="px-4 py-3">Receipt Date</th>
-                      <th className="px-4 py-3">Supplier</th>
-                      <th className="px-4 py-3">Supplier Challan #</th>
-                      <th className="px-4 py-3">PO Number</th>
-                      <th className="px-4 py-3 text-right">Lines</th>
-                      <th className="px-4 py-3 text-center">QC Status</th>
+                  <thead className="table-head-std">
+                    <tr className="table-head-row-std">
+                      <th>GRN #</th>
+                      <th>Receipt Date</th>
+                      <th>Supplier</th>
+                      <th>Supplier Challan #</th>
+                      <th>PO Number</th>
+                      <th className="text-right">Lines</th>
+                      <th className="text-center">QC Status</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -780,8 +879,8 @@ export const GoodsReceiptPage = () => {
                         </td>
                         <td className="px-4 py-3 text-slate-700">{g.receipt_date}</td>
                         <td className="px-4 py-3 font-medium text-slate-900">{g.vendorName}</td>
-                        <td className="px-4 py-3 font-mono text-slate-700">{g.supplier_challan_no || '—'}</td>
-                        <td className="px-4 py-3 font-mono text-slate-700">{g.poNumber || '—'}</td>
+                        <td className="px-4 py-3 font-mono text-slate-700">{g.supplier_challan_no || '"”'}</td>
+                        <td className="px-4 py-3 font-mono text-slate-700">{g.poNumber || '"”'}</td>
                         <td className="px-4 py-3 text-right font-semibold text-slate-800">{g.lines?.length || 0}</td>
                         <td className="px-4 py-3 text-center">
                           <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold border ${
@@ -825,14 +924,14 @@ export const GoodsReceiptPage = () => {
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs text-slate-600">
-                <thead className="bg-slate-50 uppercase font-semibold text-slate-500 tracking-wider border-b border-slate-200 text-[11px]">
-                  <tr>
-                    <th className="py-2.5 px-4">Bill Number</th>
-                    <th className="py-2.5 px-4">Supplier</th>
-                    <th className="py-2.5 px-4">Date</th>
-                    <th className="py-2.5 px-4 text-right">Bill Items</th>
-                    <th className="py-2.5 px-4 text-right">Amount</th>
-                    <th className="py-2.5 px-4 text-center">Action</th>
+                <thead className="table-head-std">
+                  <tr className="table-head-row-std">
+                    <th>Bill Number</th>
+                    <th>Supplier</th>
+                    <th>Date</th>
+                    <th className="text-right">Bill Items</th>
+                    <th className="text-right">Amount</th>
+                    <th className="text-center">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -860,87 +959,7 @@ export const GoodsReceiptPage = () => {
         </div>
       )}
 
-      {/* TAB 3: Purchase Orders Awaiting Intake */}
-      {activeTab === 'orders' && (
-        <div className="bg-white rounded-xl border border-[#dce5f4] shadow-xs overflow-hidden">
-          <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
-            <div>
-              <h3 className="font-bold text-sm text-[#1F2E4A]">Purchase Orders Awaiting Goods Receipt</h3>
-              <p className="text-xs text-slate-500 mt-0.5">Approved purchase orders with remaining unreceived meterage</p>
-            </div>
-            <span className="text-xs text-slate-600 font-mono bg-amber-50 text-amber-700 border border-amber-200 px-2.5 py-1 rounded-full font-semibold">
-              {pendingPOs.length} orders pending
-            </span>
-          </div>
-          {pendingPOs.length === 0 ? (
-            <div className="p-12 text-center text-slate-400 text-xs">
-              No purchase orders awaiting intake. All approved orders are fully received.
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs text-slate-600">
-                <thead className="bg-slate-50 uppercase font-semibold text-slate-500 tracking-wider border-b border-slate-200 text-[11px]">
-                  <tr>
-                    <th className="py-2.5 px-4">PO Number</th>
-                    <th className="py-2.5 px-4">Date</th>
-                    <th className="py-2.5 px-4">Supplier / Mill</th>
-                    <th className="py-2.5 px-4">Fabric / Item</th>
-                    <th className="py-2.5 px-4 text-right">Ordered Qty</th>
-                    <th className="py-2.5 px-4 text-right">Received Qty</th>
-                    <th className="py-2.5 px-4 text-right">Remaining</th>
-                    <th className="py-2.5 px-4 text-center">Status</th>
-                    <th className="py-2.5 px-4 text-center">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {pendingPOs.map((po) => {
-                    const lines = po.lineItems || po.items || [];
-                    const ordered = lines.reduce((sum, l) => sum + (Number(l.qty ?? l.orderedQty) || 0), 0);
-                    const received = lines.reduce((sum, l) => sum + (Number(l.receivedQty ?? l.received_qty) || 0), 0);
-                    const remaining = Math.max(0, ordered - received);
-                    const fabricName = lines[0]?.fabricQualityName || lines[0]?.itemName || lines[0]?.name || lines[0]?.description || '—';
-                    const uom = lines[0]?.uom || 'MTR';
-                    return (
-                      <tr key={po.id} className="hover:bg-slate-50/70 transition-colors">
-                        <td className="p-4 font-mono font-bold text-blue-600">{po.poNumber}</td>
-                        <td className="p-4 text-slate-700">{formatDateDDMMYYYY(po.date || po.docDate || po.createdAt)}</td>
-                        <td className="p-4 font-medium text-slate-900">{po.vendorName || po.partyName || '—'}</td>
-                        <td className="p-4 text-slate-800">{fabricName}{lines.length > 1 ? ` (+${lines.length - 1} more)` : ''}</td>
-                        <td className="p-4 text-right font-mono text-slate-700">{numIN(ordered)} {uom}</td>
-                        <td className="p-4 text-right font-mono text-emerald-700 font-semibold">{numIN(received)} {uom}</td>
-                        <td className="p-4 text-right font-mono text-amber-700 font-bold bg-amber-50/50">{numIN(remaining)} {uom}</td>
-                        <td className="p-4 text-center">
-                          <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold border ${
-                            po.status === 'Partially Received'
-                              ? 'bg-amber-50 text-amber-700 border-amber-200'
-                              : 'bg-blue-50 text-blue-700 border-blue-200'
-                          }`}>
-                            {po.status}
-                          </span>
-                        </td>
-                        <td className="p-4 text-center">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              openStandaloneModal({ vendorId: po.vendorId || po.partyId });
-                              handlePoSelect(po.id);
-                            }}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 shadow-xs transition"
-                          >
-                            <PackageCheck size={13} /> Receive GRN
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ── Standalone GRN Modal (Phase 2.2 with Taka Breakdown) ── */}
+      {/* â”€â”€ Standalone GRN Modal (Phase 2.2 with Taka Breakdown) â”€â”€ */}
       {standaloneModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
           <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden">
@@ -1256,14 +1275,14 @@ export const GoodsReceiptPage = () => {
                           <span className="text-slate-500 font-medium">Variance vs PO:</span>
                           {shortage > 0 ? (
                             <span className="text-amber-600 font-semibold flex items-center gap-1">
-                              ⚠️ Shortage: {numIN(shortage)} m ({Math.round((shortage / line.orderedQty) * 100)}%)
+                              âš ï¸ Shortage: {numIN(shortage)} m ({Math.round((shortage / line.orderedQty) * 100)}%)
                             </span>
                           ) : excess > 0 ? (
                             <span className="text-blue-600 font-semibold flex items-center gap-1">
-                              ℹ️ Excess: +{numIN(excess)} m ({Math.round((excess / line.orderedQty) * 100)}%)
+                              â„¹ï¸ Excess: +{numIN(excess)} m ({Math.round((excess / line.orderedQty) * 100)}%)
                             </span>
                           ) : (
-                            <span className="text-emerald-600 font-semibold">✓ Exact match with PO</span>
+                            <span className="text-emerald-600 font-semibold">âœ“ Exact match with PO</span>
                           )}
                         </div>
                       )}
@@ -1273,7 +1292,7 @@ export const GoodsReceiptPage = () => {
                         <div className="flex items-center justify-between border-b border-slate-200/80 pb-2">
                           <span className="font-extrabold text-[#17294e] text-xs flex items-center gap-1.5">
                             <Package size={14} className="text-blue-700" />
-                            Batch Details — Auto-Generated Batch
+                            Batch Details "” Auto-Generated Batch
                           </span>
                           <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-100/70 text-blue-800 font-bold">
                             Batch Number: Auto (assigned on save)
@@ -1357,14 +1376,14 @@ export const GoodsReceiptPage = () => {
         </div>
       )}
 
-      {/* ── Bill-scoped Receive Modal (Legacy) ── */}
+      {/* â”€â”€ Bill-scoped Receive Modal (Legacy) â”€â”€ */}
       {selectedBill && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
           <div className="bg-white rounded-xl border border-slate-200 shadow-xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
             <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
               <div>
                 <h3 className="font-bold text-slate-900 text-sm">Goods Intake: {selectedBill.billNumber}</h3>
-                <p className="text-xs text-slate-500 mt-0.5">{selectedBill.vendor} • {formatDateDDMMYYYY(selectedBill.date)}</p>
+                <p className="text-xs text-slate-500 mt-0.5">{selectedBill.vendor} "¢ {formatDateDDMMYYYY(selectedBill.date)}</p>
               </div>
               <button onClick={() => setSelectedBill(null)} className="text-slate-400 hover:text-slate-600 p-1 rounded-md">
                 <X size={16} />

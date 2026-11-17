@@ -1,3 +1,4 @@
+import { modal } from '../../../context/ModalContext';
 import { useState, useMemo, useEffect } from "react";
 import { Download, ChevronDown, Trash2, Eye } from "lucide-react";
 import EmployeeProfileModal from "./EmployeeProfileModal";
@@ -119,7 +120,13 @@ export default function Employees() {
 
   async function handleDelete(id, name) {
     if (!id) return setToast("Cannot delete — missing employee id.", "error");
-    if (typeof window !== "undefined" && !window.confirm(`Delete employee ${name}? This cannot be undone.`)) return;
+    const confirmed = await modal.deleteConfirm({
+      title: "Delete Employee?",
+      message: `Are you sure you want to delete employee "${name}"? This action cannot be undone.`,
+      itemName: name,
+      confirmText: "Delete Employee",
+    });
+    if (!confirmed) return;
     try {
       await deleteStoreEmployee(id);
       useAppStore.getState().refreshHrms?.("employees");

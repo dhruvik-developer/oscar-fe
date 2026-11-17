@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import {
   FlaskConical,
   Plus,
@@ -26,6 +27,29 @@ import MasterSourceLink from '../../../components/common/MasterSourceLink';
 import KpiCard from '../../../components/ui/KpiCard';
 import { useTableSort } from '../../../hooks/useTableSort';
 import SortableTh from '../../../components/ui/SortableTh';
+
+/** The API's names -> the names this screen reads. */
+const sampleFromApi = (s) => ({
+  ...s,
+  sample_number: s.sampleNumber,
+  issue_date: s.sampleDate,
+  party_name: s.partyName,
+  salesperson_name: s.salespersonName,
+  broker_name: s.brokerName,
+  sample_type: s.sampleType,
+  due_date: s.dueDate,
+  quantity: Number(s.quantity) || 0,
+  returned_quantity: Number(s.returnedQuantity) || 0,
+  outstanding: (Number(s.quantity) || 0) - (Number(s.returnedQuantity) || 0) - (Number(s.consumedQuantity) || 0),
+});
+
+const dashboardFromApi = (d) => (d ? {
+  ...d,
+  activeSamplesCount: (d.totalIssued || 0) - (d.returnedCount || 0) - (d.consumedCount || 0),
+  activeMeters: (Number(d.totalMetersIssued) || 0) - (Number(d.totalMetersReturned) || 0) - (Number(d.totalMetersConsumed) || 0),
+  totalExpense: Number(d.totalConsumedExpense) || 0,
+  consumedMeters: Number(d.totalMetersConsumed) || 0,
+} : null);
 
 export default function SampleListPage() {
   const [samples, setSamples] = useState([]);
@@ -72,8 +96,8 @@ export default function SampleListPage() {
         inventoryService.getSampleDashboard(),
       ]);
       const data = samplesRes?.data || samplesRes?.results || samplesRes || [];
-      setSamples(Array.isArray(data) ? data : []);
-      setDashboard(dashRes?.data || dashRes || null);
+      setSamples(Array.isArray(data) ? data.map(sampleFromApi) : []);
+      setDashboard(dashboardFromApi(dashRes?.data || dashRes));
     } catch (err) {
       console.error('Failed to load samples:', err);
     } finally {
@@ -196,22 +220,30 @@ export default function SampleListPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-slate-200">
         <div>
+          {/* Breadcrumb */}
+          <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 mb-2 overflow-x-auto whitespace-nowrap text-[12px] font-medium text-slate-500 scrollbar-none">
+            <Link to="/dashboard" className="transition-colors hover:text-slate-700">Dashboard</Link>
+            <span className="shrink-0 text-slate-300">›</span>
+            <Link to="/inventory" className="transition-colors hover:text-slate-700">Inventory</Link>
+            <span className="shrink-0 text-slate-300">›</span>
+            <span className="font-semibold text-slate-900">Sample Management</span>
+          </nav>
           <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
+            <h1 className="text-[19px] sm:text-[21px] font-extrabold tracking-tight text-slate-900 flex items-center gap-2">
               <FlaskConical className="w-7 h-7 text-indigo-600" />
               Sampling Register & Expense
             </h1>
             <PageInfoButton title="Sample Register & Expense" />
           </div>
-          <p className="text-sm text-slate-500 mt-1">
+          <p className="text-[13px] text-slate-500 mt-0.5">
             Track fabric swatches, cuts, and hangers issued to parties with automatic inventory deduction and expense booking.
           </p>
         </div>
         <button
           onClick={() => setShowIssueModal(true)}
-          className="inline-flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm rounded-lg shadow-sm transition-colors"
+          className="h-9 px-3 rounded-lg bg-blue-600 text-white font-semibold text-xs inline-flex items-center gap-1 cursor-pointer"
         >
-          <Plus className="w-4 h-4" /> Issue New Sample
+          <Plus size={14} /> Issue New Sample
         </button>
       </div>
 
@@ -369,7 +401,7 @@ export default function SampleListPage() {
                           <button
                             onClick={() => {
                               setActiveSample(s);
-                              setReturnQty(String(s.quantity - (s.returned_quantity || 0)));
+                              setReturnQty(String(s.outstanding));
                               setShowReturnModal(true);
                             }}
                             className="px-2.5 py-1 text-xs font-medium text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded border border-emerald-200 transition-colors"
@@ -379,7 +411,7 @@ export default function SampleListPage() {
                           <button
                             onClick={() => {
                               setActiveSample(s);
-                              setConsumeQty(String(s.quantity - (s.returned_quantity || 0)));
+                              setConsumeQty(String(s.outstanding));
                               setShowConsumeModal(true);
                             }}
                             className="px-2.5 py-1 text-xs font-medium text-purple-700 bg-purple-50 hover:bg-purple-100 rounded border border-purple-200 transition-colors"

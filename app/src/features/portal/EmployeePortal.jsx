@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { modal } from '../../context/ModalContext';
 import { Link } from 'react-router-dom';
 import {
   UserCheck,
@@ -1149,7 +1150,13 @@ export default function EmployeePortal() {
 
   // The requester withdraws their own pending asset request.
   const handleWithdrawAssetRequest = async (id) => {
-    if (!window.confirm('Withdraw this asset request?')) return;
+    const ok = await modal.confirm({
+      title: 'Withdraw Asset Request',
+      message: 'Withdraw this asset request?',
+      confirmLabel: 'Withdraw Request',
+      iconType: 'warning',
+    });
+    if (!ok) return;
     try {
       setIsSubmitting(true);
       await withdrawAssetRequest(id);
@@ -1272,7 +1279,13 @@ export default function EmployeePortal() {
   };
 
   const handleCancelResignation = async (resigId) => {
-    if (!window.confirm('Are you sure you want to withdraw/cancel your voluntary resignation notice?')) return;
+    const ok = await modal.confirm({
+      title: 'Withdraw Resignation Notice',
+      message: 'Are you sure you want to withdraw/cancel your voluntary resignation notice?',
+      confirmLabel: 'Withdraw Notice',
+      iconType: 'warning',
+    });
+    if (!ok) return;
     try {
       setIsSubmitting(true);
       await api.post(`/hrms/resignations/${resigId}/cancel/`, { reason: 'Withdrawn by employee' });

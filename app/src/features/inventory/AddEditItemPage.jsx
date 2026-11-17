@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { modal } from '../../context/ModalContext';
 import { resolveUnit } from '../../utils/uom';
 import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
 import { useERP } from '../../context/ERPContext';
@@ -500,7 +501,7 @@ export const AddEditItemPage = () => {
   const handleFileSelect = (file) => {
     if (!file) return;
     if (!file.type.startsWith('image/')) {
-      alert('Please select an image file (PNG, JPG, JPEG, WEBP, or SVG).');
+      modal.warning('Please select an image file (PNG, JPG, JPEG, WEBP, or SVG).', 'Invalid File Type');
       return;
     }
     const reader = new FileReader();
@@ -556,7 +557,7 @@ export const AddEditItemPage = () => {
       setCategory(targetCategory.name);
     }
     if (!targetCategory) {
-      alert('No item category is configured yet. Please create a category (e.g. Fabric) first, then add custom fields.');
+      modal.warning('No item category is configured yet. Please create a category (e.g. Fabric) first, then add custom fields.', 'Category Required');
       return;
     }
     if (!newFieldName.trim()) return;

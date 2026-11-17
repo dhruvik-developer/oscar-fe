@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { modal } from '../../context/ModalContext';
 import { createPortal } from 'react-dom';
 import { PenTool, ShieldCheck } from 'lucide-react';
 import { api } from '../../services/api';
@@ -75,7 +76,8 @@ export function SignatureSlot({
   const sig = doc?.signatures?.[signatory];
 
   const remove = async () => {
-    if (!window.confirm('Remove this signature?')) return;
+    const ok = await modal.deleteConfirm('Remove this signature?', 'Remove Signature');
+    if (!ok) return;
     setError('');
     try {
       await doc.save(signatory, null);

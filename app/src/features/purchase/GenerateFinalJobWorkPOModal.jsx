@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { modal } from '../../context/ModalContext';
 import {
   X, FileText, Users, BarChart3, PackageCheck, Boxes, Plus, Trash2,
   UploadCloud, Calculator, CheckCircle2, XCircle, AlertTriangle, Package,
@@ -356,7 +357,7 @@ export default function GenerateFinalJobWorkPOModal({
       console.error('Failed to generate final PO:', err);
       const msg = err?.response?.data?.detail || err?.message || 'Failed to generate Final Job Work PO.';
       if (showToast) showToast(msg, 'error');
-      else alert(msg);
+      else await modal.error(msg, 'Final Job Work PO Error');
     } finally {
       setSubmitting(false);
     }

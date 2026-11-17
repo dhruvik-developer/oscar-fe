@@ -438,10 +438,81 @@ export const HRMS_RESOURCES = {
   recruitmentQuestions: plain('/hrms/recruitment/questions/'),
 
   // ── performance ───────────────────────────────────────────────────────────
-  appraisals: dated('/hrms/performance/appraisals/', ['dueDate', 'completedDate']),
+  appraisals: {
+    path: '/hrms/performance/appraisals/',
+    toApi: (appr) => compact({
+      id: isServerId(appr.id) ? appr.id : undefined,
+      employee: appr.employee || undefined,
+      employeeId: appr.employeeId || undefined,
+      reviewer: appr.reviewer || undefined,
+      managerId: appr.managerId || undefined,
+      cycle: appr.cycle || undefined,
+      cycleId: appr.cycleId || undefined,
+      stage: appr.stage || 'Self Review',
+      status: appr.status || 'Draft',
+      finalRating: appr.rating !== undefined ? Number(appr.rating) : undefined,
+      rating: appr.rating !== undefined ? Number(appr.rating) : undefined,
+      selfRating: appr.selfReview?.rating !== undefined ? Number(appr.selfReview.rating) : undefined,
+      managerRating: appr.managerReview?.rating !== undefined ? Number(appr.managerReview.rating) : undefined,
+      strengths: appr.selfReview?.strengths || appr.managerReview?.strengths || appr.strengths || undefined,
+      areasForImprovement: appr.selfReview?.areasForImprovement || appr.managerReview?.areasForImprovement || appr.areasForImprovement || undefined,
+      developmentFeedback: appr.managerReview?.developmentFeedback || appr.developmentFeedback || undefined,
+      hrComments: appr.hrComments || undefined,
+      selfComments: appr.selfReview?.comments || appr.selfComments || undefined,
+    }),
+    fromApi: (row) => {
+      const rating = Number(row.finalRating ?? row.rating ?? row.managerRating ?? row.selfRating) || 4.0;
+      let label = 'Meets Expectations';
+      if (rating >= 4.5) label = 'Outstanding';
+      else if (rating >= 3.8) label = 'Exceeds Expectations';
+      else if (rating >= 3.0) label = 'Meets Expectations';
+      else if (rating >= 2.0) label = 'Needs Improvement';
+      else label = 'Unsatisfactory';
+
+      return {
+        ...row,
+        employee: row.employee || row.employeeName || '',
+        reviewer: row.reviewer || row.managerName || '',
+        cycle: row.cycle || row.cycleName || 'Annual Review 2026',
+        due: row.due || (row.dueDate ? String(row.dueDate) : '15 Nov 2024'),
+        department: row.department || '',
+        designation: row.designation || '',
+        rating,
+        ratingScaleLabel: row.ratingScaleLabel || label,
+        weightedScore: Number(row.weightedScore) || Math.round((rating / 5) * 100),
+        stage: row.stage || 'Self Review',
+        status: row.status || 'Draft',
+        _synced: true,
+      };
+    },
+  },
   cycles: dated('/hrms/performance/cycles/', ['startDate', 'endDate']),
   goals: dated('/hrms/performance/goals/', ['dueDate']),
-  indicators: plain('/hrms/performance/indicators/'),
+  indicators: {
+    path: '/hrms/performance/indicators/',
+    toApi: (ind) => compact({
+      name: ind.name,
+      category: ind.category || 'Organisational',
+      weight: ind.weight !== undefined ? Number(ind.weight) : undefined,
+      department: ind.department || undefined,
+      location: ind.branch || ind.location || undefined,
+      target: ind.target || undefined,
+      measurementType: ind.measurementType || undefined,
+      assignedEmployee: ind.assignedEmployee || undefined,
+      designation: ind.designation || undefined,
+      description: ind.description || undefined,
+      status: ind.status || undefined,
+    }),
+    fromApi: (row) => ({
+      ...row,
+      rating: Number(row.rating) || 4.0,
+      weight: Number(row.weight) || 0,
+      branch: row.location || row.branch || '',
+      department: row.department || '',
+      createdAt: row.created_at || row.createdAt || '',
+      _synced: true,
+    }),
+  },
   kpis: plain('/hrms/performance/kpis/'),
 
   // ── training ──────────────────────────────────────────────────────────────

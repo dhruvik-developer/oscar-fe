@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { modal } from '../../context/ModalContext';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Copy, Eye, Pencil, Plus, Printer, Trash2, X } from 'lucide-react';
 import {
@@ -194,12 +195,13 @@ export default function ProcessPlanDetailPage() {
     }
   };
   const handleDeleteCharge = async (cid) => {
-    if (!window.confirm('Delete this charge?')) return;
+    const ok = await modal.deleteConfirm('Delete this charge?', 'Delete Charge');
+    if (!ok) return;
     try {
       await deletePlanCharge(po.id, cid);
       await reloadPlan();
     } catch (err) {
-      window.alert(errorMessage(err, 'Could not delete the charge.'));
+      await modal.error(errorMessage(err, 'Could not delete the charge.'), 'Delete Charge Error');
     }
   };
 
@@ -213,7 +215,7 @@ export default function ProcessPlanDetailPage() {
       });
       navigate(`/job-work/process-plan/${copy.id}`);
     } catch (err) {
-      window.alert(errorMessage(err, 'Could not duplicate the process plan.'));
+      await modal.error(errorMessage(err, 'Could not duplicate the process plan.'), 'Duplicate Error');
     }
   };
 
@@ -226,11 +228,12 @@ export default function ProcessPlanDetailPage() {
 
   // Approval points (approve_jobwork on the server).
   const handleApprove = async () => {
-    try { setPo(await approvePlan(po.id)); } catch (err) { window.alert(errorMessage(err, 'Could not approve the plan.')); }
+    try { setPo(await approvePlan(po.id)); } catch (err) { await modal.error(errorMessage(err, 'Could not approve the plan.'), 'Approve Error'); }
   };
   const handleComplete = async () => {
-    if (!window.confirm(`Mark ${po.planNo} as Completed?`)) return;
-    try { setPo(await completePlan(po.id)); } catch (err) { window.alert(errorMessage(err, 'Could not complete the plan.')); }
+    const ok = await modal.confirm({ title: 'Complete Plan', message: `Mark ${po.planNo} as Completed?`, confirmLabel: 'Complete Plan', iconType: 'info' });
+    if (!ok) return;
+    try { setPo(await completePlan(po.id)); } catch (err) { await modal.error(errorMessage(err, 'Could not complete the plan.'), 'Complete Error'); }
   };
 
   const lossPct = Number(po.expectedLoss) || 0;

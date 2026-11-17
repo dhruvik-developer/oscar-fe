@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { modal } from '../../../context/ModalContext';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -111,7 +112,7 @@ export default function MasterTasksPage() {
       .filter(Boolean);
     return { ...row, stageIds };
   };
-  const reportFailure = (err) => window.alert(describeError(err) || NOT_SIGNED_IN);
+  const reportFailure = (err) => modal.error(describeError(err) || NOT_SIGNED_IN, 'Task Error');
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('All');
   const [deptFilter, setDeptFilter] = useState('All');

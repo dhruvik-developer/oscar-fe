@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { modal } from '../../context/ModalContext';
 import { useSearchParams } from 'react-router-dom';
 import {
   Download,
@@ -227,12 +228,13 @@ export function FinancialReportsPage() {
   };
 
   const handleDeleteBudget = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this budget?')) return;
+    const ok = await modal.deleteConfirm('Are you sure you want to delete this budget?', 'Delete Budget');
+    if (!ok) return;
     try {
       await accountingService.deleteBudget(id);
       budgets.reload();
     } catch (err) {
-      alert(describeApiError(err));
+      await modal.error(describeApiError(err), 'Delete Budget Failed');
     }
   };
 

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { modal } from '../../../context/ModalContext';
 import { useFabricMastersEmbed } from './fabricMastersEmbed';
 import {
   Search,
@@ -755,7 +756,7 @@ export default function ColourShadeMasterPage() {
         updateLocalRows((prev) => prev.map((r) => (r.id === row.id ? { ...r, isActive: newStatus } : r)));
       }
     } catch (err) {
-      alert(`Could not update status: ${describeError(err)}`);
+      await modal.error(`Could not update status: ${describeError(err)}`, 'Status Update Error');
     }
   };
 

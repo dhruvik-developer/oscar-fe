@@ -7,7 +7,7 @@ import { sortRows } from '../../hooks/useTableSort';
 const NON_SORTABLE_KEYS = new Set(['actions', 'action', 'menu', 'select', 'more', '_actions']);
 
 /**
- * DataTable — Unified CRM/ERP/HRMS Data Table.
+ * DataTable "” Unified CRM/ERP/HRMS Data Table.
  * Supports both ERP props (header, accessor, title, subtitle, searchFilter, keyExtractor)
  * and CRM/HRMS props (label, key, searchable, selectable, emptyTitle, emptyDesc, etc.)
  */
@@ -24,7 +24,7 @@ export function DataTable({
   onRowClick,
   actions,
   searchable = false,
-  searchPlaceholder = 'Search…',
+  searchPlaceholder = 'Search"¦',
   searchFilter,
   emptyMessage,
   emptyTitle = 'No records found',
@@ -55,7 +55,7 @@ export function DataTable({
     return Array.from(set).sort((a, b) => a - b);
   }, [initialPageSize, pageSizeOptions]);
 
-  const isSearchEnabled = searchable || !!searchFilter || searchPlaceholder !== 'Search…' || !!title;
+  const isSearchEnabled = searchable || !!searchFilter || searchPlaceholder !== 'Search"¦' || !!title;
 
   const safeData = useMemo(() => (Array.isArray(data) ? data : []), [data]);
 
@@ -214,11 +214,11 @@ export function DataTable({
         return col.render(row, row);
       } catch (err) {
         console.warn('Error in DataTable renderCell:', err);
-        return val != null ? String(val) : '—';
+        return val != null ? String(val) : '"”';
       }
     }
 
-    return val != null ? String(val) : '—';
+    return val != null ? String(val) : '"”';
   }
 
   return (
@@ -267,10 +267,10 @@ export function DataTable({
         {/* Wide tables keep legible column widths and scroll inside this box
             on narrow screens instead of crushing cells. */}
         <table className={`data-table w-full border-collapse text-left text-xs${columns.length > 4 ? ' min-w-[640px] lg:min-w-0' : ''}`}>
-          <thead className="sticky top-0 z-10 shadow-xs">
-            <tr className="border-b border-border bg-table-head text-text-secondary font-semibold text-[11px] uppercase tracking-wider">
+          <thead className="table-head-std sticky top-0 z-10 shadow-xs">
+            <tr className="table-head-row-std border-b border-border bg-table-head text-text-secondary font-semibold text-xs h-11">
               {selectable && (
-                <th className="col-check py-2.5 px-3 w-10 text-center bg-table-head">
+                <th className="col-check th-std py-0 px-3 w-10 text-center bg-table-head h-11 align-middle">
                   <input
                     type="checkbox"
                     className="row-check rounded border-border text-primary focus:ring-primary cursor-pointer"
@@ -291,28 +291,32 @@ export function DataTable({
                     key={colKey}
                     aria-sort={sortKey === colKey ? (sortDir === 'asc' ? 'ascending' : 'descending') : undefined}
                     style={col.width ? { width: col.width } : {}}
-                    className={`py-2.5 px-3 ${alignCls}`}
+                    className={`th-std h-11 px-3 align-middle text-xs font-semibold ${alignCls}`}
                   >
                     {sortableKeys.has(colKey) ? (
                       <button
                         type="button"
-                        className={`inline-flex items-center gap-1 font-bold text-text-secondary hover:text-primary transition cursor-pointer ${
+                        className={`inline-flex items-center gap-1.5 font-semibold text-text-secondary hover:text-primary transition cursor-pointer ${
                           col.align === 'right' ? 'ml-auto justify-end' : col.align === 'center' ? 'mx-auto justify-center' : 'justify-start'
                         }`}
                         onClick={() => toggleSort(colKey)}
                       >
-                        <span>{colTitle}</span>
-                        <SortIcon active={sortKey === colKey} dir={sortDir} />
+                        <span className="leading-tight">{colTitle}</span>
+                        <SortIcon active={sortKey === colKey} dir={sortDir} size={14} />
                       </button>
                     ) : (
-                      <div className={`w-full ${col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : 'text-left'}`}>
-                        <span>{colTitle}</span>
+                      <div className={`w-full inline-flex items-center ${col.align === 'right' ? 'justify-end text-right' : col.align === 'center' ? 'justify-center text-center' : 'justify-start text-left'}`}>
+                        <span className="leading-tight">{colTitle}</span>
                       </div>
                     )}
                   </th>
                 );
               })}
-              {actions && <th className="col-more py-2.5 px-3 text-center w-12"><MoreVertical size={14} className="mx-auto text-muted" /></th>}
+              {actions && (
+                <th className="col-more th-std py-0 px-3 text-center w-12 h-11 align-middle">
+                  <MoreVertical size={14} className="mx-auto text-muted" />
+                </th>
+              )}
             </tr>
           </thead>
           <tbody className="divide-y divide-border/60">

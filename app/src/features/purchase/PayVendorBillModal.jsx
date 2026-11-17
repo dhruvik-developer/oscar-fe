@@ -580,6 +580,7 @@ export function PayVendorBillModal({ po, onClose, onBillUpdated }) {
               createOnly
               poSummary={poSummary}
               vendor={vendor}
+              billVendors={poDetails?.billVendors || []}
               billableLines={batches}
               onClose={() => setIsCreatingBill(false)}
               onBillSaved={async () => {
@@ -858,6 +859,12 @@ export function PayVendorBillModal({ po, onClose, onBillUpdated }) {
                 </div>
               )}
 
+              {reviewIsMismatch && reviewActions.includes('approve') && (
+                <p className="text-[11px] font-semibold text-amber-800">
+                  Approving accepts the vendor's bill: the payable is created as per the Vendor Bill, not the PO amount.
+                </p>
+              )}
+
               <div className="pt-3 border-t border-slate-200 flex items-center justify-between">
                 <button
                   type="button"
@@ -884,7 +891,7 @@ export function PayVendorBillModal({ po, onClose, onBillUpdated }) {
                       className="px-4 py-2 text-xs font-bold text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 shadow disabled:opacity-50 flex items-center gap-1"
                     >
                       <ShieldCheck size={14} />
-                      <span>{reviewIsMismatch ? 'Approve Mismatch' : 'Approve Bill'}</span>
+                      <span>{reviewIsMismatch ? 'Approve Vendor Bill (Mismatch)' : 'Approve Vendor Bill'}</span>
                     </button>
                   </div>
                 )}

@@ -34,6 +34,9 @@ const SYNC_EVENT = 'crm:data-updated';
 let feed = [];
 // 'idle' until the first read, then 'loading' | 'ready' | 'error'.
 let feedState = { status: 'idle', error: '' };
+// One in-flight feed read shared by every caller (Topbar mounts, panel open,
+// events, timers). No response cache: the promise is cleared when it settles.
+let feedRefreshPromise = null;
 
 function readStore() {
   return feed;
@@ -57,17 +60,24 @@ export async function refreshNotifications() {
     signalUpdate();
     return feed;
   }
+  if (feedRefreshPromise) return feedRefreshPromise;
+
   feedState = { ...feedState, status: feed.length || feedState.status === 'ready' ? feedState.status : 'loading' };
-  try {
-    const body = await api.get('/notifications/', { query: { limit: 100 } });
-    feed = rowsOf(body);
-    feedState = { status: 'ready', error: '' };
-  } catch (err) {
-    console.warn('[CRM] notifications unavailable:', err?.message || err);
-    feedState = { status: 'error', error: err?.message || 'Notifications could not be loaded.' };
-  }
-  signalUpdate();
-  return feed;
+  feedRefreshPromise = (async () => {
+    try {
+      const body = await api.get('/notifications/', { query: { limit: 100 } });
+      feed = rowsOf(body);
+      feedState = { status: 'ready', error: '' };
+    } catch (err) {
+      console.warn('[CRM] notifications unavailable:', err?.message || err);
+      feedState = { status: 'error', error: err?.message || 'Notifications could not be loaded.' };
+    }
+    signalUpdate();
+    return feed;
+  })().finally(() => {
+    feedRefreshPromise = null;
+  });
+  return feedRefreshPromise;
 }
 
 function signalUpdate() {

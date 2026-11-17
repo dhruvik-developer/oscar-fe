@@ -89,10 +89,13 @@ export function SupplierPaymentInlineSlide({ po, instruction, onClose, onPayment
   }, [poId, finalPoId]);
 
   // Actively fetch backend bank accounts and trigger ERP context pull
+  const refreshCollectionsRef = useRef(refreshCollections);
+  refreshCollectionsRef.current = refreshCollections;
+
   useEffect(() => {
     let active = true;
-    if (refreshCollections) {
-      refreshCollections(['bankAccounts']);
+    if (refreshCollectionsRef.current) {
+      refreshCollectionsRef.current(['bankAccounts']);
     }
     api.get('/accounts/bank-accounts/').then((res) => {
       const list = Array.isArray(res) ? res : res?.results || [];
@@ -103,7 +106,7 @@ export function SupplierPaymentInlineSlide({ po, instruction, onClose, onPayment
       console.warn('Bank accounts fetch notice:', err);
     });
     return () => { active = false; };
-  }, [refreshCollections]);
+  }, []);
 
   // Combined deduplicated list of company bank accounts
   const activeBankList = useMemo(() => {

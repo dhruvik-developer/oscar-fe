@@ -38,7 +38,11 @@ export default function useUnits() {
   useEffect(() => {
     const onChange = (rows) => { setUnits(rows); setLoading(false); };
     listeners.add(onChange);
-    if (cache === null) (inflight || refreshUnits()).catch(() => setLoading(false));
+    if (cache !== null) {
+      setLoading(false);
+      return () => listeners.delete(onChange);
+    }
+    (inflight || refreshUnits()).catch(() => setLoading(false));
     return () => listeners.delete(onChange);
   }, []);
 

@@ -102,9 +102,7 @@ const usePerformanceStoreBase = create((set, get) => ({
   persist: () => {
     const s = get();
     writeThrough("cycles", s.cycles);
-    writeThrough("appraisals", s.appraisals);
-    writeThrough("indicators", s.indicators);
-    writeThrough("kpis", s.kpis);
+    // Appraisals, Indicators and KPIs are synced directly via hrmsSync.create/update/remove in addAppraisal/addIndicator/addKpi
   },
 
   // ── Cycle Management ──────────────────────────────────────────
@@ -143,105 +141,161 @@ const usePerformanceStoreBase = create((set, get) => ({
   },
 
   // ── KPI & Indicator Management ───────────────────────────────
-  addIndicator: (ind) => {
-    const id = ind.id || `IND-${String(get().indicators.length + 1).padStart(3, "0")}`;
+  addIndicator: async (ind) => {
+    const payload = {
+      ...ind,
+      weight: Number(ind.weight) || 10,
+      rating: ind.rating ? Number(ind.rating) : 4.0,
+      status: ind.status || "Active",
+    };
+    let saved = null;
+    try {
+      saved = await hrmsSync.create("indicators", payload);
+    } catch (err) {
+      console.warn("Failed to save indicator to server:", err);
+    }
     const created = {
       ...ind,
-      id,
-      rating: ind.rating ? Number(ind.rating) : 4.0,
-      weight: Number(ind.weight) || 10,
-      status: ind.status || "Active",
-      createdAt: ind.createdAt || "Today",
-      updatedAt: ind.updatedAt || "Today",
+      ...(saved || {}),
+      id: saved?.id || ind.id || `IND-${String(get().indicators.length + 1).padStart(3, "0")}`,
+      weight: Number(saved?.weight ?? ind.weight) || 10,
+      rating: Number(saved?.rating ?? ind.rating) || 4.0,
+      status: saved?.status || ind.status || "Active",
+      branch: saved?.location || saved?.branch || ind.branch || "",
+      department: saved?.department || ind.department || "",
+      createdAt: saved?.createdAt || ind.createdAt || "Today",
+      updatedAt: saved?.updatedAt || ind.updatedAt || "Today",
     };
-    set((s) => ({ indicators: [created, ...s.indicators] }));
-    get().persist();
+    set((s) => ({ indicators: [created, ...s.indicators.filter((i) => i.id !== created.id)] }));
     return created;
   },
 
-  updateIndicator: (id, patch) => {
+  updateIndicator: async (id, patch) => {
+    const payload = {
+      ...patch,
+      weight: patch.weight !== undefined ? Number(patch.weight) : undefined,
+      rating: patch.rating !== undefined ? Number(patch.rating) : undefined,
+    };
+    let saved = null;
+    if (isServerId(id)) {
+      try {
+        saved = await hrmsSync.update("indicators", id, payload);
+      } catch (err) {
+        console.warn("Failed to update indicator on server:", err);
+      }
+    }
+    const updated = {
+      ...patch,
+      ...(saved || {}),
+      id,
+      weight: patch.weight !== undefined ? Number(patch.weight) : undefined,
+      rating: patch.rating !== undefined ? Number(patch.rating) : undefined,
+      updatedAt: "Just now",
+    };
     set((s) => ({
       indicators: s.indicators.map((i) =>
-        i.id === id
-          ? {
-              ...i,
-              ...patch,
-              weight: patch.weight !== undefined ? Number(patch.weight) : i.weight,
-              rating: patch.rating !== undefined ? Number(patch.rating) : i.rating,
-              updatedAt: "Just now",
-            }
-          : i
+        i.id === id ? { ...i, ...updated } : i
       ),
     }));
-    get().persist();
+    return updated;
   },
 
-  deleteIndicator: (id) => {
+  deleteIndicator: async (id) => {
+    if (isServerId(id)) {
+      try {
+        await hrmsSync.remove("indicators", id);
+      } catch (err) {
+        console.warn("Failed to delete indicator on server:", err);
+      }
+    }
     set((s) => ({ indicators: s.indicators.filter((i) => i.id !== id) }));
-    get().persist();
   },
 
-  addKpi: (kpi) => {
-    const id = kpi.id || `KPI-${get().kpis.length + 101}`;
-    const created = {
+  addKpi: async (kpi) => {
+    const payload = {
       ...kpi,
-      id,
       weight: Number(kpi.weight) || 10,
       status: kpi.status || "Active",
-      createdAt: kpi.createdAt || "Today",
+    };
+    const saved = await hrmsSync.create("kpis", payload);
+    const created = {
+      ...saved,
+      weight: Number(saved.weight) || 10,
+      status: saved.status || "Active",
+      createdAt: saved.createdAt || "Today",
     };
     set((s) => ({ kpis: [created, ...s.kpis] }));
-    get().persist();
     return created;
   },
 
-  updateKpi: (id, patch) => {
+  updateKpi: async (id, patch) => {
+    const payload = {
+      ...patch,
+      weight: patch.weight !== undefined ? Number(patch.weight) : undefined,
+    };
+    const saved = await hrmsSync.update("kpis", id, payload);
+    const updated = {
+      ...saved,
+      weight: Number(saved.weight) || 10,
+      status: saved.status || "Active",
+      createdAt: saved.createdAt || "Today",
+    };
     set((s) => ({
-      kpis: s.kpis.map((k) =>
-        k.id === id
-          ? {
-              ...k,
-              ...patch,
-              weight: patch.weight !== undefined ? Number(patch.weight) : k.weight,
-            }
-          : k
-      ),
+      kpis: s.kpis.map((k) => (k.id === id ? updated : k)),
     }));
-    get().persist();
+    return updated;
   },
 
-  deleteKpi: (id) => {
+  deleteKpi: async (id) => {
+    await hrmsSync.remove("kpis", id);
     set((s) => ({ kpis: s.kpis.filter((k) => k.id !== id) }));
-    get().persist();
   },
 
   // ── Appraisal Workflow Actions ────────────────────────────────
-  addAppraisal: (appraisal) => {
-    const id = appraisal.id || `APR-${String(get().appraisals.length + 1).padStart(3, "0")}`;
+  addAppraisal: async (appraisal) => {
     const initialRating = Number(appraisal.rating) || 4.0;
     const tier = getRatingScaleTier(initialRating);
     const activeCycle = get().cycles.find((c) => c.status === "Active") || get().cycles[0];
     const resolvedCycleId = (appraisal.cycleId && appraisal.cycleId !== "CYC-2024-Q4")
       ? appraisal.cycleId
-      : (activeCycle?.id || appraisal.cycleId || "CYC-2024-Q4");
+      : (activeCycle?.id || appraisal.cycleId || undefined);
     const resolvedCycleName = (appraisal.cycle && appraisal.cycle !== "Q4 2024")
       ? appraisal.cycle
-      : (activeCycle?.name || appraisal.cycle || "Annual Review");
-    const newAppr = {
-      id,
-      avatar: appraisal.avatar || "https://i.pravatar.cc/100?img=15",
-      employee: appraisal.employee,
+      : (activeCycle?.name || appraisal.cycle || "Annual Review 2026");
+
+    const payload = {
+      ...appraisal,
+      rating: initialRating,
       cycle: resolvedCycleName,
       cycleId: resolvedCycleId,
-      reviewer: appraisal.reviewer,
-      department: appraisal.department || "Engineering",
-      designation: appraisal.designation || "Senior Specialist",
-      rating: initialRating,
-      ratingScaleLabel: tier.label,
-      weightedScore: Math.round((initialRating / 5) * 100),
       stage: appraisal.stage || "Self Review",
-      status: appraisal.status || "Pending",
-      due: appraisal.due || "15 Nov 2024",
+      status: appraisal.status || "Draft",
+    };
+
+    let saved = null;
+    try {
+      saved = await hrmsSync.create("appraisals", payload);
+    } catch (err) {
+      console.warn("Failed to create appraisal on server:", err);
+    }
+
+    const newAppr = {
+      ...appraisal,
+      ...(saved || {}),
+      id: saved?.id || appraisal.id || `APR-${String(get().appraisals.length + 1).padStart(3, "0")}`,
+      avatar: appraisal.avatar || "https://i.pravatar.cc/100?img=15",
+      employee: saved?.employee || appraisal.employee,
+      cycle: saved?.cycle || resolvedCycleName,
+      cycleId: saved?.cycleId || resolvedCycleId,
+      reviewer: saved?.reviewer || appraisal.reviewer,
+      department: saved?.department || appraisal.department || "Engineering",
+      designation: saved?.designation || appraisal.designation || "Senior Specialist",
+      rating: initialRating,
+      ratingScaleLabel: saved?.ratingScaleLabel || tier.label,
+      weightedScore: saved?.weightedScore || Math.round((initialRating / 5) * 100),
+      stage: saved?.stage || appraisal.stage || "Self Review",
+      status: saved?.status || appraisal.status || "Draft",
+      due: saved?.due || appraisal.due || "15 Nov 2024",
       selfReview: appraisal.selfReview || {
         rating: initialRating,
         comments: "",
@@ -265,13 +319,13 @@ const usePerformanceStoreBase = create((set, get) => ({
         approvedAt: null,
         status: "Pending",
       },
-      history: [
+      history: saved?.history?.length ? saved.history : [
         {
           stage: "Draft",
           action: "Appraisal Created",
           actor: "HR Admin",
           date: new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }),
-          note: "Appraisal initiated for " + (appraisal.cycle || "Q4 2024"),
+          note: "Appraisal initiated for " + (saved?.cycle || resolvedCycleName),
         },
       ],
       kpiResults: appraisal.kpiResults || [
@@ -281,15 +335,22 @@ const usePerformanceStoreBase = create((set, get) => ({
     };
 
     set((s) => ({ appraisals: [newAppr, ...s.appraisals] }));
-    get().persist();
     return newAppr;
   },
 
-  updateAppraisal: (id, patch) => {
+  updateAppraisal: async (id, patch) => {
+    let saved = null;
+    if (isServerId(id)) {
+      try {
+        saved = await hrmsSync.update("appraisals", id, patch);
+      } catch (err) {
+        console.warn("Failed to update appraisal on server:", err);
+      }
+    }
     set((s) => ({
       appraisals: s.appraisals.map((a) => {
         if (a.id !== id) return a;
-        const merged = { ...a, ...patch };
+        const merged = { ...a, ...(saved || {}), ...patch };
         if (patch.rating !== undefined) {
           const tier = getRatingScaleTier(patch.rating);
           merged.ratingScaleLabel = tier.label;
@@ -298,12 +359,17 @@ const usePerformanceStoreBase = create((set, get) => ({
         return merged;
       }),
     }));
-    get().persist();
   },
 
-  deleteAppraisal: (id) => {
+  deleteAppraisal: async (id) => {
+    if (isServerId(id)) {
+      try {
+        await hrmsSync.remove("appraisals", id);
+      } catch (err) {
+        console.warn("Failed to delete appraisal on server:", err);
+      }
+    }
     set((s) => ({ appraisals: s.appraisals.filter((a) => a.id !== id) }));
-    get().persist();
   },
 
   // 1. Submit Self Review (Employee -> Manager Review)

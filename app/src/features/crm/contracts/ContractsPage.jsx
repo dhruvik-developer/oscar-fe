@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { modal } from '../../../context/ModalContext';
 import { Link } from 'react-router-dom';
 import {
   FileText, Plus, Search, Eye, Pencil, Download, Check, Printer, Send,
@@ -144,9 +145,9 @@ export default function ContractsPage() {
   const handleSendContract = async (id) => {
     try {
       await crmService.sendContractForSignature(id);
-      alert('Contract queued and sent for signature.');
+      await modal.success('Contract queued and sent for signature.', 'Contract Sent');
     } catch (err) {
-      alert(err?.response?.data?.message || err?.message || 'E-signature is not configured on this workspace.');
+      await modal.error(err?.response?.data?.message || err?.message || 'E-signature is not configured on this workspace.', 'E-Signature');
     }
   };
 

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { modal } from '../../../context/ModalContext';
 import { Link } from 'react-router-dom';
 import {
   Package,
@@ -201,7 +202,7 @@ export default function QCPendingInspectionsPage() {
       setShowBulkAssignModal(false);
       setSelectedIds(new Set());
     } catch (err) {
-      alert('Could not bulk assign: ' + (err.message || 'Error'));
+      await modal.error('Could not bulk assign: ' + (err.message || 'Error'), 'Bulk Assign Error');
     } finally {
       setAssigning(false);
     }
@@ -333,7 +334,7 @@ export default function QCPendingInspectionsPage() {
       showToast(`QC draft saved for ${measuringItem.refNo}.`);
       setShowMeasurementModal(false);
     } catch (err) {
-      alert('Could not save draft: ' + (err.message || 'Error'));
+      await modal.error('Could not save draft: ' + (err.message || 'Error'), 'Save Draft Error');
     }
   };
 
@@ -347,21 +348,17 @@ export default function QCPendingInspectionsPage() {
     const sum = Number((g + h + rep + rej).toFixed(4));
 
     if (sum <= 0) {
-      alert('Please enter disposition quantities before completing inspection.');
+      await modal.warning('Please enter disposition quantities before completing inspection.', 'Quantities Required');
       return;
     }
 
     if (Math.abs(awaitingQcQty - sum) >= 0.001) {
       if (sum < awaitingQcQty) {
         const remaining = (awaitingQcQty - sum).toFixed(2);
-        alert(
-          `Disposition total (${sum} ${measuringItem.uom}) must equal the quantity awaiting QC (${awaitingQcQty} ${measuringItem.uom}).\n\nThere is still ${remaining} ${measuringItem.uom} unallocated. Please allocate the remaining quantity (e.g. click "Put Remaining on Hold") before completing.`
-        );
+        await modal.warning(`Disposition total (${sum} ${measuringItem.uom}) must equal the quantity awaiting QC (${awaitingQcQty} ${measuringItem.uom}).\n\nThere is still ${remaining} ${measuringItem.uom} unallocated. Please allocate the remaining quantity before completing.`, 'Allocation Mismatch');
       } else {
         const over = (sum - awaitingQcQty).toFixed(2);
-        alert(
-          `Disposition total (${sum} ${measuringItem.uom}) exceeds the quantity awaiting QC (${awaitingQcQty} ${measuringItem.uom}) by ${over} ${measuringItem.uom}. Please correct the quantities.`
-        );
+        await modal.warning(`Disposition total (${sum} ${measuringItem.uom}) exceeds the quantity awaiting QC (${awaitingQcQty} ${measuringItem.uom}) by ${over} ${measuringItem.uom}. Please correct the quantities.`, 'Allocation Mismatch');
       }
       return;
     }
@@ -385,7 +382,7 @@ export default function QCPendingInspectionsPage() {
       setShowMeasurementModal(false);
       setMeasuringItem(null);
     } catch (err) {
-      alert('Could not complete QC inspection: ' + (err.message || 'Error'));
+      await modal.error('Could not complete QC inspection: ' + (err.message || 'Error'), 'Inspection Error');
     } finally {
       setCompletingInspection(false);
     }

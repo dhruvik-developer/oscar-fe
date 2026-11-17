@@ -28,7 +28,7 @@ export function exportToCSV(filename, headers, rows) {
 }
 export function exportObjectsToCSV(filename, data, columnMapping) {
     if (!data || data.length === 0) {
-        alert('No data available to export.');
+        modal.info('No data available to export.', 'Export CSV');
         return;
     }
     if (columnMapping && columnMapping.length > 0) {

@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import { useAppStore } from "../../../stores/appStore";
 import { usePerformanceStore } from "../../../stores/performanceStore";
 import { DataTable } from "../../../components/hrms/DataTable";
@@ -39,6 +39,9 @@ export default function KpiData() {
     status: "Active",
   });
   const [errors, setErrors] = useState({});
+  const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
+  const [saveError, setSaveError] = useState("");
 
   const filtered = useMemo(() => {
     return kpis.filter((r) => {
@@ -74,6 +77,7 @@ export default function KpiData() {
       status: "Active",
     });
     setErrors({});
+    setSaveError("");
     setAddOpen(true);
   }
 
@@ -90,23 +94,50 @@ export default function KpiData() {
       status: r.status,
     });
     setErrors({});
+    setSaveError("");
   }
 
   function save() {
+    if (savingRef.current) return;
     const e = validate(form);
     if (Object.keys(e).length) {
       setErrors(e);
       return;
     }
 
+    const payload = { ...form, weight: Number(form.weight) };
+    savingRef.current = true;
+    setSaving(true);
+    setSaveError("");
+
+    const done = () => {
+      savingRef.current = false;
+      setSaving(false);
+    };
+
+    const fail = (err, action) => {
+      const detail =
+        err?.payload?.field_errors &&
+        Object.values(err.payload.field_errors).flat().filter(Boolean)[0];
+      setSaveError(detail || err?.message || `Failed to ${action} KPI`);
+    };
+
     if (editRow) {
-      updateKpi(editRow.id, { ...form, weight: Number(form.weight) });
-      showToast("KPI updated successfully.");
-      setEditRow(null);
+      updateKpi(editRow.id, payload)
+        .then(() => {
+          showToast("KPI updated successfully.");
+          setEditRow(null);
+        })
+        .catch((err) => fail(err, "update"))
+        .finally(done);
     } else {
-      addKpi({ ...form, weight: Number(form.weight) });
-      showToast("KPI created successfully.");
-      setAddOpen(false);
+      addKpi(payload)
+        .then(() => {
+          showToast("KPI created successfully.");
+          setAddOpen(false);
+        })
+        .catch((err) => fail(err, "create"))
+        .finally(done);
     }
   }
 
@@ -383,34 +414,52 @@ export default function KpiData() {
       {/* Add Modal */}
       <Modal
         isOpen={addOpen}
-        onClose={() => setAddOpen(false)}
+        onClose={() => {
+          if (!saving) setAddOpen(false);
+        }}
         title="Add Key Performance Indicator"
         footer={
           <>
-            <Button variant="secondary" onClick={() => setAddOpen(false)}>
+            <Button variant="secondary" disabled={saving} onClick={() => setAddOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={save}>Save KPI</Button>
+            <Button disabled={saving} onClick={save}>
+              {saving ? "Saving…" : "Save KPI"}
+            </Button>
           </>
         }
       >
+        {saveError && (
+          <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-[12px] text-red-600">
+            {saveError}
+          </div>
+        )}
         {renderFormFields()}
       </Modal>
 
       {/* Edit Modal */}
       <Modal
         isOpen={!!editRow}
-        onClose={() => setEditRow(null)}
+        onClose={() => {
+          if (!saving) setEditRow(null);
+        }}
         title="Edit Key Performance Indicator"
         footer={
           <>
-            <Button variant="secondary" onClick={() => setEditRow(null)}>
+            <Button variant="secondary" disabled={saving} onClick={() => setEditRow(null)}>
               Cancel
             </Button>
-            <Button onClick={save}>Save Changes</Button>
+            <Button disabled={saving} onClick={save}>
+              {saving ? "Saving…" : "Save Changes"}
+            </Button>
           </>
         }
       >
+        {saveError && (
+          <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-[12px] text-red-600">
+            {saveError}
+          </div>
+        )}
         {renderFormFields()}
       </Modal>
 
@@ -476,9 +525,18 @@ export default function KpiData() {
             <Button
               variant="danger"
               onClick={() => {
-                if (deleteRow) deleteKpi(deleteRow.id);
-                setDeleteRow(null);
-                showToast("KPI deleted successfully.");
+                if (deleteRow) {
+                  deleteKpi(deleteRow.id)
+                    .then(() => {
+                      showToast("KPI deleted successfully.");
+                    })
+                    .catch((err) => {
+                      showToast(err?.message || "Failed to delete KPI", "error");
+                    })
+                    .finally(() => {
+                      setDeleteRow(null);
+                    });
+                }
               }}
             >
               Delete KPI

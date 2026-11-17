@@ -1,5 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { useNavigate, Link, useLocation } from 'react-router-dom';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
 import {
   Search,
   CalendarDays,
@@ -17,6 +17,7 @@ import {
 import { usePunchActions } from '../../features/hrms/attendance/usePunchActions';
 import { EarlyPunchOutModal } from '../../features/hrms/attendance/components/EarlyPunchOutModal';
 import { useAppStore } from '../../stores/appStore';
+import { useSharedPolling } from '../../hooks/usePolling';
 import { approvalService } from '../../services/domainServices';
 import NotificationCenter from './NotificationCenter';
 
@@ -25,7 +26,6 @@ import NotificationCenter from './NotificationCenter';
 
 export default function Topbar() {
   const navigate = useNavigate();
-  const { pathname } = useLocation();
   const globalSearch = useAppStore((s) => s.globalSearch);
   const setGlobalSearch = useAppStore((s) => s.setGlobalSearch);
   const setCommandPaletteOpen = useAppStore((s) => s.setCommandPaletteOpen);
@@ -79,25 +79,17 @@ export default function Topbar() {
 
   const [approvalBadge, setApprovalBadge] = useState(0);
 
-  useEffect(() => {
-    let cancelled = false;
-    const fetchBadge = async () => {
-      try {
-        const res = await approvalService.getRequestBadge();
-        if (cancelled) return;
-        const c = res?.pendingCount ?? res?.count ?? 0;
-        setApprovalBadge(Number(c) || 0);
-      } catch {
-        // silent fallback
-      }
-    };
-    fetchBadge();
-    const interval = setInterval(fetchBadge, 30000);
-    return () => {
-      cancelled = true;
-      clearInterval(interval);
-    };
-  }, [pathname]);
+  const fetchApprovalBadge = useCallback(async () => {
+    try {
+      const res = await approvalService.getRequestBadge();
+      const c = res?.pendingCount ?? res?.count ?? 0;
+      setApprovalBadge(Number(c) || 0);
+    } catch {
+      // silent fallback
+    }
+  }, []);
+
+  useSharedPolling('approval-badge', fetchApprovalBadge, 30000);
 
 
   return (

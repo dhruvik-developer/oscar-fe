@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { modal } from '../../context/ModalContext';
 import {
   Tag,
   Printer,
@@ -396,7 +397,7 @@ export default function TakaTagPrintPage() {
       }, 350);
     } catch (err) {
       console.error('Print failure:', err);
-      alert('Failed to register print event: ' + (err?.message || 'Error occurred.'));
+      await modal.error('Failed to register print event: ' + (err?.message || 'Error occurred.'), 'Print Error');
       setIsPrinting(false);
     }
   };
@@ -427,13 +428,13 @@ export default function TakaTagPrintPage() {
   };
 
   // Download PDF via Backend ReportLab
-  const handleDownloadPdf = () => {
+  const handleDownloadPdf = async () => {
     const ids = Array.from(selectedRowIds);
     if (ids.length === 0) {
-      alert('Please select at least one taka to download printable PDF.');
+      await modal.warning('Please select at least one taka to download printable PDF.', 'Selection Required');
       return;
     }
-    inventoryService.openTakaTagsPdf(ids).catch((err) => alert(err?.message || 'Could not download PDF.'));
+    inventoryService.openTakaTagsPdf(ids).catch((err) => modal.error(err?.message || 'Could not download PDF.', 'PDF Error'));
   };
 
   // Summary Metrics

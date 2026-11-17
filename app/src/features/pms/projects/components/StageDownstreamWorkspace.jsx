@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { modal } from '../../../../context/ModalContext';
 import {
   ClipboardList,
   Truck,
@@ -543,9 +544,13 @@ export function StageDownstreamWorkspace({
   };
 
   const handleCloseProject = async () => {
-    if (!window.confirm(`Are you sure you want to mark project ${project?.code} as Completed & Closed?`)) {
-      return;
-    }
+    const ok = await modal.confirm({
+      title: 'Complete Project',
+      message: `Are you sure you want to mark project ${project?.code} as Completed & Closed?`,
+      confirmLabel: 'Mark Completed',
+      iconType: 'info',
+    });
+    if (!ok) return;
     setSubmitting(true);
     try {
       await api.post(`/pms/projects/${projectId}/close/`, {

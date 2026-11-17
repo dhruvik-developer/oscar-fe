@@ -1,3 +1,4 @@
+import { modal } from '../../../context/ModalContext';
 import { useState, useRef, useEffect, useMemo } from "react";
 import { hrmsSync, isBackendEnabled, isServerId, pullHrmsSettings, pushHrmsSettings } from '../../../services/hrmsSync';
 import { Link, useSearchParams } from "react-router-dom";
@@ -457,14 +458,19 @@ export default function HRAdminPage({ defaultTab }) {
     setEditingTeam(null);
   };
 
-  const handleDeleteTeam = (id, name) => {
-    if (window.confirm(`Are you sure you want to remove team "${name}"?`)) {
-      setTeams((prev) => prev.filter((t) => t.id !== id));
-      if (isBackendEnabled()) {
-        hrmsSync.remove('teams', id).catch(console.warn);
-      }
-      showToast(`Team "${name}" removed`);
+  const handleDeleteTeam = async (id, name) => {
+    const confirmed = await modal.deleteConfirm({
+      title: "Remove Team?",
+      message: `Are you sure you want to remove team "${name}"?`,
+      itemName: name,
+      confirmText: "Remove Team"
+    });
+    if (!confirmed) return;
+    setTeams((prev) => prev.filter((t) => t.id !== id));
+    if (isBackendEnabled()) {
+      hrmsSync.remove('teams', id).catch(console.warn);
     }
+    showToast(`Team "${name}" removed`);
   };
 
   // ── Approval Chain Handlers ─────────────────────────────────
@@ -534,14 +540,19 @@ export default function HRAdminPage({ defaultTab }) {
     );
   };
 
-  const handleDeleteChain = (id, module) => {
-    if (window.confirm(`Remove approval workflow for "${module}"?`)) {
-      setApprovalChains((prev) => prev.filter((c) => c.id !== id));
-      if (isBackendEnabled()) {
-        hrmsSync.remove('approvalChains', id).catch(console.warn);
-      }
-      showToast(`Approval chain for "${module}" removed`);
+  const handleDeleteChain = async (id, module) => {
+    const confirmed = await modal.deleteConfirm({
+      title: "Remove Approval Workflow?",
+      message: `Are you sure you want to remove the approval workflow for "${module}"?`,
+      itemName: module,
+      confirmText: "Remove Workflow"
+    });
+    if (!confirmed) return;
+    setApprovalChains((prev) => prev.filter((c) => c.id !== id));
+    if (isBackendEnabled()) {
+      hrmsSync.remove('approvalChains', id).catch(console.warn);
     }
+    showToast(`Approval chain for "${module}" removed`);
   };
 
   // ── Termination Handlers ────────────────────────────────────
@@ -843,8 +854,15 @@ export default function HRAdminPage({ defaultTab }) {
     setEditingHoliday(null);
   };
 
-  const handleDeleteHoliday = (id, name) => {
-    if (window.confirm(`Remove holiday "${name}"?`)) {
+  const handleDeleteHoliday = async (id, name) => {
+    const confirmed = await modal.deleteConfirm({
+      title: "Remove Holiday?",
+      message: `Are you sure you want to remove holiday "${name}"?`,
+      itemName: name,
+      confirmText: "Remove Holiday"
+    });
+    if (!confirmed) return;
+    if (true) {
       setHolidays((prev) => prev.filter((h) => h.id !== id));
       if (isBackendEnabled()) {
         hrmsSync.remove('holidays', id).catch(console.warn);

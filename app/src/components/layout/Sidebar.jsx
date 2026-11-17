@@ -345,13 +345,13 @@ export const NAV = [
         // The Defect Master is in Textile Operations Masters.
         children: [
           { label: 'QC Dashboard', to: '/inventory/qc/dashboard', dot: true },
-          { label: 'QC Entry', to: '/inventory/qc/entry' },
-          { label: 'Reprocess', to: '/inventory/qc/reprocess' },
-          { label: 'QC History', to: '/inventory/qc/history' },
+          // { label: 'QC Entry', to: '/inventory/qc/entry' },
+          // { label: 'Reprocess', to: '/inventory/qc/reprocess' },
+          // { label: 'QC History', to: '/inventory/qc/history' },
           { label: 'QC Reports', to: '/inventory/qc/reports' },
         ],
       },
-      { label: 'Production Runs (In-house)', icon: Factory, to: '/inventory/production-runs' },
+      // { label: 'Production Runs (In-house)', icon: Factory, to: '/inventory/production-runs' },
       {
         label: 'Warehouse & Movement',
         icon: Warehouse,
@@ -371,7 +371,7 @@ export const NAV = [
         navigateOnOpen: true,
         children: [
           { label: 'Valuation & Ageing', to: '/inventory/valuation', dot: true },
-          { label: 'Lot Costing & Profitability', to: '/inventory/lot-costing' },
+          // { label: 'Lot Costing & Profitability', to: '/inventory/lot-costing' },
           { label: 'Month-End Audit', to: '/inventory/audit' },
         ],
       },
@@ -481,14 +481,15 @@ export const NAV = [
     ],
   },
 
-  {
-    label: 'Reports',
-    icon: BarChart3,
-    children: [
-      { label: 'Standard Reports', to: '/reports', dot: true },
-      { label: 'Owner Executive MIS', to: '/reports/owner-mis' },
-    ],
-  },
+  // [TEMPORARILY HIDDEN] Reports module — comment out to hide from sidebar
+  // {
+  //   label: 'Reports',
+  //   icon: BarChart3,
+  //   children: [
+  //     { label: 'Standard Reports', to: '/reports', dot: true },
+  //     { label: 'Owner Executive MIS', to: '/reports/owner-mis' },
+  //   ],
+  // },
 
   {
     label: 'Administration',

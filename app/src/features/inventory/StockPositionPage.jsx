@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { modal } from '../../context/ModalContext';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import {
   Layers,
@@ -429,16 +430,16 @@ export function StockPositionPage() {
   const handleIssueSampleSubmit = async (e) => {
     e.preventDefault();
     if (!sampleForm.itemId) {
-      alert('Please select an item.');
+      await modal.warning('Please select an item.', 'Item Required');
       return;
     }
     const issueQty = Number(sampleForm.qty);
     if (!issueQty || issueQty <= 0) {
-      alert('Please enter a valid positive quantity.');
+      await modal.warning('Please enter a valid positive quantity.', 'Invalid Quantity');
       return;
     }
     if (sampleForm.availableStock !== null && issueQty > sampleForm.availableStock) {
-      alert(`Requested sample quantity (${issueQty} ${sampleForm.uom}) exceeds available Good Fabric Stock (${sampleForm.availableStock} ${sampleForm.uom}).`);
+      await modal.warning(`Requested sample quantity (${issueQty} ${sampleForm.uom}) exceeds available Good Fabric Stock (${sampleForm.availableStock} ${sampleForm.uom}).`, 'Stock Exceeded');
       return;
     }
 
@@ -477,7 +478,7 @@ export function StockPositionPage() {
         fetchData(true);
       }, 1000);
     } catch (err) {
-      alert(err?.response?.data?.detail || err?.message || 'Failed to issue sample.');
+      await modal.error(err?.response?.data?.detail || err?.message || 'Failed to issue sample.', 'Sample Issue Error');
     } finally {
       setSubmittingSample(false);
     }
@@ -489,11 +490,11 @@ export function StockPositionPage() {
     if (!returnModalRecord) return;
     const rQty = Number(returnForm.returnQty);
     if (!rQty || rQty <= 0) {
-      alert('Please enter a valid return quantity greater than 0.');
+      await modal.warning('Please enter a valid return quantity greater than 0.', 'Invalid Quantity');
       return;
     }
     if (rQty > Number(returnModalRecord.remainingQty || 0)) {
-      alert(`Return quantity cannot exceed remaining pending quantity (${returnModalRecord.remainingQty} ${returnModalRecord.uom}).`);
+      await modal.warning(`Return quantity cannot exceed remaining pending quantity (${returnModalRecord.remainingQty} ${returnModalRecord.uom}).`, 'Quantity Exceeded');
       return;
     }
 
@@ -520,7 +521,7 @@ export function StockPositionPage() {
         fetchData(true);
       }, 1000);
     } catch (err) {
-      alert(err?.response?.data?.detail || err?.message || 'Failed to record return.');
+      await modal.error(err?.response?.data?.detail || err?.message || 'Failed to record return.', 'Sample Return Error');
     } finally {
       setSubmittingReturn(false);
     }

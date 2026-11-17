@@ -274,70 +274,37 @@ export default function ProductionDashboardPage() {
       )}
 
       {/* ── KPI TILES ────────────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
-        {/* Today's Production */}
-        <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow">
-          <div className="flex items-center justify-between text-slate-500 mb-1">
-            <span className="text-xs font-semibold uppercase tracking-wider">Today's Produced</span>
-            <div className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
-              <TrendingUp className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="text-2xl font-bold text-slate-900">
-            {fmtNum(kpis.totalTodayProduced)} <span className="text-sm font-normal text-slate-500">m</span>
-          </div>
-          <div className="text-xs text-slate-500 mt-1 flex items-center gap-1">
-            <span className="font-semibold text-emerald-600">{fmtInt(kpis.totalTodayTakas)} rolls</span> produced on {selectedDate}
-          </div>
-        </div>
-
-        {/* Cumulative Production */}
-        <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow">
-          <div className="flex items-center justify-between text-slate-500 mb-1">
-            <span className="text-xs font-semibold uppercase tracking-wider">Cumulative Total</span>
-            <div className="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
-              <Layers className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="text-2xl font-bold text-slate-900">
-            {fmtNum(kpis.totalCumulative)} <span className="text-sm font-normal text-slate-500">m</span>
-          </div>
-          <div className="text-xs text-slate-500 mt-1">
-            Balance: <span className="font-semibold text-amber-600">{fmtNum(kpis.totalBalance)} m</span> pending
-          </div>
-        </div>
-
-        {/* Delayed Orders */}
-        <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow">
-          <div className="flex items-center justify-between text-slate-500 mb-1">
-            <span className="text-xs font-semibold uppercase tracking-wider">Delayed Orders</span>
-            <div className="w-7 h-7 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center">
-              <Clock className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="text-2xl font-bold text-rose-600">
-            {kpis.totalDelayed}
-          </div>
-          <div className="text-xs text-slate-500 mt-1">
-            Past expected start date without progress
-          </div>
-        </div>
-
-        {/* Missing Today's Update */}
-        <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow">
-          <div className="flex items-center justify-between text-slate-500 mb-1">
-            <span className="text-xs font-semibold uppercase tracking-wider">Missing Update</span>
-            <div className="w-7 h-7 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center">
-              <AlertTriangle className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="text-2xl font-bold text-amber-600">
-            {kpis.totalMissingUpdates}
-          </div>
-          <div className="text-xs text-slate-500 mt-1">
-            Running instructions with zero entry today
-          </div>
-        </div>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5">
+        <KpiCard
+          label="Today's Produced"
+          value={fmtNum(kpis.totalTodayProduced)}
+          unit="m"
+          sub={`${fmtInt(kpis.totalTodayTakas)} rolls produced on ${selectedDate}`}
+          icon={TrendingUp}
+          index={0}
+        />
+        <KpiCard
+          label="Cumulative Total"
+          value={fmtNum(kpis.totalCumulative)}
+          unit="m"
+          sub={`Balance: ${fmtNum(kpis.totalBalance)} m pending`}
+          icon={Layers}
+          index={1}
+        />
+        <KpiCard
+          label="Delayed Orders"
+          value={kpis.totalDelayed}
+          sub="Past expected start date without progress"
+          icon={Clock}
+          index={2}
+        />
+        <KpiCard
+          label="Missing Update"
+          value={kpis.totalMissingUpdates}
+          sub="Running instructions with zero entry today"
+          icon={AlertTriangle}
+          index={3}
+        />
       </div>
 
       {/* ── TABS & FILTER BAR ───────────────────────────────────────────────── */}

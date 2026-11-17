@@ -62,7 +62,7 @@ export default function FabricMastersPage() {
       <PageHeader
         title="Fabric Masters"
         subtitle="Set up a fabric once: Quality + Design + Colour make an Item / Variant. Setup lists are filled rarely."
-        breadcrumb={[{ label: 'Dashboard', path: '/dashboard' }, { label: 'Inventory', path: '/inventory' }, { label: 'Fabric Masters' }]}
+        breadcrumb={[{ label: 'Inventory', path: '/inventory' }, { label: 'Fabric Masters' }]}
       />
 
       <div className="bg-white border border-slate-200 rounded-xl">

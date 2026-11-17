@@ -4,9 +4,9 @@ import { api } from '../../services/api';
 import { useAppStore } from '../../stores/appStore';
 import {
   BarChart3, Banknote, ShoppingCart, Settings, Truck, FileText,
-  Landmark, Database, Package,
+  Landmark, Database, Package, TrendingUp, TrendingDown,
   Factory, ShieldCheck, Users, TriangleAlert, ArrowRight, ChevronDown,
-  Layers, ClipboardList, Cog, Boxes, RotateCcw, Ban, HelpCircle, Loader2, RefreshCw,
+  Layers, ClipboardList, Cog, Boxes, RotateCcw, Ban, HelpCircle, Loader2, RefreshCw, CheckCircle2, Calendar,
 } from 'lucide-react';
 import PageInfoButton from '../../components/ui/PageInfoButton';
 import KpiCard from '../../components/ui/KpiCard';
@@ -45,7 +45,48 @@ const pctChange = (cur, prev) => {
   if (p === 0) return null;
   return ((c - p) / Math.abs(p)) * 100;
 };
-const lakhTick = (v) => (v >= 10 ? Math.round(v).toLocaleString('en-IN') : v.toFixed(2));
+const getAdaptiveChartScale = (maxVal) => {
+  if (maxVal <= 0) {
+    return {
+      niceMax: 100000,
+      unitLabel: '₹ in Lakhs',
+      formatTick: (v) => (v === 0 ? '0' : `${+(v / 100000).toFixed(1)}L`),
+    };
+  }
+  if (maxVal >= 10000000) {
+    const cr = maxVal / 10000000;
+    const niceCr = Math.ceil(cr * 1.15 * 10) / 10;
+    return {
+      niceMax: niceCr * 10000000,
+      unitLabel: '₹ in Crores',
+      formatTick: (v) => (v === 0 ? '0' : `${+(v / 10000000).toFixed(niceCr >= 10 ? 0 : 1)} Cr`),
+    };
+  }
+  if (maxVal >= 100000) {
+    const l = maxVal / 100000;
+    const niceL = Math.ceil(l * 1.15 * 10) / 10;
+    return {
+      niceMax: niceL * 100000,
+      unitLabel: '₹ in Lakhs',
+      formatTick: (v) => (v === 0 ? '0' : `${+(v / 100000).toFixed(2)}L`),
+    };
+  }
+  if (maxVal >= 1000) {
+    const k = maxVal / 1000;
+    const niceK = Math.ceil(k * 1.15 / 5) * 5;
+    return {
+      niceMax: niceK * 1000,
+      unitLabel: '₹ in Thousands',
+      formatTick: (v) => (v === 0 ? '0' : `${Math.round(v / 1000)}k`),
+    };
+  }
+  const nice = Math.ceil((maxVal * 1.15) / 100) * 100;
+  return {
+    niceMax: nice,
+    unitLabel: 'Amounts in ₹',
+    formatTick: (v) => (v === 0 ? '0' : `₹${Math.round(v)}`),
+  };
+};
 
 function Donut({ pct, size = 128, stroke = 13, color = '#22c55e', track = '#e6ecf4', children }) {
   const r = (size - stroke) / 2;
@@ -69,17 +110,15 @@ function Donut({ pct, size = 128, stroke = 13, color = '#22c55e', track = '#e6ec
   );
 }
 
-function KpiTile({ icon: Icon, label, value, pct, vs, tileBg, iconBg, iconColor }) {
-  const up = pct >= 0;
-  const trendText = pct !== null ? `${up ? '+' : ''}${pct.toFixed(1)}% vs ${vs}` : undefined;
+function KpiTile({ icon: Icon, label, value, pct, vs, index }) {
   return (
     <KpiCard
       icon={Icon}
       label={label}
       value={value}
-      trend={trendText}
-      iconBg={iconBg}
-      iconColor={iconColor}
+      pct={pct}
+      vs={vs}
+      index={index}
     />
   );
 }
@@ -121,24 +160,24 @@ const JW_COLORS = ['#2563eb', '#22c55e', '#f59e0b', '#7c3aed'];
 
 export const DashboardPage = () => {
   const currentUser = useAppStore((s) => s.currentUser);
-  const [period, setPeriod] = useState('today');
+  const todayIso = localIso(new Date());
+  const yesterdayIso = localIso(new Date(Date.now() - 86400000));
+  const [selectedDate, setSelectedDate] = useState(() => todayIso);
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [reloadKey, setReloadKey] = useState(0);
-  const [batchView, setBatchView] = useState('worst');
+  const [batchView, setBatchView] = useState('profitable');
+  const [hoveredDayIdx, setHoveredDayIdx] = useState(null);
 
   const retry = useCallback(() => setReloadKey((k) => k + 1), []);
 
   useEffect(() => {
     let active = true;
-    const now = new Date();
-    const target = period === 'yesterday'
-      ? new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1)
-      : now;
+    if (!selectedDate) return;
     setLoading(true);
     setError('');
-    api.get('/reports/sales-dashboard/', { query: { date: localIso(target) } })
+    api.get('/reports/sales-dashboard/', { query: { date: selectedDate } })
       .then((res) => {
         if (!active) return;
         setData(res?.data && res.data.kpis ? res.data : res);
@@ -150,9 +189,13 @@ export const DashboardPage = () => {
       })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [period, reloadKey]);
+  }, [selectedDate, reloadKey]);
 
-  const periodLabel = period === 'yesterday' ? 'Yesterday' : 'Today';
+  const periodLabel = selectedDate === todayIso
+    ? 'Today'
+    : selectedDate === yesterdayIso
+      ? 'Yesterday'
+      : displayDate(selectedDate);
   const header = (
     <div className="relative overflow-hidden rounded-xl border border-[#e2eaf5] bg-white shadow-[0_1px_2px_rgba(16,42,82,0.05)]">
       <img
@@ -173,16 +216,33 @@ export const DashboardPage = () => {
             {data?.date ? `Figures for ${displayDate(data.date)}, compared with ${displayDate(data.previousDate)}.` : 'Live figures from the books.'}
           </p>
         </div>
-        <div className="relative">
-          <select
-            value={period}
-            onChange={(e) => setPeriod(e.target.value)}
-            className="appearance-none rounded-lg border border-[#dce5f4] bg-white py-2 pl-3.5 pr-9 text-[12.5px] font-semibold text-slate-700 shadow-xs outline-none cursor-pointer"
-          >
-            <option value="today">Today</option>
-            <option value="yesterday">Yesterday</option>
-          </select>
-          <ChevronDown size={14} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 rounded-lg border border-[#dce5f4] bg-white px-3 py-1.5 shadow-xs transition-colors focus-within:border-[#2563eb]">
+            <Calendar size={15} className="text-[#2563eb] shrink-0" />
+            <input
+              type="date"
+              value={selectedDate}
+              onChange={(e) => {
+                if (e.target.value) setSelectedDate(e.target.value);
+              }}
+              onClick={(e) => {
+                if (e.target.showPicker) {
+                  try { e.target.showPicker(); } catch {}
+                }
+              }}
+              className="bg-transparent text-[12.5px] font-semibold text-slate-700 outline-none cursor-pointer"
+            />
+          </div>
+          {selectedDate !== todayIso && (
+            <button
+              type="button"
+              onClick={() => setSelectedDate(todayIso)}
+              className="rounded-lg border border-[#dce5f4] bg-white px-2.5 py-1.5 text-[12px] font-bold text-[#2563eb] hover:bg-slate-50 cursor-pointer shadow-xs transition-colors"
+              title="Reset to Today"
+            >
+              Today
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -238,7 +298,7 @@ export const DashboardPage = () => {
   const attention = Array.isArray(data.attention) ? data.attention : [];
   // null when the viewer may not see batch cost (view_ledger).
   const bp = data.batchProfit;
-  const bpRows = bp ? (batchView === 'best' ? bp.best : bp.worst) || [] : [];
+  const bpRows = bp ? (batchView === 'loss' ? (Array.isArray(bp.lossMaking) ? bp.lossMaking : bp.worst || []) : (Array.isArray(bp.profitable) ? bp.profitable : bp.best || [])) : [];
 
   /* inventory position */
   const lotSub = (row) => `${meters(row?.qty)}${row?.lots ? ` · ${num(row.lots).toLocaleString('en-IN')} lot${num(row.lots) === 1 ? '' : 's'}` : ''}`;
@@ -255,11 +315,12 @@ export const DashboardPage = () => {
   ];
   const inventoryEmpty = inventoryRows.every((r) => num(r.row?.qty) === 0 && num(r.row?.value) === 0);
 
-  /* sales & collection trend, in lakhs */
-  const salesL = trend.map((t) => num(t.sales) / 100000);
-  const collL = trend.map((t) => num(t.collection) / 100000);
-  const maxLakh = Math.max(0, ...salesL, ...collL);
-  const trendEmpty = trend.length === 0 || maxLakh <= 0;
+  /* sales & collection trend */
+  const maxRawVal = Math.max(0, ...trend.map((t) => Math.max(num(t.sales), num(t.collection))));
+  const total7dSales = trend.reduce((sum, t) => sum + num(t.sales), 0);
+  const total7dColl = trend.reduce((sum, t) => sum + num(t.collection), 0);
+  const chartScale = getAdaptiveChartScale(maxRawVal);
+  const trendEmpty = trend.length === 0 || maxRawVal <= 0;
 
   /* receivable ageing */
   const bucketOrder = Array.isArray(ageingData.bucketOrder) && ageingData.bucketOrder.length
@@ -290,14 +351,14 @@ export const DashboardPage = () => {
       {/* business position */}
       <section className="rounded-xl border border-[#e2eaf5] bg-white p-3.5 shadow-[0_1px_2px_rgba(16,42,82,0.05)]">
         <h2 className="mb-3 px-0.5 text-[13px] font-extrabold text-[#17294e]">{periodLabel}&apos;s Business Position</h2>
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 2xl:grid-cols-6">
-          {KPI_DEFS.map((k) => {
+        <div className="grid grid-cols-2 gap-3.5 md:grid-cols-3 2xl:grid-cols-6">
+          {KPI_DEFS.map((k, idx) => {
             const v = kpis[k.key] || { current: 0, previous: 0 };
             return (
               <KpiTile
                 key={k.key} icon={k.icon} label={k.label}
                 value={inr(v.current)} pct={pctChange(v.current, v.previous)}
-                vs={inr(v.previous)} tileBg={k.tileBg} iconBg={k.iconBg} iconColor={k.iconColor}
+                vs={inr(v.previous)} index={idx}
               />
             );
           })}
@@ -305,110 +366,227 @@ export const DashboardPage = () => {
       </section>
 
       {/* funds row */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {[
-          {
-            icon: Landmark, label: 'Funds Position', value: inr(funds.total),
-            sub: Array.isArray(funds.accounts) && funds.accounts.length
-              ? `Cash & Bank · ${funds.accounts.length} account${funds.accounts.length === 1 ? '' : 's'}`
-              : 'No cash / bank accounts',
-            bg: '#e8f1fd', fg: '#2563eb',
-          },
-          {
-            icon: Database, label: 'Working Capital', value: inr(wc.workingCapital),
-            sub: `${inr(wc.currentAssets)} assets − ${inr(wc.currentLiabilities)} liab.`,
-            bg: '#e7f6ef', fg: '#0d9488',
-          },
-          { icon: Package, label: 'Stock Value', value: inr(data.stockValue), sub: 'On hand at weighted average cost', bg: '#e7f6ec', fg: '#16a34a' },
-        ].map((c) => (
-          <div key={c.label} className="flex items-center gap-3 rounded-xl border border-[#e2eaf5] bg-white p-4 shadow-[0_1px_2px_rgba(16,42,82,0.05)]">
-            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl" style={{ background: c.bg, color: c.fg }}>
-              <c.icon size={21} />
-            </span>
-            <div className="min-w-0">
-              <p className="text-[11px] font-semibold text-slate-500">{c.label}</p>
-              <p className="truncate text-[18px] font-extrabold tracking-tight text-[#17294e]">{c.value}</p>
-              <p className="truncate text-[11px] text-slate-400">{c.sub}</p>
-            </div>
-          </div>
-        ))}
+      <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 xl:grid-cols-4">
+        <KpiCard
+          icon={Landmark}
+          label="Funds Position"
+          value={inr(funds.total)}
+          sub={Array.isArray(funds.accounts) && funds.accounts.length
+            ? `Cash & Bank · ${funds.accounts.length} account${funds.accounts.length === 1 ? '' : 's'}`
+            : 'No cash / bank accounts'}
+          variant="white"
+          index={0}
+        />
+        <KpiCard
+          icon={Database}
+          label="Working Capital"
+          value={inr(wc.workingCapital)}
+          sub={`${inr(wc.currentAssets)} assets − ${inr(wc.currentLiabilities)} liab.`}
+          variant="white"
+          index={1}
+        />
+        <KpiCard
+          icon={Package}
+          label="Stock Value"
+          value={inr(data.stockValue)}
+          sub="On hand at weighted average cost"
+          variant="white"
+          index={2}
+        />
         {bp && (
-          <div className="flex items-center gap-3 rounded-xl border border-[#e2eaf5] bg-white p-4 shadow-[0_1px_2px_rgba(16,42,82,0.05)]">
-            <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl ${num(bp.lossMaking) > 0 ? 'bg-[#fdeeee] text-rose-600' : 'bg-[#efe9fd] text-violet-600'}`}>
-              <Boxes size={21} />
-            </span>
-            <div className="min-w-0 flex-1">
-              <p className="text-[11px] font-semibold text-slate-500">Batch Profit / Loss</p>
-              <p className={`truncate text-[18px] font-extrabold tracking-tight ${num(bp.net) < 0 ? 'text-rose-600' : 'text-[#17294e]'}`}>{inr(bp.net)}</p>
-              <p className="truncate text-[11px] text-slate-400">
-                {num(bp.batches)} batch{num(bp.batches) === 1 ? '' : 'es'} sold · last {bp.windowDays} days
-              </p>
-            </div>
-            <div className="flex flex-col items-end text-right text-[11px] font-bold">
-              <span className="text-emerald-600">{num(bp.profitable)} profit</span>
-              <span className={num(bp.lossMaking) > 0 ? 'text-rose-600' : 'text-slate-400'}>{num(bp.lossMaking)} loss</span>
-            </div>
-          </div>
+          <Link to="/inventory/batch-profitability" className="block">
+            <KpiCard
+              icon={Boxes}
+              label="Batch Realized Profit"
+              value={inr(bp.netRealizedContribution || bp.net)}
+              sub={num(bp.profitableCount || bp.profitable) + num(bp.lossMakingCount || bp.lossMaking) > 0
+                ? `${num(bp.profitableCount || bp.profitable)} profitable · ${num(bp.lossMakingCount || bp.lossMaking)} loss-making`
+                : `${num(bp.unsoldBatchesCount || bp.totalBatches || 0)} unsold (Not Yet Realized)`}
+              variant="white"
+              index={3}
+            />
+          </Link>
         )}
       </div>
 
       {bp && (
-        <SectionCard icon={Boxes} title="Batch-wise Profit / Loss" linkTo="/inventory/batches" linkLabel="Batch Registry">
-          <div className="-mt-1 mb-3 flex flex-wrap items-center justify-between gap-2">
-            <p className="text-[11px] text-slate-400">
-              Batches sold in the last {bp.windowDays} days · each batch&apos;s full result to date (revenue − cost − written-off claims)
+        <SectionCard
+          icon={TrendingUp}
+          title="Batch-wise Profitability"
+          linkTo="/inventory/batch-profitability"
+          linkLabel="View All Batch Profitability →"
+        >
+          {/* Header Description & View Toggle */}
+          <div className="-mt-1 mb-4 flex flex-wrap items-center justify-between gap-2">
+            <p className="text-[11.5px] text-slate-500">
+              Realized profit &amp; loss per batch from commercial dispatches (Revenue − Sold Landed Cost − Direct Expenses). Unsold stock is preserved as Not Yet Realized.
             </p>
-            <div className="flex rounded-lg border border-slate-200 p-0.5 text-[11px] font-bold">
-              {[['worst', `Loss first${num(bp.lossMaking) ? ` (${num(bp.lossMaking)})` : ''}`], ['best', 'Top profit']].map(([key, label]) => (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => setBatchView(key)}
-                  className={`rounded-md px-2.5 py-1 cursor-pointer ${batchView === key ? 'bg-[#2563eb] text-white' : 'text-slate-500 hover:text-slate-700'}`}
-                >
-                  {label}
-                </button>
-              ))}
+            <div className="flex rounded-lg border border-slate-200 p-0.5 text-[11px] font-bold bg-slate-50">
+              <button
+                type="button"
+                onClick={() => setBatchView('profitable')}
+                className={`rounded-md px-3 py-1 cursor-pointer transition-colors ${
+                  batchView === 'profitable'
+                    ? 'bg-[#2563eb] text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                Top 5 Profitable Batches {num(bp.profitableCount ?? bp.profitable) > 0 ? `(${num(bp.profitableCount ?? bp.profitable)})` : ''}
+              </button>
+              <button
+                type="button"
+                onClick={() => setBatchView('loss')}
+                className={`rounded-md px-3 py-1 cursor-pointer transition-colors ${
+                  batchView === 'loss'
+                    ? 'bg-[#2563eb] text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                Top 5 Loss-making Batches {num(bp.lossMakingCount ?? bp.lossMaking) > 0 ? `(${num(bp.lossMakingCount ?? bp.lossMaking)})` : ''}
+              </button>
             </div>
           </div>
-          {num(bp.lossMaking) > 0 && batchView === 'worst' && (
-            <div className="mb-3 flex items-center gap-1.5 rounded-lg bg-[#fdeeee] px-3 py-2 text-[12px] font-bold text-[#dc2626]">
-              <TriangleAlert size={14} /> {num(bp.lossMaking)} batch{num(bp.lossMaking) === 1 ? '' : 'es'} in loss · total {inr(bp.totalLoss)}
-            </div>
-          )}
+
+          {/* 4 Summary Metrics Cards */}
+          <div className="mb-4 grid grid-cols-2 gap-3.5 md:grid-cols-4">
+            <KpiCard
+              label="Total Realized Profit"
+              value={inr(bp.totalRealizedProfit || bp.totalProfit)}
+              sub="Dispatched sales gain"
+              icon={TrendingUp}
+              tone="green"
+            />
+            <KpiCard
+              label="Total Realized Loss"
+              value={inr(bp.totalRealizedLoss || bp.totalLoss)}
+              sub="Dispatched sales loss"
+              icon={TrendingDown}
+              tone="pink"
+            />
+            <KpiCard
+              label="Profitable Batches"
+              value={num(bp.profitableCount ?? bp.profitable)}
+              sub="Batches with net positive margin"
+              icon={ShieldCheck}
+              tone="blue"
+            />
+            <KpiCard
+              label="Loss-making Batches"
+              value={num(bp.lossMakingCount ?? bp.lossMaking)}
+              sub="Batches with net negative margin"
+              icon={TriangleAlert}
+              tone="amber"
+            />
+          </div>
+
+          {/* Table or Empty/Unsold State */}
           {bpRows.length === 0 ? (
-            <EmptyNote>{batchView === 'best' ? 'No profitable batches yet.' : `No batches sold in the last ${bp.windowDays} days.`}</EmptyNote>
+            <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-6 text-center">
+              <ShieldCheck size={28} className="mx-auto mb-2 text-blue-600" />
+              <h4 className="text-sm font-bold text-slate-800">
+                {batchView === 'loss'
+                  ? 'No Loss-Making Batches Found'
+                  : 'All Batches Held in Inventory (Not Yet Realized)'}
+              </h4>
+              <p className="mx-auto mt-1 max-w-xl text-xs text-slate-500 leading-relaxed">
+                {batchView === 'loss'
+                  ? 'There are currently no batches that incurred a realized net loss on commercial sales dispatches.'
+                  : `Currently, all ${num(bp.unsoldBatchesCount || bp.totalBatches || 0)} active batches are maintained in warehouse inventory (${inr(bp.totalUnsoldValue)} valuation). Under OSCAR realized profit principles, unsold stock is strictly classified as "Not Yet Realized" and never counted as premature profit.`}
+              </p>
+              <div className="mt-4 flex items-center justify-center gap-3">
+                <Link
+                  to="/inventory/batch-profitability"
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-[#2563eb] px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-blue-600 transition-colors"
+                >
+                  Open Full Batch Profitability Ledger <ArrowRight size={14} />
+                </Link>
+                <Link
+                  to="/inventory/batches"
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+                >
+                  <Boxes size={14} /> Batch Registry
+                </Link>
+              </div>
+            </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[640px] text-[12px]">
+              <table className="w-full min-w-[750px] text-[12px]">
                 <thead>
-                  <tr className="border-b border-slate-100 text-left text-[10.5px] font-bold uppercase tracking-wide text-slate-400">
-                    <th className="py-2 pr-3">Batch</th>
-                    <th className="py-2 pr-3">Fabric</th>
-                    <th className="py-2 pr-3 text-right">Sold</th>
-                    <th className="py-2 pr-3 text-right">Revenue</th>
-                    <th className="py-2 pr-3 text-right">Cost</th>
-                    <th className="py-2 pr-3 text-right">Written off</th>
-                    <th className="py-2 pr-3 text-right">Profit / Loss</th>
-                    <th className="py-2 text-right">Margin</th>
+                  <tr className="border-b border-slate-200 bg-slate-50/50 text-left text-[10.5px] font-bold uppercase tracking-wide text-slate-500">
+                    <th className="py-2.5 px-3">Batch Code</th>
+                    <th className="py-2.5 px-3">Fabric Name</th>
+                    <th className="py-2.5 px-3">Stage</th>
+                    <th className="py-2.5 px-3 text-right">Total Sold Qty</th>
+                    <th className="py-2.5 px-3 text-right">Allocated Revenue</th>
+                    <th className="py-2.5 px-3 text-right">Total Allocated Cost</th>
+                    <th className="py-2.5 px-3 text-right">Net Profit / Loss</th>
+                    <th className="py-2.5 px-3 text-center">Profit Margin %</th>
+                    <th className="py-2.5 px-3 text-center">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {bpRows.map((r) => {
-                    const loss = num(r.netResult) < 0;
+                    const isLoss = num(r.netResult) < 0;
+                    const isGrey = String(r.stage || r.fabricType).toUpperCase() === 'GREY';
+                    const isDyed = String(r.stage || r.fabricType).toUpperCase() === 'DYED';
+
                     return (
-                      <tr key={r.id} className={loss ? 'bg-[#fff7f7]' : ''}>
-                        <td className="py-2 pr-3 font-bold">
-                          <Link to={`/inventory/batches/${encodeURIComponent(r.batchCode)}`} className="text-[#2563eb] hover:underline">{r.batchCode}</Link>
+                      <tr key={r.id} className="hover:bg-slate-50/70 transition-colors">
+                        <td className="py-2.5 px-3 font-bold font-mono">
+                          <Link
+                            to={`/inventory/batches/${encodeURIComponent(r.batchCode)}`}
+                            className="text-[#2563eb] hover:underline"
+                            title="Open Batch Passport"
+                          >
+                            {r.batchCode}
+                          </Link>
                         </td>
-                        <td className="max-w-[180px] truncate py-2 pr-3 text-slate-600" title={r.item || ''}>{r.item || '—'}</td>
-                        <td className="py-2 pr-3 text-right text-slate-600">{meters(r.soldQty)}</td>
-                        <td className="py-2 pr-3 text-right text-slate-600">{inr(r.revenue)}</td>
-                        <td className="py-2 pr-3 text-right text-slate-600">{inr(r.cost)}</td>
-                        <td className="py-2 pr-3 text-right text-slate-600">{num(r.writtenOffLoss) ? inr(r.writtenOffLoss) : '—'}</td>
-                        <td className={`py-2 pr-3 text-right font-extrabold ${loss ? 'text-rose-600' : 'text-emerald-600'}`}>{inr(r.netResult)}</td>
-                        <td className={`py-2 text-right font-bold ${loss ? 'text-rose-600' : 'text-slate-600'}`}>
-                          {r.marginPct === null || r.marginPct === undefined ? '—' : `${num(r.marginPct).toFixed(1)}%`}
+                        <td className="max-w-[200px] truncate py-2.5 px-3 font-medium text-slate-700" title={r.fabricName || r.item || ''}>
+                          {r.fabricName || r.item || '—'}
+                        </td>
+                        <td className="py-2.5 px-3">
+                          <span
+                            className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
+                              isGrey
+                                ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                                : isDyed
+                                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                  : 'bg-slate-100 text-slate-700'
+                            }`}
+                          >
+                            {r.stage || r.fabricType || 'Fabric'}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3 text-right font-mono font-medium text-slate-700">
+                          {meters(r.soldQty)}
+                        </td>
+                        <td className="py-2.5 px-3 text-right font-mono font-medium text-slate-700">
+                          {inr(r.salesRevenue || r.revenue)}
+                        </td>
+                        <td className="py-2.5 px-3 text-right font-mono font-medium text-slate-700">
+                          {inr(r.totalAllocatedCost || r.cost)}
+                        </td>
+                        <td className="py-2.5 px-3 text-right font-mono">
+                          <span className={`font-extrabold ${isLoss ? 'text-rose-600' : 'text-emerald-600'}`}>
+                            {!isLoss ? '+' : ''}{inr(r.netResult)}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3 text-center font-bold">
+                          {r.marginPct === null || r.marginPct === undefined ? (
+                            <span className="text-slate-400">—</span>
+                          ) : (
+                            <span className={isLoss ? 'text-rose-600' : 'text-emerald-600'}>
+                              {num(r.marginPct).toFixed(1)}%
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-2.5 px-3 text-center">
+                          <Link
+                            to={`/inventory/batch-profitability?search=${encodeURIComponent(r.batchCode)}`}
+                            className="inline-flex items-center gap-1 rounded border border-slate-200 bg-white px-2 py-1 text-[11px] font-semibold text-slate-600 hover:text-blue-600 hover:border-blue-300 transition-colors"
+                          >
+                            Audit
+                          </Link>
                         </td>
                       </tr>
                     );
@@ -533,49 +711,110 @@ export const DashboardPage = () => {
 
       {/* sales chart / ageing / attention */}
       <div className="grid grid-cols-1 gap-3 xl:grid-cols-3">
-        <SectionCard icon={BarChart3} title="Sales & Collection (Last 7 Days)" linkTo="/sales/invoices">
+        <SectionCard icon={BarChart3} title="Sales & Collection (Last 7 Days)" linkTo="/sales/invoices" className="flex flex-col justify-between">
           {trendEmpty ? (
             <EmptyNote>No sales or collections in the last 7 days.</EmptyNote>
           ) : (
-            <>
-              <div className="mb-2 flex items-center gap-4 text-[11px] font-bold text-slate-500">
-                <span className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-[3px] bg-[#2563eb]" />Sales</span>
-                <span className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-[3px] bg-[#34d399]" />Collection</span>
-              </div>
-              <div className="flex gap-1.5">
-                <div className="flex w-9 flex-col justify-between py-0.5 text-right text-[9px] font-semibold text-slate-400">
-                  {[1, 0.75, 0.5, 0.25, 0].map((f) => <span key={f}>{lakhTick(maxLakh * f)}</span>)}
-                </div>
-                <div className="relative flex-1">
-                  <div className="absolute inset-0 flex flex-col justify-between">
-                    {[0, 1, 2, 3, 4].map((i) => <div key={i} className="border-t border-dashed border-slate-100" />)}
+            <div className="flex flex-1 flex-col justify-between">
+              <div>
+                <div className="mb-3 flex items-center justify-between gap-2 text-[11.5px]">
+                  <div className="flex items-center gap-3 font-semibold text-slate-600">
+                    <span className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-xs bg-[#2563eb]" />Sales</span>
+                    <span className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-xs bg-[#10b981]" />Collection</span>
                   </div>
-                  <div className="relative flex h-40 items-end gap-1.5">
-                    {trend.map((t, i) => {
-                      const s = salesL[i];
-                      const c = collL[i];
-                      const h = (v) => (v > 0 ? `${Math.max(2, (v / maxLakh) * 100)}%` : '0%');
-                      return (
-                        <div key={t.date} className="flex h-full flex-1 flex-col items-center justify-end gap-1">
-                          <div className="flex w-full max-w-[46px] flex-1 items-end justify-center gap-1">
-                            <div className="w-1/2 rounded-t-[4px] bg-[#2563eb]" style={{ height: h(s) }} title={`Sales ${inr(t.sales)}`} />
-                            <div className="w-1/2 rounded-t-[4px] bg-[#34d399]" style={{ height: h(c) }} title={`Collection ${inr(t.collection)}`} />
+                  <div className="text-[11px] font-semibold text-slate-500">
+                    {hoveredDayIdx !== null && trend[hoveredDayIdx] ? (
+                      <span className="rounded bg-slate-100 px-2 py-0.5 font-mono text-slate-700">
+                        {dayLabel(trend[hoveredDayIdx].date)}: <span className="font-bold text-[#2563eb]">{inr(trend[hoveredDayIdx].sales)}</span> | <span className="font-bold text-[#10b981]">{inr(trend[hoveredDayIdx].collection)}</span>
+                      </span>
+                    ) : (
+                      <span className="text-[10px] text-slate-400 font-medium">{chartScale.unitLabel}</span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex gap-2">
+                  <div className="flex w-12 shrink-0 flex-col justify-between py-0.5 pr-2 text-right text-[9.5px] font-semibold text-slate-400 font-mono">
+                    {[1, 0.75, 0.5, 0.25, 0].map((f) => (
+                      <span key={f}>{chartScale.formatTick(chartScale.niceMax * f)}</span>
+                    ))}
+                  </div>
+                  <div className="relative flex-1">
+                    <div className="absolute inset-0 flex flex-col justify-between pointer-events-none">
+                      {[0, 1, 2, 3, 4].map((i) => <div key={i} className="border-t border-dashed border-slate-100" />)}
+                    </div>
+                    <div className="relative flex h-44 items-end gap-2">
+                      {trend.map((t, i) => {
+                        const s = num(t.sales);
+                        const c = num(t.collection);
+                        const h = (v) => (v > 0 ? `${Math.max(4, (v / chartScale.niceMax) * 100)}%` : '0%');
+                        const isHovered = hoveredDayIdx === i;
+                        return (
+                          <div
+                            key={t.date}
+                            onMouseEnter={() => setHoveredDayIdx(i)}
+                            onMouseLeave={() => setHoveredDayIdx(null)}
+                            className={`flex h-full flex-1 flex-col items-center justify-end gap-1.5 rounded-md transition-colors cursor-pointer py-0.5 ${isHovered ? 'bg-slate-50' : ''}`}
+                          >
+                            <div className="flex w-full max-w-[48px] flex-1 items-end justify-center gap-1 px-0.5">
+                              <div
+                                className="w-1/2 rounded-t-md bg-[#2563eb] transition-all hover:brightness-110 shadow-xs"
+                                style={{ height: h(s) }}
+                                title={`Sales: ${inr(t.sales)} on ${dayLabel(t.date)}`}
+                              />
+                              <div
+                                className="w-1/2 rounded-t-md bg-[#10b981] transition-all hover:brightness-110 shadow-xs"
+                                style={{ height: h(c) }}
+                                title={`Collection: ${inr(t.collection)} on ${dayLabel(t.date)}`}
+                              />
+                            </div>
+                            <span className={`text-[9.5px] font-semibold tracking-tight ${isHovered ? 'font-bold text-slate-900' : 'text-slate-500'}`}>
+                              {dayLabel(t.date)}
+                            </span>
                           </div>
-                          <span className="text-[8.5px] font-semibold text-slate-400">{dayLabel(t.date)}</span>
-                        </div>
-                      );
-                    })}
+                        );
+                      })}
+                    </div>
                   </div>
                 </div>
               </div>
-              <p className="mt-1 text-[10px] font-semibold text-slate-400">₹ in Lakhs</p>
-            </>
+
+              {/* ── Sleek Bottom Executive Summary Strip (fills space beautifully) ── */}
+              <div className="mt-3.5 pt-3 border-t border-slate-100 grid grid-cols-2 gap-2.5">
+                <div className="rounded-lg bg-blue-50/60 border border-blue-100/70 px-3 py-2 flex items-center justify-between">
+                  <div>
+                    <span className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">7D Sales</span>
+                    <strong className="block text-[14px] font-black font-mono text-blue-700 leading-tight">{inr(total7dSales)}</strong>
+                  </div>
+                  <span className="h-2 w-2 rounded-full bg-blue-600 shrink-0" />
+                </div>
+                <div className="rounded-lg bg-emerald-50/60 border border-emerald-100/70 px-3 py-2 flex items-center justify-between">
+                  <div>
+                    <span className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">7D Collection</span>
+                    <strong className="block text-[14px] font-black font-mono text-emerald-700 leading-tight">{inr(total7dColl)}</strong>
+                  </div>
+                  <span className="h-2 w-2 rounded-full bg-emerald-600 shrink-0" />
+                </div>
+              </div>
+            </div>
           )}
         </SectionCard>
 
         <SectionCard icon={Users} title="Customer Receivable Ageing" linkTo="/sales/invoices">
           {ageingTotal === 0 ? (
-            <EmptyNote>No outstanding receivables.</EmptyNote>
+            <div className="flex flex-col items-center justify-center py-6 px-3 text-center">
+              <div className="flex h-11 w-11 items-center justify-center rounded-full bg-emerald-50 text-emerald-600 mb-2">
+                <CheckCircle2 size={24} />
+              </div>
+              <h4 className="text-[13px] font-bold text-slate-800">All Receivables Settled</h4>
+              <p className="mt-1 text-[11px] text-slate-500 max-w-[240px]">
+                All customer sales invoices are fully paid or reconciled. Zero pending or overdue receivables across all accounts.
+              </p>
+              <div className="mt-3 inline-flex items-center gap-2 rounded-lg bg-emerald-50/70 border border-emerald-100 px-3 py-1 text-[11px] font-semibold text-emerald-800">
+                <span>Total Balance Due:</span>
+                <span className="font-extrabold font-mono">₹0.00</span>
+              </div>
+            </div>
           ) : (
             <>
               <ul className="space-y-3 pt-1">

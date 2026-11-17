@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { modal } from '../../../context/ModalContext';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import {
   Package,
   CheckCircle2,
@@ -31,6 +31,7 @@ import {
 import { inventoryService } from '../../../services/domainServices';
 import { useERP } from '../../../context/ERPContext';
 import QCPageHeader from './QCPageHeader';
+import KpiCard from '../../../components/ui/KpiCard';
 
 export default function QCDashboardPage({ defaultTab = 'All' }) {
   const { purchaseBills = [], vendors = [], items = [], formatCurrency } = useERP();
@@ -50,8 +51,15 @@ export default function QCDashboardPage({ defaultTab = 'All' }) {
   const [dateTo, setDateTo] = useState(() => new Date().toISOString().split('T')[0]);
   const [sourceTypeFilter, setSourceTypeFilter] = useState('All');
 
+  const [searchParams] = useSearchParams();
+  const queryTab = searchParams.get('tab');
   // Table Controls
-  const [activeTab, setActiveTab] = useState(defaultTab);
+  const [activeTab, setActiveTab] = useState(queryTab || defaultTab);
+
+  useEffect(() => {
+    const t = searchParams.get('tab');
+    if (t) setActiveTab(t);
+  }, [searchParams]);
   const [searchQuery, setSearchQuery] = useState('');
   const [qualityTopN, setQualityTopN] = useState('Top 5');
   const [selectedRecord, setSelectedRecord] = useState(null);
@@ -376,102 +384,49 @@ export default function QCDashboardPage({ defaultTab = 'All' }) {
       />
 
       {/* ── 6 Top Metric Cards ───────────────────────────────────── */}
-      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
-        {/* Card 1: Total Received */}
-        <div className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-2xs flex items-start gap-3">
-          <div className="w-10 h-10 rounded-full bg-[#e0f2fe] text-[#0284c7] flex items-center justify-center shrink-0">
-            <Package className="w-5 h-5" />
-          </div>
-          <div className="min-w-0">
-            <p className="text-[11px] font-medium text-slate-500 truncate">Total Received for QC</p>
-            <p className="text-lg font-bold text-slate-900 tracking-tight leading-tight mt-0.5">
-              {Number(cards.totalReceived.qty).toLocaleString('en-IN')} {cards.totalReceived.uom}
-            </p>
-            <p className="text-[10px] text-slate-400 mt-0.5 truncate">
-              {cards.totalReceived.lots} Lots | {cards.totalReceived.takas} Taka
-            </p>
-          </div>
-        </div>
-
-        {/* Card 2: Inspected Quantity */}
-        <div className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-2xs flex items-start gap-3">
-          <div className="w-10 h-10 rounded-full bg-[#dcfce7] text-[#16a34a] flex items-center justify-center shrink-0">
-            <CheckCircle2 className="w-5 h-5" />
-          </div>
-          <div className="min-w-0">
-            <p className="text-[11px] font-medium text-slate-500 truncate">Inspected Quantity</p>
-            <p className="text-lg font-bold text-slate-900 tracking-tight leading-tight mt-0.5">
-              {Number(cards.inspected.qty).toLocaleString('en-IN')} {cards.inspected.uom}
-            </p>
-            <p className="text-[10px] text-emerald-600 font-medium mt-0.5 truncate">
-              {cards.inspected.lots} Lots ({cards.inspected.pct}%)
-            </p>
-          </div>
-        </div>
-
-        {/* Card 3: Good Quantity */}
-        <div className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-2xs flex items-start gap-3">
-          <div className="w-10 h-10 rounded-full bg-[#d1fae5] text-[#059669] flex items-center justify-center shrink-0">
-            <CheckCircle2 className="w-5 h-5" />
-          </div>
-          <div className="min-w-0">
-            <p className="text-[11px] font-medium text-slate-500 truncate">Good Quantity</p>
-            <p className="text-lg font-bold text-slate-900 tracking-tight leading-tight mt-0.5">
-              {Number(cards.good.qty).toLocaleString('en-IN')} {cards.good.uom}
-            </p>
-            <p className="text-[10px] text-emerald-600 font-medium mt-0.5 truncate">
-              {cards.good.pct}% of Inspected
-            </p>
-          </div>
-        </div>
-
-        {/* Card 4: Hold Quantity */}
-        <div className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-2xs flex items-start gap-3">
-          <div className="w-10 h-10 rounded-full bg-[#fef3c7] text-[#d97706] flex items-center justify-center shrink-0">
-            <Pause className="w-5 h-5" />
-          </div>
-          <div className="min-w-0">
-            <p className="text-[11px] font-medium text-slate-500 truncate">Hold Quantity</p>
-            <p className="text-lg font-bold text-slate-900 tracking-tight leading-tight mt-0.5">
-              {Number(cards.hold.qty).toLocaleString('en-IN')} {cards.hold.uom}
-            </p>
-            <p className="text-[10px] text-amber-600 font-medium mt-0.5 truncate">
-              {cards.hold.pct}% of Inspected
-            </p>
-          </div>
-        </div>
-
-        {/* Card 5: Reprocess Quantity */}
-        <div className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-2xs flex items-start gap-3">
-          <div className="w-10 h-10 rounded-full bg-[#f3e8ff] text-[#9333ea] flex items-center justify-center shrink-0">
-            <RotateCcw className="w-5 h-5" />
-          </div>
-          <div className="min-w-0">
-            <p className="text-[11px] font-medium text-slate-500 truncate">Reprocess Quantity</p>
-            <p className="text-lg font-bold text-slate-900 tracking-tight leading-tight mt-0.5">
-              {Number(cards.reprocess.qty).toLocaleString('en-IN')} {cards.reprocess.uom}
-            </p>
-            <p className="text-[10px] text-purple-600 font-medium mt-0.5 truncate">
-              {cards.reprocess.pct}% of Inspected
-            </p>
-          </div>
-        </div>
-
-        {/* Card 6: Rejected Quantity */}
-        <div className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-2xs flex items-start gap-3">
-          <div className="w-10 h-10 rounded-full bg-[#fee2e2] text-[#dc2626] flex items-center justify-center shrink-0">
-            <XCircle className="w-5 h-5" />
-          </div>
-          <div className="min-w-0">
-            <p className="text-[11px] font-medium text-slate-500 truncate">Rejected Quantity</p>
-            <p className="text-lg font-bold text-slate-900 tracking-tight leading-tight mt-0.5">
-              {Number(cards.rejected.qty).toLocaleString('en-IN')} {cards.rejected.uom}
-            </p>
-            <p className="text-[10px] text-rose-600 font-medium mt-0.5 truncate">
-              {cards.rejected.pct}% of Inspected
-            </p>
-          </div>
-        </div>
+      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3.5">
+        <KpiCard
+          label="Total Received for QC"
+          value={`${Number(cards.totalReceived.qty).toLocaleString('en-IN')} ${cards.totalReceived.uom}`}
+          sub={`${cards.totalReceived.lots} Lots | ${cards.totalReceived.takas} Taka`}
+          icon={Package}
+          index={0}
+        />
+        <KpiCard
+          label="Inspected Quantity"
+          value={`${Number(cards.inspected.qty).toLocaleString('en-IN')} ${cards.inspected.uom}`}
+          sub={`${cards.inspected.lots} Lots (${cards.inspected.pct}%)`}
+          icon={CheckCircle2}
+          index={1}
+        />
+        <KpiCard
+          label="Good Quantity"
+          value={`${Number(cards.good.qty).toLocaleString('en-IN')} ${cards.good.uom}`}
+          sub={`${cards.good.pct}% of Inspected`}
+          icon={CheckCircle2}
+          index={2}
+        />
+        <KpiCard
+          label="Hold Quantity"
+          value={`${Number(cards.hold.qty).toLocaleString('en-IN')} ${cards.hold.uom}`}
+          sub={`${cards.hold.pct}% of Inspected`}
+          icon={Pause}
+          index={3}
+        />
+        <KpiCard
+          label="Reprocess Quantity"
+          value={`${Number(cards.reprocess.qty).toLocaleString('en-IN')} ${cards.reprocess.uom}`}
+          sub={`${cards.reprocess.pct}% of Inspected`}
+          icon={RotateCcw}
+          index={4}
+        />
+        <KpiCard
+          label="Rejected Quantity"
+          value={`${Number(cards.rejected.qty).toLocaleString('en-IN')} ${cards.rejected.uom}`}
+          sub={`${cards.rejected.pct}% of Inspected`}
+          icon={XCircle}
+          index={5}
+        />
       </div>
 
       {/* ── Middle 4 Analytics Cards ─────────────────────────────── */}

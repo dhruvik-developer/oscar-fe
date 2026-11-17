@@ -620,7 +620,7 @@ const usePerformanceStoreBase = create((set, get) => ({
       : "86%";
 
     return [
-      { label: "Active Cycle", value: activeCycle.name.replace("Performance Cycle", "").replace("Appraisal Cycle", "").trim(), sub: activeCycle.reviewPeriod || "Oct – Dec 2024" },
+      { label: "Active Cycle", value: (activeCycle.name || "Annual Review").replace(/Performance Cycle/i, "").replace(/Appraisal Cycle/i, "").replace(/Review Cycle/i, "Review").trim(), sub: activeCycle.reviewPeriod || "Oct – Dec 2024" },
       { label: "Pending Reviews", value: String(pendingReviews), sub: "Awaiting stage action" },
       { label: "Completed", value: String(completedReviews), sub: "This cycle" },
       { label: "Avg Rating", value: avgRating, sub: "Across all departments" },

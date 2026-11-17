@@ -146,7 +146,7 @@ export default function FinalJobWorkPOsPage() {
       />
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3.5 lg:grid-cols-4">
         <Kpi
           icon={ShoppingCart}
           value={totalCount}

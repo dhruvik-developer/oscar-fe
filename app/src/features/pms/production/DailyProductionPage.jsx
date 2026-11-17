@@ -415,7 +415,6 @@ export default function DailyProductionPage() {
         title="Daily Production Entry"
         subtitle={`Record daily grey fabric production output from ${vendor} against Production Instruction ${piNumber}.`}
         breadcrumb={[
-          { label: 'Dashboard', path: '/dashboard' },
           { label: 'PMS' },
           { label: 'Daily Production Entry' },
           { label: piNumber },

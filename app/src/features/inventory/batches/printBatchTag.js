@@ -2,14 +2,20 @@ import QRCode from 'qrcode';
 
 /**
  * Returns the best origin to use for mobile QR code scanning.
+ * - If running on a configured public domain (e.g. VITE_PUBLIC_URL), uses that.
  * - If running on a public domain or LAN IP, returns window.location.origin.
  * - If running on localhost or 127.0.0.1, replaces it with the LAN IP so mobile phones
  *   on the same network can access it.
  */
 export function getMobileScanOrigin() {
+  if (import.meta.env.VITE_PUBLIC_URL) {
+    return import.meta.env.VITE_PUBLIC_URL.replace(/\/+$/, '');
+  }
+  if (import.meta.env.VITE_APP_URL) {
+    return import.meta.env.VITE_APP_URL.replace(/\/+$/, '');
+  }
   const hostname = window.location.hostname;
   const port = window.location.port ? `:${window.location.port}` : '';
-  // The dev server reads this PC's address when it starts (vite.config.js).
   const lanIp = import.meta.env.VITE_LAN_IP || hostname;
 
   if (hostname === 'localhost' || hostname === '127.0.0.1') {
@@ -19,20 +25,16 @@ export function getMobileScanOrigin() {
 }
 
 /**
- * Generates the public mobile Batch Passport URL.
- * Encodes essential batch metadata in query parameters so that even if the mobile
- * device is unauthenticated or the backend server is temporarily unreachable,
- * the mobile Batch Passport card loads instantly with complete information.
+ * Generates the public mobile Batch Passport URL (no login required).
  */
-/** What a batch QR opens: the batch's A to Z page, behind the login. */
 export function batchHistoryUrl(code) {
-  return `${getMobileScanOrigin()}/inventory/batches/${encodeURIComponent(code)}/a-to-z`;
+  return `${getMobileScanOrigin()}/public/batch/${encodeURIComponent(code)}`;
 }
 
 export function batchUrl(batchOrCode) {
   const origin = getMobileScanOrigin();
   if (typeof batchOrCode === 'string') {
-    return `${origin}/batch/${encodeURIComponent(batchOrCode)}`;
+    return `${origin}/public/batch/${encodeURIComponent(batchOrCode)}`;
   }
 
   const b = batchOrCode || {};
@@ -52,7 +54,7 @@ export function batchUrl(batchOrCode) {
   if (b.status) params.set('status', b.status);
 
   const qs = params.toString();
-  return `${origin}/batch/${encodeURIComponent(code)}${qs ? `?${qs}` : ''}`;
+  return `${origin}/public/batch/${encodeURIComponent(code)}${qs ? `?${qs}` : ''}`;
 }
 
 const escapeHtml = (value) =>
@@ -128,8 +130,8 @@ export async function printBatchTags(batches) {
     </style></head><body>
     <div class="no-print-bar">
       <div>
-        <span>📱 <b>Mobile Phone QR Target:</b> <code style="background:#0f172a;padding:2px 6px;border-radius:4px;color:#38bdf8;">${escapeHtml(lanOrigin)}</code></span>
-        <span style="margin-left:12px;color:#94a3b8;">(Connect phone to same Wi-Fi to scan & view details)</span>
+        <span>📱 <b>Public Mobile Phone QR Target:</b> <code style="background:#0f172a;padding:2px 6px;border-radius:4px;color:#38bdf8;">${escapeHtml(lanOrigin)}</code></span>
+        <span style="margin-left:12px;color:#94a3b8;">(Scan with any phone camera to view Batch Passport directly — no login required)</span>
       </div>
       <div>
         <button onclick="window.print()">Print Tags</button>

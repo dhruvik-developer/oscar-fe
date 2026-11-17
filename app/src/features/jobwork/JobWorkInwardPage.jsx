@@ -224,7 +224,6 @@ export default function JobWorkInwardPage() {
         title="Job Work Inward"
         subtitle="Track processed material received back from vendors."
         breadcrumb={[
-          { label: 'Dashboard', path: '/dashboard' },
           { label: 'PMS', path: '/pms' },
           { label: 'Job Work / Processing' },
           { label: 'Job Work Inward' },

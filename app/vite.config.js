@@ -26,6 +26,17 @@ export default defineConfig({
       '/api': {
         target: 'http://127.0.0.1:8000',
         changeOrigin: true,
+        autoRewrite: true,
+        configure: (proxy) => {
+          proxy.on('proxyRes', (proxyRes) => {
+            proxyRes.headers['cache-control'] = 'no-cache, no-store, must-revalidate';
+            proxyRes.headers['pragma'] = 'no-cache';
+            proxyRes.headers['expires'] = '0';
+            if (proxyRes.headers['location']) {
+              proxyRes.headers['location'] = proxyRes.headers['location'].replace(/^https?:\/\/127\.0\.0\.1:8000/i, '');
+            }
+          });
+        },
       },
     },
   },

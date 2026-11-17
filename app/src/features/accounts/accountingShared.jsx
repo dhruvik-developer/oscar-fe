@@ -19,21 +19,21 @@ const INR = new Intl.NumberFormat('en-IN', {
 
 /** ₹ in Indian grouping; a value the server did not send renders as an em dash. */
 export function formatINR(value) {
-  if (value === null || value === undefined || value === '') return '"”';
+  if (value === null || value === undefined || value === '') return '-';
   const n = Number(value);
-  if (!Number.isFinite(n)) return '"”';
+  if (!Number.isFinite(n)) return '-';
   return INR.format(n);
 }
 
 export function formatNumberIN(value, digits = 2) {
-  if (value === null || value === undefined || value === '') return '"”';
+  if (value === null || value === undefined || value === '') return '-';
   const n = Number(value);
-  if (!Number.isFinite(n)) return '"”';
+  if (!Number.isFinite(n)) return '-';
   return n.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: digits });
 }
 
 export function formatDate(value) {
-  if (!value) return '"”';
+  if (!value) return '-';
   return formatDateDDMMYYYY(String(value).slice(0, 10));
 }
 
@@ -187,14 +187,16 @@ export function TabBar({ tabs, active, onChange }) {
   );
 }
 
-export function Kpi({ label, value, note, tone = 'text-slate-800' }) {
-  const selectedTone = tone.includes('rose') || tone.includes('red') ? 'rose' : tone.includes('emerald') || tone.includes('green') ? 'emerald' : tone.includes('amber') ? 'amber' : 'blue';
+export function Kpi({ label, value, note, tone, index, icon, ...rest }) {
   return (
     <KpiCard
       label={label}
       value={value}
       sub={note}
-      tone={selectedTone}
+      tone={tone}
+      index={index}
+      icon={icon}
+      {...rest}
     />
   );
 }

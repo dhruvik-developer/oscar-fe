@@ -7,6 +7,7 @@ import { FilterBar } from "../../../components/hrms/FilterBar";
 import { Modal } from "../../../components/hrms/Modal";
 import { Button } from "../../../components/ui/Button";
 import PageHeader from "../../../components/ui/PageHeader";
+import KpiCard from "../../../components/ui/KpiCard";
 import StatusBadge from "../../../components/ui/StatusBadge";
 import {
   ArrowLeft,
@@ -357,7 +358,6 @@ export default function Candidates() {
         title="Candidate Pipeline & Roster"
         subtitle={`Track applications, evaluate candidates, and manage hiring stages. Showing ${filtered.length} of ${candidates.length} candidates.`}
         breadcrumb={[
-          { label: "Dashboard", path: "/dashboard" },
           { label: "HRMS", path: "/hrms" },
           { label: "Recruitment", path: "/hrms/recruitment" },
           { label: "Candidates", path: "/hrms/recruitment/candidates" },
@@ -400,32 +400,34 @@ export default function Candidates() {
 
       {/* Overview Stat Strip */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
-        <div className="bg-card border border-border rounded-2xl p-4 shadow-2xs">
-          <span className="text-[11px] font-bold uppercase tracking-wider text-muted">Total Applicants</span>
-          <div className="text-2xl font-black text-text mt-1">{candidates.length}</div>
-          <span className="text-[11px] text-muted font-medium">Registered in talent pool</span>
-        </div>
-        <div className="bg-card border border-border rounded-2xl p-4 shadow-2xs">
-          <span className="text-[11px] font-bold uppercase tracking-wider text-muted">In Evaluation</span>
-          <div className="text-2xl font-black text-blue-600 mt-1">
-            {candidates.filter((c) => c.stage === "Screening" || c.stage === "Interview").length}
-          </div>
-          <span className="text-[11px] text-muted font-medium">Active screening & rounds</span>
-        </div>
-        <div className="bg-card border border-border rounded-2xl p-4 shadow-2xs">
-          <span className="text-[11px] font-bold uppercase tracking-wider text-muted">Shortlisted / Offers</span>
-          <div className="text-2xl font-black text-purple-600 mt-1">
-            {candidates.filter((c) => c.stage === "Shortlisted" || c.stage === "Offer").length}
-          </div>
-          <span className="text-[11px] text-muted font-medium">High qualification fit</span>
-        </div>
-        <div className="bg-card border border-border rounded-2xl p-4 shadow-2xs">
-          <span className="text-[11px] font-bold uppercase tracking-wider text-muted">Successfully Hired</span>
-          <div className="text-2xl font-black text-emerald-600 mt-1">
-            {candidates.filter((c) => c.stage === "Hired").length}
-          </div>
-          <span className="text-[11px] text-muted font-medium">Transferred to onboarding</span>
-        </div>
+        <KpiCard
+          index={0}
+          label="Total Applicants"
+          value={candidates.length}
+          sub="Registered in talent pool"
+          icon={Users}
+        />
+        <KpiCard
+          index={1}
+          label="In Evaluation"
+          value={candidates.filter((c) => c.stage === "Screening" || c.stage === "Interview").length}
+          sub="Active screening & rounds"
+          icon={Clock}
+        />
+        <KpiCard
+          index={2}
+          label="Shortlisted / Offers"
+          value={candidates.filter((c) => c.stage === "Shortlisted" || c.stage === "Offer").length}
+          sub="High qualification fit"
+          icon={Award}
+        />
+        <KpiCard
+          index={3}
+          label="Successfully Hired"
+          value={candidates.filter((c) => c.stage === "Hired").length}
+          sub="Transferred to onboarding"
+          icon={CheckCircle2}
+        />
       </div>
 
       {/* Main Content: Kanban Drag & Drop Pipeline vs DataTable */}

@@ -23,6 +23,7 @@ import { describeError } from "../../../services/resourceSync";
 import { useTableSort } from "../../../hooks/useTableSort";
 import SortableTh from "../../../components/ui/SortableTh";
 import AppPagination from "../../../components/ui/AppPagination";
+import Modal from "../../../components/ui/Modal";
 
 const BASIS_LABELS = {
   INVOICE: "Invoice Value",
@@ -353,12 +354,12 @@ export default function IncentivesPage() {
       )}
 
       {/* Metric Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-        <MetricCard label="Gross Eligible Sales" value={`₹${stats.gross.toLocaleString("en-IN")}`} sub="Quarterly aggregated" icon={TrendingUp} />
-        <MetricCard label="Deducted Returns" value={`₹${stats.returns.toLocaleString("en-IN")}`} sub="Sales returns & credit notes" icon={ShieldAlert} />
-        <MetricCard label="Net Incentive Base" value={`₹${stats.net.toLocaleString("en-IN")}`} sub="Base the rate applies to" icon={DollarSign} />
-        <MetricCard label="Calculated Accrual" value={`₹${stats.incentive.toLocaleString("en-IN")}`} sub="Total incentive earned" icon={Award} />
-        <MetricCard label="Disbursed / Paid" value={`₹${stats.paid.toLocaleString("en-IN")}`} sub="Paid out to salespersons" icon={CheckCircle2} />
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3.5">
+        <MetricCard index={0} label="Gross Eligible Sales" value={`₹${stats.gross.toLocaleString("en-IN")}`} sub="Quarterly aggregated" icon={TrendingUp} />
+        <MetricCard index={1} label="Deducted Returns" value={`₹${stats.returns.toLocaleString("en-IN")}`} sub="Sales returns & credit notes" icon={ShieldAlert} />
+        <MetricCard index={2} label="Net Incentive Base" value={`₹${stats.net.toLocaleString("en-IN")}`} sub="Base the rate applies to" icon={DollarSign} />
+        <MetricCard index={3} label="Calculated Accrual" value={`₹${stats.incentive.toLocaleString("en-IN")}`} sub="Total incentive earned" icon={Award} />
+        <MetricCard index={4} label="Disbursed / Paid" value={`₹${stats.paid.toLocaleString("en-IN")}`} sub="Paid out to salespersons" icon={CheckCircle2} />
       </div>
 
       {/* Schemes */}
@@ -592,283 +593,305 @@ export default function IncentivesPage() {
       </div>
 
       {/* Calculate Quarterly Modal */}
-      {isCalcModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-card border border-border rounded-xl shadow-lg w-full max-w-md p-6 space-y-4">
-            <h3 className="text-lg font-bold text-text">Calculate Quarterly Incentive</h3>
-            <p className="text-sm text-muted">
-              Takes the quarter's invoices and returns for every salesperson named on them and applies each active quarterly
-              scheme. Rows already approved or paid are left as they are.
-            </p>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="text-xs font-semibold text-muted uppercase">Quarter</label>
-                <select
-                  value={calcQuarter}
-                  onChange={(e) => setCalcQuarter(Number(e.target.value))}
-                  className="w-full mt-1.5 p-2 bg-soft border border-border rounded-lg text-sm text-text"
-                >
-                  <option value={1}>Q1 (Apr - Jun)</option>
-                  <option value={2}>Q2 (Jul - Sep)</option>
-                  <option value={3}>Q3 (Oct - Dec)</option>
-                  <option value={4}>Q4 (Jan - Mar)</option>
-                </select>
-              </div>
-              <div>
-                <label className="text-xs font-semibold text-muted uppercase">Financial Year (start)</label>
-                <input
-                  type="number"
-                  value={calcYear}
-                  onChange={(e) => setCalcYear(Number(e.target.value))}
-                  className="w-full mt-1.5 p-2 bg-soft border border-border rounded-lg text-sm text-text"
-                />
-                <div className="text-[11px] text-muted mt-1">
-                  FY {calcYear}-{String((calcYear + 1) % 100).padStart(2, "0")}
-                </div>
-              </div>
-            </div>
-            <div className="flex justify-end gap-3 pt-3">
-              <button
-                onClick={() => setIsCalcModalOpen(false)}
-                className="px-4 py-2 text-sm font-medium border border-border rounded-lg hover:bg-soft"
-              >
-                Cancel
-              </button>
-              <button
-                disabled={calculating}
-                onClick={handleCalculate}
-                className="px-4 py-2 text-sm font-medium text-white bg-primary rounded-lg hover:bg-primary/90 flex items-center gap-2"
-              >
-                {calculating && <RefreshCw className="w-4 h-4 animate-spin" />}
-                Calculate Accruals
-              </button>
+      <Modal
+        isOpen={isCalcModalOpen}
+        onClose={() => setIsCalcModalOpen(false)}
+        title="Calculate Quarterly Incentive"
+        subtitle="Takes the quarter's invoices and returns for every salesperson named on them and applies each active quarterly scheme. Rows already approved or paid are left as they are."
+        size="md"
+        resizable={true}
+        allowMaximize={true}
+        footer={
+          <div className="flex justify-end gap-3 w-full">
+            <button
+              type="button"
+              onClick={() => setIsCalcModalOpen(false)}
+              className="px-4 py-2 text-sm font-medium border border-border rounded-lg hover:bg-soft text-text"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={calculating}
+              onClick={handleCalculate}
+              className="px-4 py-2 text-sm font-medium text-white bg-primary rounded-lg hover:bg-primary/90 flex items-center gap-2"
+            >
+              {calculating && <RefreshCw className="w-4 h-4 animate-spin" />}
+              Calculate Accruals
+            </button>
+          </div>
+        }
+      >
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="text-xs font-semibold text-muted uppercase">Quarter</label>
+            <select
+              value={calcQuarter}
+              onChange={(e) => setCalcQuarter(Number(e.target.value))}
+              className="w-full mt-1.5 p-2 bg-soft border border-border rounded-lg text-sm text-text"
+            >
+              <option value={1}>Q1 (Apr - Jun)</option>
+              <option value={2}>Q2 (Jul - Sep)</option>
+              <option value={3}>Q3 (Oct - Dec)</option>
+              <option value={4}>Q4 (Jan - Mar)</option>
+            </select>
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-muted uppercase">Financial Year (start)</label>
+            <input
+              type="number"
+              value={calcYear}
+              onChange={(e) => setCalcYear(Number(e.target.value))}
+              className="w-full mt-1.5 p-2 bg-soft border border-border rounded-lg text-sm text-text"
+            />
+            <div className="text-[11px] text-muted mt-1">
+              FY {calcYear}-{String((calcYear + 1) % 100).padStart(2, "0")}
             </div>
           </div>
         </div>
-      )}
+      </Modal>
 
       {/* Hold Modal */}
-      {isHoldModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-card border border-border rounded-xl shadow-lg w-full max-w-md p-6 space-y-4">
-            <h3 className="text-lg font-bold text-text text-red-600 flex items-center gap-2">
-              <AlertCircle className="w-5 h-5" /> Hold Incentive Payout
-            </h3>
-            <p className="text-sm text-muted">
-              Place a managerial hold on <b>{selectedAccrual?.employeeName}</b>'s incentive payout due to overdue customer
-              accounts, returns, or pending verification.
-            </p>
-            <div>
-              <label className="text-xs font-semibold text-muted uppercase">Reason for Hold</label>
-              <textarea
-                rows="3"
-                value={holdReason}
-                onChange={(e) => setHoldReason(e.target.value)}
-                placeholder="e.g. Pending party payment for Invoice INV-204"
-                className="w-full mt-1.5 p-2.5 bg-soft border border-border rounded-lg text-sm text-text focus:outline-none focus:ring-1 focus:ring-red-500"
-              />
-            </div>
-            <div className="flex justify-end gap-3 pt-2">
-              <button
-                onClick={() => {
-                  setIsHoldModalOpen(false);
-                  setSelectedAccrual(null);
-                }}
-                className="px-4 py-2 text-sm font-medium border border-border rounded-lg hover:bg-soft"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleHoldConfirm}
-                className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700"
-              >
-                Confirm Hold
-              </button>
-            </div>
+      <Modal
+        isOpen={isHoldModalOpen}
+        onClose={() => {
+          setIsHoldModalOpen(false);
+          setSelectedAccrual(null);
+        }}
+        title={
+          <span className="flex items-center gap-2 text-red-600">
+            <AlertCircle className="w-5 h-5" /> Hold Incentive Payout
+          </span>
+        }
+        subtitle={
+          <span>
+            Place a managerial hold on <b>{selectedAccrual?.employeeName}</b>'s incentive payout due to overdue customer
+            accounts, returns, or pending verification.
+          </span>
+        }
+        size="md"
+        resizable={true}
+        allowMaximize={true}
+        footer={
+          <div className="flex justify-end gap-3 w-full">
+            <button
+              type="button"
+              onClick={() => {
+                setIsHoldModalOpen(false);
+                setSelectedAccrual(null);
+              }}
+              className="px-4 py-2 text-sm font-medium border border-border rounded-lg hover:bg-soft text-text"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleHoldConfirm}
+              className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700"
+            >
+              Confirm Hold
+            </button>
           </div>
+        }
+      >
+        <div>
+          <label className="text-xs font-semibold text-muted uppercase">Reason for Hold</label>
+          <textarea
+            rows="3"
+            value={holdReason}
+            onChange={(e) => setHoldReason(e.target.value)}
+            placeholder="e.g. Pending party payment for Invoice INV-204"
+            className="w-full mt-1.5 p-2.5 bg-soft border border-border rounded-lg text-sm text-text focus:outline-none focus:ring-1 focus:ring-red-500"
+          />
         </div>
-      )}
+      </Modal>
 
       {/* Scheme Modal */}
-      {isSchemeModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-card border border-border rounded-xl shadow-lg w-full max-w-xl p-6 space-y-4 max-h-[90vh] overflow-y-auto">
-            <h3 className="text-lg font-bold text-text">{schemeForm.id ? "Edit Incentive Scheme" : "New Incentive Scheme"}</h3>
-            <p className="text-sm text-muted">
-              Quarterly salesperson incentive (Oscar Letter Pad §12). Sales returns and credit notes are always deducted.
-            </p>
-            {schemeError && (
-              <div className="p-2.5 rounded-lg border border-red-200 bg-red-50 text-sm text-red-700 dark:bg-red-950/30 dark:border-red-900 dark:text-red-400">
-                {schemeError}
-              </div>
-            )}
-            <div className="space-y-3">
-              <div>
-                <label className="text-xs font-semibold text-muted uppercase">Scheme Name</label>
-                <input
-                  type="text"
-                  value={schemeForm.name}
-                  onChange={(e) => setSchemeForm({ ...schemeForm, name: e.target.value })}
-                  placeholder="e.g. Quarterly Standard Slab"
-                  className="w-full mt-1 p-2 bg-soft border border-border rounded-lg text-sm text-text"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs font-semibold text-muted uppercase">Calculation Basis</label>
-                  <select
-                    value={schemeForm.basis}
-                    onChange={(e) => setSchemeForm({ ...schemeForm, basis: e.target.value })}
-                    className="w-full mt-1 p-2 bg-soft border border-border rounded-lg text-sm text-text"
-                  >
-                    {Object.entries(BASIS_LABELS).map(([value, label]) => (
-                      <option key={value} value={value}>{label}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="text-xs font-semibold text-muted uppercase">Rate Structure</label>
-                  <select
-                    value={schemeForm.mode}
-                    onChange={(e) => setSchemeForm({ ...schemeForm, mode: e.target.value })}
-                    className="w-full mt-1 p-2 bg-soft border border-border rounded-lg text-sm text-text"
-                  >
-                    {Object.entries(RATE_MODES).map(([value, label]) => (
-                      <option key={value} value={value}>{label}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
+      <Modal
+        isOpen={isSchemeModalOpen}
+        onClose={() => setIsSchemeModalOpen(false)}
+        title={schemeForm.id ? "Edit Incentive Scheme" : "New Incentive Scheme"}
+        subtitle="Quarterly salesperson incentive (Oscar Letter Pad §12). Sales returns and credit notes are always deducted."
+        size="lg"
+        resizable={true}
+        allowMaximize={true}
+        footer={
+          <div className="flex justify-end gap-3 w-full">
+            <button
+              type="button"
+              onClick={() => setIsSchemeModalOpen(false)}
+              className="px-4 py-2 text-sm font-medium border border-border rounded-lg hover:bg-soft text-text"
+            >
+              Close
+            </button>
+            <button
+              type="button"
+              disabled={savingScheme}
+              onClick={handleSaveScheme}
+              className="px-4 py-2 text-sm font-medium text-white bg-primary rounded-lg hover:bg-primary/90 flex items-center gap-2"
+            >
+              {savingScheme && <RefreshCw className="w-4 h-4 animate-spin" />}
+              Save Scheme
+            </button>
+          </div>
+        }
+      >
+        {schemeError && (
+          <div className="mb-4 p-2.5 rounded-lg border border-red-200 bg-red-50 text-sm text-red-700 dark:bg-red-950/30 dark:border-red-900 dark:text-red-400">
+            {schemeError}
+          </div>
+        )}
+        <div className="space-y-4">
+          <div>
+            <label className="text-xs font-semibold text-muted uppercase">Scheme Name</label>
+            <input
+              type="text"
+              value={schemeForm.name}
+              onChange={(e) => setSchemeForm({ ...schemeForm, name: e.target.value })}
+              placeholder="e.g. Quarterly Standard Slab"
+              className="w-full mt-1 p-2 bg-soft border border-border rounded-lg text-sm text-text"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-semibold text-muted uppercase">Calculation Basis</label>
+              <select
+                value={schemeForm.basis}
+                onChange={(e) => setSchemeForm({ ...schemeForm, basis: e.target.value })}
+                className="w-full mt-1 p-2 bg-soft border border-border rounded-lg text-sm text-text"
+              >
+                {Object.entries(BASIS_LABELS).map(([value, label]) => (
+                  <option key={value} value={value}>{label}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-muted uppercase">Rate Structure</label>
+              <select
+                value={schemeForm.mode}
+                onChange={(e) => setSchemeForm({ ...schemeForm, mode: e.target.value })}
+                className="w-full mt-1 p-2 bg-soft border border-border rounded-lg text-sm text-text"
+              >
+                {Object.entries(RATE_MODES).map(([value, label]) => (
+                  <option key={value} value={value}>{label}</option>
+                ))}
+              </select>
+            </div>
+          </div>
 
-              {schemeForm.mode === "flat" ? (
-                <div>
-                  <label className="text-xs font-semibold text-muted uppercase">Flat Rate (%)</label>
+          {schemeForm.mode === "flat" ? (
+            <div>
+              <label className="text-xs font-semibold text-muted uppercase">Flat Rate (%)</label>
+              <input
+                type="number"
+                step="0.1"
+                value={schemeForm.ratePct}
+                onChange={(e) => setSchemeForm({ ...schemeForm, ratePct: e.target.value })}
+                className="w-full mt-1 p-2 bg-soft border border-border rounded-lg text-sm text-text"
+              />
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <label className="text-xs font-semibold text-muted uppercase">Sales Brackets (₹) — leave the last "Max" empty for no limit</label>
+              {schemeForm.slabs.map((slab, idx) => (
+                <div key={idx} className="flex items-center gap-2">
+                  <span className="text-xs text-muted w-12">Tier {idx + 1}:</span>
+                  <input
+                    type="number"
+                    placeholder="Min"
+                    value={slab.min}
+                    onChange={(e) => updateSlab(idx, "min", e.target.value)}
+                    className="w-28 p-1.5 bg-soft border border-border rounded text-xs text-text"
+                  />
+                  <span className="text-xs text-muted">to</span>
+                  <input
+                    type="number"
+                    placeholder="No limit"
+                    value={slab.max ?? ""}
+                    onChange={(e) => updateSlab(idx, "max", e.target.value)}
+                    className="w-28 p-1.5 bg-soft border border-border rounded text-xs text-text"
+                  />
                   <input
                     type="number"
                     step="0.1"
-                    value={schemeForm.ratePct}
-                    onChange={(e) => setSchemeForm({ ...schemeForm, ratePct: e.target.value })}
-                    className="w-full mt-1 p-2 bg-soft border border-border rounded-lg text-sm text-text"
+                    placeholder="%"
+                    value={slab.rate_pct}
+                    onChange={(e) => updateSlab(idx, "rate_pct", e.target.value)}
+                    className="w-16 p-1.5 bg-soft border border-border rounded text-xs text-text font-bold"
                   />
+                  <span className="text-xs text-muted">%</span>
+                  {schemeForm.slabs.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => setSchemeForm({ ...schemeForm, slabs: schemeForm.slabs.filter((_, i) => i !== idx) })}
+                      title="Remove tier"
+                      className="p-1 text-muted hover:text-red-600"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
                 </div>
-              ) : (
-                <div className="space-y-2">
-                  <label className="text-xs font-semibold text-muted uppercase">Sales Brackets (₹) — leave the last "Max" empty for no limit</label>
-                  {schemeForm.slabs.map((slab, idx) => (
-                    <div key={idx} className="flex items-center gap-2">
-                      <span className="text-xs text-muted w-12">Tier {idx + 1}:</span>
-                      <input
-                        type="number"
-                        placeholder="Min"
-                        value={slab.min}
-                        onChange={(e) => updateSlab(idx, "min", e.target.value)}
-                        className="w-28 p-1.5 bg-soft border border-border rounded text-xs text-text"
-                      />
-                      <span className="text-xs text-muted">to</span>
-                      <input
-                        type="number"
-                        placeholder="No limit"
-                        value={slab.max ?? ""}
-                        onChange={(e) => updateSlab(idx, "max", e.target.value)}
-                        className="w-28 p-1.5 bg-soft border border-border rounded text-xs text-text"
-                      />
-                      <input
-                        type="number"
-                        step="0.1"
-                        placeholder="%"
-                        value={slab.rate_pct}
-                        onChange={(e) => updateSlab(idx, "rate_pct", e.target.value)}
-                        className="w-16 p-1.5 bg-soft border border-border rounded text-xs text-text font-bold"
-                      />
-                      <span className="text-xs text-muted">%</span>
-                      {schemeForm.slabs.length > 1 && (
-                        <button
-                          onClick={() => setSchemeForm({ ...schemeForm, slabs: schemeForm.slabs.filter((_, i) => i !== idx) })}
-                          title="Remove tier"
-                          className="p-1 text-muted hover:text-red-600"
-                        >
-                          <X className="w-3.5 h-3.5" />
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                  <button
-                    onClick={() => {
-                      const last = schemeForm.slabs[schemeForm.slabs.length - 1];
-                      const start = last && last.max !== "" && last.max !== null ? Number(last.max) : 0;
-                      setSchemeForm({ ...schemeForm, slabs: [...schemeForm.slabs, { min: start, max: "", rate_pct: 0 }] });
-                    }}
-                    className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
-                  >
-                    <Plus className="w-3.5 h-3.5" /> Add tier
-                  </button>
-                </div>
-              )}
-
-              <div>
-                <label className="text-xs font-semibold text-muted uppercase">Pay incentive after (days from customer payment)</label>
-                <input
-                  type="number"
-                  min="0"
-                  step="1"
-                  value={schemeForm.payoutAfterDays}
-                  onChange={(e) => setSchemeForm({ ...schemeForm, payoutAfterDays: e.target.value })}
-                  className="w-full mt-1 p-2 bg-soft border border-border rounded-lg text-sm text-text"
-                />
-                <div className="text-[11px] text-muted mt-1">
-                  Each customer payment releases its share of the incentive once it is this many days old. Default 90.
-                </div>
-              </div>
-
-              <div className="space-y-2 pt-2">
-                <label className="flex items-center gap-2 text-sm text-text">
-                  <input
-                    type="checkbox"
-                    checked={schemeForm.holdUnpaidInvoices}
-                    onChange={(e) => setSchemeForm({ ...schemeForm, holdUnpaidInvoices: e.target.checked })}
-                    className="rounded border-border"
-                  />
-                  Hold the share of unpaid invoices (released automatically as the customer pays)
-                </label>
-                <label className="flex items-center gap-2 text-sm text-text">
-                  <input
-                    type="checkbox"
-                    checked={schemeForm.excludeGst}
-                    onChange={(e) => setSchemeForm({ ...schemeForm, excludeGst: e.target.checked })}
-                    className="rounded border-border"
-                  />
-                  Exclude GST from the sales base
-                </label>
-                <label className="flex items-center gap-2 text-sm text-text">
-                  <input
-                    type="checkbox"
-                    checked={schemeForm.isActive}
-                    onChange={(e) => setSchemeForm({ ...schemeForm, isActive: e.target.checked })}
-                    className="rounded border-border"
-                  />
-                  Active
-                </label>
-              </div>
+              ))}
+              <button
+                type="button"
+                onClick={() => {
+                  const last = schemeForm.slabs[schemeForm.slabs.length - 1];
+                  const start = last && last.max !== "" && last.max !== null ? Number(last.max) : 0;
+                  setSchemeForm({ ...schemeForm, slabs: [...schemeForm.slabs, { min: start, max: "", rate_pct: 0 }] });
+                }}
+                className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+              >
+                <Plus className="w-3.5 h-3.5" /> Add tier
+              </button>
             </div>
-            <div className="flex justify-end gap-3 pt-3">
-              <button
-                onClick={() => setIsSchemeModalOpen(false)}
-                className="px-4 py-2 text-sm font-medium border border-border rounded-lg hover:bg-soft"
-              >
-                Close
-              </button>
-              <button
-                disabled={savingScheme}
-                onClick={handleSaveScheme}
-                className="px-4 py-2 text-sm font-medium text-white bg-primary rounded-lg hover:bg-primary/90 flex items-center gap-2"
-              >
-                {savingScheme && <RefreshCw className="w-4 h-4 animate-spin" />}
-                Save Scheme
-              </button>
+          )}
+
+          <div>
+            <label className="text-xs font-semibold text-muted uppercase">Pay incentive after (days from customer payment)</label>
+            <input
+              type="number"
+              min="0"
+              step="1"
+              value={schemeForm.payoutAfterDays}
+              onChange={(e) => setSchemeForm({ ...schemeForm, payoutAfterDays: e.target.value })}
+              className="w-full mt-1 p-2 bg-soft border border-border rounded-lg text-sm text-text"
+            />
+            <div className="text-[11px] text-muted mt-1">
+              Each customer payment releases its share of the incentive once it is this many days old. Default 90.
             </div>
           </div>
+
+          <div className="space-y-2 pt-2">
+            <label className="flex items-center gap-2 text-sm text-text">
+              <input
+                type="checkbox"
+                checked={schemeForm.holdUnpaidInvoices}
+                onChange={(e) => setSchemeForm({ ...schemeForm, holdUnpaidInvoices: e.target.checked })}
+                className="rounded border-border"
+              />
+              Hold the share of unpaid invoices (released automatically as the customer pays)
+            </label>
+            <label className="flex items-center gap-2 text-sm text-text">
+              <input
+                type="checkbox"
+                checked={schemeForm.excludeGst}
+                onChange={(e) => setSchemeForm({ ...schemeForm, excludeGst: e.target.checked })}
+                className="rounded border-border"
+              />
+              Exclude GST from the sales base
+            </label>
+            <label className="flex items-center gap-2 text-sm text-text">
+              <input
+                type="checkbox"
+                checked={schemeForm.isActive}
+                onChange={(e) => setSchemeForm({ ...schemeForm, isActive: e.target.checked })}
+                className="rounded border-border"
+              />
+              Active
+            </label>
+          </div>
         </div>
-      )}
+      </Modal>
     </div>
   );
 }

@@ -262,10 +262,10 @@ export default function ProjectsPage() {
       {notice && <p role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs text-emerald-700">{notice}</p>}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 my-4">
-        <KpiCard label="Total Projects" value={stats.total} icon={FolderOpen} tone="blue" />
-        <KpiCard label="Active" value={stats.active} icon={Clock} tone="emerald" />
-        <KpiCard label="Completed" value={stats.completed} icon={CheckCircle2} tone="purple" />
-        <KpiCard label="Won Deals Ready" value={stats.ready} icon={Trophy} tone="amber" />
+        <KpiCard index={0} label="Total Projects" value={stats.total} icon={FolderOpen} tone="blue" />
+        <KpiCard index={1} label="Active" value={stats.active} icon={Clock} tone="emerald" />
+        <KpiCard index={2} label="Completed" value={stats.completed} icon={CheckCircle2} tone="purple" />
+        <KpiCard index={3} label="Won Deals Ready" value={stats.ready} icon={Trophy} tone="amber" />
       </div>
 
       {wonDeals.length > 0 && (

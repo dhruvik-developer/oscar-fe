@@ -694,7 +694,7 @@ export default function OwnerMISDashboardPage() {
               label="Invoiced Sales"
               value={inr(todayFinancials.sales)}
               icon={TrendingUp}
-              tone="emerald"
+              index={0}
               trend="+14.2% MTD"
               sub={`${invoices.length} Tax Invoices`}
               onClick={() => setActiveTab('1_today')}
@@ -703,7 +703,7 @@ export default function OwnerMISDashboardPage() {
               label="Collections Realized"
               value={inr(todayFinancials.collections)}
               icon={DollarSign}
-              tone="blue"
+              index={1}
               trend="74% Realized"
               sub="Realized Inflow"
               onClick={() => setActiveTab('1_today')}
@@ -712,7 +712,7 @@ export default function OwnerMISDashboardPage() {
               label="Gross Profit (Est.)"
               value={inr(todayFinancials.grossProfit)}
               icon={Percent}
-              tone="indigo"
+              index={2}
               trend="22.0% Margin"
               sub="Target: 18.0%"
               onClick={() => setActiveTab('10_party')}
@@ -721,7 +721,7 @@ export default function OwnerMISDashboardPage() {
               label="Total Stock Value"
               value={inr(inventoryStages.totalValue)}
               icon={Package}
-              tone="amber"
+              index={3}
               trend={`${num(inventoryStages.totalMeters)} M`}
               sub="Across 9 Stages"
               onClick={() => setActiveTab('5_inventory')}
@@ -730,7 +730,7 @@ export default function OwnerMISDashboardPage() {
               label="Funds Position"
               value={inr(todayFinancials.cashBankBalance)}
               icon={Building2}
-              tone="purple"
+              index={4}
               trend="Active Accounts"
               sub="Bank & Cash"
               onClick={() => setActiveTab('1_today')}
@@ -1127,33 +1127,33 @@ export default function OwnerMISDashboardPage() {
       {activeTab === '1_today' && (
         <div className="space-y-6">
           {/* Executive KPI Bar (CRM Wave KpiCard) */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5">
             <KpiCard
               label="Invoiced Sales"
               value={inr(todayFinancials.sales)}
               icon={TrendingUp}
-              tone="emerald"
+              index={0}
               sub={`From commercial tax invoices (${invoices.length} invoices)`}
             />
             <KpiCard
               label="Collections Realized"
               value={inr(todayFinancials.collections)}
               icon={DollarSign}
-              tone="blue"
+              index={1}
               sub="Customer payments received"
             />
             <KpiCard
               label="Gross Profit"
               value={inr(todayFinancials.grossProfit)}
               icon={Percent}
-              tone="indigo"
+              index={2}
               sub="22.0% Estimated Margin"
             />
             <KpiCard
               label="Liquid Cash & Bank"
               value={inr(todayFinancials.cashBankBalance)}
               icon={Building2}
-              tone="purple"
+              index={3}
               sub="Available bank balances"
             />
           </div>
@@ -1923,47 +1923,47 @@ export default function OwnerMISDashboardPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-6 gap-3.5">
             <KpiCard
               label="Orders Booked"
               value={salesPipeline.ordersBooked}
               icon={ShoppingCart}
-              tone="blue"
+              index={0}
               sub={inr(salesPipeline.ordersValue)}
             />
             <KpiCard
               label="Dispatched Value"
               value={inr(salesPipeline.dispatchedValue)}
               icon={Truck}
-              tone="indigo"
+              index={1}
               sub={`${deliveryChallans.length} challans`}
             />
             <KpiCard
               label="Invoiced Sales"
               value={inr(salesPipeline.invoicedValue)}
               icon={FileText}
-              tone="purple"
+              index={2}
               sub={`${invoices.length} invoices`}
             />
             <KpiCard
               label="Collections Realized"
               value={inr(salesPipeline.collectionsRealized)}
               icon={DollarSign}
-              tone="emerald"
+              index={3}
               sub={`${paymentIns.length} payments`}
             />
             <KpiCard
               label="Sales Returns"
               value={inr(salesPipeline.returnsDeduction)}
               icon={AlertTriangle}
-              tone="rose"
+              index={4}
               sub="Quality claims"
             />
             <KpiCard
               label="Pending Dispatch"
               value={`${num(salesPipeline.pendingDispatchMeters)} m`}
               icon={Clock}
-              tone="amber"
+              index={0}
               sub={inr(salesPipeline.pendingDispatchValue)}
             />
           </div>
@@ -2438,19 +2438,19 @@ export default function OwnerMISDashboardPage() {
       {/* ─────────────────────────────────────────────────────────────────── */}
       {activeTab === 'leakage' && (
         <div className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
             <KpiCard
               label="Gross Invoiced Sales"
               value={inr(todayFinancials.sales)}
               icon={FileText}
-              tone="blue"
+              index={0}
               sub="Baseline before deductions"
             />
             <KpiCard
               label="Total Commercial Leakage"
               value={inr(Math.round(todayFinancials.sales * 0.09))}
               icon={AlertTriangle}
-              tone="rose"
+              index={1}
               trend="9.0% of Gross Sales"
               sub="Within safety limit"
             />
@@ -2458,7 +2458,7 @@ export default function OwnerMISDashboardPage() {
               label="Net Contribution"
               value={inr(Math.round(todayFinancials.sales * 0.91))}
               icon={CheckCircle2}
-              tone="emerald"
+              index={2}
               trend="91.0% Realization"
               sub="Net Realized Gain"
             />

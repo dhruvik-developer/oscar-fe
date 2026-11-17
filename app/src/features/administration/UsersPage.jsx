@@ -719,12 +719,12 @@ export function UsersPage() {
         text="Create user accounts, assign roles and manage active or inactive status. Keep team details up to date so each person has the right access for their responsibilities."
       />
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-        <KpiCard label="Total Users" value={stats.total} icon={Users} tone="blue" />
-        <KpiCard label="Active Users" value={stats.active} icon={UserCheck} tone="emerald" />
-        <KpiCard label="Inactive Users" value={stats.inactive} icon={UserX} tone="rose" />
-        <KpiCard label="Administrators" value={stats.admins} icon={Shield} tone="purple" />
-        <KpiCard label="Synced from HRMS" value={stats.employees} icon={Briefcase} tone="purple" />
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
+        <KpiCard index={0} label="Total Users" value={stats.total} icon={Users} tone="blue" />
+        <KpiCard index={1} label="Active Users" value={stats.active} icon={UserCheck} tone="emerald" />
+        <KpiCard index={2} label="Inactive Users" value={stats.inactive} icon={UserX} tone="rose" />
+        <KpiCard index={3} label="Administrators" value={stats.admins} icon={Shield} tone="purple" />
+        <KpiCard index={4} label="Synced from HRMS" value={stats.employees} icon={Briefcase} tone="purple" />
       </div>
 
       {/* ── Search & Filter Bar ────────────────────────────────── */}

@@ -42,12 +42,10 @@ export function QCPageHeader({
   }
   const defaultBreadcrumbs = (isDashboard || subpage === null)
     ? [
-        { label: 'Dashboard', path: '/dashboard' },
         { label: 'Inventory', path: '/inventory/stock-position' },
         { label: 'Quality Control', isCurrent: true },
       ]
     : [
-        { label: 'Dashboard', path: '/dashboard' },
         { label: 'Inventory', path: '/inventory/stock-position' },
         { label: 'Quality Control', path: '/inventory/qc' },
         { label: subpage || title, isCurrent: true },

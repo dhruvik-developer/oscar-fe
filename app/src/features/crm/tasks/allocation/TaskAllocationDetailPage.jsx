@@ -154,7 +154,6 @@ export default function TaskAllocationDetailPage() {
       <PageHeader
         title={task.title}
         breadcrumb={[
-          { label: 'Dashboard', path: '/dashboard' },
           { label: 'CRM' },
           { label: 'Task Allocation', path: '/crm/tasks/allocation' },
           { label: task.title },

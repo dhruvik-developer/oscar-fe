@@ -9,7 +9,7 @@ import { inventoryService } from '../../../services/domainServices';
 import { describeApiError, formatNumberIN } from '../../accounts/accountingShared';
 import { QcStageFilter } from './QcStageGate';
 
-const crumbs = (label) => [{ label: 'Dashboard', path: '/dashboard' }, { label: 'Inventory', path: '/inventory' }, { label }];
+const crumbs = (label) => [{ label: 'Inventory', path: '/inventory' }, { label }];
 const RESULT_STYLE = {
   Pass: 'bg-emerald-50 text-emerald-700', 'Second Quality': 'bg-sky-50 text-sky-700', Hold: 'bg-amber-50 text-amber-800',
   Reprocess: 'bg-violet-50 text-violet-700', Reject: 'bg-rose-50 text-rose-700',

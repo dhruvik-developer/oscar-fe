@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Search, X, UserX, CalendarX2, Tag, Megaphone, SlidersHorizontal, ArrowRight,
+  RotateCcw, CheckCircle2, AlertCircle, CheckSquare, Square,
 } from 'lucide-react';
 import { useCrmStore } from '../../../stores/crmStore';
 import PageHeader from '../../../components/ui/PageHeader';
@@ -10,6 +11,7 @@ import EmptyState from '../../../components/ui/EmptyState';
 import CrmKpiCard from '../common/CrmKpiCard';
 import { isLostLead } from '../../../services/leadStatus';
 import { toISODate } from '../../../utils/dateUtils';
+import RestoreLeadModal from './RestoreLeadModal';
 
 const EMPTY_FILTERS = { query: '', owner: '', source: '', reason: '', from: '', to: '' };
 
@@ -17,6 +19,7 @@ const SORTS = {
   newest: { label: 'Newest first', compare: (a, b) => (b.createdISO || '').localeCompare(a.createdISO || '') },
   oldest: { label: 'Oldest first', compare: (a, b) => (a.createdISO || '').localeCompare(b.createdISO || '') },
   name: { label: 'Name A–Z', compare: (a, b) => (a.name || '').localeCompare(b.name || '') },
+  valueHigh: { label: 'Highest value', compare: (a, b) => (Number(b.amount) || 0) - (Number(a.amount) || 0) },
 };
 
 const fieldClass =
@@ -58,18 +61,111 @@ function topOf(rows, key) {
 
 export default function LostLeadsPage() {
   const leads = useCrmStore((s) => s.leads);
+  const deals = useCrmStore((s) => s.deals);
+  const stages = useCrmStore((s) => s.stages);
   const lostReasons = useCrmStore((s) => s.lostReasons);
 
+  // Modal and toast state
+  const [restoreModalLead, setRestoreModalLead] = useState(null);
+  const [isBulkRestoreOpen, setIsBulkRestoreOpen] = useState(false);
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  const [isRestoring, setIsRestoring] = useState(false);
+  const [toast, setToast] = useState({ show: false, message: '', isError: false });
+
+  // Auto-dismiss toast after 5s
+  useEffect(() => {
+    if (!toast.show) return;
+    const timer = setTimeout(() => setToast({ show: false, message: '', isError: false }), 5000);
+    return () => clearTimeout(timer);
+  }, [toast.show]);
+
+  // Ensure latest data is hydrated
+  useEffect(() => {
+    useCrmStore.getState().hydrate?.().catch(() => {});
+  }, []);
+
   // Lost leads with the derived fields the page filters and sorts on.
+  // Combines lost leads and deals marked Lost so that any lost deal/lead is guaranteed visible.
   const lostLeads = useMemo(() => {
     const reasonName = new Map((lostReasons || []).map((r) => [String(r.id), r.name || r.label]));
-    return leads.filter(isLostLead).map((lead) => ({
-      ...lead,
-      createdISO: toISODate(lead.createdOn),
-      // `lostReason` is a lookup id from the server, or already a label.
-      reasonLabel: reasonName.get(String(lead.lostReason)) || (typeof lead.lostReason === 'string' && !/^[0-9a-f-]{36}$/i.test(lead.lostReason) ? lead.lostReason : ''),
-    }));
-  }, [leads, lostReasons]);
+
+    // Identify all lost deals (stage === 'Lost' or tag === 'Lost')
+    const lostDeals = (deals || []).filter((d) =>
+      d && (d.stage === 'Lost' || d.tag === 'Lost' || /lost|declined/i.test(String(d.stage || '')))
+    );
+    const lostDealByLeadId = new Map();
+    const lostDealByClientName = new Map();
+    lostDeals.forEach((d) => {
+      if (d.leadId) lostDealByLeadId.set(String(d.leadId), d);
+      const nameKey = (d.title || d.name || d.client || '').trim().toLowerCase();
+      if (nameKey) lostDealByClientName.set(nameKey, d);
+    });
+
+    const leadIdsSeen = new Set();
+    const result = [];
+
+    // 1. Leads matching isLost or associated with a lost deal
+    (leads || []).forEach((lead) => {
+      if (!lead) return;
+      const linkedLostDeal = lostDealByLeadId.get(String(lead.id)) ||
+        lostDealByClientName.get((lead.name || '').trim().toLowerCase());
+      const isLost = isLostLead(lead) || Boolean(linkedLostDeal);
+
+      if (isLost) {
+        leadIdsSeen.add(String(lead.id));
+        const leadReason = lead.lostReason || linkedLostDeal?.lostReason || linkedLostDeal?.reason;
+        const reasonLabel = reasonName.get(String(leadReason)) ||
+          (typeof leadReason === 'string' && !/^[0-9a-f-]{36}$/i.test(leadReason) ? leadReason : '') ||
+          'Lost';
+
+        result.push({
+          ...lead,
+          amount: Number(lead.amount) || Number(linkedLostDeal?.price) || Number(linkedLostDeal?.value) || 0,
+          createdISO: toISODate(lead.createdOn) || (linkedLostDeal?.createdAt ? toISODate(linkedLostDeal.createdAt) : ''),
+          reasonLabel,
+          status: 'Lost',
+          isLost: true,
+          dealId: linkedLostDeal?.id,
+          dealTitle: linkedLostDeal?.title || linkedLostDeal?.name,
+        });
+      }
+    });
+
+    // 2. Orphan lost deals that have no corresponding lead record in leads
+    lostDeals.forEach((deal) => {
+      if (deal.leadId && leadIdsSeen.has(String(deal.leadId))) return;
+      const nameKey = (deal.title || deal.name || deal.client || '').trim().toLowerCase();
+      if (nameKey && (leads || []).some((l) => (l.name || '').trim().toLowerCase() === nameKey && leadIdsSeen.has(String(l.id)))) {
+        return;
+      }
+
+      const dealReason = deal.lostReason || deal.reason;
+      const reasonLabel = reasonName.get(String(dealReason)) ||
+        (typeof dealReason === 'string' && !/^[0-9a-f-]{36}$/i.test(dealReason) ? dealReason : '') ||
+        'Lost';
+
+      result.push({
+        id: deal.leadId || deal.id,
+        name: deal.title || deal.name || deal.client || 'Untitled Deal',
+        company: deal.client || deal.company || '—',
+        phone: deal.phone || '',
+        email: deal.email || '',
+        leadNumber: deal.dealNumber || deal.deal_number || deal.leadNumber || '',
+        owner: deal.assignedUser || deal.owner || '',
+        source: deal.source || '',
+        amount: Number(deal.price) || Number(deal.value) || 0,
+        createdOn: deal.createdAt ? (toISODate(deal.createdAt) || deal.createdAt) : '—',
+        createdISO: deal.createdAt ? toISODate(deal.createdAt) : '',
+        reasonLabel,
+        status: 'Lost',
+        isLost: true,
+        dealId: deal.id,
+        dealTitle: deal.title || deal.name,
+      });
+    });
+
+    return result;
+  }, [leads, deals, lostReasons]);
 
   const [filters, setFilters] = useState(EMPTY_FILTERS);
   const [sort, setSort] = useState('newest');
@@ -84,11 +180,13 @@ export default function LostLeadsPage() {
     const monthPrefix = new Date().toISOString().slice(0, 7);
     const topReason = topOf(lostLeads, 'reasonLabel');
     const topSource = topOf(lostLeads, 'source');
+    const totalLostValue = lostLeads.reduce((sum, l) => sum + (Number(l.amount) || 0), 0);
     return {
       total: lostLeads.length,
       thisMonth: lostLeads.filter((lead) => (lead.createdISO || '').startsWith(monthPrefix)).length,
       topReason,
       topSource,
+      totalLostValue,
     };
   }, [lostLeads]);
 
@@ -112,7 +210,7 @@ export default function LostLeadsPage() {
       }
       return true;
     });
-    return [...rows].sort(SORTS[sort].compare);
+    return [...rows].sort(SORTS[sort]?.compare || SORTS.newest.compare);
   }, [lostLeads, filters, sort]);
 
   // Any filter, sort or page-size change starts again from the first page.
@@ -122,24 +220,154 @@ export default function LostLeadsPage() {
   const activeCount = Object.keys(EMPTY_FILTERS).filter((key) => filters[key] !== EMPTY_FILTERS[key]).length;
   const setFilter = (key) => (e) => setFilters((prev) => ({ ...prev, [key]: e.target.value }));
 
+  // Selection handlers
+  const allPageSelected = pageRows.length > 0 && pageRows.every((r) => selectedIds.has(r.id));
+  const toggleSelectAll = () => {
+    if (allPageSelected) {
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        pageRows.forEach((r) => next.delete(r.id));
+        return next;
+      });
+    } else {
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        pageRows.forEach((r) => next.add(r.id));
+        return next;
+      });
+    }
+  };
+
+  const toggleSelectRow = (id) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  // Restore action handler
+  const handleConfirmRestore = async ({ stageId, dealStage, targetLeads }) => {
+    setIsRestoring(true);
+    try {
+      const isMultiple = targetLeads.length > 1;
+      const idsToRestore = targetLeads.map((l) => l.id);
+
+      // Separate regular leads and orphan deals
+      const regularLeads = targetLeads.filter((l) => (leads || []).some((lead) => String(lead.id) === String(l.id)));
+      const orphanDeals = targetLeads.filter((l) => !(leads || []).some((lead) => String(lead.id) === String(l.id)));
+
+      if (regularLeads.length > 0) {
+        if (regularLeads.length === 1) {
+          await useCrmStore.getState().reopenLead(regularLeads[0].id, { stageId, dealStage });
+        } else {
+          await useCrmStore.getState().bulkReopenLeads(regularLeads.map((l) => l.id), { stageId, dealStage });
+        }
+      }
+
+      // If any orphan deals were selected, restore deal stage
+      for (const d of orphanDeals) {
+        const targetDealId = d.dealId || d.id;
+        await useCrmStore.getState().updateRecord('deals', targetDealId, { stage: dealStage || 'Draft', tag: '' });
+      }
+
+      await Promise.all([
+        useCrmStore.getState().refresh('leads'),
+        useCrmStore.getState().refresh('deals'),
+      ]);
+
+      setToast({
+        show: true,
+        isError: false,
+        message: isMultiple
+          ? `${targetLeads.length} leads restored back to active pipeline!`
+          : `Lead "${targetLeads[0]?.name}" restored back to active pipeline!`,
+      });
+
+      setSelectedIds(new Set());
+      setRestoreModalLead(null);
+      setIsBulkRestoreOpen(false);
+    } catch (err) {
+      console.error('[CRM] Restore error:', err);
+      setToast({
+        show: true,
+        isError: true,
+        message: `Restore failed: ${err?.message || 'Server error occurred'}`,
+      });
+    } finally {
+      setIsRestoring(false);
+    }
+  };
+
+  const selectedLeadsList = useMemo(() => {
+    return lostLeads.filter((l) => selectedIds.has(l.id));
+  }, [lostLeads, selectedIds]);
+
   return (
     <div className="space-y-4">
+      {/* Toast Notification */}
+      {toast.show && (
+        <div className="fixed top-6 right-6 z-50 flex items-center gap-3 px-4 py-3 rounded-2xl bg-slate-900 text-white shadow-2xl border border-slate-700 animate-in fade-in slide-in-from-top-4 duration-200 text-xs">
+          {toast.isError ? (
+            <AlertCircle size={17} className="text-rose-400 shrink-0" />
+          ) : (
+            <CheckCircle2 size={17} className="text-emerald-400 shrink-0" />
+          )}
+          <span className="font-medium">{toast.message}</span>
+          {!toast.isError && (
+            <Link
+              to="/crm/leads"
+              className="ml-2 font-bold text-blue-400 hover:text-blue-300 underline flex items-center gap-1"
+            >
+              <span>View Leads</span>
+              <ArrowRight size={12} />
+            </Link>
+          )}
+          <button
+            type="button"
+            onClick={() => setToast({ show: false, message: '', isError: false })}
+            className="ml-2 text-slate-400 hover:text-white cursor-pointer"
+          >
+            <X size={14} />
+          </button>
+        </div>
+      )}
+
+      {/* Restore Lead Modal */}
+      <RestoreLeadModal
+        lead={restoreModalLead}
+        leads={isBulkRestoreOpen ? selectedLeadsList : []}
+        stages={stages}
+        isOpen={Boolean(restoreModalLead) || isBulkRestoreOpen}
+        isLoading={isRestoring}
+        onClose={() => {
+          setRestoreModalLead(null);
+          setIsBulkRestoreOpen(false);
+        }}
+        onConfirm={handleConfirmRestore}
+      />
+
       <PageHeader
         title="Lost Leads"
-        subtitle="Leads marked as Lost / Closed. These records also remain in the main Leads list."
+        subtitle="Leads and deals marked as Lost / Closed. You can restore any lead back to the active pipeline at any time."
       />
 
       <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
-        <CrmKpiCard label="Total Lost" value={kpis.total} icon={UserX} tone="rose" />
+        <CrmKpiCard label="Total Lost" value={kpis.total} icon={UserX} tone="rose">
+          {kpis.totalLostValue > 0 && (
+            <span className="text-[11px] font-semibold text-rose-500">₹ {kpis.totalLostValue.toLocaleString('en-IN')}</span>
+          )}
+        </CrmKpiCard>
         <CrmKpiCard label="Lost This Month" value={kpis.thisMonth} icon={CalendarX2} tone="amber" />
         <CrmKpiCard label="Top Lost Reason" value={kpis.topReason?.value || '—'} icon={Tag} tone="purple">
           {kpis.topReason && (
-            <span className="text-[11px] font-semibold text-slate-400">{kpis.topReason.count} lead{kpis.topReason.count === 1 ? '' : 's'}</span>
+            <span className="text-[11px] font-semibold text-slate-400">{kpis.topReason.count} record{kpis.topReason.count === 1 ? '' : 's'}</span>
           )}
         </CrmKpiCard>
         <CrmKpiCard label="Top Source" value={kpis.topSource?.value || '—'} icon={Megaphone} tone="sky">
           {kpis.topSource && (
-            <span className="text-[11px] font-semibold text-slate-400">{kpis.topSource.count} lead{kpis.topSource.count === 1 ? '' : 's'}</span>
+            <span className="text-[11px] font-semibold text-slate-400">{kpis.topSource.count} record{kpis.topSource.count === 1 ? '' : 's'}</span>
           )}
         </CrmKpiCard>
       </div>
@@ -157,7 +385,7 @@ export default function LostLeadsPage() {
             </div>
             <div className="flex items-center gap-2">
               <span className="text-[11px] text-slate-500">
-                <span className="font-bold text-slate-700">{filtered.length}</span> of {lostLeads.length} lost lead{lostLeads.length === 1 ? '' : 's'}
+                <span className="font-bold text-slate-700">{filtered.length}</span> of {lostLeads.length} lost record{lostLeads.length === 1 ? '' : 's'}
               </span>
               {activeCount > 0 && (
                 <button
@@ -222,12 +450,39 @@ export default function LostLeadsPage() {
           </div>
         </div>
 
+        {/* Bulk Action Bar */}
+        {selectedIds.size > 0 && (
+          <div className="px-4 py-2.5 bg-emerald-50 border-b border-emerald-100 flex items-center justify-between text-xs animate-in fade-in duration-150">
+            <div className="flex items-center gap-2 text-emerald-900 font-semibold">
+              <CheckCircle2 size={15} className="text-emerald-600" />
+              <span>{selectedIds.size} lead{selectedIds.size > 1 ? 's' : ''} selected</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setSelectedIds(new Set())}
+                className="px-2.5 py-1 rounded-lg text-slate-500 hover:text-slate-700 hover:bg-emerald-100/50 cursor-pointer text-xs"
+              >
+                Deselect all
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsBulkRestoreOpen(true)}
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs shadow-xs cursor-pointer transition-colors"
+              >
+                <RotateCcw size={12} />
+                <span>Restore Selected ({selectedIds.size})</span>
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Table */}
         {lostLeads.length === 0 ? (
           <EmptyState
             icon={UserX}
             title="No lost leads"
-            description="Leads you mark as Lost in the Leads list appear here, so you can review why deals slipped away."
+            description="Leads and deals you mark as Lost in the Leads list or Deals pipeline appear here, so you can review and restore them at any time."
             action={(
               <Link
                 to="/crm/leads"
@@ -259,50 +514,90 @@ export default function LostLeadsPage() {
             <table className="w-full text-xs">
               <thead>
                 <tr className="bg-slate-50/80 text-slate-500 text-left text-[10.5px] uppercase tracking-wide">
-                  <th className="px-4 py-3 font-bold w-12">#</th>
+                  <th className="px-3 py-3 font-bold w-10 text-center">
+                    <input
+                      type="checkbox"
+                      checked={allPageSelected}
+                      onChange={toggleSelectAll}
+                      aria-label="Select all leads on page"
+                      className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                    />
+                  </th>
+                  <th className="px-3 py-3 font-bold w-10">#</th>
                   <th className="px-4 py-3 font-bold">Lead</th>
                   <th className="px-4 py-3 font-bold">Company</th>
                   <th className="px-4 py-3 font-bold">Lost reason</th>
                   <th className="px-4 py-3 font-bold">Owner</th>
                   <th className="px-4 py-3 font-bold">Source</th>
+                  <th className="px-4 py-3 font-bold text-right">Value</th>
                   <th className="px-4 py-3 font-bold whitespace-nowrap">Created on</th>
+                  <th className="px-4 py-3 font-bold text-right whitespace-nowrap">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {pageRows.map((lead, index) => (
-                  <tr key={lead.id} className="hover:bg-blue-50/30 transition-colors">
-                    <td className="px-4 py-3 text-slate-400 font-medium">{(page - 1) * pageSize + index + 1}</td>
-                    <td className="px-4 py-3">
-                      <Link to={`/crm/leads/${encodeURIComponent(lead.id)}`} className="flex items-center gap-2.5 group">
-                        <Avatar name={lead.name} />
-                        <span className="min-w-0">
-                          <span className="block font-semibold text-slate-800 group-hover:text-blue-600 truncate">{lead.name || 'Untitled Lead'}</span>
-                          <span className="block text-[11px] text-slate-400 truncate">{lead.leadNumber || lead.email || lead.phone || '—'}</span>
+                {pageRows.map((lead, index) => {
+                  const isChecked = selectedIds.has(lead.id);
+                  return (
+                    <tr
+                      key={lead.id}
+                      className={`hover:bg-blue-50/30 transition-colors ${isChecked ? 'bg-emerald-50/30' : ''}`}
+                    >
+                      <td className="px-3 py-3 text-center">
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => toggleSelectRow(lead.id)}
+                          aria-label={`Select ${lead.name}`}
+                          className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                        />
+                      </td>
+                      <td className="px-3 py-3 text-slate-400 font-medium">{(page - 1) * pageSize + index + 1}</td>
+                      <td className="px-4 py-3">
+                        <Link to={`/crm/leads/${encodeURIComponent(lead.id)}`} className="flex items-center gap-2.5 group">
+                          <Avatar name={lead.name} />
+                          <span className="min-w-0">
+                            <span className="block font-semibold text-slate-800 group-hover:text-blue-600 truncate">{lead.name || 'Untitled Lead'}</span>
+                            <span className="block text-[11px] text-slate-400 truncate">{lead.leadNumber || lead.dealTitle || lead.email || lead.phone || '—'}</span>
+                          </span>
+                        </Link>
+                      </td>
+                      <td className="px-4 py-3 text-slate-600">{lead.company || '—'}</td>
+                      <td className="px-4 py-3">
+                        <span className="inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold bg-rose-50 text-rose-700 border border-rose-100 whitespace-nowrap">
+                          {lead.reasonLabel || lead.status || 'Lost'}
                         </span>
-                      </Link>
-                    </td>
-                    <td className="px-4 py-3 text-slate-600">{lead.company || '—'}</td>
-                    <td className="px-4 py-3">
-                      <span className="inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold bg-rose-50 text-rose-700 border border-rose-100 whitespace-nowrap">
-                        {lead.reasonLabel || lead.status || 'Lost'}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      {lead.owner ? (
-                        <span className="flex items-center gap-2 text-slate-700">
-                          <Avatar name={lead.owner} size="w-6 h-6 text-[9.5px]" />
-                          <span className="truncate">{lead.owner}</span>
-                        </span>
-                      ) : <span className="text-slate-400">Unassigned</span>}
-                    </td>
-                    <td className="px-4 py-3">
-                      {lead.source ? (
-                        <span className="inline-flex px-2 py-0.5 rounded-md text-[11px] font-medium bg-slate-100 text-slate-600 whitespace-nowrap">{lead.source}</span>
-                      ) : <span className="text-slate-400">—</span>}
-                    </td>
-                    <td className="px-4 py-3 text-slate-600 whitespace-nowrap">{lead.createdOn || '—'}</td>
-                  </tr>
-                ))}
+                      </td>
+                      <td className="px-4 py-3">
+                        {lead.owner ? (
+                          <span className="flex items-center gap-2 text-slate-700">
+                            <Avatar name={lead.owner} size="w-6 h-6 text-[9.5px]" />
+                            <span className="truncate">{lead.owner}</span>
+                          </span>
+                        ) : <span className="text-slate-400">Unassigned</span>}
+                      </td>
+                      <td className="px-4 py-3">
+                        {lead.source ? (
+                          <span className="inline-flex px-2 py-0.5 rounded-md text-[11px] font-medium bg-slate-100 text-slate-600 whitespace-nowrap">{lead.source}</span>
+                        ) : <span className="text-slate-400">—</span>}
+                      </td>
+                      <td className="px-4 py-3 font-semibold text-slate-800 text-right whitespace-nowrap">
+                        {lead.amount ? `₹ ${Number(lead.amount).toLocaleString('en-IN')}` : '—'}
+                      </td>
+                      <td className="px-4 py-3 text-slate-600 whitespace-nowrap">{lead.createdOn || '—'}</td>
+                      <td className="px-4 py-3 text-right whitespace-nowrap">
+                        <button
+                          type="button"
+                          onClick={() => setRestoreModalLead(lead)}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 active:bg-emerald-200 text-emerald-700 border border-emerald-200/80 font-semibold text-xs shadow-2xs transition-all cursor-pointer group"
+                          title="Restore this lead back to active leads"
+                        >
+                          <RotateCcw size={12} className="transition-transform group-hover:-rotate-45" />
+                          <span>Restore</span>
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

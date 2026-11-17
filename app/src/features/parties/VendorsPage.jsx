@@ -157,10 +157,10 @@ export const VendorsPage = () => {
             New Vendor
           </Button>}/>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <StatCard label="Total Suppliers" value={vendors.length} icon={Building2}/>
-        <StatCard label="Accounts Payable" value={formatCurrency(totalPayable)} icon={DollarSign}/>
-        <StatCard label="Standard Terms" value="Net 30 / Net 45" icon={Clock}/>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+        <StatCard index={0} label="Total Suppliers" value={vendors.length} icon={Building2}/>
+        <StatCard index={1} label="Accounts Payable" value={formatCurrency(totalPayable)} icon={DollarSign}/>
+        <StatCard index={2} label="Standard Terms" value="Net 30 / Net 45" icon={Clock}/>
       </div>
 
       <DataTable

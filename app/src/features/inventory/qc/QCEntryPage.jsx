@@ -327,7 +327,7 @@ export default function QCEntryPage() {
       <PageHeader
         title="QC Entry"
         subtitle="Check fabric roll by roll: actual meter, kg, width, GSM, defects and the result — Pass, Second Quality, Hold, Reprocess or Reject."
-        breadcrumb={[{ label: 'Dashboard', path: '/dashboard' }, { label: 'Inventory', path: '/inventory' }, { label: 'QC Entry' }]}
+        breadcrumb={[{ label: 'Inventory', path: '/inventory' }, { label: 'QC Entry' }]}
         actions={(
           <div className="flex gap-2">
             <Link to="/inventory/masters/textile?tab=defects" className="h-9 px-3 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-600 hover:bg-slate-50 inline-flex items-center">Defect Master</Link>

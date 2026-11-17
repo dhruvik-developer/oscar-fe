@@ -433,7 +433,6 @@ export default function ProcessPlanDetailPage() {
           </span>
         }
         breadcrumb={[
-          { label: 'Dashboard', path: '/dashboard' },
           { label: 'PMS', path: '/pms' },
           { label: 'Job Work / Processing' },
           { label: 'Process Plan', path: '/job-work/process-plan' },

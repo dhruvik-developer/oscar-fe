@@ -28,7 +28,7 @@ const salesOrderGuide = {
         { term: 'SO Lifecycle', definition: 'The flexible progression: Draft → Confirmed → Proforma (Optional) → Partially / Fully Dispatched (Challan) → Invoiced → Closed. Only dispatched quantity can be invoiced.' },
     ],
     tips: [
-        'Use the ðŸ“‹ Clone button on any past order to duplicate customer and line items in 1 click.',
+        'Use the Clone button on any past order to duplicate customer and line items in 1 click.',
         'If stock is 0 or low, click [+PO] directly on the line item to requisition missing units immediately.',
     ],
     workflow: ['Quotation Approved', 'Sales Order Confirmed', 'Proforma Issued (Optional)', 'Delivery Challan Dispatched', 'Sales Invoice Issued', 'Payment Receipt Settled'],
@@ -554,11 +554,11 @@ export const SalesOrdersPage = () => {
           </Button>}/>
 
       {/* Sales Orders KPI Stat Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard label="Total Booked Pipeline" value={formatCurrency(totalSoValue)} icon={IndianRupee} />
-        <StatCard label="Active In-Fulfillment" value={formatCurrency(confirmedValue)} icon={Truck} trend={{ positive: true, text: `${openOrdersCount} orders active` }} highlight={openOrdersCount > 0} />
-        <StatCard label="Open Backlog Orders" value={`${openOrdersCount} Orders`} icon={Clock} subtext="Pending warehouse dispatch" />
-        <StatCard label="Invoiced & Fulfilled" value={`${fulfilledOrdersCount} Completed`} icon={CheckCircle2} trend={{ positive: true, text: 'Invoices created' }} />
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+        <StatCard index={0} label="Total Booked Pipeline" value={formatCurrency(totalSoValue)} icon={IndianRupee} />
+        <StatCard index={1} label="Active In-Fulfillment" value={formatCurrency(confirmedValue)} icon={Truck} trend={{ positive: true, text: `${openOrdersCount} orders active` }} highlight={openOrdersCount > 0} />
+        <StatCard index={2} label="Open Backlog Orders" value={`${openOrdersCount} Orders`} icon={Clock} subtext="Pending warehouse dispatch" />
+        <StatCard index={3} label="Invoiced & Fulfilled" value={`${fulfilledOrdersCount} Completed`} icon={CheckCircle2} trend={{ positive: true, text: 'Invoices created' }} />
       </div>
 
       {/* Filter Tabs */}

@@ -553,9 +553,10 @@ export const ProformaInvoicesPage = () => {
       />
 
       {/* KPI Stat Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard label="Total Proformas Issued" value={totalPiCount} icon={FileSpreadsheet} />
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+        <StatCard index={0} label="Total Proformas Issued" value={totalPiCount} icon={FileSpreadsheet} />
         <StatCard
+          index={1}
           label="Active Proforma Pipeline"
           value={formatCurrency(activePipelineValue)}
           icon={IndianRupee}
@@ -563,12 +564,14 @@ export const ProformaInvoicesPage = () => {
           highlight={activePipelineValue > 0}
         />
         <StatCard
+          index={2}
           label="Converted to Final Invoices"
           value={`${convertedCount} Converted`}
           icon={CheckCircle2}
           trend={{ positive: true, text: 'Direct Tax Invoice Conversion' }}
         />
         <StatCard
+          index={3}
           label="Commercial Payment Guard"
           value="Non-Tax / Pre-GL"
           icon={Clock}

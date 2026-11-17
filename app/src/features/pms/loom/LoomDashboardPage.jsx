@@ -160,41 +160,41 @@ export default function LoomDashboardPage() {
       />
 
       {/* KPI Cards Strip - Responsive 5 cols on lg, 2 cols on mobile */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5 sm:gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
         <KpiCard
           title="Looms Running"
           value={`${runningLooms} / ${totalLooms}`}
           subtitle={totalLooms - runningLooms > 0 ? `${totalLooms - runningLooms} idle looms` : 'Full capacity'}
           icon={Factory}
-          color={totalLooms - runningLooms > 0 ? 'amber' : 'green'}
+          index={0}
         />
         <KpiCard
           title="Meters on Looms"
           value={formatNum(totalMetersOnLooms)}
           subtitle={`+ ${formatNum(totalSpareMeters)} m spares`}
           icon={Layers}
-          color="blue"
+          index={1}
         />
         <KpiCard
           title="Daily Output"
           value={`${formatNum(totalDailyOutput)} m/d`}
           subtitle="7-day factory avg"
           icon={TrendingUp}
-          color="green"
+          index={2}
         />
         <KpiCard
           title="Avg Loom Cover"
           value={`${totalDailyOutput > 0 ? formatNum(totalMetersOnLooms / totalDailyOutput, 1) : 0} d`}
           subtitle="Until beams run out"
           icon={Clock}
-          color="blue"
+          index={3}
         />
         <KpiCard
           title="Beams to Prepare"
           value={totalBeamsToPrepare}
           subtitle="Ending in ≤ 7d with no spare"
           icon={AlertTriangle}
-          color={totalBeamsToPrepare > 0 ? 'rose' : 'green'}
+          index={4}
         />
       </div>
 

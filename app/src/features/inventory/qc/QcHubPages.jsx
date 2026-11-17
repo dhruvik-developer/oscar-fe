@@ -55,7 +55,7 @@ function Hub({ title, subtitle, tabs, param, counts = {}, numbered = false }) {
       <PageHeader
         title={title}
         subtitle={subtitle}
-        breadcrumb={[{ label: 'Dashboard', path: '/dashboard' }, { label: 'Inventory', path: '/inventory' }, { label: title }]}
+        breadcrumb={[{ label: 'Inventory', path: '/inventory' }, { label: title }]}
       />
       <div className="bg-white border border-slate-200 rounded-xl">
         <div className="px-3 pt-3 pb-2 border-b border-slate-100"><QcStageFilter /></div>
@@ -122,7 +122,7 @@ function SingleQcPage({ title, subtitle, component }) {
       <PageHeader
         title={title}
         subtitle={subtitle}
-        breadcrumb={[{ label: 'Dashboard', path: '/dashboard' }, { label: 'Inventory', path: '/inventory' }, { label: 'QC', path: '/inventory/qc/dashboard' }, { label: title }]}
+        breadcrumb={[{ label: 'Inventory', path: '/inventory' }, { label: 'QC', path: '/inventory/qc/dashboard' }, { label: title }]}
       />
       <div className="bg-white border border-slate-200 rounded-xl px-3 py-2.5"><QcStageFilter /></div>
       <QcHubEmbed.Provider value>

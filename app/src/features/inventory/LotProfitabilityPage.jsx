@@ -196,19 +196,22 @@ export default function LotProfitabilityPage() {
       )}
 
       {/* Top Stat Cards for Selected Lot */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
         <StatCard
+          index={0}
           label="Selected Lot"
           value={selectedLotNo || 'None selected'}
           icon={Layers}
         />
         <StatCard
+          index={1}
           label="Total Landed Cost"
           value={lotDetailLoading ? '…' : formatINR(lotDetail?.totalCost || selectedSummary?.totalLotCost || 0)}
           icon={DollarSign}
           tone="blue"
         />
         <StatCard
+          index={2}
           label="Cost / Good Meter"
           value={
             lotDetailLoading
@@ -219,6 +222,7 @@ export default function LotProfitabilityPage() {
           tone="emerald"
         />
         <StatCard
+          index={3}
           label="Net Contribution Margin"
           value={
             loading

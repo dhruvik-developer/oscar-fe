@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import KpiCard from '../../../../components/ui/KpiCard';
 import { modal } from '../../../../context/ModalContext';
 import {
   Activity,
@@ -628,90 +629,43 @@ export function Stage17InvoicePaymentWorkspace({
         </div>
       </div>
 
-      {/* 2. SUMMARY KPI CARDS (5 Cards matching Stage 11 & Stage 16 design) */}
+      {/* 2. SUMMARY KPI CARDS (5 Cards) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
-        {/* Card 1: Total Dispatched Qty */}
-        <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-xs hover:border-blue-300 transition-colors">
-          <div className="flex items-center justify-between text-blue-600 mb-1">
-            <span className="text-xs font-semibold text-slate-600">Total Dispatched</span>
-            <Truck size={17} />
-          </div>
-          <div className="text-xl font-bold font-mono text-blue-700">
-            {n(dispatchedQty)} <span className="text-xs font-normal text-slate-500">M</span>
-          </div>
-          <div className="text-[11px] text-slate-500 mt-1 flex items-center justify-between">
-            <span>Stage 16 DC</span>
-            <span className="font-medium text-blue-600">{n(summary.pendingInvoicingQty)} M pending</span>
-          </div>
-        </div>
-
-        {/* Card 2: Total Proforma Value */}
-        <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-xs hover:border-teal-300 transition-colors">
-          <div className="flex items-center justify-between text-teal-600 mb-1">
-            <span className="text-xs font-semibold text-slate-600">Proforma Invoiced</span>
-            <FileSpreadsheet size={17} />
-          </div>
-          <div className="text-xl font-bold font-mono text-teal-700">
-            ₹ {n(summary.totalProformaAmount)}
-          </div>
-          <div className="text-[11px] text-slate-500 mt-1 flex items-center justify-between">
-            <span>{proformas.length} Proformas</span>
-            <span className="font-medium text-teal-600">No AR Post</span>
-          </div>
-        </div>
-
-        {/* Card 3: Final Tax Invoices */}
-        <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-xs hover:border-purple-300 transition-colors">
-          <div className="flex items-center justify-between text-purple-600 mb-1">
-            <span className="text-xs font-semibold text-slate-600">Final Tax Invoices</span>
-            <FileText size={17} />
-          </div>
-          <div className="text-xl font-bold font-mono text-purple-700">
-            ₹ {n(totalBilled)}
-          </div>
-          <div className="text-[11px] text-slate-500 mt-1 flex items-center justify-between">
-            <span>{finalInvoices.length} Invoices</span>
-            <span className="font-medium text-purple-600">{n(invoicedQty)} M Billed</span>
-          </div>
-        </div>
-
-        {/* Card 4: Payments Received */}
-        <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-xs hover:border-emerald-300 transition-colors">
-          <div className="flex items-center justify-between text-emerald-600 mb-1">
-            <span className="text-xs font-semibold text-slate-600">Payment Collected</span>
-            <CheckCircle2 size={17} />
-          </div>
-          <div className="text-xl font-bold font-mono text-emerald-700">
-            ₹ {n(totalCollected)}
-          </div>
-          <div className="text-[11px] text-slate-500 mt-1 flex items-center justify-between">
-            <span>{payments.length} Vouchers</span>
-            <span className="font-medium text-emerald-600">{collectionPct}% Paid</span>
-          </div>
-        </div>
-
-        {/* Card 5: Total Outstanding Balance */}
-        <div className={`bg-white p-3.5 rounded-xl border shadow-xs transition-colors ${
-          outstandingBal <= 0 ? 'border-emerald-200 hover:border-emerald-300' : 'border-rose-200 hover:border-rose-300'
-        }`}>
-          <div className={`flex items-center justify-between mb-1 ${
-            outstandingBal <= 0 ? 'text-emerald-600' : 'text-rose-600'
-          }`}>
-            <span className="text-xs font-semibold text-slate-600">Outstanding Due</span>
-            <IndianRupee size={17} />
-          </div>
-          <div className={`text-xl font-bold font-mono ${
-            outstandingBal <= 0 ? 'text-emerald-700' : 'text-rose-700'
-          }`}>
-            ₹ {n(outstandingBal)}
-          </div>
-          <div className="text-[11px] text-slate-500 mt-1 flex items-center justify-between">
-            <span>Customer AR</span>
-            <span className={`font-semibold ${outstandingBal <= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-              {outstandingBal <= 0 ? 'Cleared ✓' : 'Payment Due'}
-            </span>
-          </div>
-        </div>
+        <KpiCard
+          index={0}
+          label="Total Dispatched"
+          value={`${n(dispatchedQty)} M`}
+          icon={Truck}
+          sub={`Stage 16 DC · ${n(summary.pendingInvoicingQty)} M pending`}
+        />
+        <KpiCard
+          index={1}
+          label="Proforma Invoiced"
+          value={`₹ ${n(summary.totalProformaAmount)}`}
+          icon={FileSpreadsheet}
+          sub={`${proformas.length} Proformas · No AR Post`}
+        />
+        <KpiCard
+          index={2}
+          label="Final Tax Invoices"
+          value={`₹ ${n(totalBilled)}`}
+          icon={FileText}
+          sub={`${finalInvoices.length} Invoices · ${n(invoicedQty)} M Billed`}
+        />
+        <KpiCard
+          index={3}
+          label="Payment Collected"
+          value={`₹ ${n(totalCollected)}`}
+          icon={CheckCircle2}
+          sub={`${payments.length} Vouchers · ${collectionPct}% Paid`}
+        />
+        <KpiCard
+          index={4}
+          label="Outstanding Due"
+          value={`₹ ${n(outstandingBal)}`}
+          icon={IndianRupee}
+          sub={`Customer AR · ${outstandingBal <= 0 ? 'Cleared ✓' : 'Payment Due'}`}
+        />
       </div>
 
       {/* 3. WORKSPACE TABS */}

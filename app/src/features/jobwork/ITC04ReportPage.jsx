@@ -155,32 +155,32 @@ export default function ITC04ReportPage() {
       </PageHeader>
 
       {/* Summary KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
         <KpiCard
           label="Total Sent"
           value={`${num(summary.totalSentMeters)} Mtr`}
           sub={`Sent (${summary.totalSentTakas || 0} Takas)`}
           icon={Send}
-          tone="indigo"
+          index={0}
         />
         <KpiCard
           label="Total Received"
           value={`${num(summary.totalReceivedMeters)} Mtr`}
           sub={`Received (${summary.totalReceivedTakas || 0} Takas)`}
           icon={ArrowDownLeft}
-          tone="emerald"
+          index={1}
         />
         <KpiCard
           label="Approved Job Losses"
           value={`${num(summary.totalLossMeters)} Mtr`}
           icon={AlertCircle}
-          tone="rose"
+          index={2}
         />
         <KpiCard
           label="Closing WIP with Vendors"
           value={`${num(summary.pendingWithProcessorsMeters)} Mtr`}
           icon={Clock}
-          tone="amber"
+          index={3}
         />
       </div>
 

@@ -1,6 +1,7 @@
 import { modal } from '../../../context/ModalContext';
 import React, { useState, useMemo, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import KpiCard from "../../../components/ui/KpiCard";
 import {
   FileText,
   Shield,
@@ -595,68 +596,49 @@ export function CompanyPolicyModule({ forcedSection }) {
 
           {/* KPI Cards Grid */}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
-            <div
+            <KpiCard
+              label="Total Policies"
+              value={kpis.total}
+              sub={`Across ${categories.length} categories`}
+              icon={FileText}
+              color="blue"
               onClick={() => handleNavSection("policies")}
-              className="bg-white border border-bdr rounded-2xl p-4.5 shadow-xs hover:border-slate-300 transition-all cursor-pointer"
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-[12px] font-medium text-muted">Total Policies</span>
-                <FileText size={17} className="text-slate-400" />
-              </div>
-              <div className="text-[26px] font-bold text-slate-900 mt-1">{kpis.total}</div>
-              <div className="text-[11.5px] text-muted mt-0.5">Across {categories.length} categories</div>
-            </div>
-
-            <div
+            />
+            <KpiCard
+              label="Active & Published"
+              value={kpis.active}
+              sub="Enforced across org"
+              icon={CheckCircle2}
+              color="green"
               onClick={() => handleNavSection("policies")}
-              className="bg-white border border-bdr rounded-2xl p-4.5 shadow-xs hover:border-slate-300 transition-all cursor-pointer"
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-[12px] font-medium text-muted">Active & Published</span>
-                <CheckCircle2 size={17} className="text-emerald-500" />
-              </div>
-              <div className="text-[26px] font-bold text-emerald-700 mt-1">{kpis.active}</div>
-              <div className="text-[11.5px] text-muted mt-0.5">Enforced across org</div>
-            </div>
-
-            <div
+            />
+            <KpiCard
+              label="Pending Approval"
+              value={kpis.pendingApproval}
+              sub="Awaiting executive sign-off"
+              icon={Clock}
+              color="orange"
               onClick={() => handleNavSection("pending-approval")}
-              className="bg-white border border-bdr rounded-2xl p-4.5 shadow-xs hover:border-slate-300 transition-all cursor-pointer"
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-[12px] font-medium text-muted">Pending Approval</span>
-                <Clock size={17} className="text-amber-500" />
-              </div>
-              <div className="text-[26px] font-bold text-amber-600 mt-1">{kpis.pendingApproval}</div>
-              <div className="text-[11.5px] text-muted mt-0.5">Awaiting executive sign-off</div>
-            </div>
-
-            <div
+            />
+            <KpiCard
+              label="Pending Acks"
+              value={kpis.pendingAcks}
+              sub="Staff sign-offs pending"
+              icon={FileCheck}
+              color="pink"
               onClick={() => handleNavSection("acknowledgements")}
-              className="bg-white border border-bdr rounded-2xl p-4.5 shadow-xs hover:border-slate-300 transition-all cursor-pointer"
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-[12px] font-medium text-muted">Pending Acks</span>
-                <FileCheck size={17} className="text-rose-500" />
-              </div>
-              <div className="text-[26px] font-bold text-rose-600 mt-1">{kpis.pendingAcks}</div>
-              <div className="text-[11.5px] text-muted mt-0.5">Staff sign-offs pending</div>
-            </div>
-
-            <div
+            />
+            <KpiCard
+              label="Due for Review"
+              value={kpis.dueForReview}
+              sub="Next 60 days cycle"
+              icon={AlertTriangle}
+              color="purple"
               onClick={() => {
                 setStatusFilter("All");
                 handleNavSection("policies");
               }}
-              className="bg-white border border-bdr rounded-2xl p-4.5 shadow-xs hover:border-slate-300 transition-all cursor-pointer"
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-[12px] font-medium text-muted">Due for Review</span>
-                <AlertTriangle size={17} className="text-orange-500" />
-              </div>
-              <div className="text-[26px] font-bold text-orange-600 mt-1">{kpis.dueForReview}</div>
-              <div className="text-[11.5px] text-muted mt-0.5">Next 60 days cycle</div>
-            </div>
+            />
           </div>
 
           {/* Two-Column Grid: Recently Updated Policies & Quick Actions / Requiring Attention */}

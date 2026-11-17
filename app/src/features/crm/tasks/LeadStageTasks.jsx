@@ -11,7 +11,6 @@ import {
   X,
   CheckCircle2,
 } from "lucide-react";
-import InfoBanner from "../common/InfoBanner";
 import PageHeader from "../../../components/ui/PageHeader";
 import StageTasksGuideModal from "./StageTasksGuideModal";
 import MasterSourceLink from "../../../components/common/MasterSourceLink";
@@ -183,8 +182,6 @@ function NumberStepper({ value, onChange, min = 1, max = 99, ariaLabel }) {
   );
 }
 
-// Which pipeline the screen is looking at is a view preference, not data.
-const PIPELINE_KEY = 'leadStageTasksPipelineV1';
 
 /** A blank stage task, as the "add task" form opens it. */
 const EMPTY_MASTER_TASK = {
@@ -201,12 +198,6 @@ const EMPTY_MASTER_TASK = {
   isActive: true,
 };
 
-function getStoredPipeline() {
-  try {
-    return localStorage.getItem(PIPELINE_KEY) || 'Sales';
-  } catch { /* ignore */ }
-  return 'Sales';
-}
 
 /**
  * The screen renders a stage with its tasks nested. The API keeps them apart
@@ -237,7 +228,6 @@ export default function LeadStageTasks({ leadForms = [] }) {
   }, [storeStages, storeStageTasks]);
   const [openStages, setOpenStages] = useState([]);
   const [isTaskRolesOpen, setIsTaskRolesOpen] = useState(false);
-  const [pipeline, setPipeline] = useState(getStoredPipeline);
   const [taskModalStageId, setTaskModalStageId] = useState(null);
   const [masterTask, setMasterTask] = useState(EMPTY_MASTER_TASK);
   const [saveSuccess, setSaveSuccess] = useState(false);
@@ -264,11 +254,6 @@ export default function LeadStageTasks({ leadForms = [] }) {
     useCrmStore.getState().refresh("masterTasks").catch(() => {});
   }, []);
 
-  useEffect(() => {
-    try {
-      localStorage.setItem(PIPELINE_KEY, pipeline);
-    } catch { /* ignore */ }
-  }, [pipeline]);
 
   /** Re-read the configured stages and their tasks from the server. */
   function resetToDefaults() {
@@ -528,17 +513,6 @@ export default function LeadStageTasks({ leadForms = [] }) {
               <span className="grid h-7 w-7 place-items-center rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 text-[13px] font-bold text-white shadow-sm transition-transform duration-200 group-hover:scale-105 group-hover:rotate-6">?</span>
               How to create lead stage tasks?
             </button>
-            <div className="flex items-center gap-2 text-xs text-slate-600 font-medium">
-              <span>Pipeline</span>
-              <select
-                value={pipeline}
-                onChange={(e) => setPipeline(e.target.value)}
-                className="bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-700 focus:outline-none focus:border-blue-500 shadow-2xs cursor-pointer"
-              >
-                <option>Sales</option>
-                <option>Support</option>
-              </select>
-            </div>
             <button
               type="button"
               onClick={() => addTask(stages[0]?.id)}
@@ -553,11 +527,6 @@ export default function LeadStageTasks({ leadForms = [] }) {
         }
       />
 
-      <InfoBanner
-        storageKey="infoBannerLeadStageTasksV1"
-        title="Why use Lead Stage Tasks?"
-        text="These auto-create the right tasks when a lead enters a stage. You map tasks once, then every stage change creates follow-ups automatically."
-      />
 
       {formError && (
         <div className="flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-2.5 text-xs font-semibold text-rose-700">

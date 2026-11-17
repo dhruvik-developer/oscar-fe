@@ -312,7 +312,7 @@ export default function Dashboard() {
       </div>
 
       {/* 6 Metric Cards Section */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3.5">
         {metrics.map((m, i) => (
           <MetricCard
             key={m.label}
@@ -320,6 +320,7 @@ export default function Dashboard() {
             value={m.value}
             sub={m.sub}
             icon={metricIcons[i] ?? Target}
+            index={i}
           />
         ))}
       </div>

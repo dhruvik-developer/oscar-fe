@@ -64,7 +64,7 @@ export function PrintProductionCompletionModal({ isOpen, onClose, completionData
   const rows = completionData?.dailySummary || [];
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 animate-in fade-in duration-150">
+    <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 animate-in fade-in duration-150">
       <div
         className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-4xl w-full max-h-[95vh] flex flex-col overflow-hidden"
         onClick={(e) => e.stopPropagation()}

@@ -93,7 +93,7 @@ export function CreateProductionInstructionModal({ project, po, defaultQty, onCl
   const field = 'w-full border border-slate-300 rounded-lg p-2 bg-white text-slate-800';
   const label = 'block font-semibold text-slate-700 mb-1';
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
       <form onSubmit={submit} className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl bg-white shadow-2xl border border-slate-200 text-xs">
         <div className="flex items-center justify-between p-4 border-b border-slate-100 sticky top-0 bg-white">
           <div className="flex items-center gap-2">

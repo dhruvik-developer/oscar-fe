@@ -145,7 +145,7 @@ export default function Flexibility() {
               type="button"
               onClick={save}
               disabled={!canEdit || saving || !loaded}
-              className="inline-flex items-center gap-1.5 px-5 py-2 bg-[#1e3a8a] text-white rounded-xl text-[13px] font-semibold hover:bg-[#1e40af] disabled:opacity-50 transition shadow-xs"
+              className="inline-flex items-center gap-1.5 px-5 py-2 bg-primary text-white rounded-xl text-[13px] font-semibold hover:bg-primary-dark disabled:opacity-50 transition shadow-xs"
             >
               <Check size={15} />
               {saving ? "Saving…" : "Save Changes"}
@@ -494,14 +494,6 @@ export default function Flexibility() {
             className="px-4 py-2 text-[12.5px] font-medium text-slate-600 bg-white border border-[#cbd5e1] rounded-xl hover:bg-slate-50"
           >
             Discard Changes
-          </button>
-          <button
-            type="button"
-            onClick={save}
-            disabled={!canEdit || saving || !loaded}
-            className="px-4 py-2 text-[12.5px] font-semibold text-white bg-[#1e3a8a] rounded-xl hover:bg-[#1e40af] disabled:opacity-50"
-          >
-            {saving ? "Saving…" : "Save Changes"}
           </button>
         </div>
       </div>

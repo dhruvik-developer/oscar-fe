@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
+import { modal } from '../../context/ModalContext';
 import { useSearchParams } from 'react-router-dom';
 import { useERP } from '../../context/ERPContext';
 import { DataTable } from '../../components/ui/DataTable';
 import { StatusBadge } from '../../components/ui/StatusBadge';
 import { StatCard } from '../../components/ui/StatCard';
 import { Button } from '../../components/ui/Button';
-import { Plus, FileSpreadsheet, CheckCircle2, DollarSign, X, Eye, Printer, Clock, AlertCircle, FileText, Ban, MapPin } from 'lucide-react';
+import { Plus, FileSpreadsheet, CheckCircle2, IndianRupee, X, Eye, Printer, Clock, AlertCircle, FileText, Ban, MapPin } from 'lucide-react';
 import { LineItemEditor } from '../../components/common/LineItemEditor';
 import { DocumentTimeline } from '../../components/common/DocumentTimeline';
 import { RelatedDocumentsCard } from '../../components/common/RelatedDocumentsCard';
@@ -82,8 +83,8 @@ export const PurchaseBillsPage = () => {
         e.preventDefault();
         const po = purchaseOrders.find((p) => p.id === selectedPoId);
         const vend = vendors.find((v) => v.id === selectedVendorId);
-        if (!vend) { alert('Select a vendor.'); return; }
-        if (!billDate) { alert('Enter the bill date.'); return; }
+        if (!vend) { await modal.warning('Select a vendor.', 'Vendor Required'); return; }
+        if (!billDate) { await modal.warning('Enter the bill date.', 'Date Required'); return; }
         setSaving(true);
         try {
             await addPurchaseBill({
@@ -336,15 +337,24 @@ export const PurchaseBillsPage = () => {
                             <Ban size={13}/>
                           </button>
                         )}
-                        <button
-                          onClick={() => {
-                            setShowPayModal(b);
-                            setPayAmount(outstanding.balanceDue);
-                          }}
-                          className="px-2.5 py-1 bg-primary hover:bg-primary-hover text-white rounded-xl text-[11px] font-semibold cursor-pointer shadow-2xs transition-colors flex items-center gap-1"
-                        >
-                          <DollarSign size={11}/> Pay Bill
-                        </button>
+                        {b.status === 'Draft' ? (
+                          <span
+                            className="text-[11px] font-semibold text-amber-600 dark:text-amber-400"
+                            title="Not posted yet. Pay it through Pay Vendor Bill on the purchase order."
+                          >
+                            Draft
+                          </span>
+                        ) : (
+                          <button
+                            onClick={() => {
+                              setShowPayModal(b);
+                              setPayAmount(outstanding.balanceDue);
+                            }}
+                            className="px-2.5 py-1 bg-primary hover:bg-primary-hover text-white rounded-xl text-[11px] font-semibold cursor-pointer shadow-2xs transition-colors flex items-center gap-1"
+                          >
+                            <IndianRupee size={11}/> Pay Bill
+                          </button>
+                        )}
                       </div>
                     ) : (
                       <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 inline-flex items-center gap-1">
@@ -362,13 +372,11 @@ export const PurchaseBillsPage = () => {
     const unpaidBillsCount = purchaseBills.filter(b => getBillOutstanding(b.id).balanceDue > 0).length;
 
     return (<div className="space-y-6">
-      <PageHeader title="Purchase Bills & Accounts Payable" subtitle="Supplier invoice intake, line-item inventory replenishment, remaining balance tracking, and vendor disbursements." guide={purchaseBillGuide} actions={<Button icon={Plus} onClick={() => setShowAddModal(true)}>
-            Enter Vendor Bill
-          </Button>}/>
+      <PageHeader title="Purchase Bills & Accounts Payable" subtitle="Supplier invoice intake, line-item inventory replenishment, remaining balance tracking, and vendor disbursements." guide={purchaseBillGuide} />
 
       {/* Purchase Bills KPI Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard label="Total Billed Invoices" value={formatCurrency(totalBilled)} icon={DollarSign} />
+        <StatCard label="Total Billed Invoices" value={formatCurrency(totalBilled)} icon={IndianRupee} />
         <StatCard label="AP Payable Due" value={formatCurrency(totalApOutstanding)} icon={Clock} trend={{ positive: totalApOutstanding === 0, text: totalApOutstanding > 0 ? `${unpaidBillsCount} unpaid bills` : 'All bills cleared' }} highlight={totalApOutstanding > 0} />
         <StatCard label="Total Disbursed" value={formatCurrency(totalDisbursed)} icon={CheckCircle2} trend={{ positive: true, text: 'Disbursements verified' }} />
         <StatCard label="Active Bills" value={`${purchaseBills.length} Bills`} icon={FileText} subtext={`${unpaidBillsCount} awaiting payment`} />
@@ -538,7 +546,7 @@ export const PurchaseBillsPage = () => {
                   <div>
                     <span className="text-slate-400 block text-[10px]">3. Vendor Invoiced Amount</span>
                     <strong className="text-slate-800 font-mono">
-                      ${(selectedBill.total || selectedBill.amount).toFixed(2)}
+                      {formatCurrency(selectedBill.total || selectedBill.amount)}
                     </strong>
                   </div>
                 </div>
@@ -557,7 +565,7 @@ export const PurchaseBillsPage = () => {
 
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 lg:gap-0 pt-4 border-t border-slate-200 bg-slate-50 -mx-4 -mb-4 px-4 sm:-mx-6 sm:-mb-6 sm:px-6 py-3">
               <div className="font-mono text-xs">
-                Total: <strong className="text-slate-900">${(selectedBill.total || selectedBill.amount).toFixed(2)}</strong> | Due: <strong className="text-amber-700">${getBillOutstanding(selectedBill.id).balanceDue.toFixed(2)}</strong>
+                Total: <strong className="text-slate-900">{formatCurrency(selectedBill.total || selectedBill.amount)}</strong> | Due: <strong className="text-amber-700">{formatCurrency(getBillOutstanding(selectedBill.id).balanceDue)}</strong>
               </div>
               <div className="flex flex-wrap lg:flex-nowrap items-center gap-2">
                 {selectedBill.status === 'Cancelled' ? (
@@ -576,7 +584,7 @@ export const PurchaseBillsPage = () => {
                     >
                       <Ban size={13} /> Cancel Bill
                     </button>
-                    {getBillOutstanding(selectedBill.id).balanceDue > 0.01 && (
+                    {selectedBill.status !== 'Draft' && getBillOutstanding(selectedBill.id).balanceDue > 0.01 && (
                       <Button onClick={() => {
                         setShowPayModal(selectedBill);
                         setPayAmount(getBillOutstanding(selectedBill.id).balanceDue);
@@ -600,7 +608,7 @@ export const PurchaseBillsPage = () => {
           <div className="bg-white rounded-xl border border-slate-200 max-w-md w-full p-4 sm:p-6 shadow-2xl text-xs max-h-[95vh] overflow-y-auto">
             <div className="flex items-center justify-between pb-3 border-b border-slate-200">
               <div className="flex items-center gap-2">
-                <DollarSign className="w-5 h-5 text-emerald-600"/>
+                <IndianRupee className="w-5 h-5 text-emerald-600"/>
                 <h3 className="font-bold text-base text-slate-900">Disburse Vendor Payment</h3>
               </div>
               <button onClick={() => setShowPayModal(null)} className="text-slate-400 hover:text-slate-600">
@@ -619,7 +627,7 @@ export const PurchaseBillsPage = () => {
                 </div>
                 <div className="flex justify-between text-amber-700 font-semibold border-t border-slate-200 pt-1">
                   <span>Balance Due:</span>
-                  <span className="font-mono">${getBillOutstanding(showPayModal.id).balanceDue.toFixed(2)}</span>
+                  <span className="font-mono">{formatCurrency(getBillOutstanding(showPayModal.id).balanceDue)}</span>
                 </div>
               </div>
 

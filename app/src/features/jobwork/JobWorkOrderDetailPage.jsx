@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { modal } from '../../context/ModalContext';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -177,7 +178,7 @@ export default function JobWorkOrderDetailPage() {
       setSignModalOpen(false);
     } catch (err) {
       console.error('Error saving signature:', err);
-      window.alert(errorMessage(err, 'Failed to save signature.'));
+      await modal.error(errorMessage(err, 'Failed to save signature.'), 'Signature Error');
     } finally {
       setIsSigning(false);
     }
@@ -185,7 +186,8 @@ export default function JobWorkOrderDetailPage() {
 
   const handleClearSignature = async (type) => {
     if (!viewingDoc || !jwo?.id) return;
-    if (!window.confirm(`Clear this ${type === 'authorized' ? 'Authorized' : 'Receiver'} signature?`)) return;
+    const ok = await modal.confirm({ title: 'Clear Signature', message: `Clear this ${type === 'authorized' ? 'Authorized' : 'Receiver'} signature?`, confirmLabel: 'Clear Signature', iconType: 'warning' });
+    if (!ok) return;
     try {
       setIsSigning(true);
       let docType = 'jwo';
@@ -213,7 +215,7 @@ export default function JobWorkOrderDetailPage() {
       }
     } catch (err) {
       console.error('Error clearing signature:', err);
-      window.alert(errorMessage(err, 'Failed to clear signature.'));
+      await modal.error(errorMessage(err, 'Failed to clear signature.'), 'Signature Error');
     } finally {
       setIsSigning(false);
     }
@@ -339,7 +341,7 @@ export default function JobWorkOrderDetailPage() {
       setJwo(await fetchJWO(jwo.id));
       return true;
     } catch (err) {
-      window.alert(errorMessage(err, fallback));
+      await modal.error(errorMessage(err, fallback), 'Action Failed');
       return false;
     } finally {
       setSaving(false);
@@ -380,17 +382,22 @@ export default function JobWorkOrderDetailPage() {
     const allowed = Math.round((totalOutward * tolPct / 100) * 100) / 100;
 
     if (totalOutward > 0 && Math.abs(variance) > allowed) {
-      if (!window.confirm(
-        `Reconciliation Gate Alert:\n` +
-        `Total Sent: ${numIN(totalOutward)} M\n` +
-        `Total Received: ${numIN(totalInwardQty)} M\n` +
-        `Approved Loss: ${numIN(totalApprovedLoss)} M\n` +
-        `Net Variance: ${numIN(variance)} M (Allowed: ${numIN(allowed)} M, ${tolPct}%)\n\n` +
-        `The difference exceeds the allowed tolerance. Do you want to force close this order with manager override?`
-      )) return;
+      const ok = await modal.confirm({
+        title: 'Reconciliation Gate Alert',
+        message: `Total Sent: ${numIN(totalOutward)} M\nTotal Received: ${numIN(totalInwardQty)} M\nApproved Loss: ${numIN(totalApprovedLoss)} M\nNet Variance: ${numIN(variance)} M (Allowed: ${numIN(allowed)} M, ${tolPct}%)\n\nThe difference exceeds the allowed tolerance. Do you want to force close this order with manager override?`,
+        confirmLabel: 'Force Close Order',
+        iconType: 'warning',
+      });
+      if (!ok) return;
       await save(() => closeJWO(jwo.id, { force: true }), 'Could not close the job work order.');
     } else {
-      if (!window.confirm(`Close ${jwo.jwoNo}? Its rows can no longer be changed.`)) return;
+      const ok = await modal.confirm({
+        title: 'Close Order',
+        message: `Close ${jwo.jwoNo}? Its rows can no longer be changed.`,
+        confirmLabel: 'Close Order',
+        iconType: 'warning',
+      });
+      if (!ok) return;
       await save(() => closeJWO(jwo.id), 'Could not close the job work order.');
     }
   };
@@ -409,7 +416,7 @@ export default function JobWorkOrderDetailPage() {
     e.preventDefault();
     const qty = Number(lossForm.qty);
     if (!(qty > 0)) {
-      window.alert('Loss quantity must be greater than 0.');
+      await modal.warning('Loss quantity must be greater than 0.', 'Invalid Quantity');
       return;
     }
     const ok = await save(
@@ -424,7 +431,8 @@ export default function JobWorkOrderDetailPage() {
   };
 
   const handleApproveLoss = async (lossId) => {
-    if (!window.confirm('Approve this loss entry?')) return;
+    const ok = await modal.confirm({ title: 'Approve Loss', message: 'Approve this loss entry?', confirmLabel: 'Approve', iconType: 'info' });
+    if (!ok) return;
     await save(() => approveJWOLoss(jwo.id, lossId), 'Could not approve the loss entry.');
   };
 
@@ -458,7 +466,8 @@ export default function JobWorkOrderDetailPage() {
 
   const handleDeleteMaterial = async (mId) => {
     setOpenActionMenuId(null);
-    if (!window.confirm('Delete this material item?')) return;
+    const ok = await modal.deleteConfirm('Delete this material item?', 'Delete Material');
+    if (!ok) return;
     await save(() => deleteJWORow(jwo.id, 'materials', mId), 'Could not delete the material.');
   };
 
@@ -517,7 +526,8 @@ export default function JobWorkOrderDetailPage() {
 
   const handleDeleteOutward = async (outwardId) => {
     setOpenActionMenuId(null);
-    if (!window.confirm('Delete this outward challan?')) return;
+    const ok = await modal.deleteConfirm('Delete this outward challan?', 'Delete Outward Challan');
+    if (!ok) return;
     await save(() => deleteJWORow(jwo.id, 'outwards', outwardId), 'Could not delete the outward challan.');
   };
 
@@ -525,7 +535,7 @@ export default function JobWorkOrderDetailPage() {
     e.preventDefault();
     const qty = Number(outwardForm.qty);
     if (!(qty > 0)) {
-      window.alert('Quantity must be greater than 0.');
+      await modal.warning('Quantity must be greater than 0.', 'Invalid Quantity');
       return;
     }
     const row = {
@@ -581,7 +591,8 @@ export default function JobWorkOrderDetailPage() {
 
   const handleDeleteInward = async (inwardId) => {
     setOpenActionMenuId(null);
-    if (!window.confirm('Delete this inward receipt?')) return;
+    const ok = await modal.deleteConfirm('Delete this inward receipt?', 'Delete Inward Receipt');
+    if (!ok) return;
     await save(() => deleteJWORow(jwo.id, 'inwards', inwardId), 'Could not delete the inward receipt.');
   };
 
@@ -589,7 +600,7 @@ export default function JobWorkOrderDetailPage() {
     e.preventDefault();
     const qty = Number(inwardForm.qty);
     if (!(qty > 0)) {
-      window.alert('Quantity must be greater than 0.');
+      await modal.warning('Quantity must be greater than 0.', 'Invalid Quantity');
       return;
     }
     const rejected = Math.max(0, Number(inwardForm.rejected) || 0);
@@ -614,7 +625,7 @@ export default function JobWorkOrderDetailPage() {
 
   const handleSaveRemarks = async () => {
     const ok = await save(() => updateJWOHeader(jwo.id, { remarks: remarksText }), 'Could not save remarks.');
-    if (ok) window.alert('Remarks saved successfully.');
+    if (ok) await modal.success('Remarks saved successfully.', 'Remarks Saved');
   };
 
   // Charges Handlers
@@ -650,7 +661,8 @@ export default function JobWorkOrderDetailPage() {
 
   const handleDeleteCharge = async (chargeId) => {
     setOpenActionMenuId(null);
-    if (!window.confirm('Delete this charge?')) return;
+    const ok = await modal.deleteConfirm('Delete this charge?', 'Delete Charge');
+    if (!ok) return;
     await save(() => deleteJWORow(jwo.id, 'charges', chargeId), 'Could not delete the charge.');
   };
 
@@ -753,7 +765,7 @@ export default function JobWorkOrderDetailPage() {
   const handleSaveUploadDoc = async (e) => {
     e.preventDefault();
     if (!docForm.file) {
-      window.alert('Choose a file to upload.');
+      await modal.warning('Choose a file to upload.', 'File Required');
       return;
     }
     setIsUploadingDoc(true);
@@ -771,7 +783,7 @@ export default function JobWorkOrderDetailPage() {
       }), 'Could not save the document.');
       if (ok) setShowUploadDocModal(false);
     } catch (err) {
-      window.alert(errorMessage(err, 'Could not upload the document.'));
+      await modal.error(errorMessage(err, 'Could not upload the document.'), 'Upload Error');
     } finally {
       setIsUploadingDoc(false);
     }
@@ -779,7 +791,8 @@ export default function JobWorkOrderDetailPage() {
 
   const handleDeleteDoc = async (docId) => {
     setOpenActionMenuId(null);
-    if (!window.confirm('Delete this uploaded document?')) return;
+    const ok = await modal.deleteConfirm('Delete this uploaded document?', 'Delete Document');
+    if (!ok) return;
     await save(() => deleteJWORow(jwo.id, 'documents', docId), 'Could not delete the document.');
   };
 

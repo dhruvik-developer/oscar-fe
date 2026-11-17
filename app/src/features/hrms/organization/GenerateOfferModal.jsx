@@ -20,7 +20,7 @@ export default function GenerateOfferModal({
     position: "",
     jobType: "Full-time",
     dept: "Engineering",
-    salary: "$95,000 / annum",
+    salary: "₹95,000 / annum",
     location: "New York HQ",
     workMode: "Hybrid",
     joiningDate: new Date(Date.now() + 21 * 86400000).toISOString().split("T")[0],
@@ -74,7 +74,7 @@ export default function GenerateOfferModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
+    <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
       <div className="bg-white rounded-2xl border border-slate-300 shadow-2xl w-full max-w-lg p-4 sm:p-6 my-auto">
         <div className="flex justify-between items-center mb-4 pb-3 border-b border-slate-200">
           <div className="flex items-center gap-2">
@@ -212,7 +212,7 @@ export default function GenerateOfferModal({
               <input
                 type="text"
                 required
-                placeholder="e.g. $95,000 / yr or ₹50,000 / mo"
+                placeholder="e.g. ₹95,000 / yr or ₹50,000 / mo"
                 value={formData.salary}
                 onChange={(e) =>
                   setFormData({ ...formData, salary: e.target.value })

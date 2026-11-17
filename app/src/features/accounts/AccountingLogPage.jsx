@@ -79,7 +79,7 @@ function EntryLines({ lines }) {
   );
 }
 
-export default function AccountingLogPage() {
+export default function AccountingLogPage({ embedded = false }) {
   const [module, setModule] = useState('');
   const [page, setPage] = useState(1);
   const [filters, setFilters] = useState({ dateFrom: '', dateTo: '', search: '' });
@@ -119,10 +119,17 @@ export default function AccountingLogPage() {
 
   return (
     <div className="space-y-5">
-      <PageHeader
-        title="Accounting Log"
-        subtitle="Every ledger entry posted by payroll, salary advances, incentives, broker commission, expenses and payments in / out, with the document that caused it. Read-only."
-      />
+      {!embedded ? (
+        <PageHeader
+          title="Accounting Log"
+          subtitle="Every ledger entry posted by payroll, salary advances, incentives, broker commission, expenses and payments in / out, with the document that caused it. Read-only."
+        />
+      ) : (
+        <div className="pb-1">
+          <h2 className="text-base font-bold text-slate-900">Accounting Log</h2>
+          <p className="text-xs text-slate-500">Every ledger entry posted by payroll, salary advances, incentives, broker commission, expenses and payments in / out. Read-only.</p>
+        </div>
+      )}
 
       {/* Module tiles double as the filter */}
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">

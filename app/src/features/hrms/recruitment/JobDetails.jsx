@@ -200,7 +200,7 @@ export default function JobDetails() {
               </div>
               <div className="bg-soft/50 border border-border/80 rounded-xl p-3">
                 <span className="text-[10px] font-bold uppercase text-muted block">Approved Compensation</span>
-                <span className="font-bold text-emerald-600 dark:text-emerald-400 mt-0.5 block">{job.salaryRange || "$85,000 - $115,000 / annum"}</span>
+                <span className="font-bold text-emerald-600 dark:text-emerald-400 mt-0.5 block">{job.salaryRange || "₹85,000 - ₹115,000 / annum"}</span>
                 <span className="text-[11px] text-muted">Includes base + bonus</span>
               </div>
               <div className="bg-soft/50 border border-border/80 rounded-xl p-3">

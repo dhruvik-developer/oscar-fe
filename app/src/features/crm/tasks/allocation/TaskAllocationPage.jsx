@@ -128,8 +128,8 @@ export default function TaskAllocationPage() {
   }
 
   function sortIcon(key) {
-    if (sortKey !== key) return <ChevronsUpDown size={13} className="text-slate-300" />;
-    return sortDir === 'asc' ? <ChevronUp size={13} className="text-blue-600" /> : <ChevronDown size={13} className="text-blue-600" />;
+    if (sortKey !== key) return <ChevronsUpDown size={14} className="table-sort-icon shrink-0 text-text-secondary/50 group-hover:text-text-secondary transition-colors" />;
+    return sortDir === 'asc' ? <ChevronUp size={14} className="table-sort-icon shrink-0 text-primary transition-transform" /> : <ChevronDown size={14} className="table-sort-icon shrink-0 text-primary transition-transform" />;
   }
 
   function applyFilters() {
@@ -300,27 +300,27 @@ export default function TaskAllocationPage() {
 
         <div className="overflow-x-auto">
           <table className="w-full text-left text-[13px] border-collapse min-w-[980px]">
-            <thead>
-              <tr className="bg-[#f8fafc] border-b border-slate-100 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
-                <th className="px-5 py-3.5">
-                  <button type="button" onClick={() => toggleSort('title')} className="inline-flex items-center gap-1.5 hover:text-slate-800 transition">Task {sortIcon('title')}</button>
+            <thead className="table-head-std">
+              <tr className="table-head-row-std">
+                <th>
+                  <button type="button" onClick={() => toggleSort('title')} className="inline-flex items-center gap-1.5 hover:text-primary transition cursor-pointer">Task {sortIcon('title')}</button>
                 </th>
-                <th className="px-4 py-3.5">
-                  <button type="button" onClick={() => toggleSort('assignee')} className="inline-flex items-center gap-1.5 hover:text-slate-800 transition">Assignee {sortIcon('assignee')}</button>
+                <th>
+                  <button type="button" onClick={() => toggleSort('assignee')} className="inline-flex items-center gap-1.5 hover:text-primary transition cursor-pointer">Assignee {sortIcon('assignee')}</button>
                 </th>
-                <th className="px-4 py-3.5">
-                  <button type="button" onClick={() => toggleSort('assignedBy')} className="inline-flex items-center gap-1.5 hover:text-slate-800 transition">Assigned By {sortIcon('assignedBy')}</button>
+                <th>
+                  <button type="button" onClick={() => toggleSort('assignedBy')} className="inline-flex items-center gap-1.5 hover:text-primary transition cursor-pointer">Assigned By {sortIcon('assignedBy')}</button>
                 </th>
-                <th className="px-4 py-3.5">
-                  <button type="button" onClick={() => toggleSort('priority')} className="inline-flex items-center gap-1.5 hover:text-slate-800 transition">Priority {sortIcon('priority')}</button>
+                <th>
+                  <button type="button" onClick={() => toggleSort('priority')} className="inline-flex items-center gap-1.5 hover:text-primary transition cursor-pointer">Priority {sortIcon('priority')}</button>
                 </th>
-                <th className="px-4 py-3.5">
-                  <button type="button" onClick={() => toggleSort('deadline')} className="inline-flex items-center gap-1.5 hover:text-slate-800 transition">Deadline {sortIcon('deadline')}</button>
+                <th>
+                  <button type="button" onClick={() => toggleSort('deadline')} className="inline-flex items-center gap-1.5 hover:text-primary transition cursor-pointer">Deadline {sortIcon('deadline')}</button>
                 </th>
-                <th className="px-4 py-3.5">
-                  <button type="button" onClick={() => toggleSort('status')} className="inline-flex items-center gap-1.5 hover:text-slate-800 transition">Status {sortIcon('status')}</button>
+                <th>
+                  <button type="button" onClick={() => toggleSort('status')} className="inline-flex items-center gap-1.5 hover:text-primary transition cursor-pointer">Status {sortIcon('status')}</button>
                 </th>
-                <th className="px-5 py-3.5 text-right">Action</th>
+                <th className="text-right">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">

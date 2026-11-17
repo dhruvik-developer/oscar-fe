@@ -143,21 +143,20 @@ export async function pushSettings(settings) {
   return api.put('/pms/settings/', settings);
 }
 
-/** The people a stage can be assigned to. PMS reads the same roster as CRM. */
+/** The people a stage can be assigned to. PMS reads the HRMS employee roster. */
 export async function pullEmployees() {
   if (!isBackendEnabled()) return null;
   try {
-    const body = await api.get('/crm/team-roster/');
-    const roster = body?.roster || body || {};
-    const members = [];
-    Object.entries(roster).forEach(([role, people]) => {
-      (people || []).forEach((person) => members.push({
-        ...person,
-        role,
-        department: person.department || '',
-      }));
-    });
-    return members;
+    const body = await api.get('/hrms/employees/', { query: { page_size: 200 } });
+    const rows = body?.results || body || [];
+    return rows.map((person) => ({
+      id: person.id,
+      name: person.name,
+      employeeCode: person.employeeCode || person.empId,
+      department: person.department || '',
+      designation: person.designation || person.role || '',
+      email: person.email || '',
+    }));
   } catch (err) {
     console.warn('[pmsSync] pull employees failed:', err?.message || err);
     return null;
@@ -365,7 +364,7 @@ export async function createDocumentShare(projectId, docId, payload = {}) {
   return {
     ...share,
     token: share.token ?? body.token ?? null,
-    url: share.url ?? body.url ?? null,
+    url: share.url ?? body.url ?? (share.token ? `/pms/approve/${share.token}` : null),
   };
 }
 

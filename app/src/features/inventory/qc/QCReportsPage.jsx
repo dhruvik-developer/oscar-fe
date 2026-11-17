@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { modal } from '../../../context/ModalContext';
 import {
   FileText,
   Search,
@@ -152,7 +153,7 @@ export default function QCReportsPage() {
   // CSV Export
   const handleExport = () => {
     if (!filteredData || filteredData.length === 0) {
-      alert('No records available in this report to export.');
+      modal.info('No records available in this report to export.', 'Export CSV');
       return;
     }
 

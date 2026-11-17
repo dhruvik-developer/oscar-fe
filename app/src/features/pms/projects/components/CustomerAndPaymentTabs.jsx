@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { modal } from '../../../../context/ModalContext';
 import { Link } from 'react-router-dom';
 import {
   Package, Boxes, Layers, ShoppingCart, Truck, Receipt, CheckCircle2,
@@ -1043,7 +1044,13 @@ export function PaymentDispatchTab({ project }) {
   };
 
   const handleConvertProforma = async (pi) => {
-    if (!window.confirm(`Convert Proforma Invoice ${pi.proformaNumber || pi.proforma_number} into an official Tax Sales Invoice? This will post general ledger accounting entries.`)) return;
+    const ok = await modal.confirm({
+      title: 'Convert Proforma Invoice',
+      message: `Convert Proforma Invoice ${pi.proformaNumber || pi.proforma_number} into an official Tax Sales Invoice? This will post general ledger accounting entries.`,
+      confirmLabel: 'Convert to Tax Invoice',
+      iconType: 'info',
+    });
+    if (!ok) return;
     setSubmitting(true);
     try {
       await convertStage17Proforma(projectId, pi.id);
@@ -1057,7 +1064,12 @@ export function PaymentDispatchTab({ project }) {
   };
 
   const handleCancelProforma = async (pi) => {
-    const reason = window.prompt('Enter cancellation reason:', 'Customer requested revised quote');
+    const reason = await modal.prompt({
+      title: 'Cancel Proforma Invoice',
+      message: 'Enter cancellation reason:',
+      defaultValue: 'Customer requested revised quote',
+      confirmLabel: 'Cancel Invoice',
+    });
     if (reason === null) return;
     setSubmitting(true);
     try {
@@ -1785,7 +1797,7 @@ export function PaymentDispatchTab({ project }) {
 
       {/* Modal 1: Create Customer Dispatch */}
       {isDispatchModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="bg-white rounded-2xl max-w-2xl w-full p-5 space-y-4 shadow-xl border border-slate-200 max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in-95">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div className="flex items-center gap-2">
@@ -1965,7 +1977,7 @@ export function PaymentDispatchTab({ project }) {
 
       {/* Modal 2: Update LR */}
       {isLrModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="bg-white rounded-2xl max-w-md w-full p-5 space-y-4 shadow-xl border border-slate-200">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <h3 className="text-sm font-bold text-slate-900">
@@ -2043,7 +2055,7 @@ export function PaymentDispatchTab({ project }) {
 
       {/* Modal 3: Create Proforma Invoice */}
       {isProformaModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="bg-white rounded-2xl max-w-md w-full p-5 space-y-4 shadow-xl border border-slate-200">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div className="flex items-center gap-2">
@@ -2173,7 +2185,7 @@ export function PaymentDispatchTab({ project }) {
 
       {/* Modal 4: Create Final Tax Invoice */}
       {isFinalInvoiceModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="bg-white rounded-2xl max-w-md w-full p-5 space-y-4 shadow-xl border border-slate-200">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div className="flex items-center gap-2">
@@ -2303,7 +2315,7 @@ export function PaymentDispatchTab({ project }) {
 
       {/* Modal 5: Record Payment Receipt */}
       {isPaymentModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="bg-white rounded-2xl max-w-md w-full p-5 space-y-4 shadow-xl border border-slate-200">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div className="flex items-center gap-2">

@@ -22,6 +22,7 @@ import { useIncentiveStore } from "../../../stores/incentiveStore";
 import { describeError } from "../../../services/resourceSync";
 import { useTableSort } from "../../../hooks/useTableSort";
 import SortableTh from "../../../components/ui/SortableTh";
+import AppPagination from "../../../components/ui/AppPagination";
 
 const BASIS_LABELS = {
   INVOICE: "Invoice Value",
@@ -244,6 +245,26 @@ export default function IncentivesPage() {
     },
   });
 
+  const [schemePage, setSchemePage] = useState(1);
+  const [schemePageSize, setSchemePageSize] = useState(5);
+
+  const paginatedSchemes = useMemo(() => {
+    const start = (schemePage - 1) * schemePageSize;
+    return (schemeSort.rows || []).slice(start, start + schemePageSize);
+  }, [schemeSort.rows, schemePage, schemePageSize]);
+
+  const [accrualPage, setAccrualPage] = useState(1);
+  const [accrualPageSize, setAccrualPageSize] = useState(10);
+
+  useEffect(() => {
+    setAccrualPage(1);
+  }, [search, statusFilter, accrualPageSize]);
+
+  const paginatedAccruals = useMemo(() => {
+    const start = (accrualPage - 1) * accrualPageSize;
+    return accrualSort.rows.slice(start, start + accrualPageSize);
+  }, [accrualSort.rows, accrualPage, accrualPageSize]);
+
   const stats = useMemo(() => {
     let gross = 0;
     let returns = 0;
@@ -284,7 +305,7 @@ export default function IncentivesPage() {
   const skipped = quarterlyReport?.skipped || [];
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="flex flex-col gap-6 w-full pb-12">
       <PageHeader
         title="Salesperson Incentive Management"
         subtitle="Configure incentive schemes, calculate quarterly payouts net of returns, and control approve / hold / payout (Scope §12). Incentive is paid outside payroll."
@@ -366,7 +387,7 @@ export default function IncentivesPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {schemeSort.rows.map((s) => (
+                {paginatedSchemes.map((s) => (
                   <tr key={s.id} className="hover:bg-soft/50 transition">
                     <td className="py-2.5 px-4">
                       <div className="font-medium text-text">{s.name}</div>
@@ -411,6 +432,14 @@ export default function IncentivesPage() {
             </table>
           </div>
         )}
+        <AppPagination
+          total={(schemes || []).length}
+          page={schemePage}
+          pageSize={schemePageSize}
+          onPageChange={setSchemePage}
+          onPageSizeChange={setSchemePageSize}
+          pageSizeOptions={[5, 10, 20]}
+        />
       </div>
 
       {/* Filter and Search Bar */}
@@ -467,7 +496,7 @@ export default function IncentivesPage() {
                   </td>
                 </tr>
               ) : (
-                accrualSort.rows.map((row) => (
+                paginatedAccruals.map((row) => (
                   <tr key={row.id} className="hover:bg-soft/50 transition">
                     <td className="py-3 px-4">
                       <div className="font-medium text-text">{row.employeeName || row.employee?.name || "Salesperson"}</div>
@@ -552,11 +581,19 @@ export default function IncentivesPage() {
             </tbody>
           </table>
         </div>
+        <AppPagination
+          total={filteredAccruals.length}
+          page={accrualPage}
+          pageSize={accrualPageSize}
+          onPageChange={setAccrualPage}
+          onPageSizeChange={setAccrualPageSize}
+          pageSizeOptions={[10, 25, 50, 100]}
+        />
       </div>
 
       {/* Calculate Quarterly Modal */}
       {isCalcModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="bg-card border border-border rounded-xl shadow-lg w-full max-w-md p-6 space-y-4">
             <h3 className="text-lg font-bold text-text">Calculate Quarterly Incentive</h3>
             <p className="text-sm text-muted">
@@ -612,7 +649,7 @@ export default function IncentivesPage() {
 
       {/* Hold Modal */}
       {isHoldModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="bg-card border border-border rounded-xl shadow-lg w-full max-w-md p-6 space-y-4">
             <h3 className="text-lg font-bold text-text text-red-600 flex items-center gap-2">
               <AlertCircle className="w-5 h-5" /> Hold Incentive Payout
@@ -627,7 +664,7 @@ export default function IncentivesPage() {
                 rows="3"
                 value={holdReason}
                 onChange={(e) => setHoldReason(e.target.value)}
-                placeholder="e.g. Pending party payment for Invoice #INV-204"
+                placeholder="e.g. Pending party payment for Invoice INV-204"
                 className="w-full mt-1.5 p-2.5 bg-soft border border-border rounded-lg text-sm text-text focus:outline-none focus:ring-1 focus:ring-red-500"
               />
             </div>
@@ -654,7 +691,7 @@ export default function IncentivesPage() {
 
       {/* Scheme Modal */}
       {isSchemeModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="bg-card border border-border rounded-xl shadow-lg w-full max-w-xl p-6 space-y-4 max-h-[90vh] overflow-y-auto">
             <h3 className="text-lg font-bold text-text">{schemeForm.id ? "Edit Incentive Scheme" : "New Incentive Scheme"}</h3>
             <p className="text-sm text-muted">

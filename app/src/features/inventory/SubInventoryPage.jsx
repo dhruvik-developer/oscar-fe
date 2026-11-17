@@ -693,7 +693,7 @@ export default function SubInventoryPage() {
                               : 'bg-stone-50 text-stone-700 border-stone-200'
                           }`}
                         >
-                          {b.fabricType === 'DYED' ? 'Dyeing / Dyed' : 'Grey Fabric'}
+                          {b.fabricType === 'DYED' ? 'Dyeing / Dyed' : activeSub === 'DYED' ? 'At Dyeing Mill' : 'Grey Fabric'}
                         </span>
                       </td>
                       <td className="px-3 py-2.5 text-slate-600">

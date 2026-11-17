@@ -134,7 +134,7 @@ export default function TrainingDashboard({ initialTab }) {
               onClick={() => handleTabChange(t.key)}
               className={`flex items-center gap-2 shrink-0 lg:shrink px-4 py-2.5 rounded-xl text-[13px] font-medium transition cursor-pointer whitespace-nowrap ${
                 isActive
-                  ? "bg-[#1b2b4a] text-white shadow-2xs font-semibold"
+                  ? "bg-primary text-white shadow-2xs font-semibold"
                   : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
               }`}
             >

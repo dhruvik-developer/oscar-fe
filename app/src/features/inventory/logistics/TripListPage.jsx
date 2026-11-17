@@ -1,4 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { Link } from 'react-router-dom';
+import { modal } from '../../../context/ModalContext';
+import { Modal } from '../../../components/ui/Modal';
 import {
   Truck,
   Plus,
@@ -179,7 +182,7 @@ export default function TripListPage() {
       setShowTransporterModal(false);
       setNewTransporter({ name: '', code: '', contactPerson: '', phone: '', gstin: '', address: '' });
     } catch (err) {
-      alert(err?.response?.data?.message || err?.message || 'Failed to create transporter.');
+      await modal.error(err?.response?.data?.message || err?.message || 'Failed to create transporter.', 'Transporter Error');
     } finally {
       setTransporterSubmitting(false);
     }
@@ -313,22 +316,30 @@ export default function TripListPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-slate-200">
         <div>
+          {/* Breadcrumb */}
+          <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 mb-2 overflow-x-auto whitespace-nowrap text-[12px] font-medium text-slate-500 scrollbar-none">
+            <Link to="/dashboard" className="transition-colors hover:text-slate-700">Dashboard</Link>
+            <span className="shrink-0 text-slate-300">"º</span>
+            <Link to="/inventory" className="transition-colors hover:text-slate-700">Inventory</Link>
+            <span className="shrink-0 text-slate-300">"º</span>
+            <span className="font-semibold text-slate-900">Logistics & Tempo Register</span>
+          </nav>
           <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
+            <h1 className="text-[19px] sm:text-[21px] font-extrabold tracking-tight text-slate-900 flex items-center gap-2">
               <Truck className="w-7 h-7 text-indigo-600" />
               Logistics & Tempo Register
             </h1>
             <PageInfoButton title="Logistics & Trip Register" />
           </div>
-          <p className="text-sm text-slate-500 mt-1">
+          <p className="text-[13px] text-slate-500 mt-0.5">
             Track inward/outward vehicle trips, LR details, freight charges, and direct landed-cost allocation to lots.
           </p>
         </div>
         <button
           onClick={() => setShowCreateModal(true)}
-          className="inline-flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm rounded-lg shadow-sm transition-colors"
+          className="h-9 px-3 rounded-lg bg-blue-600 text-white font-semibold text-xs inline-flex items-center gap-1 cursor-pointer"
         >
-          <Plus className="w-4 h-4" /> Record New Trip
+          <Plus size={14} /> Record New Trip
         </button>
       </div>
 
@@ -372,16 +383,16 @@ export default function TripListPage() {
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse text-sm">
-            <thead>
-              <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-medium">
-                <SortableTh sort={sort} sortKey="trip_number" className="py-3 px-4">Trip No / Date</SortableTh>
-                <SortableTh sort={sort} sortKey="vehicle_number" className="py-3 px-4">Vehicle & Driver</SortableTh>
-                <SortableTh sort={sort} sortKey="route" className="py-3 px-4">Route</SortableTh>
-                <SortableTh sort={sort} sortKey="transporter" className="py-3 px-4">LR / Transporter</SortableTh>
-                <SortableTh sort={sort} sortKey="total_charges" className="py-3 px-4 text-right" align="right">Total Charges</SortableTh>
-                <SortableTh sort={sort} sortKey="allocation" className="py-3 px-4">Cost Allocation</SortableTh>
-                <SortableTh sort={sort} sortKey="status" className="py-3 px-4">Delivery Status</SortableTh>
-                <th className="py-3 px-4 text-right">Actions</th>
+            <thead className="table-head-std">
+              <tr className="table-head-row-std">
+                <SortableTh sort={sort} sortKey="trip_number">Trip No / Date</SortableTh>
+                <SortableTh sort={sort} sortKey="vehicle_number">Vehicle & Driver</SortableTh>
+                <SortableTh sort={sort} sortKey="route">Route</SortableTh>
+                <SortableTh sort={sort} sortKey="transporter">LR / Transporter</SortableTh>
+                <SortableTh sort={sort} sortKey="total_charges" align="right">Total Charges</SortableTh>
+                <SortableTh sort={sort} sortKey="allocation">Cost Allocation</SortableTh>
+                <SortableTh sort={sort} sortKey="status">Delivery Status</SortableTh>
+                <th className="text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -495,7 +506,7 @@ export default function TripListPage() {
                       })()}
                       {!t.freight_allocated && !t.is_cost_allocated && (t.cost_allocation_target || 'LOT') !== 'EXPENSE'
                         && Number(t.total_charges) > 0 && !(t.materials || []).length && (
-                        <div className="text-[10px] text-amber-600 mt-1 whitespace-normal">No lot lines — cost can't be allocated</div>
+                        <div className="text-[10px] text-amber-600 mt-1 whitespace-normal">No lot lines "” cost can't be allocated</div>
                       )}
                     </td>
                   </tr>
@@ -507,19 +518,39 @@ export default function TripListPage() {
       </div>
 
       {/* Record Trip Modal */}
-      {showCreateModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 overflow-y-auto">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl my-8 overflow-hidden border border-slate-200">
-            <div className="flex items-center justify-between p-4 border-b border-slate-100 bg-slate-50">
-              <h2 className="font-semibold text-slate-900 flex items-center gap-2">
-                <Truck className="w-5 h-5 text-indigo-600" />
-                Record Logistics & Tempo Trip
-              </h2>
-              <button onClick={() => setShowCreateModal(false)} className="text-slate-400 hover:text-slate-600">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <form onSubmit={handleCreateSubmit} className="p-4 space-y-4 max-h-[80vh] overflow-y-auto">
+      <Modal
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        title={
+          <span className="font-semibold text-slate-900 flex items-center gap-2">
+            <Truck className="w-5 h-5 text-indigo-600" />
+            Record Logistics & Tempo Trip
+          </span>
+        }
+        size="xl"
+        resizable={true}
+        allowMaximize={true}
+        footer={
+          <div className="flex justify-end gap-2 w-full">
+            <button
+              type="button"
+              onClick={() => setShowCreateModal(false)}
+              className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-800 rounded-lg hover:bg-slate-100 transition"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              form="create-trip-form"
+              disabled={submitting}
+              className="px-4 py-2 text-sm bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg shadow-sm transition disabled:opacity-50"
+            >
+              {submitting ? 'Recording...' : 'Save Trip'}
+            </button>
+          </div>
+        }
+      >
+        <form id="create-trip-form" onSubmit={handleCreateSubmit} className="space-y-4">
               {error && (
                 <div className="p-2.5 bg-rose-50 border border-rose-200 rounded text-rose-700 text-xs flex items-center gap-2">
                   <AlertCircle className="w-4 h-4 shrink-0" />
@@ -842,22 +873,22 @@ export default function TripListPage() {
                 {tripForm.materials.length > 0 && (
                   <div className="border border-slate-200 rounded overflow-hidden mt-2">
                     <table className="w-full text-xs">
-                      <thead className="bg-slate-50 border-b border-slate-200 text-slate-600">
-                        <tr>
-                          <th className="p-2 text-left">Lot</th>
-                          <th className="p-2 text-left">Taka</th>
-                          <th className="p-2 text-right">Meters</th>
-                          <th className="p-2 text-right">Weight (Kg)</th>
-                          <th className="p-2 text-center">Action</th>
+                      <thead className="table-head-std">
+                        <tr className="table-head-row-std">
+                          <th className="text-left">Lot</th>
+                          <th className="text-left">Taka</th>
+                          <th className="text-right">Meters</th>
+                          <th className="text-right">Weight (Kg)</th>
+                          <th className="text-center">Action</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
                         {tripForm.materials.map((m, idx) => (
                           <tr key={idx}>
                             <td className="p-2 font-medium">{m.lotNumber}</td>
-                            <td className="p-2">{m.takaNumber || '—'}</td>
+                            <td className="p-2">{m.takaNumber || '-'}</td>
                             <td className="p-2 text-right">{m.meters} M</td>
-                            <td className="p-2 text-right">{m.weightKg || '—'}</td>
+                            <td className="p-2 text-right">{m.weightKg || '-'}</td>
                             <td className="p-2 text-center">
                               <button
                                 type="button"
@@ -875,41 +906,46 @@ export default function TripListPage() {
                 )}
               </div>
 
-              <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => setShowCreateModal(false)}
-                  className="px-4 py-2 text-sm text-slate-600"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="px-4 py-2 text-sm bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg"
-                >
-                  {submitting ? 'Recording...' : 'Save Trip'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+              
+          <button type="submit" className="hidden" aria-hidden="true" tabIndex={-1} />
+        </form>
+      </Modal>
 
       {/* Create Transporter Modal */}
-      {showTransporterModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 overflow-y-auto">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden border border-slate-200">
-            <div className="flex items-center justify-between p-4 border-b border-slate-100 bg-slate-50">
-              <h2 className="font-semibold text-slate-900 flex items-center gap-2">
-                <Truck className="w-5 h-5 text-indigo-600" />
-                Register New Transporter
-              </h2>
-              <button onClick={() => setShowTransporterModal(false)} className="text-slate-400 hover:text-slate-600">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <form onSubmit={handleCreateTransporterSubmit} className="p-4 space-y-3">
+      <Modal
+        isOpen={showTransporterModal}
+        onClose={() => setShowTransporterModal(false)}
+        title={
+          <span className="font-semibold text-slate-900 flex items-center gap-2">
+            <Truck className="w-5 h-5 text-indigo-600" />
+            Register New Transporter
+          </span>
+        }
+        size="md"
+        resizable={true}
+        allowMaximize={true}
+        backdropClassName="z-[110]"
+        footer={
+          <div className="flex justify-end gap-2 w-full">
+            <button
+              type="button"
+              onClick={() => setShowTransporterModal(false)}
+              className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-800 rounded-lg hover:bg-slate-100 transition"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              form="create-transporter-form"
+              disabled={transporterSubmitting}
+              className="px-4 py-2 text-sm bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg disabled:opacity-50"
+            >
+              {transporterSubmitting ? 'Saving...' : 'Save Transporter'}
+            </button>
+          </div>
+        }
+      >
+        <form id="create-transporter-form" onSubmit={handleCreateTransporterSubmit} className="space-y-3">
               <div>
                 <label className="block text-xs font-medium text-slate-700 mb-1">Transporter Name *</label>
                 <input
@@ -975,41 +1011,47 @@ export default function TripListPage() {
                   className="w-full text-sm border border-slate-200 rounded-md p-2"
                 />
               </div>
-              <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => setShowTransporterModal(false)}
-                  className="px-4 py-2 text-sm text-slate-600"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={transporterSubmitting}
-                  className="px-4 py-2 text-sm bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg disabled:opacity-50"
-                >
-                  {transporterSubmitting ? 'Saving...' : 'Save Transporter'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+              
+          <button type="submit" className="hidden" aria-hidden="true" tabIndex={-1} />
+        </form>
+      </Modal>
 
       {/* Confirm Delivery Modal */}
-      {deliveryModalTrip && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 overflow-y-auto">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-lg overflow-hidden border border-slate-200">
-            <div className="flex items-center justify-between p-4 border-b border-slate-100 bg-emerald-50/50">
-              <h2 className="font-semibold text-slate-900 flex items-center gap-2">
-                <CheckCircle2 className="w-5 h-5 text-emerald-600" />
-                Confirm Trip Delivery — {deliveryModalTrip.trip_number}
-              </h2>
-              <button onClick={() => setDeliveryModalTrip(null)} className="text-slate-400 hover:text-slate-600">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <form onSubmit={handleConfirmDeliverySubmit} className="p-4 space-y-4">
+      <Modal
+        isOpen={Boolean(deliveryModalTrip)}
+        onClose={() => setDeliveryModalTrip(null)}
+        title={
+          <span className="font-semibold text-slate-900 flex items-center gap-2">
+            <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+            Confirm Trip Delivery — {deliveryModalTrip?.trip_number}
+          </span>
+        }
+        size="lg"
+        resizable={true}
+        allowMaximize={true}
+        footer={
+          <div className="flex justify-end gap-2 w-full">
+            <button
+              type="button"
+              onClick={() => setDeliveryModalTrip(null)}
+              className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-800 rounded-lg hover:bg-slate-100 transition"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              form="confirm-delivery-form"
+              disabled={confirmingDelivery}
+              className="px-4 py-2 text-sm bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-lg disabled:opacity-50 inline-flex items-center gap-1.5"
+            >
+              <CheckCircle2 className="w-4 h-4" />
+              {confirmingDelivery ? 'Confirming...' : 'Confirm Delivery'}
+            </button>
+          </div>
+        }
+      >
+        {deliveryModalTrip && (
+          <form id="confirm-delivery-form" onSubmit={handleConfirmDeliverySubmit} className="space-y-4">
               {deliveryError && (
                 <div className="p-2.5 bg-rose-50 border border-rose-200 rounded text-rose-700 text-xs flex items-center gap-2">
                   <AlertCircle className="w-4 h-4 shrink-0" />
@@ -1025,7 +1067,7 @@ export default function TripListPage() {
                   Route: {deliveryModalTrip.from_location || 'Mill'} → {deliveryModalTrip.to_location || 'Destination'}
                 </div>
                 <div className="text-slate-500">
-                  Driver: {deliveryModalTrip.driver_name || 'Unassigned'} ({deliveryModalTrip.driver_mobile || '—'})
+                  Driver: {deliveryModalTrip.driver_name || 'Unassigned'} ({deliveryModalTrip.driver_mobile || '-'})
                 </div>
               </div>
 
@@ -1073,27 +1115,11 @@ export default function TripListPage() {
                 />
               </div>
 
-              <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => setDeliveryModalTrip(null)}
-                  className="px-4 py-2 text-sm text-slate-600"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={confirmingDelivery}
-                  className="px-4 py-2 text-sm bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-lg disabled:opacity-50 inline-flex items-center gap-1.5"
-                >
-                  <CheckCircle2 className="w-4 h-4" />
-                  {confirmingDelivery ? 'Confirming...' : 'Confirm Delivery'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+              
+            <button type="submit" className="hidden" aria-hidden="true" tabIndex={-1} />
+          </form>
+        )}
+      </Modal>
       <PrintLorryReceiptModal isOpen={Boolean(printTripId)} onClose={() => setPrintTripId(null)} tripId={printTripId} />
     </div>
   );

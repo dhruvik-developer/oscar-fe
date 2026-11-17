@@ -155,7 +155,6 @@ function GeneralSettings() {
               <label className="font-semibold text-slate-700 block mb-1">Base Currency</label>
               <select value={currency} onChange={(e) => setCurrency(e.target.value)} className="w-full p-2 border border-[#CED4DA] rounded bg-[#F8F9FA]">
                 <option value="INR (₹)">INR (₹) - Indian Rupee</option>
-                <option value="USD ($)">USD ($) - United States Dollar</option>
                 <option value="EUR (€)">EUR (€) - Euro</option>
                 <option value="GBP (£)">GBP (£) - British Pound</option>
               </select>

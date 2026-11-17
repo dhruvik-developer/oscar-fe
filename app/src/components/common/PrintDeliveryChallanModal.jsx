@@ -193,6 +193,15 @@ export const PrintDeliveryChallanModal = ({ isOpen, onClose, challan }) => {
                                                     {it.itemSku && (
                                                         <p className="text-[10px] text-slate-500 font-mono">SKU: {it.itemSku}</p>
                                                     )}
+                                                    {Array.isArray(it.takaAllocations || it.taka_allocations) && (it.takaAllocations || it.taka_allocations).length > 0 && (
+                                                        <div className="mt-1 flex flex-wrap gap-1">
+                                                            {(it.takaAllocations || it.taka_allocations).map((a, aidx) => (
+                                                                <span key={aidx} className="inline-block text-[9px] font-mono px-1.5 py-0.5 bg-slate-100 text-slate-700 rounded border border-slate-300">
+                                                                    Batch: {a.lotNo || a.lot_number || '-'} ({a.qty} {it.unit || it.uom || 'Mtr'})
+                                                                </span>
+                                                            ))}
+                                                        </div>
+                                                    )}
                                                 </td>
                                                 <td className="py-2.5 px-3 text-center font-mono text-slate-600">
                                                     {it.serialNumber || `SN-${String(idx + 1).padStart(4, '0')}`}

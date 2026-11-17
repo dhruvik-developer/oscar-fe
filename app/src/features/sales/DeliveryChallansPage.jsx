@@ -4,13 +4,15 @@ import { useERP } from '../../context/ERPContext';
 import { DataTable } from '../../components/ui/DataTable';
 import { StatusBadge } from '../../components/ui/StatusBadge';
 import { Button } from '../../components/ui/Button';
-import { Plus, Truck, CheckCircle2, X, AlertTriangle, Printer, Package, MapPin, UserCheck, Ban, ShieldAlert, Eye, Award, Send, FileText, ShieldCheck } from 'lucide-react';
+import { Plus, Truck, CheckCircle2, X, AlertTriangle, Printer, Package, MapPin, UserCheck, Ban, ShieldAlert, Eye, Award, Send, ShieldCheck } from 'lucide-react';
 import { RelatedDocumentsCard } from '../../components/common/RelatedDocumentsCard';
 import { PageHeader } from '../../components/common/PageHeader';
 import { formatDateDDMMYYYY } from '../../utils/dateUtils';
 import { SendChallanModal } from '../../components/common/SendChallanModal';
 import { PrintDeliveryChallanModal } from '../../components/common/PrintDeliveryChallanModal';
 import { SignatureSlot, useDocumentSignatures } from '../../components/common/SignatureSlot';
+import MasterSourceLink from '../../components/common/MasterSourceLink';
+import BatchAllocationModal from '../../components/common/BatchAllocationModal';
 const challanGuide = {
     title: 'Delivery Challans & Waybills',
     subtitle: 'Warehouse logistics dispatch, non-commercial shipping waybills, and proof of delivery (POD).',
@@ -24,38 +26,13 @@ const challanGuide = {
     tips: [
         'Delivery Challans never show commercial unit prices or taxes, matching standard international shipping practices.',
         'Click "Confirm POD" once the customer signs the physical or digital receiving slip to mark delivery complete.',
+        'Only one active Delivery Challan is allowed per Sales Order. Create another after the current challan is delivered or cancelled.',
     ],
     workflow: ['Sales Order Confirmed', 'Delivery Challan Generated', 'Carrier In-Transit', 'Consignee Receives Goods', 'POD Verified & Invoice Issued'],
 };
 export const DeliveryChallansPage = () => {
-    const { deliveryChallans, addDeliveryChallan, updateDeliveryChallanStatus, cancelDeliveryChallan, convertChallanToInvoice, salesOrders, invoices, paymentIns, items: masterItems, calculateItemStock } = useERP();
+    const { deliveryChallans, addDeliveryChallan, updateDeliveryChallanStatus, cancelDeliveryChallan, salesOrders, invoices, paymentIns, items: masterItems, calculateItemStock } = useERP();
     const location = useLocation();
-    const navigate = useNavigate();
-
-    const handleConvertToInvoice = async (challan) => {
-        if (!challan) return;
-        try {
-            const inv = await convertChallanToInvoice(challan.id);
-            if (inv) {
-                setSelectedChallan(null);
-                navigate('/sales/invoices');
-            }
-        } catch (err) {
-            console.error('Failed to convert challan to invoice:', err);
-        }
-    };
-
-    const challanHasInvoice = (challan) => {
-        if (!challan) return false;
-        return (invoices || []).some(inv =>
-            inv.status !== 'Cancelled' && (
-                (challan.id && (inv.deliveryChallanId === challan.id || inv.sourceDeliveryChallanId === challan.id)) ||
-                (challan.challanNumber && (inv.deliveryChallanNumber === challan.challanNumber)) ||
-                (challan.sourceInvoiceId && inv.id === challan.sourceInvoiceId) ||
-                (challan.invoiceId && inv.id === challan.invoiceId)
-            )
-        );
-    };
     React.useEffect(() => {
         if (location.state?.challanId) setSelectedChallan(deliveryChallans.find(dc => dc.id === location.state.challanId) || null);
     }, [location.state, deliveryChallans]);
@@ -66,6 +43,7 @@ export const DeliveryChallansPage = () => {
     const [printChallanTarget, setPrintChallanTarget] = useState(null);
     const [cancelModalTarget, setCancelModalTarget] = useState(null);
     const [sendModalChallan, setSendModalChallan] = useState(null);
+    const [podSavingIds, setPodSavingIds] = useState(new Set());
     const [selectedSoId, setSelectedSoId] = useState(salesOrders[0]?.id || '');
     const [transporter, setTransporter] = useState('');
     const [vehicleNo, setVehicleNo] = useState('');
@@ -74,6 +52,41 @@ export const DeliveryChallansPage = () => {
     const [dispatchNote, setDispatchNote] = useState('');
     const [lineItems, setLineItems] = useState([]);
     const [validationError, setValidationError] = useState('');
+    const [batchModalTarget, setBatchModalTarget] = useState(null);
+
+    const hasActiveChallanForOrder = (order, exceptChallanId) => (deliveryChallans || []).some((challan) => {
+        if (challan.id === exceptChallanId || ['Delivered', 'Cancelled'].includes(challan.status)) return false;
+        const matchesId = order.id && [challan.salesOrderId, challan.sourceSalesOrderId].some(
+            (id) => id && String(id) === String(order.id)
+        );
+        const matchesNumber = order.orderNumber && [
+            challan.salesOrderNumber,
+            challan.sourceSalesOrderNumber,
+            challan.linkedSo,
+        ].some((number) => number && number === order.orderNumber);
+        return matchesId || matchesNumber;
+    });
+
+    const seenActiveOrderKeys = new Set();
+    const visibleDeliveryChallans = (deliveryChallans || []).filter((challan) => {
+        if (['Delivered', 'Cancelled'].includes(challan.status)) return true;
+        const linkedOrder = salesOrders.find((order) =>
+            (challan.salesOrderId && String(challan.salesOrderId) === String(order.id)) ||
+            (challan.sourceSalesOrderId && String(challan.sourceSalesOrderId) === String(order.id)) ||
+            (challan.salesOrderNumber && challan.salesOrderNumber === order.orderNumber) ||
+            (challan.sourceSalesOrderNumber && challan.sourceSalesOrderNumber === order.orderNumber) ||
+            (challan.linkedSo && challan.linkedSo === order.orderNumber)
+        );
+        const orderKey = linkedOrder
+            ? `order:${linkedOrder.id}`
+            : challan.salesOrderId || challan.sourceSalesOrderId
+                ? `id:${challan.salesOrderId || challan.sourceSalesOrderId}`
+                : challan.salesOrderNumber || challan.sourceSalesOrderNumber || challan.linkedSo;
+        if (!orderKey) return true;
+        if (seenActiveOrderKeys.has(orderKey)) return false;
+        seenActiveOrderKeys.add(orderKey);
+        return true;
+    });
 
     const prepareOrderLines = (order) => {
         if (!order || !order.items) return [];
@@ -94,6 +107,8 @@ export const DeliveryChallansPage = () => {
                 isSerial,
                 availableSerials,
                 selectedSerials: availableSerials.slice(0, defaultDispatchQty),
+                takaAllocations: it.takaAllocations || it.taka_allocations || [],
+                batchAllocations: it.batchAllocations || [],
             };
         });
     };
@@ -108,12 +123,13 @@ export const DeliveryChallansPage = () => {
     const openAddModal = () => {
         setDraftChallan(null);
         // Only orders with quantity still to dispatch can be picked.
-        const defaultSo = salesOrders.find((o) => o.stage === 'Confirmed' || o.stage === 'Partially Dispatched');
-        if (defaultSo) {
-            setSelectedSoId(defaultSo.id);
-            setLineItems(prepareOrderLines(defaultSo));
-        }
-        setValidationError('');
+        const defaultSo = salesOrders.find((o) =>
+            (o.stage === 'Confirmed' || o.stage === 'Partially Dispatched') &&
+            !hasActiveChallanForOrder(o)
+        );
+        setSelectedSoId(defaultSo?.id || '');
+        setLineItems(defaultSo ? prepareOrderLines(defaultSo) : []);
+        setValidationError(defaultSo ? '' : 'No eligible Sales Order is available. An active Delivery Challan may already exist for each order.');
         setShowAddModal(true);
     };
 
@@ -166,11 +182,15 @@ export const DeliveryChallansPage = () => {
         setLineItems(updated);
     };
 
-    const handleCreate = (e) => {
+    const handleCreate = async (e) => {
         e.preventDefault();
         const order = draftChallan || salesOrders.find((o) => o.id === selectedSoId);
         if (!order) {
             setValidationError('Select the sales order to dispatch against.');
+            return;
+        }
+        if (hasActiveChallanForOrder(order, draftChallan?.id)) {
+            setValidationError(`Sales Order ${order.orderNumber || ''} already has an active Delivery Challan. Complete or cancel it before creating another.`);
             return;
         }
         
@@ -195,30 +215,59 @@ export const DeliveryChallansPage = () => {
             return;
         }
 
-        const created = addDeliveryChallan({
-            ...(draftChallan ? { ...draftChallan, id: draftChallan.id } : {}),
-            // The challan number is allocated by the server (DC series).
-            challanNumber: draftChallan?.challanNumber,
-            salesOrderId: draftChallan ? undefined : order?.id,
-            sourceSalesOrderId: draftChallan ? undefined : order?.id,
-            salesOrderNumber: order?.orderNumber || '',
-            sourceSalesOrderNumber: order?.orderNumber || '',
-            linkedSo: order?.orderNumber || '',
-            customerId: order?.customerId,
-            customer: order?.customer,
-            dispatchDate: new Date().toISOString().split('T')[0],
-            transporter,
-            vehicleNo,
-            status: 'In Transit',
-            items: validLines,
-            lineItems: validLines,
-        });
-        if (created) { setShowAddModal(false); setSelectedChallan(created); setDraftChallan(null); }
+        setValidationError('');
+        try {
+            const created = await Promise.resolve(addDeliveryChallan({
+                ...(draftChallan ? { ...draftChallan, id: draftChallan.id } : {}),
+                // The challan number is allocated by the server (DC series).
+                challanNumber: draftChallan?.challanNumber,
+                salesOrderId: draftChallan ? undefined : order?.id,
+                sourceSalesOrderId: draftChallan ? undefined : order?.id,
+                salesOrderNumber: order?.orderNumber || '',
+                sourceSalesOrderNumber: order?.orderNumber || '',
+                linkedSo: order?.orderNumber || '',
+                customerId: order?.customerId,
+                customer: order?.customer,
+                dispatchDate: new Date().toISOString().split('T')[0],
+                transporter,
+                vehicleNo,
+                status: draftChallan ? 'Dispatched' : 'Draft',
+                items: validLines,
+                lineItems: validLines,
+            }));
+            if (created) {
+                setShowAddModal(false);
+                setSelectedChallan(created);
+                setDraftChallan(null);
+            }
+        } catch (err) {
+            const fieldErrors = err?.payload?.field_errors;
+            if (fieldErrors && typeof fieldErrors === 'object') {
+                const detail = Object.entries(fieldErrors)
+                    .map(([field, messages]) => `${field}: ${[].concat(messages).filter(Boolean).join(', ')}`)
+                    .join(' | ');
+                setValidationError(detail || err?.message || 'Some fields need attention.');
+            } else {
+                setValidationError(err?.message || 'Could not save the delivery challan.');
+            }
+        }
     };
-    const markDelivered = (id) => {
-        updateDeliveryChallanStatus(id, 'Delivered');
-        if (selectedChallan && selectedChallan.id === id) {
-            setSelectedChallan({ ...selectedChallan, status: 'Delivered' });
+    const markDelivered = async (id) => {
+        if (podSavingIds.has(id)) return;
+        setPodSavingIds((prev) => new Set(prev).add(id));
+        try {
+            const updated = await updateDeliveryChallanStatus(id, 'Delivered');
+            if (updated && selectedChallan?.id === id) {
+                setSelectedChallan((prev) => (prev?.id === id ? { ...prev, ...updated } : prev));
+            }
+        } catch {
+            // The context reports the server error; leave the challan unchanged.
+        } finally {
+            setPodSavingIds((prev) => {
+                const next = new Set(prev);
+                next.delete(id);
+                return next;
+            });
         }
     };
     const getChallanRelatedDocs = (challan) => {
@@ -375,31 +424,14 @@ export const DeliveryChallansPage = () => {
                 >
                   <Printer size={13}/>
                 </button>
-                {c.status !== 'Cancelled' && (
-                  <button
-                    onClick={() => setSendModalChallan(c)}
-                    className="p-1 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded text-xs flex items-center gap-1 cursor-pointer"
-                    title="Send Waybill & Warranty Card"
-                  >
-                    <Send size={13}/>
-                  </button>
-                )}
-                {c.status !== 'Cancelled' && !challanHasInvoice(c) && (
-                  <button
-                    onClick={() => handleConvertToInvoice(c)}
-                    className="p-1 text-emerald-600 hover:text-emerald-800 hover:bg-emerald-50 rounded text-xs flex items-center gap-1 cursor-pointer"
-                    title="Convert to Sales Invoice"
-                  >
-                    <FileText size={13}/>
-                  </button>
-                )}
                 {c.status === 'Draft' && <Button size="sm" onClick={() => prepareDraftDispatch(c)}>Prepare Dispatch</Button>}
                 {c.status !== 'Draft' && c.status !== 'Delivered' && c.status !== 'Cancelled' && (
                   <button
                     onClick={() => markDelivered(c.id)}
-                    className="px-2 py-0.5 bg-primary hover:bg-primary-hover text-white rounded text-[11px] font-semibold cursor-pointer flex items-center gap-1 shadow-2xs transition-colors"
+                    disabled={podSavingIds.has(c.id)}
+                    className="px-2 py-0.5 bg-primary hover:bg-primary-hover text-white rounded text-[11px] font-semibold cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-1 shadow-2xs transition-colors"
                   >
-                    <CheckCircle2 size={11}/> POD
+                    <CheckCircle2 size={11}/> {podSavingIds.has(c.id) ? 'Saving...' : 'POD'}
                   </button>
                 )}
                 {c.status === 'Delivered' && (
@@ -432,7 +464,7 @@ export const DeliveryChallansPage = () => {
             Issue Delivery Challan
           </Button>}/>
 
-      <DataTable title="Active Dispatch Consignments" columns={columns} data={deliveryChallans} keyExtractor={(c) => c.id} searchPlaceholder="Search challan #, sales order, or carrier..." searchFilter={(c, term) => String(c.challanNumber ?? '').toLowerCase().includes(term) ||
+      <DataTable title="Active Dispatch Consignments" columns={columns} data={visibleDeliveryChallans} keyExtractor={(c) => c.id} searchPlaceholder="Search challan #, sales order, or carrier..." searchFilter={(c, term) => String(c.challanNumber ?? '').toLowerCase().includes(term) ||
             (c.salesOrderNumber && String(c.salesOrderNumber ?? '').toLowerCase().includes(term)) ||
             String(c.customer ?? '').toLowerCase().includes(term) ||
             (c.transporter && String(c.transporter ?? '').toLowerCase().includes(term))}/>
@@ -463,24 +495,33 @@ export const DeliveryChallansPage = () => {
                     ) : (
                       <option value="">-- Select Source Sales Order --</option>
                     )}
-                    {salesOrders.map((so) => (<option key={so.id} value={so.id}>
+                    {salesOrders.filter((so) => !hasActiveChallanForOrder(so, draftChallan?.id)).map((so) => (<option key={so.id} value={so.id}>
                         {so.orderNumber} - {so.customer} ({so.items?.length || 0} items)
                       </option>))}
                   </select>
                 </div>
                 <div>
-                  <label className="font-semibold text-slate-700 block mb-1">Carrier / Transporter</label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="font-semibold text-slate-700 block">Carrier / Transporter</label>
+                    <MasterSourceLink source="transporters" />
+                  </div>
                   <input type="text" value={transporter} onChange={(e) => setTransporter(e.target.value)} className="w-full p-2 border border-slate-300 rounded bg-white text-slate-800" placeholder="e.g. Transporter / Carrier name"/>
                 </div>
                 <div>
-                  <label className="font-semibold text-slate-700 block mb-1">Vehicle / Truck Plate #</label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="font-semibold text-slate-700 block">Vehicle / Truck Plate #</label>
+                    <MasterSourceLink source="vehicles" />
+                  </div>
                   <input type="text" value={vehicleNo} onChange={(e) => setVehicleNo(e.target.value)} className="w-full p-2 border border-slate-300 rounded bg-white text-slate-800" placeholder="e.g. MH-12-AB-9041"/>
                 </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="font-semibold text-slate-700 block mb-1">Driver Contact / Phone</label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="font-semibold text-slate-700 block">Driver Contact / Phone</label>
+                    <MasterSourceLink source="drivers" />
+                  </div>
                   <input type="text" value={driverContact} onChange={(e) => setDriverContact(e.target.value)} className="w-full p-2 border border-slate-300 rounded bg-white text-slate-800"/>
                 </div>
                 <div>
@@ -577,6 +618,32 @@ export const DeliveryChallansPage = () => {
                               </div>
                             </td>
                             <td className="p-2.5">
+                              {/* Multi-Batch & Taka Allocation Trigger */}
+                              <div className="mb-1.5 flex items-center gap-1">
+                                {Array.isArray(item.takaAllocations) && item.takaAllocations.length > 0 ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => setBatchModalTarget({ lineIndex: idx, item })}
+                                    className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold rounded bg-emerald-50 text-emerald-700 border border-emerald-300 hover:bg-emerald-100 transition cursor-pointer"
+                                    title="Click to view or adjust allocated batches"
+                                  >
+                                    <Package size={10} className="text-emerald-600" />
+                                    <span>
+                                      Allocated: {item.takaAllocations.reduce((sum, a) => sum + Number(a.qty || 0), 0)} ({[...new Set(item.takaAllocations.map(a => a.lotNo).filter(Boolean))].length} Batches)
+                                    </span>
+                                  </button>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => setBatchModalTarget({ lineIndex: idx, item })}
+                                    className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold rounded bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100 transition cursor-pointer"
+                                    title="Pick specific inventory batches and rolls"
+                                  >
+                                    <Package size={10} className="text-indigo-600" />
+                                    <span>+ Pick Batches</span>
+                                  </button>
+                                )}
+                              </div>
                               {item.isSerial ? (
                                 <div className="space-y-1">
                                   <span className="text-[10px] font-bold text-slate-500 block">Select Serials ({item.selectedSerials?.length || 0}/{item.qty}):</span>
@@ -660,23 +727,6 @@ export const DeliveryChallansPage = () => {
                 <StatusBadge status={selectedChallan.status}/>
               </div>
               <div className="flex flex-wrap lg:flex-nowrap items-center gap-2">
-                {selectedChallan.status !== 'Cancelled' && (
-                  <button
-                    onClick={() => setSendModalChallan(selectedChallan)}
-                    className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold cursor-pointer flex items-center gap-1.5 shadow-2xs text-xs"
-                  >
-                    <Send size={13}/> Send Waybill & Card
-                  </button>
-                )}
-                {selectedChallan.status !== 'Cancelled' && !challanHasInvoice(selectedChallan) && (
-                  <button
-                    onClick={() => handleConvertToInvoice(selectedChallan)}
-                    className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-lg font-semibold cursor-pointer flex items-center gap-1.5 shadow-2xs text-xs"
-                    title="Convert to Sales Invoice"
-                  >
-                    <FileText size={13}/> Convert to Sales Invoice
-                  </button>
-                )}
                 <button onClick={() => setPrintChallanTarget(selectedChallan)} className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-semibold cursor-pointer flex items-center gap-1.5">
                   <Printer size={13}/> Print Waybill
                 </button>
@@ -742,9 +792,21 @@ export const DeliveryChallansPage = () => {
                 if (currentStatus === 'Delivered') progressPct = 100;
                 if (isCancelled) progressPct = 0;
 
-                const advanceStage = (nextStatus) => {
-                  updateDeliveryChallanStatus(selectedChallan.id, nextStatus);
-                  setSelectedChallan({ ...selectedChallan, status: nextStatus });
+                const advanceStage = async (nextStatus) => {
+                  if (podSavingIds.has(selectedChallan.id)) return;
+                  setPodSavingIds((prev) => new Set(prev).add(selectedChallan.id));
+                  try {
+                    const updated = await updateDeliveryChallanStatus(selectedChallan.id, nextStatus);
+                    if (updated) setSelectedChallan((prev) => (prev?.id === selectedChallan.id ? { ...prev, ...updated } : prev));
+                  } catch {
+                    // The context reports the server error; leave the status unchanged.
+                  } finally {
+                    setPodSavingIds((prev) => {
+                      const next = new Set(prev);
+                      next.delete(selectedChallan.id);
+                      return next;
+                    });
+                  }
                 };
 
                 return (
@@ -769,29 +831,32 @@ export const DeliveryChallansPage = () => {
                         <div className="flex flex-wrap lg:flex-nowrap items-center gap-1.5">
                           {currentStatus === 'Dispatched' && (
                             <button
+                              disabled={podSavingIds.has(selectedChallan.id)}
                               onClick={() => advanceStage('In Transit')}
-                              className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold cursor-pointer flex items-center gap-1 shadow-2xs transition-all"
+                              className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold cursor-pointer flex items-center gap-1 shadow-2xs transition-all disabled:opacity-60 disabled:cursor-not-allowed"
                               title="Advance vehicle to In Transit highway route"
                             >
-                              <Truck size={12} /> Move Vehicle to Transit
+                              <Truck size={12} /> {podSavingIds.has(selectedChallan.id) ? 'Saving...' : 'Move Vehicle to Transit'}
                             </button>
                           )}
                           {currentStatus === 'In Transit' && (
                             <button
+                              disabled={podSavingIds.has(selectedChallan.id)}
                               onClick={() => advanceStage('Out for Delivery')}
-                              className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-semibold cursor-pointer flex items-center gap-1 shadow-2xs transition-all"
+                              className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-semibold cursor-pointer flex items-center gap-1 shadow-2xs transition-all disabled:opacity-60 disabled:cursor-not-allowed"
                               title="Advance vehicle to local distribution hub"
                             >
-                              <Truck size={12} /> Move to Out for Delivery
+                              <Truck size={12} /> {podSavingIds.has(selectedChallan.id) ? 'Saving...' : 'Move to Out for Delivery'}
                             </button>
                           )}
                           {(currentStatus === 'Out for Delivery' || currentStatus === 'In Transit') && (
                             <button
+                              disabled={podSavingIds.has(selectedChallan.id)}
                               onClick={() => advanceStage('Delivered')}
-                              className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold cursor-pointer flex items-center gap-1 shadow-2xs transition-all"
+                              className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold cursor-pointer flex items-center gap-1 shadow-2xs transition-all disabled:opacity-60 disabled:cursor-not-allowed"
                               title="Complete delivery and sign POD"
                             >
-                              <CheckCircle2 size={12} /> Complete Delivery
+                              <CheckCircle2 size={12} /> {podSavingIds.has(selectedChallan.id) ? 'Saving...' : 'Complete Delivery'}
                             </button>
                           )}
                         </div>
@@ -880,7 +945,18 @@ export const DeliveryChallansPage = () => {
                       {(selectedChallan.items || []).map((it, idx) => (
                         <tr key={it.id || idx} className="hover:bg-slate-50/60">
                           <td className="p-2.5 text-center font-mono text-slate-400">{idx + 1}</td>
-                          <td className="p-2.5 font-semibold text-slate-800">{it.description || it.name}</td>
+                          <td className="p-2.5 font-semibold text-slate-800">
+                            <div>{it.description || it.name}</div>
+                            {Array.isArray(it.takaAllocations || it.taka_allocations) && (it.takaAllocations || it.taka_allocations).length > 0 && (
+                              <div className="mt-1 flex flex-wrap gap-1 font-normal">
+                                {(it.takaAllocations || it.taka_allocations).map((a, aidx) => (
+                                  <span key={aidx} className="inline-flex items-center gap-1 text-[9px] font-mono px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200">
+                                    Batch {a.lotNo || a.lot_number || '-'}: {a.qty} {it.uom || 'Mtr'}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </td>
                           <td className="p-2.5 font-mono text-slate-500 text-[11px]">{it.itemSku || it.sku || 'SKU-LOG-01'}</td>
                           <td className="p-2.5 text-center font-bold text-slate-900">{it.qty}</td>
                           <td className="p-2.5">
@@ -935,8 +1011,8 @@ export const DeliveryChallansPage = () => {
               <div className="flex flex-wrap lg:flex-nowrap items-center gap-2">
                 {selectedChallan.status === 'Draft' && <Button onClick={() => prepareDraftDispatch(selectedChallan)}>Prepare Dispatch</Button>}
                 {selectedChallan.status !== 'Draft' && selectedChallan.status !== 'Delivered' && selectedChallan.status !== 'Cancelled' && (
-                  <Button onClick={() => markDelivered(selectedChallan.id)}>
-                    Confirm Proof of Delivery (POD)
+                  <Button disabled={podSavingIds.has(selectedChallan.id)} onClick={() => markDelivered(selectedChallan.id)}>
+                    {podSavingIds.has(selectedChallan.id) ? 'Saving POD...' : 'Confirm Proof of Delivery (POD)'}
                   </Button>
                 )}
                 {selectedChallan.status !== 'Cancelled' && (
@@ -948,14 +1024,6 @@ export const DeliveryChallansPage = () => {
                     }}
                   >
                     Cancel Challan
-                  </Button>
-                )}
-                {selectedChallan.status !== 'Cancelled' && !challanHasInvoice(selectedChallan) && (
-                  <Button
-                    onClick={() => handleConvertToInvoice(selectedChallan)}
-                    className="bg-emerald-600 hover:bg-emerald-700 text-white"
-                  >
-                    <FileText size={13} className="mr-1"/> Convert to Sales Invoice
                   </Button>
                 )}
                 <Button variant="outline" onClick={() => setSelectedChallan(null)}>
@@ -1029,5 +1097,29 @@ export const DeliveryChallansPage = () => {
         onClose={() => setPrintChallanTarget(null)}
         challan={printChallanTarget}
       />
-    </div>);
+    
+      {/* Multi-Batch & Taka Allocation Modal for Delivery Challans */}
+      {batchModalTarget && (
+        <BatchAllocationModal
+          isOpen={Boolean(batchModalTarget)}
+          onClose={() => setBatchModalTarget(null)}
+          item={batchModalTarget?.item || {}}
+          currentAllocations={lineItems[batchModalTarget.lineIndex]?.takaAllocations || []}
+          onSave={(allocations, summary) => {
+            const updated = [...lineItems];
+            const line = updated[batchModalTarget.lineIndex];
+            if (line) {
+              updated[batchModalTarget.lineIndex] = {
+                ...line,
+                qty: summary.totalQty > 0 ? summary.totalQty : line.qty,
+                takaAllocations: allocations,
+                batchAllocations: summary.batches,
+              };
+              setLineItems(updated);
+            }
+            setBatchModalTarget(null);
+          }}
+        />
+      )}
+</div>);
 };

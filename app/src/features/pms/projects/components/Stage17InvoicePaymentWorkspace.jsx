@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { modal } from '../../../../context/ModalContext';
 import {
   Activity,
   AlertCircle,
@@ -306,9 +307,13 @@ export function Stage17InvoicePaymentWorkspace({
 
   // Convert Proforma to Final Invoice
   const handleConvertProforma = async (pi) => {
-    if (!window.confirm(`Are you sure you want to convert Proforma ${pi.proformaNumber} into an official GST Tax Invoice? This will post to Accounts Receivable and update customer ledger balances.`)) {
-      return;
-    }
+    const ok = await modal.confirm({
+      title: 'Convert Proforma Invoice',
+      message: `Are you sure you want to convert Proforma ${pi.proformaNumber} into an official GST Tax Invoice? This will post to Accounts Receivable and update customer ledger balances.`,
+      confirmLabel: 'Convert to Tax Invoice',
+      iconType: 'info',
+    });
+    if (!ok) return;
 
     setSubmitting(true);
     try {
@@ -329,7 +334,12 @@ export function Stage17InvoicePaymentWorkspace({
 
   // Cancel Proforma
   const handleCancelProforma = async (pi) => {
-    const reason = window.prompt(`Enter reason for cancelling Proforma ${pi.proformaNumber}:`, 'Customer revised specifications');
+    const reason = await modal.prompt({
+      title: 'Cancel Proforma',
+      message: `Enter reason for cancelling Proforma ${pi.proformaNumber}:`,
+      defaultValue: 'Customer revised specifications',
+      confirmLabel: 'Cancel Proforma',
+    });
     if (reason === null) return;
 
     setSubmitting(true);

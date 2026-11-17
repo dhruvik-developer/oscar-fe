@@ -13,7 +13,7 @@ export const SettingsPage = () => {
     // Settings State
     const [companyName, setCompanyName] = useState('Horizon Industrial & Hardware Solutions');
     const [taxId, setTaxId] = useState('US-EIN-94-2039481');
-    const [currency, setCurrency] = useState(globalCurrency || 'USD ($)');
+    const [currency, setCurrency] = useState(globalCurrency || 'INR (₹)');
     const [fiscalYear, setFiscalYear] = useState('January - December (Calendar)');
     const [invoicePrefix, setInvoicePrefix] = useState('INV-2026-');
     const [soPrefix, setSoPrefix] = useState('SO-2026-');
@@ -59,7 +59,6 @@ export const SettingsPage = () => {
             <div>
               <label className="block font-semibold text-slate-700 mb-1">Base Accounting Currency</label>
               <select value={currency} onChange={(e) => setCurrency(e.target.value)} className="w-full border border-[#CED4DA] rounded p-2 bg-[#F8F9FA]">
-                <option value="USD ($)">USD ($) - United States Dollar</option>
                 <option value="EUR (€)">EUR (€) - Euro</option>
                 <option value="GBP (£)">GBP (£) - British Pound</option>
                 <option value="INR (₹)">INR (₹) - Indian Rupee</option>

@@ -454,12 +454,7 @@ export function LotTakaInlineSlide({ po, onClose, onLotSaved, onSwitchToGrn, onN
             <Layers size={18} />
           </div>
           <div>
-            <div className="flex items-center gap-2">
-              <h3 className="font-extrabold text-slate-900 text-sm">Lot & Taka Creation Workspace</h3>
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-800">
-                Stage 4 • In-Drawer
-              </span>
-            </div>
+            <h3 className="font-extrabold text-slate-900 text-sm">Lot & Taka Creation Workspace</h3>
             <p className="text-[11px] text-slate-500">
               Split verified GRN intake rolls and allocate barcodes to <strong className="text-slate-700">SYS-QC-HOLD</strong> for {poNumber}
             </p>
@@ -896,9 +891,6 @@ export function LotTakaInlineSlide({ po, onClose, onLotSaved, onSwitchToGrn, onN
             <ArrowLeft size={13} />
             <span>Previous: GRN / Inward</span>
           </button>
-          <span className="text-[11px] text-slate-500 font-medium hidden md:inline">
-            Stage 4 of 8 • Lot & Taka Rolls
-          </span>
         </div>
 
         <div className="flex items-center gap-2 ml-auto">

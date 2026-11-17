@@ -1,6 +1,13 @@
 /**
  * usePunchActions — Punch In / Punch Out, shared by the topbar button and the
  * Mark Attendance page so both drive (and show) the same punch.
+ *
+ * State lives in the attendance store (`todayPunch`), so a punch from either
+ * place updates the other at once, and the store re-reads the attendance rows
+ * afterwards — the server writes the day's attendance from the punches.
+ *
+ * Reads the store through `.raw`: the punch button sits in the shell on every
+ * screen and must not be the reason the attendance module loads.
  */
 import { useCallback, useState } from 'react';
 import { useAttendanceStore } from '../../../stores/attendanceStore';
@@ -21,6 +28,8 @@ export function usePunchActions() {
   const tickPunch = useAttendanceStore.raw((s) => s.tickPunch);
   const punchIn = useAttendanceStore.raw((s) => s.punchIn);
   const punchOut = useAttendanceStore.raw((s) => s.punchOut);
+  const breakIn = useAttendanceStore.raw((s) => s.breakIn);
+  const breakOut = useAttendanceStore.raw((s) => s.breakOut);
   const showToast = useAppStore((s) => s.showToast);
 
   const [submitting, setSubmitting] = useState(false);
@@ -34,13 +43,48 @@ export function usePunchActions() {
       await punchIn();
       showToast?.('Punched In successfully!');
     } catch (err) {
+      const code = err?.payload?.code;
       const msg = err?.payload?.message || err?.message || 'Failed to punch in';
+      if (code === 'ALREADY_PUNCHED_IN' || /already punched in/i.test(msg)) {
+        showToast?.('You are already punched in. Synced with server.', 'info');
+      } else {
+        setError(msg);
+        showToast?.(msg, 'error');
+      }
+    } finally {
+      setSubmitting(false);
+    }
+  }, [punchIn, showToast]);
+
+  const doBreakIn = useCallback(async (notes = "") => {
+    try {
+      setSubmitting(true);
+      setError(null);
+      await breakIn(notes);
+      showToast?.('Break In recorded! You are now on break.');
+    } catch (err) {
+      const msg = err?.payload?.message || err?.message || 'Failed to start break';
       setError(msg);
       showToast?.(msg, 'error');
     } finally {
       setSubmitting(false);
     }
-  }, [punchIn, showToast]);
+  }, [breakIn, showToast]);
+
+  const doBreakOut = useCallback(async (notes = "") => {
+    try {
+      setSubmitting(true);
+      setError(null);
+      await breakOut(notes);
+      showToast?.('Break Out recorded! Resumed working.');
+    } catch (err) {
+      const msg = err?.payload?.message || err?.message || 'Failed to end break';
+      setError(msg);
+      showToast?.(msg, 'error');
+    } finally {
+      setSubmitting(false);
+    }
+  }, [breakOut, showToast]);
 
   const executePunchOut = useCallback(async (earlyPayload = null) => {
     try {
@@ -54,9 +98,15 @@ export function usePunchActions() {
       );
       setEarlyModalOpen(false);
     } catch (err) {
+      const code = err?.payload?.code;
       const msg = err?.payload?.message || err?.message || 'Failed to punch out';
-      setError(msg);
-      showToast?.(msg, 'error');
+      if (code === 'CANNOT_PUNCH_OUT' || /cannot punch out|already punched out/i.test(msg)) {
+        showToast?.('Punch out already recorded. Synced with server.', 'info');
+        setEarlyModalOpen(false);
+      } else {
+        setError(msg);
+        showToast?.(msg, 'error');
+      }
     } finally {
       setSubmitting(false);
     }
@@ -79,6 +129,8 @@ export function usePunchActions() {
     error,
     doPunchIn,
     doPunchOut,
+    doBreakIn,
+    doBreakOut,
     executePunchOut,
     earlyModalOpen,
     setEarlyModalOpen,

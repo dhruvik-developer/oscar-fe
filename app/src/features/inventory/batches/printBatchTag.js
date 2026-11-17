@@ -1,12 +1,6 @@
 import QRCode from 'qrcode';
 
 /**
- * Detected LAN IP for the local machine so phones on the same Wi-Fi network
- * can reach the development server without getting "Site can't be reached" (localhost error).
- */
-export const DEFAULT_LAN_IP = '192.168.1.46';
-
-/**
  * Returns the best origin to use for mobile QR code scanning.
  * - If running on a public domain or LAN IP, returns window.location.origin.
  * - If running on localhost or 127.0.0.1, replaces it with the LAN IP so mobile phones
@@ -15,8 +9,8 @@ export const DEFAULT_LAN_IP = '192.168.1.46';
 export function getMobileScanOrigin() {
   const hostname = window.location.hostname;
   const port = window.location.port ? `:${window.location.port}` : '';
-  const storedIp = typeof localStorage !== 'undefined' ? localStorage.getItem('oscar_lan_ip') : null;
-  const lanIp = storedIp || DEFAULT_LAN_IP;
+  // The dev server reads this PC's address when it starts (vite.config.js).
+  const lanIp = import.meta.env.VITE_LAN_IP || hostname;
 
   if (hostname === 'localhost' || hostname === '127.0.0.1') {
     return `http://${lanIp}${port}`;
@@ -30,6 +24,11 @@ export function getMobileScanOrigin() {
  * device is unauthenticated or the backend server is temporarily unreachable,
  * the mobile Batch Passport card loads instantly with complete information.
  */
+/** What a batch QR opens: the batch's A to Z page, behind the login. */
+export function batchHistoryUrl(code) {
+  return `${getMobileScanOrigin()}/inventory/batches/${encodeURIComponent(code)}/a-to-z`;
+}
+
 export function batchUrl(batchOrCode) {
   const origin = getMobileScanOrigin();
   if (typeof batchOrCode === 'string') {
@@ -71,7 +70,7 @@ export async function printBatchTags(batches) {
 
   const tags = await Promise.all(
     batches.map(async (b) => {
-      const url = batchUrl(b);
+      const url = batchHistoryUrl(b.batchCode);
       const qr = await QRCode.toDataURL(url, { margin: 1, width: 240, errorCorrectionLevel: 'M' });
       const spec = [b.fabricQuality, b.shade, b.width ? `${b.width}" W` : '', b.gsm ? `${b.gsm} GSM` : '']
         .filter(Boolean)

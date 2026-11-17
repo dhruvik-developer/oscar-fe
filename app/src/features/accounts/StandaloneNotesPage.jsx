@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { modal } from '../../context/ModalContext';
 import {
   FileText,
   Plus,
@@ -48,7 +49,7 @@ const DOC_TYPE_LABELS = {
   MANUAL: 'Manual / Direct',
 };
 
-export default function StandaloneNotesPage() {
+export default function StandaloneNotesPage({ embedded = false }) {
   const [notes, setNotes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -179,7 +180,7 @@ export default function StandaloneNotesPage() {
       await accountingService.approveStandaloneNote(note.id);
       loadNotes();
     } catch (err) {
-      alert(describeApiError(err));
+      await modal.error(describeApiError(err), 'Approval Error');
     }
   };
 
@@ -188,7 +189,7 @@ export default function StandaloneNotesPage() {
       await accountingService.postStandaloneNote(note.id);
       loadNotes();
     } catch (err) {
-      alert(describeApiError(err));
+      await modal.error(describeApiError(err), 'Post Error');
     }
   };
 
@@ -202,7 +203,7 @@ export default function StandaloneNotesPage() {
       setCancelReason('');
       loadNotes();
     } catch (err) {
-      alert(describeApiError(err));
+      await modal.error(describeApiError(err), 'Cancel Error');
     } finally {
       setCancelling(false);
     }
@@ -260,15 +261,27 @@ export default function StandaloneNotesPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        title="Debit / Credit Notes"
-        subtitle="Manage standalone commercial adjustments against sales invoices, purchase bills, job work orders, or manual adjustments."
-        actions={
+      {!embedded ? (
+        <PageHeader
+          title="Debit / Credit Notes"
+          subtitle="Manage standalone commercial adjustments against sales invoices, purchase bills, job work orders, or manual adjustments."
+          actions={
+            <Button icon={Plus} onClick={handleOpenCreate} className="!rounded-lg !bg-blue-600 hover:!bg-blue-700">
+              Create Note
+            </Button>
+          }
+        />
+      ) : (
+        <div className="flex flex-wrap items-center justify-between gap-3 pb-1">
+          <div>
+            <h2 className="text-base font-bold text-slate-900">Debit / Credit Notes</h2>
+            <p className="text-xs text-slate-500">Standalone commercial adjustments against sales invoices, purchase bills, job work orders, or manual adjustments.</p>
+          </div>
           <Button icon={Plus} onClick={handleOpenCreate} className="!rounded-lg !bg-blue-600 hover:!bg-blue-700">
             Create Note
           </Button>
-        }
-      />
+        </div>
+      )}
 
       {error && (
         <div className="bg-rose-50 border border-rose-200 text-rose-700 rounded-xl px-4 py-3 text-sm flex items-center gap-2">
@@ -477,7 +490,7 @@ export default function StandaloneNotesPage() {
 
       {/* CREATE NOTE MODAL */}
       {showCreateModal && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-3">
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-3">
           <div className="bg-white rounded-2xl border border-slate-200 max-w-xl w-full p-5 shadow-2xl text-xs flex flex-col max-h-[90vh] overflow-hidden">
             <div className="flex items-center justify-between pb-3 border-b border-slate-200">
               <h3 className="font-bold text-base text-[#1F2E4A] flex items-center gap-2">
@@ -682,7 +695,7 @@ export default function StandaloneNotesPage() {
 
       {/* VIEW NOTE DETAIL MODAL */}
       {viewingNote && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-3">
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-3">
           <div className="bg-white rounded-2xl border border-slate-200 max-w-lg w-full p-5 shadow-2xl text-xs flex flex-col">
             <div className="flex items-center justify-between pb-3 border-b border-slate-200">
               <div className="flex items-center gap-2">
@@ -783,7 +796,7 @@ export default function StandaloneNotesPage() {
 
       {/* CANCEL MODAL */}
       {cancelTarget && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-3">
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-3">
           <div className="bg-white rounded-2xl border border-slate-200 max-w-md w-full p-5 shadow-2xl text-xs flex flex-col">
             <h3 className="font-bold text-base text-[#1F2E4A] mb-1">
               Cancel Note {cancelTarget.note_number || cancelTarget.noteNumber}?

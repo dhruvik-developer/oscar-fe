@@ -191,7 +191,7 @@ export default function Candidates() {
         position: cand.position,
         jobType: "Full-time",
         dept: cand.position?.includes("Design") ? "Design" : cand.position?.includes("HR") ? "HR" : "Engineering",
-        salary: "$95,000 / annum",
+        salary: "₹95,000 / annum",
         location: cand.location || "New York HQ",
         workMode: "Hybrid",
         sentDate: new Date().toISOString().split("T")[0],

@@ -1,4 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { PaymentInPage } from '../sales/PaymentInPage';
+import { PaymentOutPage } from '../purchase/PaymentOutPage';
 import { Plus, ArrowRightLeft } from 'lucide-react';
 import { api } from '../../services/api';
 import { Button } from '../../components/ui/Button';
@@ -12,6 +15,7 @@ import {
   ErrorState,
   Kpi,
   LoadingState,
+  TabBar,
   describeApiError,
   fetchAllPages,
   formatDate,
@@ -41,6 +45,14 @@ const cashBankGuide = {
 const BANK_TYPES = ['Bank', 'Cash', 'UPI', 'Card'];
 const TRANSFER_PAGE_SIZE = 25;
 
+const CASH_BANK_TABS = [
+  { id: 'accounts', label: 'Bank & Cash Accounts' },
+  { id: 'receipts', label: 'Receipts (Payment In)' },
+  { id: 'payments', label: 'Payments (Payment Out)' },
+  { id: 'transfers', label: 'Inter-Account Transfers' },
+];
+
+
 const emptyBank = () => ({
   name: '',
   type: '',
@@ -63,6 +75,16 @@ const emptyTransfer = () => ({
 });
 
 export const CashBankPage = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab = searchParams.get('tab') || 'accounts';
+  const handleTabChange = (t) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set('tab', t);
+      return next;
+    });
+  };
+
   const [banks, setBanks] = useState([]);
   const [banksLoading, setBanksLoading] = useState(true);
   const [banksError, setBanksError] = useState('');
@@ -236,124 +258,140 @@ export const CashBankPage = () => {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Cash & Bank Accounts"
-        subtitle="Ledger balances of bank and cash accounts, and inter-account transfers."
+        title="Cash / Bank"
+        subtitle="Manage bank accounts, cash registers, customer receipts, vendor disbursements, and inter-account transfers."
         guide={cashBankGuide}
         actions={
           <div className="flex flex-wrap gap-2">
-            <Button variant="outline" icon={ArrowRightLeft} onClick={() => { setTransferForm(emptyTransfer()); setTransferFormError(''); setShowTransferForm(true); }} disabled={banks.length < 2}>
-              New Transfer
-            </Button>
-            <Button icon={Plus} onClick={openBankForm}>Add Bank / Cash Account</Button>
+            {activeTab === 'transfers' && (
+              <Button variant="outline" icon={ArrowRightLeft} onClick={() => { setTransferForm(emptyTransfer()); setTransferFormError(''); setShowTransferForm(true); }} disabled={banks.length < 2}>
+                New Transfer
+              </Button>
+            )}
+            {activeTab === 'accounts' && (
+              <Button icon={Plus} onClick={openBankForm}>Add Bank / Cash Account</Button>
+            )}
           </div>
         }
       />
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <Kpi
-          label="Total Liquidity"
-          value={balances ? formatINR(balances.aggregates?.totalBalance) : '—'}
-          tone="text-slate-900"
-          note={balancesError ? 'Balances unavailable' : 'Sum of ledger balances (server)'}
-        />
-        <Kpi label="Bank & Cash Accounts" value={banksLoading ? '—' : String(banks.length)} />
-        <Kpi label="Transfers Recorded" value={transfers ? String(transfers.count ?? 0) : '—'} />
-      </div>
-      <ErrorState message={balancesError ? `Balances could not be loaded — ${balancesError}` : ''} onRetry={loadBalances} />
+      <TabBar tabs={CASH_BANK_TABS} active={activeTab} onChange={handleTabChange} />
 
-      <Card title="Bank & Cash Register" subtitle="Balance = opening balance + posted debits − credits on the linked ledger account.">
-        <ErrorState message={banksError} onRetry={loadBanks} />
-        {banksLoading ? (
-          <LoadingState label="Loading accounts…" />
-        ) : !banksError && (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[760px] text-left text-xs text-slate-600">
-              <thead className="bg-slate-50 border-b border-[#dce5f4]">
-                <tr>
-                  <SortableTh sort={bankSort} sortKey="name" className={thClass}>Account</SortableTh>
-                  <SortableTh sort={bankSort} sortKey="type" className={thClass}>Type</SortableTh>
-                  <SortableTh sort={bankSort} sortKey="bankBranch" className={thClass}>Bank / Branch</SortableTh>
-                  <SortableTh sort={bankSort} sortKey="accountNo" className={thClass}>Account No. / IFSC</SortableTh>
-                  <SortableTh sort={bankSort} sortKey="accountName" className={thClass}>Ledger Account</SortableTh>
-                  <SortableTh sort={bankSort} sortKey="openingBalance" className={`${thClass} text-right`} align="right">Opening</SortableTh>
-                  <SortableTh sort={bankSort} sortKey="balance" className={`${thClass} text-right`} align="right">Balance</SortableTh>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {banks.length === 0 && <EmptyRow colSpan={7} message="No bank or cash accounts yet. Add one to start tracking balances." />}
-                {bankSort.rows.map((b) => (
-                  <tr key={b.id} className="hover:bg-slate-50">
-                    <td className="py-2 px-3">
-                      <span className="font-semibold text-slate-800">{b.name}</span>
-                      {b.isDefault && <span className="ml-2 inline-flex px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">Default</span>}
-                      {b.isActive === false && <span className="ml-2 inline-flex px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-500">Inactive</span>}
-                    </td>
-                    <td className="py-2 px-3">{b.type}</td>
-                    <td className="py-2 px-3">{[b.bankName, b.branch].filter(Boolean).join(' · ') || '—'}</td>
-                    <td className="py-2 px-3 font-mono">{[b.accountNumber, b.ifsc].filter(Boolean).join(' · ') || '—'}</td>
-                    <td className="py-2 px-3">{b.accountName || '—'}</td>
-                    <td className="py-2 px-3 text-right font-mono">{formatINR(b.openingBalance)}</td>
-                    <td className="py-2 px-3 text-right font-mono font-bold text-slate-900">{formatINR(b.balance)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+      {activeTab === 'accounts' && (
+        <>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <Kpi
+              label="Total Liquidity"
+              value={balances ? formatINR(balances.aggregates?.totalBalance) : '—'}
+              tone="text-slate-900"
+              note={balancesError ? 'Balances unavailable' : 'Sum of ledger balances (server)'}
+            />
+            <Kpi label="Bank & Cash Accounts" value={banksLoading ? '—' : String(banks.length)} />
+            <Kpi label="Transfers Recorded" value={transfers ? String(transfers.count ?? 0) : '—'} />
           </div>
-        )}
-      </Card>
+          <ErrorState message={balancesError ? `Balances could not be loaded — ${balancesError}` : ''} onRetry={loadBalances} />
 
-      {balanceRows.length > 0 && (
-        <Card title="Ledger Balances" subtitle="As reported by /accounts/balances/.">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {balanceRows.map((r) => (
-              <div key={r.id} className="border border-[#dce5f4] rounded-xl p-3">
-                <p className="text-[11px] font-semibold text-slate-500">{r.name}{r.bankName ? ` · ${r.bankName}` : ''}</p>
-                <p className="font-mono font-bold text-slate-900 mt-1">{formatINR(r.balance)}</p>
+          <Card title="Bank & Cash Register" subtitle="Balance = opening balance + posted debits − credits on the linked ledger account.">
+            <ErrorState message={banksError} onRetry={loadBanks} />
+            {banksLoading ? (
+              <LoadingState label="Loading accounts…" />
+            ) : !banksError && (
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[760px] text-left text-xs text-slate-600">
+                  <thead className="bg-slate-50 border-b border-[#dce5f4]">
+                    <tr>
+                      <SortableTh sort={bankSort} sortKey="name" className={thClass}>Account</SortableTh>
+                      <SortableTh sort={bankSort} sortKey="type" className={thClass}>Type</SortableTh>
+                      <SortableTh sort={bankSort} sortKey="bankBranch" className={thClass}>Bank / Branch</SortableTh>
+                      <SortableTh sort={bankSort} sortKey="accountNo" className={thClass}>Account No. / IFSC</SortableTh>
+                      <SortableTh sort={bankSort} sortKey="accountName" className={thClass}>Ledger Account</SortableTh>
+                      <SortableTh sort={bankSort} sortKey="openingBalance" className={`${thClass} text-right`} align="right">Opening</SortableTh>
+                      <SortableTh sort={bankSort} sortKey="balance" className={`${thClass} text-right`} align="right">Balance</SortableTh>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {banks.length === 0 && <EmptyRow colSpan={7} message="No bank or cash accounts yet. Add one to start tracking balances." />}
+                    {bankSort.rows.map((b) => (
+                      <tr key={b.id} className="hover:bg-slate-50">
+                        <td className="py-2 px-3">
+                          <span className="font-semibold text-slate-800">{b.name}</span>
+                          {b.isDefault && <span className="ml-2 inline-flex px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">Default</span>}
+                          {b.isActive === false && <span className="ml-2 inline-flex px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-500">Inactive</span>}
+                        </td>
+                        <td className="py-2 px-3">{b.type}</td>
+                        <td className="py-2 px-3">{[b.bankName, b.branch].filter(Boolean).join(' · ') || '—'}</td>
+                        <td className="py-2 px-3 font-mono">{[b.accountNumber, b.ifsc].filter(Boolean).join(' · ') || '—'}</td>
+                        <td className="py-2 px-3">{b.accountName || '—'}</td>
+                        <td className="py-2 px-3 text-right font-mono">{formatINR(b.openingBalance)}</td>
+                        <td className="py-2 px-3 text-right font-mono font-bold text-slate-900">{formatINR(b.balance)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-            ))}
-          </div>
-        </Card>
+            )}
+          </Card>
+
+          {balanceRows.length > 0 && (
+            <Card title="Ledger Balances" subtitle="As reported by /accounts/balances/.">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {balanceRows.map((r) => (
+                  <div key={r.id} className="border border-[#dce5f4] rounded-xl p-3">
+                    <p className="text-[11px] font-semibold text-slate-500">{r.name}{r.bankName ? ` · ${r.bankName}` : ''}</p>
+                    <p className="font-mono font-bold text-slate-900 mt-1">{formatINR(r.balance)}</p>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          )}
+        </>
       )}
 
-      <Card title="Inter-Account Transfers" subtitle="Each transfer posts a balanced journal entry on the server; P&L is unaffected.">
-        <ErrorState message={transfersError} onRetry={loadTransfers} />
-        {transfersLoading ? (
-          <LoadingState label="Loading transfers…" />
-        ) : !transfersError && (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[680px] text-left text-xs text-slate-600">
-              <thead className="bg-slate-50 border-b border-[#dce5f4]">
-                <tr>
-                  <th className={thClass}>Date</th>
-                  <th className={thClass}>From</th>
-                  <th className={thClass}>To</th>
-                  <th className={thClass}>Reference</th>
-                  <th className={thClass}>Notes</th>
-                  <th className={`${thClass} text-right`}>Amount</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {transferRows.length === 0 && <EmptyRow colSpan={6} message="No transfers recorded yet." />}
-                {transferRows.map((t) => (
-                  <tr key={t.id} className="hover:bg-slate-50">
-                    <td className="py-2 px-3 font-mono whitespace-nowrap">{formatDate(t.date)}</td>
-                    <td className="py-2 px-3">{bankName(t.fromAccountId)}</td>
-                    <td className="py-2 px-3">{bankName(t.toAccountId)}</td>
-                    <td className="py-2 px-3 font-mono">{t.reference || '—'}</td>
-                    <td className="py-2 px-3">{t.notes || '—'}</td>
-                    <td className="py-2 px-3 text-right font-mono font-bold text-slate-900">{formatINR(t.amount)}</td>
+      {activeTab === 'receipts' && <PaymentInPage embedded />}
+
+      {activeTab === 'payments' && <PaymentOutPage embedded />}
+
+      {activeTab === 'transfers' && (
+        <Card title="Inter-Account Transfers" subtitle="Each transfer posts a balanced journal entry on the server; P&L is unaffected.">
+          <ErrorState message={transfersError} onRetry={loadTransfers} />
+          {transfersLoading ? (
+            <LoadingState label="Loading transfers…" />
+          ) : !transfersError && (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[680px] text-left text-xs text-slate-600">
+                <thead className="bg-slate-50 border-b border-[#dce5f4]">
+                  <tr>
+                    <th className={thClass}>Date</th>
+                    <th className={thClass}>From</th>
+                    <th className={thClass}>To</th>
+                    <th className={thClass}>Reference</th>
+                    <th className={thClass}>Notes</th>
+                    <th className={`${thClass} text-right`}>Amount</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-        {transfers && (transfers.count ?? 0) > TRANSFER_PAGE_SIZE && (
-          <div className="mt-3">
-            <Pagination total={transfers.count} page={transferPage} pageSize={TRANSFER_PAGE_SIZE} onChange={setTransferPage} />
-          </div>
-        )}
-      </Card>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {transferRows.length === 0 && <EmptyRow colSpan={6} message="No transfers recorded yet." />}
+                  {transferRows.map((t) => (
+                    <tr key={t.id} className="hover:bg-slate-50">
+                      <td className="py-2 px-3 font-mono whitespace-nowrap">{formatDate(t.date)}</td>
+                      <td className="py-2 px-3">{bankName(t.fromAccountId)}</td>
+                      <td className="py-2 px-3">{bankName(t.toAccountId)}</td>
+                      <td className="py-2 px-3 font-mono">{t.reference || '—'}</td>
+                      <td className="py-2 px-3">{t.notes || '—'}</td>
+                      <td className="py-2 px-3 text-right font-mono font-bold text-slate-900">{formatINR(t.amount)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          {transfers && (transfers.count ?? 0) > TRANSFER_PAGE_SIZE && (
+            <div className="mt-3">
+              <Pagination total={transfers.count} page={transferPage} pageSize={TRANSFER_PAGE_SIZE} onChange={setTransferPage} />
+            </div>
+          )}
+        </Card>
+      )}
 
       <Modal isOpen={showBankForm} onClose={bankSaving ? undefined : () => setShowBankForm(false)} title="Add Bank / Cash Account" size="lg">
         <form onSubmit={handleCreateBank} className="space-y-3 text-xs">

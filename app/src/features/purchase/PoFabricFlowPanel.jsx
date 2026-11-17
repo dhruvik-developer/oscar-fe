@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { modal } from '../../context/ModalContext';
 import { Link } from 'react-router-dom';
 import {
   Factory, Truck, Droplets, Warehouse, Layers, Wallet, Scale, Spool, RefreshCw, Plus, Pencil, Trash2, Undo2, QrCode,
@@ -481,7 +482,7 @@ function CostsSection({ data, run, busy, flowB, money }) {
             x.expenseDate, x.billReference || '—', x.status === 'ACTUAL' ? 'Actual' : 'Estimated', money(x.amount), money(x.allocated),
             <span className="inline-flex gap-1">
               <button type="button" aria-label="Edit cost" className="p-1 rounded hover:bg-slate-100" onClick={() => setForm({ ...blank, ...Object.fromEntries(Object.entries(x).map(([k, v]) => [k, v ?? ''])) })}><Pencil size={12} /></button>
-              <button type="button" aria-label="Remove cost" className="p-1 rounded hover:bg-rose-50 text-rose-600" disabled={busy} onClick={() => { if (window.confirm(`Remove ${x.expenseType} (${money(x.amount)})? Its share is taken off the batches.`)) run(`expense-del-${x.id}`, 'delete', `expenses/${x.id}/`); }}><Trash2 size={12} /></button>
+              <button type="button" aria-label="Remove cost" className="p-1 rounded hover:bg-rose-50 text-rose-600" disabled={busy} onClick={async () => { const ok = await modal.deleteConfirm(`Remove ${x.expenseType} (${money(x.amount)})? Its share is taken off the batches.`, 'Remove Cost'); if (ok) run(`expense-del-${x.id}`, 'delete', `expenses/${x.id}/`); }}><Trash2 size={12} /></button>
             </span>,
           ])}
         />
@@ -566,7 +567,7 @@ function ReconcileSection({ data, run, busy }) {
           head={[['Date'], ['Category'], ['Qty', 1], ['Reason'], ['Reference'], ['By'], ['']]}
           rows={data.discrepancies.map((x) => [x.date, x.categoryLabel, qty(x.quantity), x.reason, x.reference || '—', x.user || '—',
             <button type="button" className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-600 hover:text-rose-700" disabled={busy}
-              onClick={() => { const why = window.prompt(`Release ${qty(x.quantity)} ${x.categoryLabel.toLowerCase()}? Give a reason.`); if (why !== null) run(`release-${x.id}`, 'delete', `discrepancies/${x.id}/?reason=${encodeURIComponent(why)}`); }}>
+              onClick={async () => { const why = await modal.prompt({ title: 'Release Discrepancy', message: `Release ${qty(x.quantity)} ${x.categoryLabel.toLowerCase()}? Give a reason.`, placeholder: 'Enter reason for release...', confirmLabel: 'Release Quantity' }); if (why !== null && why !== undefined) run(`release-${x.id}`, 'delete', `discrepancies/${x.id}/?reason=${encodeURIComponent(why)}`); }}>
               <Undo2 size={12} /> Release
             </button>])}
         />

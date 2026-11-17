@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { modal } from '../../../context/ModalContext';
 import { Link } from 'react-router-dom';
 import { ChevronDown, ChevronRight, Search } from 'lucide-react';
 import PageHeader from '../../../components/ui/PageHeader';
@@ -40,7 +41,13 @@ export function QCReprocessPage() {
   useEffect(() => { load(); }, [load]);
 
   const backToQc = async (row) => {
-    const cost = window.prompt(`Rework of ${row.batchCode} done in-house. Rework cost in ₹ (leave blank if none):`, '');
+    const cost = await modal.prompt({
+      title: 'Rework In-House',
+      message: `Rework of ${row.batchCode} done in-house. Rework cost in ₹ (leave blank if none):`,
+      defaultValue: '',
+      placeholder: 'Rework cost in ₹...',
+      confirmLabel: 'Send Back to QC',
+    });
     if (cost === null) return;
     setBusy(row.batchCode);
     setError('');

@@ -1324,7 +1324,7 @@ export function ProcessPlanStageWorkspace({
           VIEW PLAN DETAILS MODAL
          ========================================================================= */}
       {viewPlanModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="w-full max-w-2xl bg-white rounded-2xl shadow-2xl border border-slate-200 p-5 space-y-4 max-h-[90vh] overflow-y-auto text-xs">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div>
@@ -1438,7 +1438,7 @@ export function ProcessPlanStageWorkspace({
           CONFIRM JWO CREATION MODAL
          ========================================================================= */}
       {confirmJwoModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl border border-slate-200 p-5 space-y-4 text-xs">
             <div className="flex items-center gap-3 text-blue-600">
               <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-200 flex items-center justify-center shrink-0">

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { modal } from '../../../../context/ModalContext';
 import { AlertCircle, Link2, Copy, Check, ExternalLink, Ban, RefreshCw, Factory } from 'lucide-react';
 import { Modal } from '../../../../components/ui/Modal';
 import { Button } from '../../../../components/ui/Button';
@@ -74,13 +75,25 @@ export function ProductionLinkModal({ isOpen, onClose, project }) {
     }
   }
 
-  function handleRegenerate() {
-    if (!window.confirm('Generate a new link? The current link will stop working immediately.')) return;
+  async function handleRegenerate() {
+    const ok = await modal.confirm({
+      title: 'Regenerate Production Link',
+      message: 'Generate a new link? The current link will stop working immediately.',
+      confirmLabel: 'Regenerate Link',
+      iconType: 'warning',
+    });
+    if (!ok) return;
     run(() => issueProductionLink(projectId, { regenerate: true }));
   }
 
-  function handleRevoke() {
-    if (!window.confirm('Revoke this link? Anyone using it will no longer be able to record production.')) return;
+  async function handleRevoke() {
+    const ok = await modal.confirm({
+      title: 'Revoke Production Link',
+      message: 'Revoke this link? Anyone using it will no longer be able to record production.',
+      confirmLabel: 'Revoke Link',
+      iconType: 'danger',
+    });
+    if (!ok) return;
     run(() => revokeProductionLink(projectId));
   }
 

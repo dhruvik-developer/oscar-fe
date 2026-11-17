@@ -91,7 +91,7 @@ export default function TrainingList({ embedded = false, onBack }) {
       </div> }
   ];
 
-  function FormFields() {
+  function renderFormFields() {
     return (
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <label className="sm:col-span-2 flex flex-col gap-1">
@@ -200,11 +200,11 @@ export default function TrainingList({ embedded = false, onBack }) {
       <DataTable columns={cols} data={filtered} emptyTitle="No trainings" emptyDesc="Add a training program to get started." emptyAction={<Button onClick={() => setAddOpen(true)}>+ Add Training</Button>} />
 
       <Modal isOpen={addOpen} onClose={() => setAddOpen(false)} title="Add Training Program" footer={<><Button variant="secondary" onClick={() => setAddOpen(false)}>Cancel</Button><Button onClick={save}>Save Training</Button></>}>
-        <FormFields />
+        {renderFormFields()}
       </Modal>
 
       <Modal isOpen={!!editRow} onClose={() => setEditRow(null)} title="Edit Training Program" footer={<><Button variant="secondary" onClick={() => setEditRow(null)}>Cancel</Button><Button onClick={save}>Save Training</Button></>}>
-        <FormFields />
+        {renderFormFields()}
       </Modal>
 
       <Drawer isOpen={!!viewRow} onClose={() => setViewRow(null)} title={viewRow?.name ?? ""} subtitle={`${viewRow?.trainer} \u2022 ${viewRow?.department}`} footer={<Button variant="secondary" onClick={() => setViewRow(null)}>Close</Button>}>

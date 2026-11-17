@@ -70,7 +70,7 @@ export const CommandPalette = ({ isOpen, onClose }) => {
         .slice(0, 4)
         .map((i) => ({
         label: `[${i.sku}] ${i.name}`,
-        sub: `Stock: ${i.stock || 0} ${i.unit || 'pcs'} • Selling: $${i.sellingPrice}`,
+        sub: `Stock: ${i.stock || 0} ${i.unit || 'pcs'} • Selling: ₹${i.sellingPrice}`,
         path: '/inventory/items',
         icon: Package,
         category: 'Inventory Items',
@@ -82,7 +82,7 @@ export const CommandPalette = ({ isOpen, onClose }) => {
         .slice(0, 3)
         .map((c) => ({
         label: c.name,
-        sub: `Code: ${c.code} • Outstanding: $${c.balance.toFixed(2)}`,
+        sub: `Code: ${c.code} • Outstanding: ₹${c.balance.toFixed(2)}`,
         path: '/parties',
         icon: Users,
         category: 'Customers',
@@ -93,7 +93,7 @@ export const CommandPalette = ({ isOpen, onClose }) => {
         .slice(0, 3)
         .map((v) => ({
         label: v.name,
-        sub: `Vendor Code: ${v.code} • Outstanding Payable: $${v.balance.toFixed(2)}`,
+        sub: `Vendor Code: ${v.code} • Outstanding Payable: ₹${v.balance.toFixed(2)}`,
         path: '/parties',
         icon: Building2,
         category: 'Suppliers & Vendors',
@@ -104,7 +104,7 @@ export const CommandPalette = ({ isOpen, onClose }) => {
         .slice(0, 3)
         .map((o) => ({
         label: `${o.orderNumber} - ${o.customer}`,
-        sub: `Value: $${o.amount.toFixed(2)} • Stage: ${o.stage}`,
+        sub: `Value: ₹${o.amount.toFixed(2)} • Stage: ${o.stage}`,
         path: '/sales/orders',
         icon: ShoppingCart,
         category: 'Sales Orders',
@@ -116,7 +116,7 @@ export const CommandPalette = ({ isOpen, onClose }) => {
         .slice(0, 3)
         .map((pi) => ({
         label: `${pi.piNumber} - ${pi.customer}`,
-        sub: `Total: $${(pi.grandTotal || pi.total || 0).toFixed(2)} • Status: ${pi.status}`,
+        sub: `Total: ₹${(pi.grandTotal || pi.total || 0).toFixed(2)} • Status: ${pi.status}`,
         path: '/sales/proforma',
         icon: FileSpreadsheet,
         category: 'Proforma Invoices',
@@ -127,7 +127,7 @@ export const CommandPalette = ({ isOpen, onClose }) => {
         .slice(0, 3)
         .map((inv) => ({
         label: `${inv.invoiceNumber} - ${inv.customer}`,
-        sub: `Total: $${inv.total.toFixed(2)} • Status: ${inv.status}`,
+        sub: `Total: ₹${inv.total.toLocaleString('en-IN', { minimumFractionDigits: 2 })} • Status: ${inv.status}`,
         path: '/sales/invoices',
         icon: Receipt,
         category: 'Invoices',

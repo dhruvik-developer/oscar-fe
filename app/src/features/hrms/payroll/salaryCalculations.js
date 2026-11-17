@@ -49,40 +49,102 @@ export function calculateSalaryComponents({
   status = "In Progress",
   paidAmount = null,
   paymentDate = null,
+  dailyHours = 8,
+  earlyLeavingMinutes = 0,
+  shortHoursDeduction = 0,
+  promotion = null, // { effective_date, previous_salary, new_salary }
+  cycleYearMonth = null, // e.g. "2026-10"
+  salaryType = "monthly", // "monthly" | "hourly"
+  hourlyRate: explicitHourlyRate = null,
+  totalAttendedHours = null,
 }) {
-  const std = Math.max(0, Number(standardSalary) || 0);
+  let std = Math.max(0, Number(standardSalary) || 0);
+
+  // If a promotion occurred within the cycle month, calculate pro-rated standard salary
+  // from the promotion effective date.
+  if (promotion && (promotion.new_salary || promotion.newSalary)) {
+    const effDateStr = promotion.effective_date || promotion.effectiveDate;
+    if (effDateStr) {
+      const effDate = new Date(effDateStr);
+      if (!isNaN(effDate.getTime())) {
+        const year = effDate.getFullYear();
+        const month = effDate.getMonth();
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+        const dayOfMonth = effDate.getDate(); // 1 to 31
+
+        const prevSal = Number(promotion.previous_salary || promotion.previousSalary) || std;
+        const newSal = Number(promotion.new_salary || promotion.newSalary) || std;
+
+        // Days before promotion effective date vs days from promotion date onwards
+        const daysBefore = Math.max(0, dayOfMonth - 1);
+        const daysAfter = Math.max(1, daysInMonth - daysBefore);
+
+        std = Math.round(((prevSal * daysBefore) + (newSal * daysAfter)) / daysInMonth);
+      }
+    }
+  }
+
   const totalD = Math.max(1, Number(totalDays) || 24);
+  const dHours = Math.max(1, Number(dailyHours) || 8);
 
   // If attendedDays is explicitly provided, use it; otherwise default to totalD
+  // Note: Half days are passed as 0.5 day (e.g. 23.5 days), meaning 0.5 day is cut.
   const attDays =
     attendedDays !== null && attendedDays !== undefined && !isNaN(Number(attendedDays))
       ? Math.max(0, Number(attendedDays))
       : totalD;
 
+  // Approved paid leaves given by the company are protected and do not cause salary deduction.
   const pLeaves = Math.max(0, Number(paidLeaves) || 0);
   const payableDays = Math.min(totalD, attDays + pLeaves);
   const absentDays = Math.max(0, totalD - payableDays); // Remaining unattended days
 
-  // Per-day rate calculation
+  // Per-day rate and hourly rate calculation
   const perDaySalary = totalD > 0 ? std / totalD : 0;
+  let effectiveHourlyRate = (totalD * dHours) > 0 ? std / (totalD * dHours) : 0;
+  if (explicitHourlyRate !== null && explicitHourlyRate !== undefined && !isNaN(Number(explicitHourlyRate))) {
+    effectiveHourlyRate = Math.max(0, Number(explicitHourlyRate));
+  }
 
-  // Attendance deduction: Remaining days salary removed from final salary
-  const attendanceDeduction = Math.round(perDaySalary * absentDays);
+  // Attendance deduction: Remaining unapproved / unattended days removed from final salary
+  let attendanceDeduction = Math.round(perDaySalary * absentDays);
 
-  // Earned salary: Standard base minus remaining days deduction
-  const earned =
-    earnedSalary !== null && earnedSalary !== undefined && !isNaN(earnedSalary) && attendedDays === null
-      ? Math.max(0, Number(earnedSalary))
-      : Math.max(0, std - attendanceDeduction);
+  // Early checkout / short working hours deduction
+  const earlyMins = Math.max(0, Number(earlyLeavingMinutes) || 0);
+  const earlyCheckoutDeduction = earlyMins > 0 ? Math.round((earlyMins / 60) * effectiveHourlyRate) : 0;
+  const explicitShortDeduction = Math.max(0, Number(shortHoursDeduction) || 0);
+  const totalWorkingHourDeduction = earlyCheckoutDeduction + explicitShortDeduction;
+
+  // Earned salary calculation:
+  // If Hourly Salary mode: Earned = Attended Hours * Hourly Rate + Paid Leaves Value
+  // If Monthly Salary mode: Earned = Standard Base - Attendance LOP
+  let earned = 0;
+  if (salaryType === "hourly") {
+    const workedHours = totalAttendedHours !== null && totalAttendedHours !== undefined
+      ? Number(totalAttendedHours)
+      : attDays * dHours;
+    const paidLeaveHours = pLeaves * dHours;
+    earned = Math.round((workedHours + paidLeaveHours) * effectiveHourlyRate);
+    attendanceDeduction = Math.max(0, Math.round(absentDays * dHours * effectiveHourlyRate));
+    // For hourly mode, baseline standard represents scheduled full month target
+    if (std === 0 && effectiveHourlyRate > 0) {
+      std = Math.round(totalD * dHours * effectiveHourlyRate);
+    }
+  } else {
+    earned =
+      earnedSalary !== null && earnedSalary !== undefined && !isNaN(earnedSalary) && attendedDays === null
+        ? Math.max(0, Number(earnedSalary))
+        : Math.max(0, std - attendanceDeduction);
+  }
 
   const earnings = Math.max(0, Number(additionalEarnings) || 0);
-  const ded = Math.max(0, Number(deductions) || 0);
+  const standardDeductions = Math.max(0, Number(deductions) || 0);
+  const totalDeductions = standardDeductions + (salaryType === "hourly" ? explicitShortDeduction : totalWorkingHourDeduction);
   const adv = Math.max(0, Number(advance) || 0);
 
   // Core formula:
-  // Remaining Payable = Standard Salary - Attendance Deduction + Additional Earnings - Deductions - Advance
-  // Equivalent to: Earned Salary + Additional Earnings - Deductions - Advance
-  const remainingPayable = Math.max(0, earned + earnings - ded - adv);
+  // Remaining Payable = Earned Salary + Additional Earnings - Deductions - Advance
+  const remainingPayable = Math.max(0, earned + earnings - totalDeductions - adv);
 
   // Progress indicator: Earned vs Standard
   const earnedProgress = std > 0 ? Math.min(100, Math.round((earned / std) * 100)) : 100;
@@ -97,17 +159,22 @@ export function calculateSalaryComponents({
     : null;
 
   return {
+    salaryType,
     standardSalary: std,
     earnedSalary: earned,
     perDaySalary: Math.round(perDaySalary),
+    hourlyRate: Math.round(effectiveHourlyRate),
     attendanceDeduction,
     absentDays,
     attendedDays: attDays,
     totalDays: totalD,
     payableDays,
     paidLeaves: pLeaves,
+    earlyLeavingMinutes: earlyMins,
+    workingHourDeduction: totalWorkingHourDeduction,
     additionalEarnings: earnings,
-    deductions: ded,
+    deductions: totalDeductions,
+    standardDeductions,
     advance: adv,
     remainingPayable,
     earnedProgress,

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { modal } from '../../../../context/ModalContext';
 import { Trash2 } from 'lucide-react';
 import { useERP } from '../../../../context/ERPContext';
 import { formatINR, formatNumberIN } from '../../../accounts/accountingShared';
@@ -96,7 +97,7 @@ export default function YarnTab({ batch, onBatch }) {
                 {['issued', 'consumed', 'returned', 'waste'].map((k) => <td key={k} className="px-2 py-1.5 text-right tabular-nums">{formatNumberIN(r[k])} {r.uom}</td>)}
                 <td className="px-2 py-1.5 text-right">
                   {perms.production && (
-                    <button type="button" disabled={busy} onClick={() => { if (window.confirm('Remove this yarn entry?')) run('yarn-delete', { yarnId: r.id }, 'Yarn entry removed.'); }} aria-label="Remove yarn entry" className="p-1.5 rounded-md border border-slate-200 text-slate-500 hover:text-rose-700 cursor-pointer"><Trash2 size={13} /></button>
+                    <button type="button" disabled={busy} onClick={async () => { const ok = await modal.deleteConfirm('Remove this yarn entry?', 'Remove Yarn Entry'); if (ok) run('yarn-delete', { yarnId: r.id }, 'Yarn entry removed.'); }} aria-label="Remove yarn entry" className="p-1.5 rounded-md border border-slate-200 text-slate-500 hover:text-rose-700 cursor-pointer"><Trash2 size={13} /></button>
                   )}
                 </td>
               </tr>

@@ -139,9 +139,6 @@ export function GreyStockUpdatedInlineSlide({ po, onClose, onNextStep, onPrevSte
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="px-2 py-0.5 rounded text-[10px] font-black bg-teal-100 text-teal-800 uppercase tracking-wider">
-                Stage 6 Slide
-              </span>
               <h3 className="text-sm font-extrabold text-slate-900">
                 Grey Stock Updated (Godown Inventory)
               </h3>
@@ -246,7 +243,7 @@ export function GreyStockUpdatedInlineSlide({ po, onClose, onNextStep, onPrevSte
               {stats.passedCount === 0 && (
                 <tr>
                   <td colSpan={6} className="py-6 text-center text-slate-400 font-sans">
-                    No QC-approved takas posted to godown stock yet. Complete Stage 5 QC inspection first.
+                    No QC-approved takas posted to godown stock yet. Complete QC inspection first.
                   </td>
                 </tr>
               )}
@@ -267,9 +264,6 @@ export function GreyStockUpdatedInlineSlide({ po, onClose, onNextStep, onPrevSte
               <span>Previous: Grey Fabric QC</span>
             </button>
           )}
-          <span className="text-[11px] text-slate-500 font-medium hidden md:inline">
-            Stage 6 of 8 • Inventory Stock Updated
-          </span>
         </div>
 
         <div className="flex items-center gap-2 ml-auto">

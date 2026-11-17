@@ -1,17 +1,18 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
-  AlertTriangle, BadgePercent, CalendarClock, CheckCircle2, Clock, IndianRupee, Plus, RefreshCw, Wallet,
+  AlertTriangle, BadgePercent, CalendarClock, CheckCircle2, Clock, IndianRupee, Plus, RefreshCw, RotateCcw, Wallet,
 } from 'lucide-react';
 import KpiCard from '../../../components/ui/KpiCard';
 import { PageHeader } from '../../../components/ui/PageHeader';
+import TablePagination from '../../../components/ui/TablePagination';
+import { useERP } from '../../../context/ERPContext';
 import { partiesService, receivablesService } from '../../../services/domainServices';
 import { DiscountRequestDrawer } from './DiscountRequestDrawer';
-import { DiscountRequestModal, PaymentTermsModal, RecordPaymentModal } from './PaymentDialogs';
+import { RecordPaymentModal } from './PaymentDialogs';
 import {
   DISCOUNT_STATUSES, INVOICE_STATUSES, STATUS_TONE, date, errorText, money, num, useCan,
 } from './receivablesFormat';
 
-const PAGE_SIZE = 25;
 const input = 'h-9 rounded-lg border border-border bg-card px-2.5 text-[13px] text-text focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20';
 const linkBtn = 'text-[12.5px] font-semibold text-primary hover:underline disabled:opacity-40 disabled:no-underline cursor-pointer';
 
@@ -23,22 +24,15 @@ function Status({ value }) {
   return <span className={`inline-block whitespace-nowrap text-[11.5px] font-semibold px-2 py-0.5 rounded-md border ${STATUS_TONE[value] || 'border-border'}`}>{value}</span>;
 }
 
-function Pager({ page, count, onPage }) {
-  const pages = Math.max(1, Math.ceil(count / PAGE_SIZE));
-  return (
-    <div className="flex items-center justify-between px-3 py-2 border-t border-border text-[12.5px] text-muted">
-      <span>{count} record{count === 1 ? '' : 's'}</span>
-      <div className="flex items-center gap-2">
-        <button type="button" className={linkBtn} disabled={page <= 1} onClick={() => onPage(page - 1)}>Previous</button>
-        <span>Page {page} of {pages}</span>
-        <button type="button" className={linkBtn} disabled={page >= pages} onClick={() => onPage(page + 1)}>Next</button>
-      </div>
-    </div>
-  );
-}
-
-function Filters({ filters, setFilters, customers, statuses, statusLabel, searchPlaceholder }) {
-  const set = (k) => (e) => setFilters((f) => ({ ...f, [k]: e.target.value, page: 1 }));
+function Filters({ filters, setFilters, customers, statuses, statusLabel, searchPlaceholder, onResetPage }) {
+  const set = (k) => (e) => {
+    setFilters((f) => ({ ...f, [k]: e.target.value }));
+    onResetPage?.();
+  };
+  const reset = () => {
+    setFilters({ ...EMPTY_FILTERS });
+    onResetPage?.();
+  };
   return (
     <div className="flex flex-wrap items-end gap-2 px-3 py-3 border-b border-border">
       <input aria-label="Search" placeholder={searchPlaceholder} className={`${input} w-56`} value={filters.search} onChange={set('search')} />
@@ -52,26 +46,32 @@ function Filters({ filters, setFilters, customers, statuses, statusLabel, search
       </select>
       <label className="text-[12px] text-muted flex items-center gap-1">From <input type="date" className={input} value={filters.from} onChange={set('from')} /></label>
       <label className="text-[12px] text-muted flex items-center gap-1">To <input type="date" className={input} value={filters.to} onChange={set('to')} /></label>
+      <button type="button" aria-label="Reset filters" title="Reset filters" onClick={reset} className="h-9 w-9 shrink-0 rounded-lg border border-border bg-card text-muted hover:text-primary hover:border-primary hover:bg-soft inline-flex items-center justify-center transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30">
+        <RotateCcw size={15} />
+      </button>
     </div>
   );
 }
 
-const EMPTY_FILTERS = { search: '', customerId: '', status: '', from: '', to: '', page: 1 };
+const EMPTY_FILTERS = { search: '', customerId: '', status: '', from: '', to: '' };
 
 export default function CustomerPaymentsPage() {
+  const { refreshCollections } = useERP();
   const can = useCan();
   const [tab, setTab] = useState('invoices');
   const [customers, setCustomers] = useState([]);
   const [invFilters, setInvFilters] = useState(EMPTY_FILTERS);
   const [reqFilters, setReqFilters] = useState(EMPTY_FILTERS);
+  const [invPage, setInvPage] = useState(1);
+  const [invPageSize, setInvPageSize] = useState(10);
+  const [reqPage, setReqPage] = useState(1);
+  const [reqPageSize, setReqPageSize] = useState(10);
   const [receivables, setReceivables] = useState({ results: [], count: 0, aggregates: {} });
   const [requests, setRequests] = useState({ results: [], count: 0 });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  const [payFor, setPayFor] = useState(null);       // { customerId, invoiceId } | {} for blank
-  const [termsFor, setTermsFor] = useState(null);   // invoice row
-  const [discountFor, setDiscountFor] = useState(null);
+  const [payFor, setPayFor] = useState(null);
   const [openRequestId, setOpenRequestId] = useState(null);
 
   useEffect(() => {
@@ -87,13 +87,19 @@ export default function CustomerPaymentsPage() {
       status: invFilters.status || undefined,
       date_from: invFilters.from || undefined,
       date_to: invFilters.to || undefined,
-      page: invFilters.page,
-      page_size: PAGE_SIZE,
+      page: invPage,
+      page_size: invPageSize,
     })
-      .then((b) => setReceivables({ results: rowsOf(b), count: b?.count || 0, aggregates: b?.aggregates || {} }))
+      .then((b) => {
+        const rows = rowsOf(b);
+        const count = typeof b?.count === 'number'
+          ? b.count
+          : (Array.isArray(b) ? b.length : (b?.results?.length || rows.length));
+        setReceivables({ results: rows, count, aggregates: b?.aggregates || {} });
+      })
       .catch((err) => setError(errorText(err, 'Could not load receivables.')))
       .finally(() => setLoading(false));
-  }, [invFilters]);
+  }, [invFilters, invPage, invPageSize]);
 
   const loadRequests = useCallback(() => receivablesService.getDiscountRequests({
     search: reqFilters.search || undefined,
@@ -101,17 +107,36 @@ export default function CustomerPaymentsPage() {
     status: reqFilters.status || undefined,
     date_from: reqFilters.from || undefined,
     date_to: reqFilters.to || undefined,
-    page: reqFilters.page,
-    page_size: PAGE_SIZE,
+    page: reqPage,
+    page_size: reqPageSize,
   })
-    .then((b) => setRequests({ results: rowsOf(b), count: b?.count || 0 }))
-    .catch((err) => setError(errorText(err, 'Could not load discount requests.'))), [reqFilters]);
+    .then((b) => {
+      const rows = rowsOf(b);
+      const count = typeof b?.count === 'number'
+        ? b.count
+        : (Array.isArray(b) ? b.length : (b?.results?.length || rows.length));
+      setRequests({ results: rows, count });
+    })
+    .catch((err) => setError(errorText(err, 'Could not load discount requests.'))), [reqFilters, reqPage, reqPageSize]);
 
   useEffect(() => { loadReceivables(); }, [loadReceivables]);
   useEffect(() => { loadRequests(); }, [loadRequests]);
 
-  const refreshAll = () => { loadReceivables(); loadRequests(); };
+  const refreshAll = () => {
+    loadReceivables();
+    loadRequests();
+    // Sales Invoices reads the shared collections, not this page's own lists.
+    refreshCollections(['invoices', 'paymentIns']);
+  };
   const k = receivables.aggregates;
+
+  const displayedInvoices = (receivables.results.length > invPageSize && receivables.count === receivables.results.length)
+    ? receivables.results.slice((invPage - 1) * invPageSize, invPage * invPageSize)
+    : receivables.results;
+
+  const displayedRequests = (requests.results.length > reqPageSize && requests.count === requests.results.length)
+    ? requests.results.slice((reqPage - 1) * reqPageSize, reqPage * reqPageSize)
+    : requests.results;
 
   return (
     <div className="space-y-5">
@@ -156,22 +181,22 @@ export default function CustomerPaymentsPage() {
         {tab === 'invoices' ? (
           <>
             <Filters filters={invFilters} setFilters={setInvFilters} customers={customers} statuses={INVOICE_STATUSES}
-              statusLabel="Payment status" searchPlaceholder="Invoice no. or customer" />
+              statusLabel="Payment status" searchPlaceholder="Invoice no. or customer" onResetPage={() => setInvPage(1)} />
             <div className="overflow-x-auto">
               <table className="w-full text-[12.5px]">
                 <thead className="text-left text-muted bg-soft/50">
                   <tr>
-                    {['Customer', 'Invoice no.', 'Invoice date', 'Due date', 'Terms', 'Invoice amount', 'Paid', 'Approved discount', 'Outstanding', 'Status', ''].map((h, i) => (
+                    {['Customer', 'Invoice no.', 'Invoice date', 'Due date', 'Terms', 'Invoice amount', 'Paid', 'Approved discount', 'Outstanding', 'Status'].map((h, i) => (
                       <th key={h || i} className={`px-3 py-2 font-medium whitespace-nowrap ${i >= 5 && i <= 8 ? 'text-right' : ''}`}>{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {loading && receivables.results.length === 0 ? (
-                    <tr><td colSpan={11} className="px-3 py-8 text-center text-muted">Loading…</td></tr>
-                  ) : receivables.results.length === 0 ? (
-                    <tr><td colSpan={11} className="px-3 py-8 text-center text-muted">No finalized invoices match these filters.</td></tr>
-                  ) : receivables.results.map((r) => (
+                  {loading && displayedInvoices.length === 0 ? (
+                    <tr><td colSpan={10} className="px-3 py-8 text-center text-muted">Loading…</td></tr>
+                  ) : displayedInvoices.length === 0 ? (
+                    <tr><td colSpan={10} className="px-3 py-8 text-center text-muted">No finalized invoices match these filters.</td></tr>
+                  ) : displayedInvoices.map((r) => (
                     <tr key={r.id} className="border-t border-border hover:bg-soft/40">
                       <td className="px-3 py-2 font-medium text-text">{r.customerName}</td>
                       <td className="px-3 py-2 font-mono">{r.invoiceNumber}</td>
@@ -188,30 +213,28 @@ export default function CustomerPaymentsPage() {
                         {num(r.customerCredit) > 0 && <div className="text-[11px] font-normal text-emerald-700">Credit {money(r.customerCredit)}</div>}
                       </td>
                       <td className="px-3 py-2"><Status value={r.paymentStatus} /></td>
-                      <td className="px-3 py-2">
-                        <div className="flex gap-3 justify-end whitespace-nowrap">
-                          {can('record_payment_in') && num(r.outstandingAmount) > 0 && (
-                            <button type="button" className={linkBtn} onClick={() => setPayFor({ customerId: r.customerId, invoiceId: r.id })}>Record payment</button>
-                          )}
-                          <button type="button" className={linkBtn} onClick={() => setTermsFor(r)}>Terms</button>
-                          {can('request_payment_discount') && num(r.paidAmount) > 0 && (
-                            <button type="button" className={linkBtn} onClick={() => setDiscountFor(r)}>
-                              Request discount{r.openDiscountRequests ? ` (${r.openDiscountRequests} open)` : ''}
-                            </button>
-                          )}
-                        </div>
-                      </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-            <Pager page={invFilters.page} count={receivables.count} onPage={(page) => setInvFilters((f) => ({ ...f, page }))} />
+            <TablePagination
+              total={receivables.count}
+              page={invPage}
+              pageSize={invPageSize}
+              onPageChange={setInvPage}
+              onPageSizeChange={(newSize) => {
+                setInvPageSize(newSize);
+                setInvPage(1);
+              }}
+              pageSizeOptions={[10, 25, 50, 100]}
+              loading={loading}
+            />
           </>
         ) : (
           <>
             <Filters filters={reqFilters} setFilters={setReqFilters} customers={customers} statuses={DISCOUNT_STATUSES}
-              statusLabel="Request status" searchPlaceholder="Request, invoice no. or customer" />
+              statusLabel="Request status" searchPlaceholder="Request, invoice no. or customer" onResetPage={() => setReqPage(1)} />
             <div className="overflow-x-auto">
               <table className="w-full text-[12.5px]">
                 <thead className="text-left text-muted bg-soft/50">
@@ -222,9 +245,9 @@ export default function CustomerPaymentsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {requests.results.length === 0 ? (
+                  {displayedRequests.length === 0 ? (
                     <tr><td colSpan={10} className="px-3 py-8 text-center text-muted">No discount requests match these filters.</td></tr>
-                  ) : requests.results.map((q) => (
+                  ) : displayedRequests.map((q) => (
                     <tr key={q.id} className="border-t border-border hover:bg-soft/40">
                       <td className="px-3 py-2 font-mono">{q.requestNumber}</td>
                       <td className="px-3 py-2 font-medium text-text">{q.customerName}</td>
@@ -245,7 +268,18 @@ export default function CustomerPaymentsPage() {
                 </tbody>
               </table>
             </div>
-            <Pager page={reqFilters.page} count={requests.count} onPage={(page) => setReqFilters((f) => ({ ...f, page }))} />
+            <TablePagination
+              total={requests.count}
+              page={reqPage}
+              pageSize={reqPageSize}
+              onPageChange={setReqPage}
+              onPageSizeChange={(newSize) => {
+                setReqPageSize(newSize);
+                setReqPage(1);
+              }}
+              pageSizeOptions={[10, 25, 50, 100]}
+              loading={loading}
+            />
           </>
         )}
       </section>
@@ -260,19 +294,6 @@ export default function CustomerPaymentsPage() {
         presetCustomerId={payFor?.customerId}
         presetInvoiceId={payFor?.invoiceId}
         onSaved={refreshAll}
-      />
-      <PaymentTermsModal
-        isOpen={Boolean(termsFor)}
-        onClose={() => setTermsFor(null)}
-        invoice={termsFor}
-        canEdit={can('edit_payment_terms')}
-        onSaved={refreshAll}
-      />
-      <DiscountRequestModal
-        isOpen={Boolean(discountFor)}
-        onClose={() => setDiscountFor(null)}
-        invoice={discountFor}
-        onSaved={() => { refreshAll(); setTab('discounts'); }}
       />
       <DiscountRequestDrawer requestId={openRequestId} onClose={() => setOpenRequestId(null)} onChanged={refreshAll} />
     </div>

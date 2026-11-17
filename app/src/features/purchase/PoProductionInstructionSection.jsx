@@ -8,7 +8,7 @@ import { purchaseService, hrmsService } from '../../services/domainServices';
 import { Button } from '../../components/ui/Button';
 import MasterSourceLink from '../../components/common/MasterSourceLink';
 
-export function PoProductionInstructionSection({ po, onUpdated, navigate, defaultCollapsed = false, onOpenDailyProduction }) {
+export function PoProductionInstructionSection({ po, onUpdated, navigate, defaultCollapsed = true, onOpenDailyProduction }) {
   const [isCollapsed, setIsCollapsed] = useState(defaultCollapsed);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);

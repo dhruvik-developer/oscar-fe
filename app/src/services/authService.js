@@ -32,6 +32,8 @@ export function normalizeUser(row) {
     reportingManager: row.reportingManager || null,
     status: row.status || 'Active',
     avatar: row.avatar || null,
+    // Superusers hold `*`, not each permission code, so gates read this flag.
+    isSuperuser: Boolean(row.isSuperuser || row.is_superuser),
     // An administrator set the password; the app holds the user on
     // /change-password until they replace it.
     mustChangePassword: Boolean(row.mustChangePassword),

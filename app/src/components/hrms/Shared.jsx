@@ -1,3 +1,4 @@
+import { GlobalModal } from "../ui/GlobalModal";
 import { useState } from "react";
 export function EmptyState({ icon = "search_off", title, desc, action }) {
   return <div className="py-14 flex flex-col items-center text-center text-muted">
@@ -15,18 +16,27 @@ export function SkeletonTable() {
 }
 export function ConfirmModal({ open, title, desc, confirmLabel = "Confirm", onConfirm, onClose, danger = false, requireReason = false, reason, setReason }) {
   if (!open) return null;
-  return <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4">
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-xs" onClick={onClose} />
-      <div className="relative bg-card text-text border border-border rounded-xl shadow-xl w-full max-w-md p-4 sm:p-6 max-h-[95vh] overflow-y-auto flex flex-col gap-4">
-        <h3 className="font-semibold text-[15px]">{title}</h3>
-        <p className="text-[13px] text-muted">{desc}</p>
-        {requireReason && <textarea value={reason} onChange={(e) => setReason?.(e.target.value)} placeholder="Rejection Reason (required)" rows={3} className="p-3 bg-soft border border-border rounded-xl text-[13px] text-text resize-none focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10" />}
-        <div className="flex justify-end gap-2">
-          <button onClick={onClose} className="px-4 py-2 bg-card border border-border rounded-xl text-[13.5px] text-text hover:bg-card-hover transition-colors">Cancel</button>
-          <button disabled={requireReason && !reason?.trim()} onClick={() => onConfirm(reason)} className={`px-5 py-2 rounded-xl text-[13.5px] font-medium disabled:opacity-40 transition-colors ${danger ? "bg-danger text-white hover:opacity-90" : "bg-primary text-white hover:bg-primary-dark"}`}>{confirmLabel}</button>
-        </div>
-      </div>
-    </div>;
+  return (
+    <GlobalModal
+      isOpen={open}
+      title={title}
+      message={desc}
+      confirmText={confirmLabel}
+      onConfirm={() => onConfirm?.(reason)}
+      onClose={onClose}
+      variant={danger ? "danger" : "primary"}
+    >
+      {requireReason && (
+        <textarea
+          value={reason}
+          onChange={(e) => setReason?.(e.target.value)}
+          placeholder="Rejection Reason (required)"
+          rows={3}
+          className="w-full mt-2 p-3 bg-slate-50 border border-slate-200 rounded-xl text-[13px] text-slate-800 resize-none focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-200"
+        />
+      )}
+    </GlobalModal>
+  );
 }
 export function ExportModal({ open, onClose, onExport }) {
   const [scope, setScope] = useState("Current View");
@@ -38,7 +48,7 @@ export function ExportModal({ open, onClose, onExport }) {
     setTimeout(() => setPhase("done"), 1200);
   }
   return <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4">
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-xs" onClick={onClose} />
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
       <div className="relative bg-card text-text border border-border rounded-xl shadow-xl w-full max-w-md p-4 sm:p-6 max-h-[95vh] overflow-y-auto flex flex-col gap-4">
         <div className="flex justify-between items-center"><h3 className="font-semibold">Export Attendance</h3><button onClick={onClose} className="w-7 h-7 rounded-full hover:bg-soft grid place-items-center"><span className="material-symbols-outlined text-[18px]">close</span></button></div>
         {phase === "idle" && <>

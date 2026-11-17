@@ -27,7 +27,8 @@ import {
   Layers,
   FileSpreadsheet,
   CheckCircle2,
-  Truck
+  Truck,
+  IndianRupee
 } from 'lucide-react';
 
 const partiesGuide = {
@@ -65,6 +66,40 @@ export default function PartiesPage() {
   const [isWizardOpen, setIsWizardOpen] = useState(false);
   const [editingParty, setEditingParty] = useState(null);
   const [viewingParty, setViewingParty] = useState(null);
+  const [balanceModalParty, setBalanceModalParty] = useState(null);
+  const [newOpeningBal, setNewOpeningBal] = useState('');
+  const [balanceUpdating, setBalanceUpdating] = useState(false);
+  const [balanceError, setBalanceError] = useState('');
+
+  const handleOpenBalanceModal = (party) => {
+    setBalanceModalParty(party);
+    const currentOpening = party.openingBalance ?? party.opening_balance ?? 0;
+    setNewOpeningBal(currentOpening !== 0 ? String(currentOpening) : '');
+    setBalanceError('');
+  };
+
+  const handleSaveBalance = async (e) => {
+    e.preventDefault();
+    if (!balanceModalParty) return;
+    const parsedVal = newOpeningBal === '' ? 0 : Number(newOpeningBal);
+    if (isNaN(parsedVal)) {
+      setBalanceError('Please enter a valid numeric balance amount.');
+      return;
+    }
+    setBalanceUpdating(true);
+    setBalanceError('');
+    try {
+      await updateParty(balanceModalParty.id, {
+        openingBalance: parsedVal,
+        opening_balance: parsedVal,
+      });
+      setBalanceModalParty(null);
+    } catch (err) {
+      setBalanceError(err?.message || 'Failed to update balance.');
+    } finally {
+      setBalanceUpdating(false);
+    }
+  };
 
   useEffect(() => {
     if (typeParam && ['customer', 'vendor', 'both'].includes(typeParam.toLowerCase())) {
@@ -228,6 +263,7 @@ export default function PartiesPage() {
       width: '14%',
       render: (party) => {
         const bal = party.balance || 0;
+        const opBal = Number(party.openingBalance ?? party.opening_balance ?? 0);
         const isPositive = bal > 0;
         return (
           <div className="text-right">
@@ -236,6 +272,11 @@ export default function PartiesPage() {
             </div>
             <div className="text-[10px] text-muted">
               {party.type === 'Vendor' ? 'Payable' : 'Receivable'}
+              {opBal !== 0 && (
+                <span className="block text-[9.5px] text-slate-400 dark:text-muted">
+                  Opening: {formatCurrency(opBal)}
+                </span>
+              )}
             </div>
           </div>
         );
@@ -254,7 +295,7 @@ export default function PartiesPage() {
       header: 'Actions',
       key: 'actions',
       align: 'right',
-      width: '8%',
+      width: '10%',
       render: (party) => (
         <div className="flex items-center justify-end gap-1.5">
           <button
@@ -272,6 +313,14 @@ export default function PartiesPage() {
             className="w-7 h-7 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 flex items-center justify-center transition cursor-pointer shadow-2xs"
           >
             <Edit2 className="w-3.5 h-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={() => handleOpenBalanceModal(party)}
+            title="Quick Update Balance / Opening Balance"
+            className="w-7 h-7 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/20 flex items-center justify-center transition cursor-pointer shadow-2xs"
+          >
+            <IndianRupee className="w-3.5 h-3.5" />
           </button>
         </div>
       ),
@@ -518,6 +567,12 @@ export default function PartiesPage() {
                     </span>
                   </div>
                   <div>
+                    <span className="text-slate-400 block text-[10px] uppercase font-semibold">Opening Balance</span>
+                    <span className="font-mono font-bold text-slate-800">
+                      ₹{Number(viewingParty.openingBalance ?? viewingParty.opening_balance ?? 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                  <div>
                     <span className="text-slate-400 block text-[10px] uppercase font-semibold">Current Balance</span>
                     <span className="font-mono font-bold text-amber-700">
                       ₹{(viewingParty.balance || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
@@ -594,6 +649,133 @@ export default function PartiesPage() {
                 Close
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Quick Update Balance Modal */}
+      {balanceModalParty && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150"
+          onClick={() => setBalanceModalParty(null)}
+        >
+          <div
+            className="bg-white dark:bg-card border border-slate-200 dark:border-border text-slate-800 dark:text-text rounded-2xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-4 sm:p-5 border-b border-slate-100 dark:border-border flex items-center justify-between bg-slate-50/70 dark:bg-soft">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 flex items-center justify-center">
+                  <IndianRupee size={20} />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-slate-800 dark:text-text text-base">
+                    Update Party Balance
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-muted truncate max-w-[240px]">
+                    {balanceModalParty.name} ({balanceModalParty.code})
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setBalanceModalParty(null)}
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-text p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-soft transition cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveBalance} className="p-5 space-y-4 text-xs">
+              {balanceError && (
+                <div className="bg-rose-50 border border-rose-200 text-rose-700 rounded-xl p-2.5 text-xs font-semibold">
+                  {balanceError}
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-3 text-center">
+                <div className="bg-slate-50 dark:bg-soft p-3 rounded-xl border border-slate-200/80 dark:border-border">
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block mb-0.5">Current Balance</span>
+                  <span className="font-mono font-bold text-amber-600 dark:text-amber-400 text-sm block">
+                    {formatCurrency(balanceModalParty.balance || 0)}
+                  </span>
+                  <span className="text-[9.5px] text-slate-400">
+                    {balanceModalParty.type === 'Vendor' ? 'Payable' : 'Receivable'}
+                  </span>
+                </div>
+                <div className="bg-slate-50 dark:bg-soft p-3 rounded-xl border border-slate-200/80 dark:border-border">
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block mb-0.5">Current Opening</span>
+                  <span className="font-mono font-bold text-slate-700 dark:text-text text-sm block">
+                    {formatCurrency(Number(balanceModalParty.openingBalance ?? balanceModalParty.opening_balance ?? 0))}
+                  </span>
+                  <span className="text-[9.5px] text-slate-400">Recorded Opening</span>
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-800 dark:text-text text-xs mb-1.5">
+                  New Opening Balance (₹) <span className="text-rose-500">*</span>
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                    <IndianRupee size={15} />
+                  </div>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={newOpeningBal}
+                    onChange={(e) => setNewOpeningBal(e.target.value)}
+                    placeholder="0.00"
+                    autoFocus
+                    className="w-full pl-8 pr-3 py-2.5 bg-white dark:bg-soft border border-slate-300 dark:border-border rounded-xl text-base font-mono font-bold text-slate-900 dark:text-text focus:outline-none focus:ring-2 focus:ring-amber-500/30"
+                  />
+                </div>
+                <p className="text-[10px] text-slate-400 mt-1">
+                  Enter opening balance for this party. Current balance and ledger recalculate automatically.
+                </p>
+              </div>
+
+              {/* Live Projected Calculation */}
+              {(() => {
+                const currentOp = Number(balanceModalParty.openingBalance ?? balanceModalParty.opening_balance ?? 0);
+                const enteredOp = newOpeningBal === '' ? 0 : Number(newOpeningBal);
+                const diff = enteredOp - currentOp;
+                const projected = (Number(balanceModalParty.balance) || 0) + diff;
+                return (
+                  <div className="bg-amber-50/60 dark:bg-amber-950/20 border border-amber-200/80 dark:border-amber-900/40 p-3 rounded-xl flex items-center justify-between">
+                    <div>
+                      <span className="text-[10px] font-bold uppercase text-amber-800 dark:text-amber-300 block">
+                        Projected New Balance
+                      </span>
+                      <span className="text-[9.5px] text-slate-500">
+                        Based on opening adjustment ({diff >= 0 ? `+${formatCurrency(diff)}` : formatCurrency(diff)})
+                      </span>
+                    </div>
+                    <span className="font-mono font-extrabold text-amber-700 dark:text-amber-400 text-sm">
+                      {formatCurrency(projected)}
+                    </span>
+                  </div>
+                );
+              })()}
+
+              <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-slate-100 dark:border-border">
+                <button
+                  type="button"
+                  onClick={() => setBalanceModalParty(null)}
+                  className="px-4 py-2 border border-slate-300 dark:border-border hover:bg-slate-100 dark:hover:bg-soft text-slate-700 dark:text-text rounded-xl font-semibold text-xs transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={balanceUpdating}
+                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs transition cursor-pointer shadow-md shadow-emerald-600/20 flex items-center gap-1.5 disabled:opacity-50"
+                >
+                  <CheckCircle2 size={15} />
+                  <span>{balanceUpdating ? 'Updating...' : 'Update Balance'}</span>
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

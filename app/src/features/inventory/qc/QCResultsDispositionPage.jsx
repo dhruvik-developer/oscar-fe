@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 
-import { useNavigate, Link, useSearchParams } from 'react-router-dom';
+import { useNavigate, Link, useLocation, useSearchParams } from 'react-router-dom';
 
 import {
   CheckCircle2,
@@ -43,6 +43,7 @@ import QCPageHeader from './QCPageHeader';
 
 export default function QCResultsDispositionPage() {
   const navigate = useNavigate();
+  const location = useLocation();
 
   const [searchParams] = useSearchParams();
 
@@ -728,6 +729,10 @@ export default function QCResultsDispositionPage() {
       });
 
       await fetchInspections(selectedInspectionId);
+      if (location.state?.qcReturnTo) {
+        navigate(location.state.qcReturnTo, { replace: true });
+        return;
+      }
 
     } catch (err) {
       showToast('Could not approve QC disposition: ' + (err.response?.data?.detail || err.message), 'error');
@@ -819,13 +824,13 @@ export default function QCResultsDispositionPage() {
         </div>
       )}
 
-      {/* Ã¢â€â‚¬Ã¢â€â‚¬ Standard QC Page Header Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ */}
+      {/* ── Standard QC Page Header ── */}
 
       <QCPageHeader
         title="QC Results & Disposition"
         subtitle="Record commercial dispositioning: Good (Godown), Hold (Review), Reprocess (Dyeing Rework), or Reject (Debit Note)."
       />
-      {/* Ã¢â€â‚¬Ã¢â€â‚¬ Top Bar: Status Summary & Live Navigation Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ */}
+      {/* ── Top Bar: Status Summary & Live Navigation ── */}
 
       <div className="bg-white rounded-xl border border-slate-200 shadow-xs p-4 flex flex-col md:flex-row items-center justify-between gap-3">
         {/* Left: Status Counts */}
@@ -875,7 +880,7 @@ export default function QCResultsDispositionPage() {
           </button>
         </div>
       </div>
-      {/* Ã¢â€â‚¬Ã¢â€â‚¬ EMPTY STATE (When no receipts await disposition) Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ */}
+      {/* ── EMPTY STATE (When no receipts await disposition) ── */}
 
       {inspectionsList.length === 0 && !loading && (
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-8 text-center space-y-4 max-w-2xl mx-auto my-6">
@@ -919,7 +924,7 @@ export default function QCResultsDispositionPage() {
         </div>
       )}
 
-      {/* Ã¢â€â‚¬Ã¢â€â‚¬ MAIN INSPECTION & DISPOSITION INTERFACE Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ */}
+      {/* ── MAIN INSPECTION & DISPOSITION INTERFACE ── */}
 
       {inspectionsList.length > 0 && (
         <div className="space-y-5">
@@ -1218,7 +1223,7 @@ export default function QCResultsDispositionPage() {
                 </div>
               </div>
             </div>
-            {/* Ã¢â€â‚¬Ã¢â€â‚¬ SECTION: DISPOSITIONING CARDS Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ */}
+            {/* ── SECTION: DISPOSITIONING CARDS ── */}
 
             <div className="pt-2 border-t border-slate-100 space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
@@ -1476,7 +1481,7 @@ export default function QCResultsDispositionPage() {
                 </div>
               </div>
             </div>
-            {/* Ã¢â€â‚¬Ã¢â€â‚¬ SECTION: MEASUREMENT DETAILS (ROLL / TAKA LEVEL) Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ */}
+            {/* ── SECTION: MEASUREMENT DETAILS (ROLL / TAKA LEVEL) ── */}
 
             <div className="pt-2 border-t border-slate-100 space-y-3">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
@@ -1650,7 +1655,7 @@ export default function QCResultsDispositionPage() {
               )}
 
             </div>
-            {/* Ã¢â€â‚¬Ã¢â€â‚¬ SECTION: REMARKS & FINDINGS Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ */}
+            {/* ── SECTION: REMARKS & FINDINGS ── */}
 
             <div className="pt-2 border-t border-slate-100 space-y-2">
               <label className="block text-slate-700 font-bold text-xs">Inspector Observations & Quality Remarks</label>
@@ -1666,7 +1671,7 @@ export default function QCResultsDispositionPage() {
                 className="w-full p-2.5 text-xs border border-slate-300 rounded-lg bg-white focus:outline-hidden focus:ring-2 focus:ring-blue-500 disabled:bg-slate-50"
               />
             </div>
-            {/* Ã¢â€â‚¬Ã¢â€â‚¬ SECTION: ACTION FOOTER Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ */}
+            {/* ── SECTION: ACTION FOOTER ── */}
 
             <div className="pt-4 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3">
               <div className="text-xs text-slate-500">

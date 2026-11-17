@@ -11,6 +11,8 @@ import TablePagination from '../../../components/ui/TablePagination';
 import { api } from '../../../services/api';
 import MasterSourceLink from '../../../components/common/MasterSourceLink';
 import { statusPill, isLockedStatus, errorText, fmtNum, listOf } from './productionStatus';
+import { useERP } from '../../../context/ERPContext';
+import { ConfirmModal } from '../../../components/ui/ConfirmModal';
 
 const fmt = fmtNum;
 const LIST_QUERY = { page_size: 200 };
@@ -75,6 +77,8 @@ function normalizeEntry(e) {
 
 export default function DailyProductionPage() {
   const navigate = useNavigate();
+  const { showToast } = useERP();
+  const [deleteConfirmId, setDeleteConfirmId] = useState(null);
   const [searchParams, setSearchParams] = useSearchParams();
 
   const [instructions, setInstructions] = useState([]);
@@ -276,8 +280,8 @@ export default function DailyProductionPage() {
     const numQty = Number(formQty);
     if (!numQty || numQty <= 0 || isNaN(numQty)) {
       errors.qty = 'Produced quantity must be greater than 0.';
-    } else if (balanceQty > 0 && numQty > (balanceQty * 1.25)) {
-      errors.qty = `Produced quantity exceeds remaining balance (${balanceQty.toLocaleString('en-IN')} Mtr) by more than 25%.`;
+    } else if (balanceQty > 0 && numQty > balanceQty) {
+      errors.qty = `Produced quantity (${numQty.toLocaleString('en-IN')} Mtr) exceeds remaining balance (${balanceQty.toLocaleString('en-IN')} Mtr) for this instruction.`;
     }
 
     const numRej = Number(formRejected) || 0;
@@ -375,14 +379,16 @@ export default function DailyProductionPage() {
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm('Delete this entry?')) return;
     setActionError(null);
     try {
       await api.delete(`/production/daily-entries/${id}/`);
       setEntries((prev) => prev.filter((item) => item.id !== id));
+      showToast('Daily production entry deleted', 'success');
       if (pi?.id) await refreshInstruction(pi.id);
     } catch (err) {
-      setActionError(errorText(err, 'Failed to delete entry'));
+      const msg = errorText(err, 'Failed to delete entry');
+      setActionError(msg);
+      showToast(msg, 'error');
     }
   };
 
@@ -670,7 +676,7 @@ export default function DailyProductionPage() {
                               </button>
                               <button
                                 type="button"
-                                onClick={() => handleDelete(row.id)}
+                                onClick={() => setDeleteConfirmId(row.id)}
                                 className="text-rose-400 hover:text-rose-600 cursor-pointer"
                                 title="Delete"
                               >
@@ -713,7 +719,7 @@ export default function DailyProductionPage() {
 
       {/* Add / Edit modal */}
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-2xs">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
           <div className="w-full max-w-xl rounded-xl bg-white shadow-2xl border border-slate-200 overflow-hidden">
             <div className="bg-slate-900 text-white px-5 py-3.5 flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -869,6 +875,20 @@ export default function DailyProductionPage() {
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={Boolean(deleteConfirmId)}
+        onClose={() => setDeleteConfirmId(null)}
+        onConfirm={async () => {
+          const id = deleteConfirmId;
+          setDeleteConfirmId(null);
+          await handleDelete(id);
+        }}
+        title="Delete Daily Production Entry"
+        message="Are you sure you want to delete this daily production entry? This will adjust produced balance meters on the parent instruction."
+        confirmText="Delete Entry"
+        variant="danger"
+      />
     </div>
   );
 }

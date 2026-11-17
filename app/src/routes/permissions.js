@@ -64,13 +64,11 @@ function moduleRules() {
     // /administration/settings which is unrestricted, so we gate the children
     // directly rather than using the prefix.
     { path: '/administration/approvals', requirement: { anyOf: ADMIN_PERMISSIONS } },
-    { path: '/administration/alerts', requirement: { anyOf: ADMIN_PERMISSIONS } },
     { path: '/administration/users', requirement: { anyOf: ADMIN_PERMISSIONS } },
     { path: '/administration/roles', requirement: { anyOf: ADMIN_PERMISSIONS } },
     { path: '/administration/clients', requirement: { anyOf: ADMIN_PERMISSIONS } },
     { path: '/admin', requirement: { anyOf: ADMIN_PERMISSIONS } },
     { path: '/approvals', requirement: { anyOf: ADMIN_PERMISSIONS } },
-    { path: '/alerts', requirement: { anyOf: ADMIN_PERMISSIONS } },
     { path: '/warranty', requirement: { allOf: ['menu_sales'] } },
   ];
 }

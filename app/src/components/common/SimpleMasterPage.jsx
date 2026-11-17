@@ -54,6 +54,7 @@ export default function SimpleMasterPage({
   searchKeys = ['name'],
   loadAux,
   toPayload,
+  embedded = false,
 }) {
   const [rows, setRows] = useState([]);
   const [aux, setAux] = useState({});
@@ -184,10 +185,26 @@ export default function SimpleMasterPage({
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        title={title}
-        subtitle={subtitle}
-        actions={
+      {!embedded ? (
+        <PageHeader
+          title={title}
+          subtitle={subtitle}
+          actions={
+            <button
+              type="button"
+              onClick={openAdd}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3.5 py-2 text-xs font-semibold text-white shadow-xs hover:bg-blue-700 transition"
+            >
+              <Plus size={15} /> Add {entityLabel}
+            </button>
+          }
+        />
+      ) : (
+        <div className="flex flex-wrap items-center justify-between gap-3 pb-1">
+          <div>
+            <h2 className="text-base font-bold text-slate-900">{title}</h2>
+            <p className="text-xs text-slate-500">{subtitle}</p>
+          </div>
           <button
             type="button"
             onClick={openAdd}
@@ -195,8 +212,8 @@ export default function SimpleMasterPage({
           >
             <Plus size={15} /> Add {entityLabel}
           </button>
-        }
-      />
+        </div>
+      )}
 
       <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-white p-3 rounded-xl border border-[#dce5f4] shadow-xs">
         <div className="relative w-full sm:w-72">

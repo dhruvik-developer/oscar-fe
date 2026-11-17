@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { modal } from '../../../../context/ModalContext';
 import {
   ClipboardList,
   Truck,
@@ -543,9 +544,13 @@ export function StageDownstreamWorkspace({
   };
 
   const handleCloseProject = async () => {
-    if (!window.confirm(`Are you sure you want to mark project ${project?.code} as Completed & Closed?`)) {
-      return;
-    }
+    const ok = await modal.confirm({
+      title: 'Complete Project',
+      message: `Are you sure you want to mark project ${project?.code} as Completed & Closed?`,
+      confirmLabel: 'Mark Completed',
+      iconType: 'info',
+    });
+    if (!ok) return;
     setSubmitting(true);
     try {
       await api.post(`/pms/projects/${projectId}/close/`, {
@@ -708,7 +713,7 @@ export function StageDownstreamWorkspace({
 
       {/* Transaction Entry Modals */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95">
             <div className="flex items-center justify-between p-4 border-b border-slate-100 bg-slate-50/50">
               <div className="flex items-center gap-2">

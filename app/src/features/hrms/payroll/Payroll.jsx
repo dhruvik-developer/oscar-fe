@@ -37,11 +37,12 @@ import { aggregatePayrollStats, formatINR } from "./salaryCalculations";
 import { describeError, localISODate } from "../../../services/hrmsSync";
 import { Badge } from "../../../components/hrms/Badge";
 import PageHeader from "../../../components/ui/PageHeader";
+import AppPagination from "../../../components/ui/AppPagination";
 import { hrmsGuides } from "../../../data/hrms/hrmsGuides";
 import { Avatar } from "../../../components/hrms/Avatar";
 
 /** Payslip statuses the server uses, in order. */
-const PAYSLIP_STAGES = WORKFLOW_STAGES.filter((s) => s.id !== "Ready for Review");
+const PAYSLIP_STAGES = WORKFLOW_STAGES;
 
 /** Day counts can be fractional (half days) — print `20` or `19.5`. */
 function fmtDays(n) {
@@ -134,7 +135,7 @@ function downloadPayslipPdf(p) {
   const allowances = Number(p.allowances || 0);
   const status = clean(p.status || "In Progress");
   const paidDate = clean(fmtDate(p.paymentDate) || "N/A");
-  const paidAmt = p.paidAmount !== null && p.paidAmount !== undefined ? Number(p.paidAmount) : remaining;
+  const paidAmt = p.paidAmount !== null && p.paidAmount !== undefined ? Number(p.paidAmount) : null;
   const inr = (n) => Math.round(n).toLocaleString("en-IN");
 
   const lines = [
@@ -179,7 +180,7 @@ function downloadPayslipPdf(p) {
     `(NET PAYABLE: INR ${inr(remaining)}) Tj`,
     "0 -24 Td",
     "/F1 10 Tf",
-    `(Payout Status: ${status}   |   Disbursed: INR ${status === "Paid" ? inr(paidAmt) : "0"}   |   Date: ${paidDate}) Tj`,
+    `(Payout Status: ${status}   |   Disbursed: ${status === "Paid" && paidAmt !== null ? inr(paidAmt) : "—"}   |   Date: ${paidDate}) Tj`,
     "0 -32 Td",
     "/F1 9 Tf",
     "(This is a computer-generated salary slip. Attendance and leave figures are taken from HRMS records.) Tj",
@@ -559,6 +560,19 @@ export default function Payroll() {
     });
   }, [computedEmployeePayrolls, empSearch, deptFilter, statusFilter]);
 
+  // Employee-wise table pagination
+  const [empPage, setEmpPage] = useState(1);
+  const [empPageSize, setEmpPageSize] = useState(10);
+
+  useEffect(() => {
+    setEmpPage(1);
+  }, [empSearch, deptFilter, statusFilter, period, empPageSize]);
+
+  const paginatedEmployees = useMemo(() => {
+    const start = (empPage - 1) * empPageSize;
+    return filteredEmployees.slice(start, start + empPageSize);
+  }, [filteredEmployees, empPage, empPageSize]);
+
   // Own salary: the signed-in employee's payslips, newest first.
   const ownHistory = useMemo(
     () =>
@@ -567,6 +581,19 @@ export default function Payroll() {
         .sort((a, b) => String(b.period || b.month || "").localeCompare(String(a.period || a.month || ""))),
     [ownHistoryRaw]
   );
+
+  // My Salary / History table pagination
+  const [historyPage, setHistoryPage] = useState(1);
+  const [historyPageSize, setHistoryPageSize] = useState(10);
+
+  useEffect(() => {
+    setHistoryPage(1);
+  }, [period, historyPageSize]);
+
+  const paginatedHistory = useMemo(() => {
+    const start = (historyPage - 1) * historyPageSize;
+    return ownHistory.slice(start, start + historyPageSize);
+  }, [ownHistory, historyPage, historyPageSize]);
   const ownRecord = useMemo(
     () => ownHistory.find((h) => h.period === period) || ownHistory[0] || null,
     [ownHistory, period]
@@ -767,7 +794,7 @@ export default function Payroll() {
     <div className="flex flex-col gap-6">
       <PageHeader
         title="Payroll Management"
-        subtitle={<>Attendance-driven payroll: <span className="font-semibold text-slate-700">Net Payable = Standard − Per-day × (Working days − Attended − Paid leave) + Earnings − Deductions − Advance</span></>}
+        //subtitle={<>Attendance-driven payroll: <span className="font-semibold text-slate-700">Net Payable = Standard − Per-day × (Working days − Attended − Paid leave) + Earnings − Deductions − Advance</span></>}
         guide={hrmsGuides.payroll}
         actions={
           <>
@@ -1349,7 +1376,7 @@ export default function Payroll() {
                       </td>
                     </tr>
                   ) : (
-                    filteredEmployees.map((p) => {
+                    paginatedEmployees.map((p) => {
                       const rowBusy = busyRowId === p.id;
                       const editable = p.status === "In Progress" || p.status === "Ready for Review" || !p.status;
                       return (
@@ -1515,6 +1542,14 @@ export default function Payroll() {
                 </tbody>
               </table>
             </div>
+            <AppPagination
+              total={filteredEmployees.length}
+              page={empPage}
+              pageSize={empPageSize}
+              onPageChange={setEmpPage}
+              onPageSizeChange={setEmpPageSize}
+              pageSizeOptions={[10, 25, 50, 100]}
+            />
           </div>
         </div>
       )}
@@ -1758,7 +1793,7 @@ export default function Payroll() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-bdr/40">
-                  {ownHistory.map((h) => (
+                  {paginatedHistory.map((h) => (
                     <tr key={h.id} className="hover:bg-slate-50/60 transition">
                       <td className="py-3 px-5 font-medium text-slate-900">{slipMonth(h)}</td>
                       <td className="py-3 px-5"><Badge tone={statusTone(h.status)}>{h.status}</Badge></td>
@@ -1798,6 +1833,14 @@ export default function Payroll() {
                 </tbody>
               </table>
             </div>
+            <AppPagination
+              total={ownHistory.length}
+              page={historyPage}
+              pageSize={historyPageSize}
+              onPageChange={setHistoryPage}
+              onPageSizeChange={setHistoryPageSize}
+              pageSizeOptions={[10, 25, 50]}
+            />
           </div>
         </div>
       )}
@@ -1806,7 +1849,7 @@ export default function Payroll() {
           MODAL 1: PAYSLIP DETAIL MODAL (FORMULA BREAKDOWN)
          ========================================================================= */}
       {selectedPayslip && (
-        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4">
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
           <div className="bg-white rounded-2xl border border-bdr shadow-xl w-full max-w-md p-4 sm:p-6 flex flex-col gap-4 animate-in fade-in zoom-in-95 max-h-[95vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-bdr/60 pb-3">
               <div className="flex items-center gap-3">
@@ -1877,6 +1920,25 @@ export default function Payroll() {
                   -{formatINR(selectedPayslip.deductions)}
                 </span>
               </div>
+
+              {/* Itemized Components (Working hours shortfall, penalties, etc.) */}
+              {Array.isArray(selectedPayslip.components) && selectedPayslip.components.length > 0 && (
+                <div className="bg-rose-50/50 border border-rose-100/80 rounded-xl p-2.5 my-1 space-y-1.5">
+                  <span className="text-[11px] font-bold text-rose-900 uppercase tracking-wider block">
+                    Components & Shortfall Deductions
+                  </span>
+                  {selectedPayslip.components.map((c, idx) => (
+                    <div key={c.id || idx} className="flex justify-between text-[12px]">
+                      <span className={c.kind === "deduction" ? "text-rose-700 font-medium" : "text-emerald-700 font-medium"}>
+                        {c.name}
+                      </span>
+                      <span className={c.kind === "deduction" ? "font-semibold text-rose-700" : "font-semibold text-emerald-700"}>
+                        {c.kind === "deduction" ? "-" : "+"}{formatINR(c.amount)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
               <div className="flex justify-between py-1 border-b border-slate-100">
                 <span className="text-slate-500">Salary Advance Recovered (-)</span>
                 <span className="font-bold text-amber-800">
@@ -1949,7 +2011,7 @@ export default function Payroll() {
           MODAL 2: GENERATE PAYROLL FROM ATTENDANCE (CONFIRMATION)
          ========================================================================= */}
       {showGenerateModal && (
-        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4">
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
           <div className="bg-white rounded-2xl border border-bdr shadow-xl w-full max-w-md p-4 sm:p-6 flex flex-col gap-4 animate-in fade-in zoom-in-95 max-h-[95vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-bdr/60 pb-3">
               <h3 className="font-bold text-[16px] text-slate-900">
@@ -2027,7 +2089,7 @@ export default function Payroll() {
           (Number(editDeductions) || 0) -
           (Number(editAdvance) || 0);
         return (
-        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4">
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
           <form
             onSubmit={handleSaveParams}
             className="bg-white rounded-2xl border border-bdr shadow-xl w-full max-w-lg p-4 sm:p-6 flex flex-col gap-4 animate-in fade-in zoom-in-95 max-h-[95vh] sm:max-h-[90vh] overflow-y-auto"
@@ -2206,7 +2268,7 @@ export default function Payroll() {
           MODAL 4: ADD SALARY STRUCTURE MODAL
          ========================================================================= */}
       {showAddStructureModal && (
-        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4">
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
           <form
             onSubmit={handleAddStructureSubmit}
             className="bg-white rounded-2xl border border-bdr shadow-xl w-full max-w-md p-4 sm:p-6 flex flex-col gap-4 animate-in fade-in zoom-in-95 max-h-[95vh] overflow-y-auto"
@@ -2299,7 +2361,7 @@ export default function Payroll() {
         const targets = computedEmployeePayrolls.filter((p) => confirmBulk.ids.includes(p.id));
         const targetNet = targets.reduce((sum, p) => sum + (Number(p.remainingPayable) || 0), 0);
         return (
-        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4">
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
           <div className="bg-white rounded-2xl border border-bdr shadow-2xl w-full max-w-lg p-4 sm:p-6 flex flex-col gap-4 animate-in fade-in zoom-in-95 max-h-[95vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-bdr/60 pb-3">
               <div>
@@ -2387,7 +2449,7 @@ export default function Payroll() {
           MODAL 6: GENERATE PAYROLL SLIP (PDF)
          ========================================================================= */}
       {showGenerateSlipModal && (
-        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4">
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
           <div className="bg-white rounded-2xl border border-bdr shadow-2xl w-full max-w-xl p-4 sm:p-6 flex flex-col gap-4 animate-in fade-in zoom-in-95 max-h-[95vh] sm:max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-bdr/60 pb-3">
               <div className="flex items-center gap-2.5">

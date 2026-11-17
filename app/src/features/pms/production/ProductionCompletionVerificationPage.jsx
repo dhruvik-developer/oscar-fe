@@ -3,16 +3,19 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ArrowLeft, Printer, MoreHorizontal, Eye, ListChecks,
   ClipboardList, Package, XCircle, CheckCircle2, AlertTriangle,
-  IndianRupee, Check, X, FileText,
+  IndianRupee, Check, X, FileText, LayoutGrid,
 } from 'lucide-react';
 import PageHeader from '../../../components/ui/PageHeader';
 import KpiCard from '../../../components/ui/KpiCard';
+import TablePagination from '../../../components/ui/TablePagination';
 import { api } from '../../../services/api';
 import {
   statusPill, canMarkComplete, canVerify, canGeneratePo, errorText, fmtNum, listOf,
 } from './productionStatus';
 import GenerateFinalJobWorkPOModal from '../../purchase/GenerateFinalJobWorkPOModal';
 import { PrintProductionCompletionModal } from './PrintProductionCompletionModal';
+import { useERP } from '../../../context/ERPContext';
+import { ConfirmModal } from '../../../components/ui/ConfirmModal';
 
 const fmtM = (n) => (n === null || n === undefined || n === '' ? '—' : `${fmtNum(n)} M`);
 const fmtDate = (d) => {
@@ -26,6 +29,8 @@ const fmtINR = (n) => (n === null || n === undefined || n === ''
 
 export default function ProductionCompletionVerificationPage() {
   const navigate = useNavigate();
+  const { showToast } = useERP();
+  const [confirmCompleteOpen, setConfirmCompleteOpen] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
 
   const [instructions, setInstructions] = useState([]);
@@ -47,6 +52,14 @@ export default function ProductionCompletionVerificationPage() {
   const [verifyReasonInput, setVerifyReasonInput] = useState('');
   const [menuOpen, setMenuOpen] = useState(false);
   const [showPrintModal, setShowPrintModal] = useState(false);
+  const [activeTab, setActiveTab] = useState(
+    () => localStorage.getItem('oscar_pms_completion_tab') || 'summary'
+  );
+
+  const handleTabChange = (tabId) => {
+    setActiveTab(tabId);
+    localStorage.setItem('oscar_pms_completion_tab', tabId);
+  };
 
   const piIdParam = searchParams.get('pi');
 
@@ -140,6 +153,14 @@ export default function ProductionCompletionVerificationPage() {
     });
   }, [completionData]);
 
+  const [summaryPage, setSummaryPage] = useState(1);
+  const [summaryPageSize, setSummaryPageSize] = useState(10);
+
+  const paginatedRows = useMemo(() => {
+    const start = (summaryPage - 1) * summaryPageSize;
+    return rows.slice(start, start + summaryPageSize);
+  }, [rows, summaryPage, summaryPageSize]);
+
   const hasData = Boolean(completionData);
   const statusLabel = status || '—';
   const jobRateLabel = jobRate > 0 ? `₹ ${jobRate.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} / M` : '—';
@@ -148,15 +169,16 @@ export default function ProductionCompletionVerificationPage() {
 
   const handleComplete = async () => {
     if (!activePiId) return;
-    if (!window.confirm('Mark this instruction as Completed (pending verification)?')) return;
     setActionError(null);
     setActionNotice(null);
     setBusy('complete');
     try {
       await api.post(`/production/instructions/${activePiId}/complete/`);
+      showToast('Instruction marked as Completed (pending verification)', 'success');
       await loadCompletionData(activePiId);
     } catch (err) {
       setActionError(`Mark Complete failed: ${errorText(err)}`);
+      showToast(`Mark Complete failed: ${errorText(err)}`, 'error');
     } finally {
       setBusy(null);
     }
@@ -164,17 +186,19 @@ export default function ProductionCompletionVerificationPage() {
 
   const handleGeneratePo = async () => {
     if (!activePiId) return;
-    if (!window.confirm('Generate the Final Job Work PO for this instruction?')) return;
     setActionError(null);
     setActionNotice(null);
     setBusy('po');
     try {
       const res = await api.post(`/production/instructions/${activePiId}/generate-po/`);
       setDetail(res);
-      setActionNotice(res?.finalPoNumber ? `Final Job Work PO ${res.finalPoNumber} created.` : 'Final Job Work PO created.');
+      const msg = res?.finalPoNumber ? `Final Job Work PO ${res.finalPoNumber} created.` : 'Final Job Work PO created.';
+      setActionNotice(msg);
+      showToast(msg, 'success');
       await loadCompletionData(activePiId);
     } catch (err) {
       setActionError(`Generate Final PO failed: ${errorText(err)}`);
+      showToast(`Generate Final PO failed: ${errorText(err)}`, 'error');
     } finally {
       setBusy(null);
     }
@@ -212,8 +236,26 @@ export default function ProductionCompletionVerificationPage() {
     }
   };
 
+  const tabs = [
+    {
+      id: 'summary',
+      label: 'Summary & Approvals',
+      icon: ClipboardList,
+    },
+    {
+      id: 'daily',
+      label: 'Daily Production Register',
+      icon: ListChecks,
+    },
+    {
+      id: 'all',
+      label: 'Show All',
+      icon: LayoutGrid,
+    },
+  ];
+
   return (
-    <div className="min-h-[calc(100vh-62px)] bg-[#eef3fb] p-3 md:p-4 space-y-3">
+    <div className="pms-screen w-full space-y-6">
       {/* Title */}
       <PageHeader
         title="Production Completion & Verification"
@@ -261,7 +303,37 @@ export default function ProductionCompletionVerificationPage() {
         </div>
       )}
 
-      {/* 1 — Summary card */}
+      {/* Screen Section Switcher */}
+      <div className="flex flex-wrap items-center justify-between gap-2.5 pt-1">
+        <div className="inline-flex p-1 bg-slate-100 dark:bg-slate-800/80 border border-slate-200/90 dark:border-slate-700/80 rounded-xl shadow-2xs">
+          {tabs.map((tab) => {
+            const Icon = tab.icon;
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => handleTabChange(tab.id)}
+                className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                  isActive
+                    ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-xs'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
+                }`}
+              >
+                <Icon size={14} className={isActive ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400'} />
+                <span>{tab.label}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="text-xs text-slate-400 hidden sm:flex items-center gap-1.5">
+          <span>Active view: <b className="text-slate-700 dark:text-slate-300 font-semibold">{tabs.find((t) => t.id === activeTab)?.label}</b></span>
+        </div>
+      </div>
+
+      {/* Section 1: Summary card */}
+      {(activeTab === 'summary' || activeTab === 'all') && (
       <div className="rounded-xl border border-[#e2eaf5] bg-white p-4 shadow-[0_1px_2px_rgba(16,42,82,0.06)]">
         <div className="flex flex-wrap items-center gap-2">
           <button
@@ -280,7 +352,7 @@ export default function ProductionCompletionVerificationPage() {
           <div className="ml-auto flex flex-wrap items-center gap-2">
             {hasData && canMarkComplete(status) && (
               <button
-                onClick={handleComplete}
+                onClick={() => setConfirmCompleteOpen(true)}
                 disabled={busy !== null}
                 className="inline-flex items-center gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-3 py-1.5 text-[12px] font-bold text-amber-700 hover:bg-amber-100 disabled:opacity-50"
               >
@@ -377,15 +449,17 @@ export default function ProductionCompletionVerificationPage() {
           <KpiCard label="Agreed Job Rate" value={jobRateLabel} icon={IndianRupee} tone="purple" />
         </div>
       </div>
+      )}
 
-      {/* 2 — Daily summary */}
+      {/* Section 2: Daily summary */}
+      {(activeTab === 'daily' || activeTab === 'all') && (
       <div className="rounded-xl border border-[#e2eaf5] bg-white shadow-[0_1px_2px_rgba(16,42,82,0.06)]">
         <div className="flex items-center gap-2 border-b border-slate-100 px-4 py-3">
           <span className="grid h-5 w-5 place-items-center rounded-full bg-[#2563eb] text-[11px] font-extrabold text-white">2</span>
           <h2 className="text-[13px] font-extrabold text-[#2563eb]">Daily Production Summary (Auto from Daily Production)</h2>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[860px] text-center text-[12px]">
+        <div className="pms-table-container overflow-x-auto">
+          <table className="w-full min-w-[860px] text-center text-[12px] pms-sticky-header">
             <thead>
               <tr className="border-b border-slate-100 text-slate-500">
                 {['#', 'Date', 'Produced Qty (M)', 'Cumulative Qty (M)', 'Balance Qty (M)', 'Entered By', 'Remarks'].map((h) => (
@@ -399,12 +473,12 @@ export default function ProductionCompletionVerificationPage() {
                   <td colSpan={7} className="px-4 py-8 text-slate-400">Loading production summary...</td>
                 </tr>
               )}
-              {!loading && rows.map((r, idx) => (
+              {!loading && paginatedRows.map((r, idx) => (
                 <tr
                   key={idx}
-                  className={`border-b border-slate-50 text-slate-600 ${idx === rows.length - 1 ? 'bg-[#f2f7ff]' : ''}`}
+                  className={`border-b border-slate-50 text-slate-600 ${idx === paginatedRows.length - 1 ? 'bg-[#f2f7ff]' : ''}`}
                 >
-                  <td className="px-4 py-2.5 font-semibold text-slate-400">{idx + 1}</td>
+                  <td className="px-4 py-2.5 font-semibold text-slate-400">{(summaryPage - 1) * summaryPageSize + idx + 1}</td>
                   <td className="px-4 py-2.5">{r.displayDate}</td>
                   <td className="px-4 py-2.5 font-semibold">{fmtNum(r.produced)}</td>
                   <td className="px-4 py-2.5">{fmtNum(r.cumulative)}</td>
@@ -422,11 +496,24 @@ export default function ProductionCompletionVerificationPage() {
             </tbody>
           </table>
         </div>
+
+        <TablePagination
+          total={rows.length}
+          page={summaryPage}
+          pageSize={summaryPageSize}
+          onPageChange={setSummaryPage}
+          onPageSizeChange={(newSize) => {
+            setSummaryPageSize(newSize);
+            setSummaryPage(1);
+          }}
+          pageSizeOptions={[10, 20, 50]}
+        />
       </div>
+      )}
 
       {/* Verify & Approve Modal */}
       {showVerifyModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <form onSubmit={handleVerify} className="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <h3 className="text-[15px] font-extrabold text-[#17294e]">Approve & Verify Production</h3>
@@ -453,6 +540,7 @@ export default function ProductionCompletionVerificationPage() {
                   max={totalProduced ?? undefined}
                   value={rejectedQtyInput}
                   onChange={(e) => setRejectedQtyInput(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === '-' || e.key === 'e' || e.key === '+') e.preventDefault(); }}
                   className="w-full rounded-lg border border-slate-300 px-3 py-2 text-[12px] text-slate-800 outline-none focus:border-blue-500"
                 />
                 <p className="mt-1 text-[10.5px] text-slate-400">
@@ -498,7 +586,7 @@ export default function ProductionCompletionVerificationPage() {
 
       {/* View PI modal */}
       {showPI && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setShowPI(false)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={() => setShowPI(false)}>
           <div className="w-full max-w-lg rounded-2xl bg-white p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <h3 className="text-[15px] font-extrabold text-[#17294e]">Production Instruction — {piNumber}</h3>
@@ -540,6 +628,18 @@ export default function ProductionCompletionVerificationPage() {
         onClose={() => setShowPrintModal(false)}
         completionData={completionData}
         detail={detail}
+      />
+      <ConfirmModal
+        isOpen={confirmCompleteOpen}
+        onClose={() => setConfirmCompleteOpen(false)}
+        onConfirm={async () => {
+          setConfirmCompleteOpen(false);
+          await handleComplete();
+        }}
+        title="Complete Production Instruction"
+        message="Mark this instruction as Completed (pending verification)?"
+        confirmText="Mark Complete"
+        variant="warning"
       />
     </div>
   );

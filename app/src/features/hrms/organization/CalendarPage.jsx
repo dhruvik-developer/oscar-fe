@@ -1,9 +1,9 @@
+import { modal } from '../../../context/ModalContext';
 import { useState, useMemo, useEffect, useRef } from "react";
 import {
   Calendar as CalendarIcon,
   Plus,
   Search,
-  Download,
   Filter,
   RotateCcw,
   Sparkles,
@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { useAppStore } from "../../../stores/appStore";
 import { useCalendarStore } from "../../../stores/calendarStore";
+import hrmsSync from "../../../services/hrmsSync";
 import { EVENT_CATEGORIES, DEPARTMENTS, MONTH_NAMES } from "./calendarConfig";
 import {
   formatDateKey,
@@ -73,6 +74,49 @@ export function CalendarPage() {
   const [modalDefaultDate, setModalDefaultDate] = useState("");
   const [deptDropdownOpen, setDeptDropdownOpen] = useState(false);
   const deptRef = useRef(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    hrmsSync.pull('holidays')
+      .then((holidaysList) => {
+        if (cancelled || !Array.isArray(holidaysList) || holidaysList.length === 0) return;
+        holidaysList.forEach((h) => {
+          const hDate = h.date || h.holidayDate;
+          if (!hDate) return;
+          const currentEvents = useCalendarStore.getState().events;
+          const existing = currentEvents.find(
+            (ev) =>
+              ev.sourceId === h.id ||
+              ev.source_id === h.id ||
+              ((ev.date === hDate || ev.startDate === hDate) &&
+                (ev.title || '').toLowerCase() === (h.name || h.title || '').toLowerCase())
+          );
+          if (!existing) {
+            addEvent({
+              id: `EV-HOL-${h.id}`,
+              source_id: h.id,
+              sourceId: h.id,
+              source_type: 'Holiday',
+              title: h.name || h.title,
+              date: hDate,
+              startDate: hDate,
+              endDate: hDate,
+              type: 'Holiday',
+              category: 'Holiday',
+              department: 'All Departments',
+              location: h.appliesTo || h.applies_to || 'All Locations',
+              description: h.description || `${h.type || h.holiday_type || 'Official'} Holiday: ${h.name || h.title}`,
+              isMandatory: true,
+              isServerSynced: true,
+            });
+          }
+        });
+      })
+      .catch((err) => console.warn('[HRMS] calendar holidays sync:', err));
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     function handleClickOutside(e) {
@@ -224,9 +268,9 @@ export function CalendarPage() {
   // Upcoming holidays
   const upcomingHolidays = useMemo(() => {
     return events
-      .filter((ev) => ev.type === "Holiday" && (ev.startDate || ev.date) >= selectedDate)
+      .filter((ev) => (ev.type === "Holiday" || ev.category === "Holiday") && (ev.startDate || ev.date) >= selectedDate)
       .sort((a, b) => (a.startDate || a.date).localeCompare(b.startDate || b.date))
-      .slice(0, 4);
+      .slice(0, 6);
   }, [events, selectedDate]);
 
   // Upcoming fun & culture events
@@ -253,9 +297,30 @@ export function CalendarPage() {
   const handleSaveEvent = (eventData, id) => {
     if (id) {
       updateEvent(id, eventData);
+      if (eventData.type === "Holiday" || eventData.category === "Holiday") {
+        hrmsSync.pull('holidays').then((list) => {
+          const match = (list || []).find((h) => (h.name || '').toLowerCase() === (eventData.title || '').toLowerCase());
+          if (match?.id) {
+            hrmsSync.update('holidays', match.id, {
+              name: eventData.title,
+              date: eventData.startDate || eventData.date,
+              type: "National Gazetted",
+              appliesTo: eventData.location || "All Locations",
+            }).catch(console.warn);
+          }
+        }).catch(console.warn);
+      }
       showToast(`Updated "${eventData.title}"`);
     } else {
       const created = addEvent(eventData);
+      if (eventData.type === "Holiday" || eventData.category === "Holiday") {
+        hrmsSync.create('holidays', {
+          name: eventData.title,
+          date: eventData.startDate || eventData.date,
+          type: "National Gazetted",
+          appliesTo: eventData.location || "All Locations",
+        }).catch(console.warn);
+      }
       showToast(`Scheduled "${created.title}"`);
     }
     setIsModalOpen(false);
@@ -264,6 +329,16 @@ export function CalendarPage() {
   const handleDeleteEvent = (id) => {
     const target = events.find((e) => e.id === id);
     deleteEvent(id);
+    if (target && (target.type === "Holiday" || target.category === "Holiday")) {
+      hrmsSync.pull('holidays').then((list) => {
+        const match = (list || []).find(
+          (h) => (target.source_id && h.id === target.source_id) || (h.name || '').toLowerCase() === (target.title || '').toLowerCase()
+        );
+        if (match?.id) {
+          hrmsSync.remove('holidays', match.id).catch(console.warn);
+        }
+      }).catch(console.warn);
+    }
     setIsModalOpen(false);
     showToast(target ? `Deleted "${target.title}"` : "Event deleted");
   };
@@ -273,8 +348,13 @@ export function CalendarPage() {
     showToast("Calendar (.ics) downloaded successfully");
   };
 
-  const handleResetDefaults = () => {
-    if (confirm("Reset calendar to default company events and holidays?")) {
+  const handleResetDefaults = async () => {
+    const confirmed = await modal.warning({
+      title: "Reset Calendar Defaults?",
+      message: "Reset calendar to default company events and holidays? Custom changes will be replaced.",
+      confirmText: "Reset Defaults"
+    });
+    if (confirmed) {
       resetToDefaults();
       showToast("Calendar reset to defaults");
     }
@@ -303,17 +383,6 @@ export function CalendarPage() {
                 </button>
               ))}
             </div>
-
-            {/* Export to ICS button */}
-            <button
-              type="button"
-              onClick={handleExport}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-white border border-bdr text-slate-700 rounded-xl text-[13px] font-medium hover:bg-off transition shadow-xs cursor-pointer"
-              title="Export calendar to iCal (.ics) for Google/Outlook Calendar"
-            >
-              <Download size={15} />
-              Export (.ics)
-            </button>
 
             {/* Add Event Button */}
             <button

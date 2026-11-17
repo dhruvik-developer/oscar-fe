@@ -152,8 +152,12 @@ const usePayrollStoreBase = create((set, get) => ({
       error: rows ? null : "Payroll could not be loaded.",
       structures: structures || s.structures,
       defaultWorkingDays: settings?.defaultWorkingDays ?? s.defaultWorkingDays,
-      departmentWorkingDays: settings?.departmentWorkingDays ?? s.departmentWorkingDays,
-      departmentWorkingHours: settings?.departmentWorkingHours ?? s.departmentWorkingHours,
+      departmentWorkingDays: (settings?.departmentWorkingDays && Object.keys(settings.departmentWorkingDays).length > 0)
+        ? { ...s.departmentWorkingDays, ...settings.departmentWorkingDays }
+        : s.departmentWorkingDays,
+      departmentWorkingHours: (settings?.departmentWorkingHours && Object.keys(settings.departmentWorkingHours).length > 0)
+        ? { ...s.departmentWorkingHours, ...settings.departmentWorkingHours }
+        : s.departmentWorkingHours,
     }));
     return rows;
   },

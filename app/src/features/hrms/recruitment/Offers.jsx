@@ -39,7 +39,7 @@ export default function Offers() {
   const [form, setForm] = useState({
     candidateId: "CAND-005",
     job: "HR Manager",
-    salary: "$95,000",
+    salary: "₹95,000",
     joiningDate: "01 Oct 2024",
     expiry: "15 Sep 2024",
     benefits: "Health, 401k",
@@ -80,7 +80,7 @@ export default function Offers() {
     setForm({
       candidateId: "CAND-005",
       job: "HR Manager",
-      salary: "$95,000",
+      salary: "₹95,000",
       joiningDate: "01 Oct 2024",
       expiry: "15 Sep 2024",
       benefits: "Health, 401k",
@@ -489,7 +489,7 @@ export default function Offers() {
               value={form.salary}
               onChange={(e) => setForm({ ...form, salary: e.target.value })}
               className="h-9 px-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-800 dark:text-slate-200 outline-none focus:border-indigo-500 text-[13px]"
-              placeholder="$95,000"
+              placeholder="₹95,000"
             />
           </label>
 
@@ -584,7 +584,7 @@ export default function Offers() {
       {/* Guide Modal */}
       {guideOpen && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/50 backdrop-blur-xs"
+          className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/50 backdrop-blur-sm"
           onClick={() => setGuideOpen(false)}
         >
           <div

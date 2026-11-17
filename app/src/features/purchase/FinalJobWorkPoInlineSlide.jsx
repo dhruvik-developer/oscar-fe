@@ -429,7 +429,7 @@ export function FinalJobWorkPoInlineSlide({
                 UOM: <strong className="text-slate-800">Mtr</strong>
               </div>
               <div>
-                Rate: <strong className="text-slate-800 font-mono">â‚¹{Number(originalPoRate).toFixed(2)}</strong>
+                Rate: <strong className="text-slate-800 font-mono">₹{Number(originalPoRate).toFixed(2)}</strong>
               </div>
             </div>
           </div>
@@ -616,7 +616,7 @@ export function FinalJobWorkPoInlineSlide({
 
               <div>
                 <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                  Approved Rate (â‚¹/Mtr) <span className="text-rose-500">*</span>
+                  Approved Rate (₹/Mtr) <span className="text-rose-500">*</span>
                 </label>
                 <input
                   type="number"
@@ -631,7 +631,7 @@ export function FinalJobWorkPoInlineSlide({
 
               <div>
                 <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                  Amount (â‚¹)
+                  Amount (₹)
                 </label>
                 <input
                   type="text"
@@ -722,14 +722,14 @@ export function FinalJobWorkPoInlineSlide({
               </div>
 
               <div className="flex items-center justify-between text-slate-600 pt-1">
-                <span>Rate (â‚¹/Mtr)</span>
+                <span>Rate (₹/Mtr)</span>
                 <span className="font-mono font-bold text-slate-900">{Number(approvedRate).toFixed(2)}</span>
               </div>
 
               {/* Highlighted Row: Final PO Amount */}
               <div className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-emerald-50/60 border border-emerald-200/80">
                 <span className="font-extrabold text-emerald-800 text-[11.5px]">
-                  Final PO Amount (â‚¹)
+                  Final PO Amount (₹)
                 </span>
                 <span className="font-mono font-black text-emerald-950 text-sm">
                   {fmtINR(calculatedPoAmount)}
@@ -803,8 +803,8 @@ export function FinalJobWorkPoInlineSlide({
                 <th className="px-3 py-2.5">HSN</th>
                 <th className="px-3 py-2.5">UOM</th>
                 <th className="px-3 py-2.5 text-right">Final Quantity (Mtr)</th>
-                <th className="px-3 py-2.5 text-right">Rate (â‚¹/Mtr)</th>
-                <th className="px-3 py-2.5 text-right">Amount (â‚¹)</th>
+                <th className="px-3 py-2.5 text-right">Rate (₹/Mtr)</th>
+                <th className="px-3 py-2.5 text-right">Amount (₹)</th>
                 <th className="px-2 py-2.5 w-10 text-center"></th>
               </tr>
             </thead>
@@ -1104,8 +1104,8 @@ export function FinalJobWorkPoInlineSlide({
                         <th className="px-3 py-2">HSN</th>
                         <th className="px-3 py-2 text-center">UOM</th>
                         <th className="px-3 py-2 text-right">Eligible Accepted Qty</th>
-                        <th className="px-3 py-2 text-right">Rate (â‚¹)</th>
-                        <th className="px-3 py-2 text-right">Amount (â‚¹)</th>
+                        <th className="px-3 py-2 text-right">Rate (₹)</th>
+                        <th className="px-3 py-2 text-right">Amount (₹)</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -1116,7 +1116,7 @@ export function FinalJobWorkPoInlineSlide({
                           <td className="px-3 py-2 font-mono text-slate-600">{item.hsn}</td>
                           <td className="px-3 py-2 text-center font-mono text-slate-600">{item.uom}</td>
                           <td className="px-3 py-2 text-right font-mono font-bold text-slate-900">{fmtM(item.finalQty)}</td>
-                          <td className="px-3 py-2 text-right font-mono text-slate-700">â‚¹{Number(item.rate).toFixed(2)}</td>
+                          <td className="px-3 py-2 text-right font-mono text-slate-700">₹{Number(item.rate).toFixed(2)}</td>
                           <td className="px-3 py-2 text-right font-mono font-black text-slate-900">{fmtINR(item.amount)}</td>
                         </tr>
                       ))}
@@ -1126,7 +1126,7 @@ export function FinalJobWorkPoInlineSlide({
                         <td colSpan={4} className="px-3 py-2 text-right text-slate-600">Grand Total:</td>
                         <td className="px-3 py-2 text-right font-mono text-slate-900">{fmtM(lineItemsTotalQty)} Mtr</td>
                         <td></td>
-                        <td className="px-3 py-2 text-right font-mono text-emerald-950 font-black text-sm">â‚¹{fmtINR(lineItemsTotalAmount)}</td>
+                        <td className="px-3 py-2 text-right font-mono text-emerald-950 font-black text-sm">₹{fmtINR(lineItemsTotalAmount)}</td>
                       </tr>
                     </tfoot>
                   </table>

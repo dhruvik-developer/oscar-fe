@@ -22,6 +22,8 @@ import {
   FilePlus2,
   Receipt,
   ArrowDownLeft,
+  ArrowUpRight,
+  ArrowRight,
   BadgePercent,
   RotateCcw,
   Boxes,
@@ -67,7 +69,7 @@ import {
   Lock,
   Truck,
   FlaskConical,
-  DollarSign,
+  IndianRupee,
 } from 'lucide-react';
 import { useAppStore } from '../../stores/appStore';
 import BrandLogo, { useBrandName } from '../common/BrandLogo';
@@ -215,44 +217,58 @@ export const NAV = [
   },
 
   {
-    label: 'PMS (Projects)',
-    icon: Briefcase,
+    label: 'PMS (Loom & Manufacturing)',
+    icon: Factory,
     permission: 'menu_pms',
+    defaultOpen: true,
     children: [
-      { label: 'PMS Dashboard', icon: Home, to: '/pms' },
-      { label: 'All Projects', icon: Layers, to: '/pms/projects' },
-      { label: 'My Projects', icon: UserCheck, to: '/pms/my-projects' },
-      {
-        label: 'Production',
-        icon: Factory,
-        defaultOpen: true,
-        children: [
-          { label: 'Production Dashboard', icon: BarChart3, to: '/pms/production-dashboard' },
-          { label: 'Production Instructions', icon: ClipboardList, to: '/pms/production-instructions' },
-          { label: 'Daily Production', icon: CalendarCheck, to: '/pms/daily-production' },
-          { label: 'Production Completion & Verification', icon: CheckCircle2, to: '/pms/production-completion' },
-        ],
-      },
-      {
-        label: 'Job Work / Processing',
-        icon: Wrench,
-        defaultOpen: false,
-        children: [
-          { label: 'Dyeing Service Orders', icon: Palette, to: '/job-work/service-orders' },
-          { label: 'Process Plan', icon: ClipboardList, to: '/job-work/process-plan' },
-          { label: 'Job Work Orders (JWO)', icon: FileText, to: '/job-work/orders' },
-          { label: 'Job Work Outward', icon: Send, to: '/job-work/outward' },
-          { label: 'Job Work Inward', icon: ArrowDownLeft, to: '/job-work/inward' },
-          { label: 'Pending Register', icon: Hourglass, to: '/job-work/pending-register' },
-          { label: 'Vendor Reconciliation', icon: GitCompare, to: '/job-work/vendor-reconciliation' },
-          { label: 'Processor Ledger', icon: BookOpen, to: '/job-work/processor-ledger' },
-          { label: 'Reprocess', icon: RotateCcw, to: '/job-work/reprocess' },
-          { label: 'ITC-04 Job Work', icon: FileSpreadsheet, to: '/job-work/itc-04' },
-        ],
-      },
-      { label: 'Timeline & Gantt', icon: Calendar, to: '/pms/timeline' },
+      { label: 'Command Center', icon: BarChart3, to: '/pms' },
+      { label: 'Machines & Beams', icon: Factory, to: '/pms/looms' },
+      { label: 'Daily Loom Entry', icon: CalendarCheck, to: '/pms/loom-daily' },
+      { label: 'Yarn Procurement', icon: Package, to: '/pms/yarn' },
+      { label: 'Programs (Batches)', icon: Layers, to: '/pms/programs' },
+      { label: 'Production Instructions (PI)', icon: ClipboardList, to: '/pms/production-instructions' },
+      { label: 'Completion & Auto-PO', icon: CheckCircle2, to: '/pms/production-completion' },
+      { label: 'Fabric Out (Dispatches)', icon: Send, to: '/pms/fabric-out' },
+      { label: 'Loom Masters', icon: Settings, to: '/pms/loom-masters' },
       { label: 'Delay Center', icon: AlertTriangle, to: '/pms/delays', badgeKey: 'pmsDelayedCount', badgeColor: '#ef4444' },
-      { label: 'PMS Reports', icon: PieChart, to: '/pms/reports' },
+
+      // ── [COMMENTED OUT UNWANTED & DUPLICATE SUBMODULES] ──────────────
+      // 1. Redundant generic production track (superseded by Loom PMS):
+      // {
+      //   label: 'Production (Legacy)',
+      //   icon: Factory,
+      //   children: [
+      //     { label: 'Production Dashboard', icon: BarChart3, to: '/pms/production-dashboard' },
+      //     { label: 'Production Instructions', icon: ClipboardList, to: '/pms/production-instructions' },
+      //     { label: 'Daily Production', icon: CalendarCheck, to: '/pms/daily-production' },
+      //     { label: 'Production Completion & Verification', icon: CheckCircle2, to: '/pms/production-completion' },
+      //   ],
+      // },
+      //
+      // 2. Corporate multi-stage project workflow (unwanted for loom factory):
+      // { label: 'All Projects', icon: Layers, to: '/pms/projects' },
+      // { label: 'My Projects', icon: UserCheck, to: '/pms/my-projects' },
+      // { label: 'Timeline & Gantt', icon: Calendar, to: '/pms/timeline' },
+      // { label: 'PMS Reports', icon: PieChart, to: '/pms/reports' },
+      //
+      // 3. Job Work / Processing (wet processing nested items):
+      // {
+      //   label: 'Job Work / Processing',
+      //   icon: Wrench,
+      //   children: [
+      //     { label: 'Dyeing Service Orders', icon: Palette, to: '/job-work/service-orders' },
+      //     { label: 'Process Plan', icon: ClipboardList, to: '/job-work/process-plan' },
+      //     { label: 'Job Work Orders (JWO)', icon: FileText, to: '/job-work/orders' },
+      //     { label: 'Job Work Outward', icon: Send, to: '/job-work/outward' },
+      //     { label: 'Job Work Inward', icon: ArrowDownLeft, to: '/job-work/inward' },
+      //     { label: 'Pending Register', icon: Hourglass, to: '/job-work/pending-register' },
+      //     { label: 'Vendor Reconciliation', icon: GitCompare, to: '/job-work/vendor-reconciliation' },
+      //     { label: 'Processor Ledger', icon: BookOpen, to: '/job-work/processor-ledger' },
+      //     { label: 'Reprocess', icon: RotateCcw, to: '/job-work/reprocess' },
+      //     { label: 'ITC-04 Job Work', icon: FileSpreadsheet, to: '/job-work/itc-04' },
+      //   ],
+      // },
     ],
   },
 
@@ -268,7 +284,7 @@ export const NAV = [
       { label: 'Delivery Challans', icon: Send, to: '/sales/delivery' },
       // [DISABLED] Warranty Cards concept commented out
       // { label: 'Warranty Cards', icon: ShieldCheck, to: '/sales/warranty' },
-      { label: 'Broker Commissions', icon: DollarSign, to: '/sales/broker-commissions' },
+      { label: 'Broker Commissions', icon: IndianRupee, to: '/sales/broker-commissions' },
       { label: 'Sales Returns', icon: RotateCcw, to: '/sales/returns' },
       { label: 'Payment In', icon: ArrowDownLeft, to: '/sales/payments' },
       { label: 'Payments & Discounts', icon: BadgePercent, to: '/sales/receivables', permission: 'view_sales' },
@@ -281,17 +297,19 @@ export const NAV = [
     permission: 'menu_purchase',
     children: [
       { label: 'Purchase Orders', icon: ClipboardList, to: '/purchase/orders' },
-      { label: 'Supplier Delivery', icon: Truck, to: '/purchase/deliveries' },
+      // { label: 'Supplier Delivery', icon: Truck, to: '/purchase/deliveries' },
       // [DISABLED] Final Job Work POs concept commented out
       // { label: 'Final Job Work POs', icon: FileSpreadsheet, to: '/purchase/final-job-work-pos' },
       { label: 'Goods Receipt', icon: PackageCheck, to: '/purchase/receipts' },
-      { label: 'Supplier Reconciliation', icon: GitCompare, to: '/purchase/reconciliation' },
-      { label: 'Supplier Ledger', icon: BookOpen, to: '/purchase/supplier-ledger' },
+      // [DISABLED] Supplier Reconciliation commented out
+      // { label: 'Supplier Reconciliation', icon: GitCompare, to: '/purchase/reconciliation' },
+      // [MOVED to Accounts] Supplier Ledger moved to Accounts module
+      // { label: 'Supplier Ledger', icon: BookOpen, to: '/purchase/supplier-ledger' },
       { label: 'Vendor Bills', icon: Receipt, to: '/purchase/vendor-bills' },
       { label: 'Bill Matching', icon: GitCompare, to: '/purchase/bill-matching' },
       { label: 'Purchase Bills', icon: Receipt, to: '/purchase/bills' },
       { label: 'Purchase Returns', icon: RotateCcw, to: '/purchase/returns' },
-      { label: 'Payment Out', icon: ArrowDownLeft, to: '/purchase/payments' },
+      { label: 'Payment Out', icon: ArrowUpRight, to: '/purchase/payments' },
       { label: 'Expenses', icon: Landmark, to: '/purchase/expenses' },
     ],
   },
@@ -319,19 +337,7 @@ export const NAV = [
         ],
       },
       { label: 'Batch Registry', icon: QrCode, to: '/inventory/batches' },
-      {
-        label: 'Stock Position',
-        icon: BarChart3,
-        defaultOpen: false,
-        navigateOnOpen: true,
-        children: [
-          { label: 'Usable Fabric Stock', to: '/inventory/stock-position?type=good', dot: true },
-          { label: 'Sample Fabric Stock', to: '/inventory/stock-position?type=sample' },
-          { label: 'Short Stock Fabric', to: '/inventory/stock-position?type=shortage' },
-          { label: 'Reprocess Stock', to: '/inventory/stock-position?type=reprocess' },
-          { label: 'Customer Return Stock', to: '/inventory/stock-position?type=customer-return' },
-        ],
-      },
+      { label: 'Stock Position', icon: BarChart3, to: '/inventory/stock-position' },
       {
         label: 'QC (Quality Control)', icon: CircleCheck, to: '/inventory/qc/dashboard',
         navigateOnOpen: true,
@@ -339,23 +345,13 @@ export const NAV = [
         // The Defect Master is in Textile Operations Masters.
         children: [
           { label: 'QC Dashboard', to: '/inventory/qc/dashboard', dot: true },
-          { label: 'QC Entry', to: '/inventory/qc/entry' },
-          { label: 'Reprocess', to: '/inventory/qc/reprocess' },
-          { label: 'QC History', to: '/inventory/qc/history' },
+          // { label: 'QC Entry', to: '/inventory/qc/entry' },
+          // { label: 'Reprocess', to: '/inventory/qc/reprocess' },
+          // { label: 'QC History', to: '/inventory/qc/history' },
           { label: 'QC Reports', to: '/inventory/qc/reports' },
         ],
       },
-      {
-        label: 'Lot & Taka',
-        icon: Tag,
-        defaultOpen: false,
-        navigateOnOpen: true,
-        children: [
-          { label: 'Lot / Taka Register', to: '/inventory/lot-register', dot: true },
-          { label: 'Taka Tag Print', to: '/inventory/taka-tags' },
-          { label: 'Production Runs (In-house)', to: '/inventory/production-runs' },
-        ],
-      },
+      // { label: 'Production Runs (In-house)', icon: Factory, to: '/inventory/production-runs' },
       {
         label: 'Warehouse & Movement',
         icon: Warehouse,
@@ -375,7 +371,7 @@ export const NAV = [
         navigateOnOpen: true,
         children: [
           { label: 'Valuation & Ageing', to: '/inventory/valuation', dot: true },
-          { label: 'Lot Costing & Profitability', to: '/inventory/lot-costing' },
+          // { label: 'Lot Costing & Profitability', to: '/inventory/lot-costing' },
           { label: 'Month-End Audit', to: '/inventory/audit' },
         ],
       },
@@ -401,13 +397,9 @@ export const NAV = [
       { label: 'Day Book & Position', icon: BookOpen, to: '/accounts/day-book' },
       { label: 'Cash / Bank', icon: Landmark, to: '/accounts/cash-bank' },
       { label: 'General Ledger', icon: FileText, to: '/accounts/general-ledger' },
-      { label: 'Debit / Credit Notes', icon: Receipt, to: '/accounts/notes' },
+      { label: 'Supplier Ledger', icon: BookOpen, to: '/accounts/supplier-ledger' },
       { label: 'Financial Reports', icon: PieChart, to: '/accounts/reports' },
       { label: 'Chart of Accounts', icon: ListChecks, to: '/accounts/chart-of-accounts' },
-      { label: 'Expense Categories', icon: Tag, to: '/accounts/expense-categories' },
-      // Ledger postings from payroll, incentive, brokerage, expenses, payments.
-      // Admin-only: needs view_audit_logs (Owner / Admin / System Admin).
-      { label: 'Accounting Log', icon: ClipboardList, to: '/accounts/accounting-log', permission: 'view_audit_logs' },
     ],
   },
 
@@ -489,21 +481,21 @@ export const NAV = [
     ],
   },
 
-  {
-    label: 'Reports',
-    icon: BarChart3,
-    children: [
-      { label: 'Standard Reports', to: '/reports', dot: true },
-      { label: 'Owner Executive MIS', to: '/reports/owner-mis' },
-    ],
-  },
+  // [TEMPORARILY HIDDEN] Reports module — comment out to hide from sidebar
+  // {
+  //   label: 'Reports',
+  //   icon: BarChart3,
+  //   children: [
+  //     { label: 'Standard Reports', to: '/reports', dot: true },
+  //     { label: 'Owner Executive MIS', to: '/reports/owner-mis' },
+  //   ],
+  // },
 
   {
     label: 'Administration',
     icon: Shield,
     children: [
       { label: 'My Approvals', icon: ShieldCheck, to: '/administration/approvals' },
-      { label: 'Alert Center', icon: AlertTriangle, to: '/administration/alerts' },
       { label: 'Users', to: '/administration/users' },
       { label: 'Roles', to: '/administration/roles' },
       { label: 'Clients', to: '/administration/clients' },
@@ -675,6 +667,9 @@ function SubItem({ item, depth = 1, badges = {} }) {
   const linkActive = (navActive) => isActive || (!queryLink && navActive);
   const count = item.badgeKey ? (badges?.[item.badgeKey] ?? 0) : 0;
   const Icon = item.icon;
+  // Opt-in accent: a nav item that sets `accent` (hex) gets a tinted icon chip,
+  // a coloured active state and a hover arrow instead of the plain leaf look.
+  const accent = item.accent;
   const trainingEnabled = useAppStore((s) => s.trainingEnabled ?? true);
   const setTrainingEnabled = useAppStore((s) => s.setTrainingEnabled);
   const recruitmentEnabled = useAppStore((s) => s.recruitmentEnabled ?? true);
@@ -715,12 +710,16 @@ function SubItem({ item, depth = 1, badges = {} }) {
         to={item.to}
         end
         title={item.label}
+        style={accent ? { '--chip': accent } : undefined}
         className={({ isActive: navActive }) =>
-          `sub-group-row${linkActive(navActive) ? ' active section-active' : ''}`
+          `sub-group-row${accent ? ' accented' : ''}${linkActive(navActive) ? ' active section-active' : ''}`
         }
       >
-        <Icon size={16} strokeWidth={2} className="nav-ico" />
+        <span className={accent ? 'nav-ico nav-ico-chip' : 'nav-ico'}>
+          <Icon size={accent ? 13 : 16} strokeWidth={accent ? 2.2 : 2} />
+        </span>
         <span className="nav-txt">{item.label}</span>
+        {accent && <ArrowRight size={13} className="sub-arrow" />}
         <NavPill pill={item.pill} />
         <NavBadge count={count} color={item.badgeColor} />
       </NavLink>
@@ -745,10 +744,13 @@ function SubItem({ item, depth = 1, badges = {} }) {
 }
 
 // ── Sub-list (group of sub-items) ───────────────────────────
-function SubList({ items, depth = 1, badges }) {
+function SubList({ items, depth = 1, badges, accent }) {
   const isDeep = depth >= 2;
   return (
-    <div className={isDeep ? 'sub-list-deep' : 'sub-list'}>
+    <div
+      className={`${isDeep ? 'sub-list-deep' : 'sub-list'}${accent ? ' sub-list-accent' : ''}`}
+      style={accent ? { '--list-accent': accent } : undefined}
+    >
       {items.map((item) => {
         if (item.children) {
           return (
@@ -979,7 +981,7 @@ function ExpandableRow({ item, depth = 0, badges = {} }) {
           </span>
         </div>
         {showChildren && item.children && (
-          <SubList items={item.children} depth={depth + 1} badges={badges} />
+          <SubList items={item.children} depth={depth + 1} badges={badges} accent={item.accent} />
         )}
       </div>
     );
@@ -1007,7 +1009,7 @@ function ExpandableRow({ item, depth = 0, badges = {} }) {
         )}
       </button>
       {showChildren && item.children && (
-        <SubList items={item.children} depth={depth + 1} badges={badges} />
+        <SubList items={item.children} depth={depth + 1} badges={badges} accent={item.accent} />
       )}
     </div>
   );

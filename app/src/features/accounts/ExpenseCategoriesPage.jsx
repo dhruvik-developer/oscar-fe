@@ -39,7 +39,7 @@ const COLUMNS = [
 
 const SEARCH_KEYS = ['name'];
 
-export default function ExpenseCategoriesPage() {
+export default function ExpenseCategoriesPage({ embedded = false }) {
   return (
     <SimpleMasterPage
       title="Expense Categories"
@@ -50,6 +50,7 @@ export default function ExpenseCategoriesPage() {
       columns={COLUMNS}
       searchKeys={SEARCH_KEYS}
       loadAux={loadExpenseAccounts}
+      embedded={embedded}
     />
   );
 }

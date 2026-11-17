@@ -7,7 +7,7 @@ import { fmtAddress } from './printDocUtils';
 export const PrintSalesOrderModal = ({ isOpen, onClose, order }) => {
   const docSigs = useDocumentSignatures('SalesOrder', order?.id, `Sales Order ${order?.orderNumber || order?.number || ""}`);
     // [PHASE-2E.1] profile-driven letterhead (was hardcoded EVENMORE / US strings)
-    const { companyProfile } = useERP();
+    const { companyProfile, formatCurrency } = useERP();
     const companyName = companyProfile?.name || 'EVENMORE ENTERPRISES';
     const companyShort = (companyName || 'E').trim().charAt(0).toUpperCase() || 'E';
     const gstin = companyProfile?.gstin || '';
@@ -176,11 +176,11 @@ export const PrintSalesOrderModal = ({ isOpen, onClose, order }) => {
                                             <p className="font-bold text-slate-900">Commercial Equipment Package</p>
                                         </td>
                                         <td className="py-2.5 px-3 text-center font-mono">1</td>
-                                        <td className="py-2.5 px-3 text-right font-mono">${(totalAmount || 0).toFixed(2)}</td>
+                                        <td className="py-2.5 px-3 text-right font-mono">{formatCurrency(totalAmount || 0)}</td>
                                         <td className="py-2.5 px-3 text-center text-slate-500">0%</td>
                                         <td className="py-2.5 px-3 text-center text-slate-500">18%</td>
                                         <td className="py-2.5 px-3 text-right font-mono font-bold text-slate-900">
-                                            ${(totalAmount || 0).toFixed(2)}
+                                            {formatCurrency(totalAmount || 0)}
                                         </td>
                                     </tr>
                                 ) : (
@@ -200,11 +200,11 @@ export const PrintSalesOrderModal = ({ isOpen, onClose, order }) => {
                                                     )}
                                                 </td>
                                                 <td className="py-2.5 px-3 text-center font-mono font-semibold text-slate-800">{qty}</td>
-                                                <td className="py-2.5 px-3 text-right font-mono">${rate.toFixed(2)}</td>
+                                                <td className="py-2.5 px-3 text-right font-mono">{formatCurrency(rate)}</td>
                                                 <td className="py-2.5 px-3 text-center text-slate-500 font-mono">{disc}%</td>
                                                 <td className="py-2.5 px-3 text-center text-slate-500 font-mono">{tax}%</td>
                                                 <td className="py-2.5 px-3 text-right font-mono font-bold text-slate-900">
-                                                    ${lineTotal.toFixed(2)}
+                                                    {formatCurrency(lineTotal)}
                                                 </td>
                                             </tr>
                                         );
@@ -230,15 +230,15 @@ export const PrintSalesOrderModal = ({ isOpen, onClose, order }) => {
                         <div className="w-72 space-y-1.5 font-mono text-xs text-right">
                             <div className="flex justify-between text-slate-600">
                                 <span>Order Net Subtotal:</span>
-                                <span>${subtotal.toFixed(2)}</span>
+                                <span>{formatCurrency(subtotal)}</span>
                             </div>
                             <div className="flex justify-between text-slate-600">
                                 <span>Estimated GST / Tax:</span>
-                                <span>${taxAmount.toFixed(2)}</span>
+                                <span>{formatCurrency(taxAmount)}</span>
                             </div>
                             <div className="flex justify-between text-sm font-black text-slate-900 pt-2 border-t-2 border-slate-900 bg-slate-50 p-1.5 rounded">
                                 <span>Grand Order Commitment:</span>
-                                <span className="text-blue-900">${grandTotal.toFixed(2)}</span>
+                                <span className="text-blue-900">{formatCurrency(grandTotal)}</span>
                             </div>
                         </div>
                     </div>

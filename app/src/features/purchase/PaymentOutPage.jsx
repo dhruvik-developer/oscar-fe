@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { modal } from '../../context/ModalContext';
 import { useERP } from '../../context/ERPContext';
 import { DataTable } from '../../components/ui/DataTable';
 import { StatCard } from '../../components/ui/StatCard';
@@ -33,7 +34,7 @@ const paymentOutGuide = {
         'Always verify the vendor bill reference number before disbursing funds to prevent duplicate payment vouchers.',
     ],
 };
-export const PaymentOutPage = () => {
+export const PaymentOutPage = ({ embedded = false }) => {
     const { paymentOuts, purchaseBills, purchaseOrders, vendors, bankAccounts, addPaymentOut, applyVendorAdvanceToBill, getVendorAdvanceBalance, getBillOutstanding, formatCurrency, formatDateDDMMYYYY, getCurrentISODate } = useERP();
     const [showAddModal, setShowAddModal] = useState(false);
     const [selectedBillId, setSelectedBillId] = useState('');
@@ -57,7 +58,7 @@ export const PaymentOutPage = () => {
     };
 
     const handleOpenModal = () => {
-        const defaultBill = purchaseBills.find(b => b.status !== 'Cancelled' && getBillOutstanding(b.id).balanceDue > 0);
+        const defaultBill = purchaseBills.find(b => !['Cancelled', 'Draft'].includes(b.status) && getBillOutstanding(b.id).balanceDue > 0);
         handleBillSelect(defaultBill?.id || '');
         setPaymentType('Final');
         setSelectedPoId('');
@@ -77,14 +78,14 @@ export const PaymentOutPage = () => {
             // no PO link on payments, so the PO is recorded in the notes.
             const po = purchaseOrders.find((p) => p.id === selectedPoId);
             const vendorId = selectedVendorId || po?.vendorId;
-            if (!vendorId) { alert('Select the supplier receiving the advance.'); return; }
+            if (!vendorId) { await modal.warning('Select the supplier receiving the advance.', 'Supplier Required'); return; }
             payload = {
                 vendorId,
                 notes: po ? `Advance against ${po.poNumber}` : undefined,
             };
         } else {
             const bill = purchaseBills.find((b) => b.id === selectedBillId);
-            if (!bill) { alert('Select the vendor bill being paid.'); return; }
+            if (!bill) { await modal.warning('Select the vendor bill being paid.', 'Bill Required'); return; }
             payload = { vendorId: bill.vendorId, billId: bill.id };
         }
         setSaving(true);
@@ -205,9 +206,21 @@ export const PaymentOutPage = () => {
     const electronicCount = activePayments.filter((p) => p.mode && p.mode !== 'Cash' && p.mode !== 'Cheque').length;
 
     return (<div className="space-y-6">
-      <PageHeader title="Payment Out Vouchers" subtitle="Vendor disbursements, ACH/Wire payment authorizations, automatic bank debit, and Accounts Payable liability reduction." guide={paymentOutGuide} actions={<Button icon={Plus} onClick={handleOpenModal}>
+      {!embedded ? (
+        <PageHeader title="Payment Out Vouchers" subtitle="Vendor disbursements, ACH/Wire payment authorizations, automatic bank debit, and Accounts Payable liability reduction." guide={paymentOutGuide} actions={<Button icon={Plus} onClick={handleOpenModal}>
+              New Payment Voucher
+            </Button>}/>
+      ) : (
+        <div className="flex flex-wrap items-center justify-between gap-3 pb-1">
+          <div>
+            <h2 className="text-base font-bold text-slate-900">Payments & Disbursements</h2>
+            <p className="text-xs text-slate-500">Vendor disbursements, ACH/Wire authorizations, and Accounts Payable settlements.</p>
+          </div>
+          <Button icon={Plus} onClick={handleOpenModal}>
             New Payment Voucher
-          </Button>}/>
+          </Button>
+        </div>
+      )}
 
       {/* Payment Out KPI Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -265,12 +278,12 @@ export const PaymentOutPage = () => {
               type="button"
               disabled={saving}
               onClick={async () => {
-                if (!advanceBillId) { alert('Select a vendor bill with an open balance.'); return; }
+                if (!advanceBillId) { await modal.warning('Select a vendor bill with an open balance.', 'Bill Required'); return; }
                 const b = purchaseBills.find((x) => x.id === advanceBillId);
                 const maxAdv = getVendorAdvanceBalance(b?.vendorId);
                 const bal = getBillOutstanding(advanceBillId).balanceDue;
                 const amt = Math.min(Number(advanceApplyAmt) || 0, maxAdv, bal);
-                if (!(amt > 0)) { alert('Enter an amount to apply.'); return; }
+                if (!(amt > 0)) { await modal.warning('Enter an amount to apply.', 'Amount Required'); return; }
                 setSaving(true);
                 try {
                   await applyVendorAdvanceToBill(advanceBillId, amt);
@@ -349,9 +362,9 @@ export const PaymentOutPage = () => {
                     <label className="block font-semibold text-slate-700 mb-1">Target Vendor Bill *</label>
                     <select required value={selectedBillId} onChange={(e) => handleBillSelect(e.target.value)} className="w-full border border-slate-300 rounded-lg p-2 bg-white text-slate-800 font-medium">
                       <option value="">Select bill</option>
-                      {purchaseBills.map((b) => {
+                      {purchaseBills.filter((b) => b.status !== 'Draft' && getBillOutstanding(b.id).balanceDue > 0.01).map((b) => {
                         const outstanding = getBillOutstanding(b.id);
-                        const tag = b.status === 'Cancelled' ? ' [Cancelled]' : outstanding.balanceDue <= 0.01 ? ' [Settled]' : ` [Due: ${formatCurrency(outstanding.balanceDue)}]`;
+                        const tag = b.status === 'Cancelled' ? ' [Cancelled]' : ` [Due: ${formatCurrency(outstanding.balanceDue)}]`;
                         return (
                           <option key={b.id} value={b.id}>
                             {b.billNumber} - {b.vendor}{tag}

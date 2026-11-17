@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { modal } from '../../context/ModalContext';
 import { TablePagination } from '../../components/ui/TablePagination';
 import { useERP } from '../../context/ERPContext';
 import { StatusBadge } from '../../components/ui/StatusBadge';
@@ -21,19 +22,22 @@ import {
   ChevronUp,
   Trash2,
   Layers,
+  Package,
   Building2,
   RefreshCw,
   Search,
+  RotateCcw,
 } from 'lucide-react';
 import api from '../../services/api';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { numIN } from '../../utils/formatters';
 import MasterSourceLink from '../../components/common/MasterSourceLink';
 import GrnDetailDrawer from './GrnDetailDrawer';
+import { ReceiptTypeNotice } from './DyeingColourField';
 
 const goodsReceiptGuide = {
   title: 'Goods Receipt Notes (GRN)',
-  subtitle: 'Physical intake verification, roll/taka breakdown, 3-way matching (PO ⇄ GRN ⇄ Bill), and QC checkpoint.',
+  subtitle: 'Physical intake verification, roll/taka breakdown, 3-way matching (PO â‡„ GRN â‡„ Bill), and QC checkpoint.',
   purpose: 'Every purchase order and delivery from suppliers/mills is received through physical GRN verification. This screen captures taka rolls per line, compares received meters against ordered PO meterage, records shortage/excess, and routes goods to QC inspection before stock release.',
   keyTerms: [
     { term: 'GRN (Goods Receipt Note)', definition: 'The physical intake document capturing roll-by-roll actual meters, kg, width, and lot numbers.' },
@@ -65,9 +69,10 @@ export const GoodsReceiptPage = () => {
   const lineUnit = (it) => it.uom || it.unit || 'MTR';
   const unitTotals = (lines, qtyOf) => formatUnitTotals(sumByUnit(lines, { qty: qtyOf, uom: lineUnit, units }), { units });
 
-  // Tab state: 'pending' (bills awaiting receipt) | 'receipts' (completed GRN register)
-  const [activeTab, setActiveTab] = useState('pending');
+  // Tab state: 'receipts' (completed GRN register) | 'pending' (bills awaiting receipt)
+  const [activeTab, setActiveTab] = useState('receipts');
   const [grnList, setGrnList] = useState([]);
+  const [totalGrnCount, setTotalGrnCount] = useState(0);
   const [viewGrn, setViewGrn] = useState(null);
   const [loadingGrns, setLoadingGrns] = useState(false);
   const [grnSearch, setGrnSearch] = useState('');
@@ -104,8 +109,9 @@ export const GoodsReceiptPage = () => {
   const fetchGrns = useCallback(async () => {
     setLoadingGrns(true);
     try {
-      const res = await api.get('/purchase/receipts/');
+      const res = await api.get('/purchase/receipts/?page_size=1000');
       const rows = Array.isArray(res) ? res : (res?.results || res?.rows || []);
+      setTotalGrnCount(res?.count ?? rows.length);
       // The API answers in camelCase (grnNumber, receiptDate, ...); this page
       // reads the snake_case names, so fill those from the camelCase ones.
       setGrnList(rows.map((r) => ({
@@ -118,14 +124,22 @@ export const GoodsReceiptPage = () => {
     } catch (err) {
       console.error('Failed to fetch GRN list:', err);
       setGrnList([]);
+      setTotalGrnCount(0);
     } finally {
       setLoadingGrns(false);
     }
   }, []);
 
+  // StrictMode runs this effect twice on mount; a ref survives between the two.
+  const initialLoadDone = useRef(false);
   useEffect(() => {
+    if (initialLoadDone.current) return;
+    initialLoadDone.current = true;
     fetchGrns();
-  }, [fetchGrns]);
+    if (typeof refreshCollections === 'function') {
+      refreshCollections(['purchaseOrders', 'purchaseBills']);
+    }
+  }, [fetchGrns, refreshCollections]);
 
   // Set default location once locations are loaded
   useEffect(() => {
@@ -134,11 +148,66 @@ export const GoodsReceiptPage = () => {
     }
   }, [locations, standaloneForm.locationId]);
 
-  // Pending receipts from bills
-  const pendingReceipts = (purchaseBills || []).filter((b) => b.goodsReceived !== true && b.status !== 'Cancelled');
-  const receivedCount = grnList.length || (purchaseBills || []).filter((b) => b.goodsReceived === true).length;
-  const pendingQtyText = unitTotals(pendingReceipts.flatMap((b) => b.items || []), (it) => Number(it.qty) || 0);
-  const pendingValue = pendingReceipts.reduce((sum, b) => sum + (Number(b.total ?? b.amount) || 0), 0);
+  // Pending receipts from active Purchase Orders awaiting receipt (standard ERP flow)
+  const pendingPOs = useMemo(() => {
+    return (purchaseOrders || []).filter((po) => {
+      if (['Draft', 'Cancelled'].includes(po.status)) return false;
+      const lines = po.lineItems || po.items || [];
+      const ordered = lines.reduce((sum, l) => sum + (Number(l.qty ?? l.orderedQty) || 0), 0);
+      const received = lines.reduce((sum, l) => sum + (Number(l.receivedQty ?? l.received_qty) || 0), 0);
+      return ordered > 0 && received < ordered;
+    });
+  }, [purchaseOrders]);
+
+  const pendingPoLines = useMemo(() => {
+    return pendingPOs.flatMap((po) =>
+      (po.lineItems || po.items || []).map((l) => {
+        const ordered = Number(l.qty ?? l.orderedQty ?? 0);
+        const received = Number(l.receivedQty ?? l.received_qty ?? 0);
+        const remaining = Math.max(0, ordered - received);
+        const rate = Number(l.rate ?? l.price ?? 0);
+        return {
+          ...l,
+          qty: remaining,
+          uom: l.uom || l.unit || 'MTR',
+          value: remaining * rate,
+        };
+      })
+    ).filter((l) => l.qty > 0);
+  }, [pendingPOs]);
+
+  // Legacy pending receipts from bills
+  // A bill whose PO already has a GRN has nothing left to receive: goods come in
+  // through the GRN, and this list is only for bills raised without one.
+  const pendingReceipts = useMemo(() => {
+    return (purchaseBills || []).filter(
+      (b) => b.goodsReceived !== true && b.status !== 'Cancelled' && !b.poAlreadyReceived,
+    );
+  }, [purchaseBills]);
+
+  // Combined metrics across pending POs and pending bills
+  const pendingIntakeLabel = pendingPOs.length > 0
+    ? `${pendingPOs.length} ${pendingPOs.length === 1 ? 'Order' : 'Orders'}`
+    : `${pendingReceipts.length} ${pendingReceipts.length === 1 ? 'Bill' : 'Bills'}`;
+
+  const allPendingLines = useMemo(() => {
+    const billLines = pendingReceipts.flatMap((b) => b.items || []);
+    return [...pendingPoLines, ...billLines];
+  }, [pendingPoLines, pendingReceipts]);
+
+  const pendingQtyText = useMemo(() => {
+    if (allPendingLines.length === 0) return '0 MTR';
+    const formatted = unitTotals(allPendingLines, (it) => Number(it.qty) || 0);
+    return !formatted || formatted === '"”' ? '0 MTR' : formatted;
+  }, [allPendingLines, unitTotals]);
+
+  const pendingValue = useMemo(() => {
+    const poVal = pendingPoLines.reduce((sum, l) => sum + (Number(l.value) || 0), 0);
+    const billVal = pendingReceipts.reduce((sum, b) => sum + (Number(b.total ?? b.amount) || 0), 0);
+    return poVal + billVal;
+  }, [pendingPoLines, pendingReceipts]);
+
+  const totalGrnDisplayCount = totalGrnCount || grnList.length;
 
   // Weight metadata helper
   const getLineWeightMeta = (line) => {
@@ -209,7 +278,7 @@ export const GoodsReceiptPage = () => {
     fetchGrns();
   };
 
-  // ── Standalone GRN Form Handlers (Phase 2.2) ──
+  // â”€â”€ Standalone GRN Form Handlers (Phase 2.2) â”€â”€
   const openStandaloneModal = (prefill = {}) => {
     setStandaloneError('');
     setStandaloneSuccess('');
@@ -307,15 +376,13 @@ export const GoodsReceiptPage = () => {
         orderedQty: lineOrdered,
         remainingQty: remaining,
         receivedQty: targetQty > 0 ? targetQty : '',
-        unitCost: Number(it.rate || it.unitPrice || 0),
+        unitCost: Number(it.rate || it.unitPrice || 0) > 0 ? Number(it.rate || it.unitPrice || 0) : '',
+        poRate: Number(it.rate || it.unitPrice || 0),
+        totalCost: targetQty > 0 && Number(it.rate || it.unitPrice || 0) > 0 ? Math.round(targetQty * Number(it.rate || it.unitPrice) * 100) / 100 : '',
         uom: it.uom || '',
         batchNumber: '',
         fabricWidth: it.fabricWidth || '',
         remarks: '',
-        takas: [
-          { id: `t-${idx + 1}-1`, takaNumber: '1', qty: targetQty > 0 ? targetQty : '', weight: '', width: it.fabricWidth ? String(it.fabricWidth) : '', remarks: '' },
-        ],
-        showTakas: true,
       };
     });
 
@@ -361,8 +428,10 @@ export const GoodsReceiptPage = () => {
           itemName: '',
           poLineId: '',
           orderedQty: 0,
-          receivedQty: 0,
-          unitCost: 0,
+          receivedQty: '',
+          unitCost: '',
+          poRate: 0,
+          totalCost: '',
           uom: '',
           batchNumber: '',
           fabricWidth: '',
@@ -390,6 +459,25 @@ export const GoodsReceiptPage = () => {
         // If receivedQty changed and there's 1 taka, auto-sync its qty
         if (field === 'receivedQty' && updated.takas?.length === 1) {
           updated.takas = [{ ...updated.takas[0], qty: Number(val) || 0 }];
+        }
+        if (field === 'receivedQty') {
+          const rQty = Number(val) || 0;
+          const uCost = Number(updated.unitCost) || 0;
+          if (uCost > 0 && rQty > 0) {
+            updated.totalCost = Math.round(rQty * uCost * 100) / 100;
+          }
+        } else if (field === 'unitCost') {
+          const uCost = Number(val) || 0;
+          const rQty = Number(updated.receivedQty) || 0;
+          if (rQty > 0 && val !== '') {
+            updated.totalCost = Math.round(rQty * uCost * 100) / 100;
+          }
+        } else if (field === 'totalCost') {
+          const tCost = Number(val) || 0;
+          const rQty = Number(updated.receivedQty) || 0;
+          if (rQty > 0 && val !== '') {
+            updated.unitCost = Math.round((tCost / rQty) * 100) / 100;
+          }
         }
         return updated;
       }),
@@ -439,10 +527,16 @@ export const GoodsReceiptPage = () => {
     }));
   };
 
-  const handleAutoSplitTakas = (lineId) => {
+  const handleAutoSplitTakas = async (lineId) => {
     const line = standaloneForm.lines.find((l) => l.id === lineId);
     if (!line) return;
-    const countStr = window.prompt(`How many rolls to split ${line.receivedQty} meters into?`, '');
+    const countStr = await modal.prompt({
+      title: 'Auto-Split Rolls',
+      message: `How many rolls to split ${line.receivedQty} meters into?`,
+      defaultValue: '',
+      placeholder: 'e.g. 4',
+      confirmLabel: 'Split Rolls',
+    });
     const count = parseInt(countStr, 10);
     if (!count || count <= 0) return;
 
@@ -488,12 +582,7 @@ export const GoodsReceiptPage = () => {
         if (!l.itemId) throw new Error(`Line ${i + 1}: Select the item received.`);
         if (!(rQty > 0)) throw new Error(`Line ${i + 1}: Received quantity must be greater than zero.`);
 
-        if (l.takas && l.takas.length > 0) {
-          const takaSum = l.takas.reduce((s, t) => s + (Number(t.qty) || 0), 0);
-          if (Math.abs(takaSum - rQty) > 0.001) {
-            throw new Error(`Line ${i + 1}: Sum of taka meters (${takaSum} m) does not match received quantity (${rQty} m).`);
-          }
-        }
+
       }
 
       const payload = {
@@ -509,17 +598,11 @@ export const GoodsReceiptPage = () => {
           orderedQty: Number(l.orderedQty) || 0,
           receivedQty: Number(l.receivedQty) || 0,
           unitCost: Number(l.unitCost) || 0,
+          totalCost: Number(l.totalCost) || (Number(l.receivedQty) * Number(l.unitCost)) || 0,
           uom: l.uom || undefined,
           batchNumber: l.batchNumber || undefined,
           fabricWidth: l.fabricWidth ? Number(l.fabricWidth) : null,
           remarks: l.remarks || '',
-          takas: (l.takas || []).map((t, tIdx) => ({
-            takaNumber: t.takaNumber || String(tIdx + 1),
-            qty: Number(t.qty) || 0,
-            weight: t.weight ? Number(t.weight) : null,
-            width: t.width ? Number(t.width) : null,
-            remarks: t.remarks || '',
-          })),
         })),
       };
 
@@ -540,23 +623,80 @@ export const GoodsReceiptPage = () => {
     }
   };
 
+  const [grnSupplierFilter, setGrnSupplierFilter] = useState('All');
+  const [grnQcFilter, setGrnQcFilter] = useState('All');
+  const [grnDateFrom, setGrnDateFrom] = useState('');
+  const [grnDateTo, setGrnDateTo] = useState('');
+
+  const supplierOptions = useMemo(() => {
+    return [...new Set(grnList.map((g) => g.vendorName).filter(Boolean))].sort();
+  }, [grnList]);
+
+  const qcStatusOptions = useMemo(() => {
+    const defaultStatuses = ['Approved', 'Pending', 'Rejected'];
+    const fromData = grnList.map((g) => g.qc_status || g.qcStatus).filter(Boolean);
+    return [...new Set([...defaultStatuses, ...fromData])];
+  }, [grnList]);
+
+  const hasActiveFilters = Boolean(
+    grnSearch.trim() ||
+    grnSupplierFilter !== 'All' ||
+    grnQcFilter !== 'All' ||
+    grnDateFrom ||
+    grnDateTo
+  );
+
+  const resetFilters = () => {
+    setGrnSearch('');
+    setGrnSupplierFilter('All');
+    setGrnQcFilter('All');
+    setGrnDateFrom('');
+    setGrnDateTo('');
+  };
+
   const filteredGrnList = useMemo(() => {
-    if (!grnSearch.trim()) return grnList;
-    const q = grnSearch.toLowerCase();
-    return grnList.filter((g) =>
-      (g.grn_number || '').toLowerCase().includes(q) ||
-      (g.vendorName || '').toLowerCase().includes(q) ||
-      (g.supplier_challan_no || '').toLowerCase().includes(q) ||
-      (g.poNumber || '').toLowerCase().includes(q)
-    );
-  }, [grnList, grnSearch]);
+    return grnList.filter((g) => {
+      // 1. Search filter
+      if (grnSearch.trim()) {
+        const q = grnSearch.toLowerCase().trim();
+        const matchesSearch =
+          (g.grn_number || '').toLowerCase().includes(q) ||
+          (g.vendorName || '').toLowerCase().includes(q) ||
+          (g.supplier_challan_no || '').toLowerCase().includes(q) ||
+          (g.poNumber || '').toLowerCase().includes(q);
+        if (!matchesSearch) return false;
+      }
+
+      // 2. Supplier filter
+      if (grnSupplierFilter !== 'All') {
+        if ((g.vendorName || '') !== grnSupplierFilter) return false;
+      }
+
+      // 3. QC Status filter
+      if (grnQcFilter !== 'All') {
+        const qc = g.qc_status || g.qcStatus || 'Pending';
+        if (qc !== grnQcFilter) return false;
+      }
+
+      // 4. Date range filter
+      if (grnDateFrom || grnDateTo) {
+        const d = (g.receipt_date || '').slice(0, 10);
+        if (d) {
+          if (grnDateFrom && d < grnDateFrom) return false;
+          if (grnDateTo && d > grnDateTo) return false;
+        }
+      }
+
+      return true;
+    });
+  }, [grnList, grnSearch, grnSupplierFilter, grnQcFilter, grnDateFrom, grnDateTo]);
 
   const [grnPage, setGrnPage] = useState(1);
-  const [grnPageSize, setGrnPageSize] = useState(10);
+  const [grnPageSize, setGrnPageSize] = useState(25);
 
   useEffect(() => {
     setGrnPage(1);
-  }, [grnSearch]);
+  }, [grnSearch, grnSupplierFilter, grnQcFilter, grnDateFrom, grnDateTo]);
 
   const paginatedGrnList = useMemo(() => {
     const start = (grnPage - 1) * grnPageSize;
@@ -569,38 +709,41 @@ export const GoodsReceiptPage = () => {
         title="Goods Receipt Notes (GRN)"
         subtitle="Physical intake verification, roll/taka capture, and 3-way matching"
         guide={goodsReceiptGuide}
-        actions={
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => openStandaloneModal()}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3.5 py-2 text-xs font-semibold text-white shadow-xs hover:bg-blue-700 transition"
-            >
-              <Plus size={14} /> New GRN Intake
-            </button>
-          </div>
-        }
       />
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard label="Awaiting Receipt" value={`${pendingReceipts.length} Bills`} icon={Truck} tone="amber" />
-        <StatCard label="Pending Qty" value={pendingQtyText === '—' ? '0' : pendingQtyText} icon={Boxes} />
-        <StatCard label="Receivable Value" value={formatCurrency(pendingValue)} icon={ClipboardCheck} tone="blue" />
-        <StatCard label="Received GRNs" value={`${grnList.length} Notes`} icon={ShieldCheck} tone="green" />
+        <StatCard
+          label="Awaiting Receipt"
+          value={pendingIntakeLabel}
+          icon={Truck}
+          tone="amber"
+          note={pendingPOs.length > 0 ? `${pendingPOs.length} POs pending intake` : undefined}
+        />
+        <StatCard
+          label="Pending Qty"
+          value={pendingQtyText}
+          icon={Boxes}
+          tone="blue"
+        />
+        <StatCard
+          label="Receivable Value"
+          value={formatCurrency(pendingValue)}
+          icon={ClipboardCheck}
+          tone="blue"
+        />
+        <StatCard
+          label="Received GRNs"
+          value={`${totalGrnDisplayCount} Notes`}
+          icon={ShieldCheck}
+          tone="green"
+          onClick={() => setActiveTab('receipts')}
+          className="cursor-pointer hover:shadow-md transition"
+        />
       </div>
 
       {/* Tabs */}
       <div className="flex border-b border-slate-200 gap-4">
-        <button
-          onClick={() => setActiveTab('pending')}
-          className={`pb-2.5 text-xs font-semibold border-b-2 transition ${
-            activeTab === 'pending'
-              ? 'border-blue-600 text-blue-700'
-              : 'border-transparent text-slate-500 hover:text-slate-800'
-          }`}
-        >
-          Pending Bills ({pendingReceipts.length})
-        </button>
         <button
           onClick={() => setActiveTab('receipts')}
           className={`pb-2.5 text-xs font-semibold border-b-2 transition ${
@@ -609,27 +752,93 @@ export const GoodsReceiptPage = () => {
               : 'border-transparent text-slate-500 hover:text-slate-800'
           }`}
         >
-          Completed GRN Register ({grnList.length})
+          Completed GRN Register ({totalGrnDisplayCount})
         </button>
+        {pendingReceipts.length > 0 && (
+          <button
+            onClick={() => setActiveTab('pending')}
+            className={`pb-2.5 text-xs font-semibold border-b-2 transition ${
+              activeTab === 'pending'
+                ? 'border-blue-600 text-blue-700'
+                : 'border-transparent text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            Pending Bills ({pendingReceipts.length})
+          </button>
+        )}
       </div>
 
       {/* TAB 1: Completed GRN Register */}
       {activeTab === 'receipts' && (
         <div className="space-y-4">
-          <div className="flex items-center justify-between gap-3 bg-white p-3 rounded-xl border border-[#dce5f4] shadow-xs">
-            <div className="relative w-72">
-              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input
-                type="text"
-                placeholder="Search GRN, Supplier, Challan..."
-                value={grnSearch}
-                onChange={(e) => setGrnSearch(e.target.value)}
-                className="w-full pl-9 pr-3 py-1.5 text-xs rounded-lg border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:border-blue-500"
-              />
+          <div className="flex flex-wrap items-center justify-between gap-2.5 bg-white p-3 rounded-xl border border-[#dce5f4] shadow-xs">
+            <div className="flex flex-wrap items-center gap-2 flex-1">
+              <div className="relative min-w-[200px] max-w-xs flex-1">
+                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Search GRN, Supplier, Challan, PO..."
+                  value={grnSearch}
+                  onChange={(e) => setGrnSearch(e.target.value)}
+                  className="w-full pl-9 pr-3 py-1.5 text-xs rounded-lg border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:border-blue-500"
+                />
+              </div>
+
+              <select
+                value={grnSupplierFilter}
+                onChange={(e) => setGrnSupplierFilter(e.target.value)}
+                className="py-1.5 px-2.5 text-xs rounded-lg border border-slate-200 bg-white font-medium text-slate-700 outline-none focus:border-blue-500 cursor-pointer"
+              >
+                <option value="All">All Suppliers</option>
+                {supplierOptions.map((s) => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
+
+              <select
+                value={grnQcFilter}
+                onChange={(e) => setGrnQcFilter(e.target.value)}
+                className="py-1.5 px-2.5 text-xs rounded-lg border border-slate-200 bg-white font-medium text-slate-700 outline-none focus:border-blue-500 cursor-pointer"
+              >
+                <option value="All">All QC Status</option>
+                {qcStatusOptions.map((st) => (
+                  <option key={st} value={st}>{st}</option>
+                ))}
+              </select>
+
+              <div className="flex items-center gap-1.5">
+                <input
+                  type="date"
+                  value={grnDateFrom}
+                  onChange={(e) => setGrnDateFrom(e.target.value)}
+                  className="py-1.5 px-2 text-xs rounded-lg border border-slate-200 bg-white text-slate-700 outline-none focus:border-blue-500"
+                  title="Receipt Date From"
+                />
+                <span className="text-slate-400 text-xs">to</span>
+                <input
+                  type="date"
+                  value={grnDateTo}
+                  onChange={(e) => setGrnDateTo(e.target.value)}
+                  className="py-1.5 px-2 text-xs rounded-lg border border-slate-200 bg-white text-slate-700 outline-none focus:border-blue-500"
+                  title="Receipt Date To"
+                />
+              </div>
+
+              {hasActiveFilters && (
+                <button
+                  type="button"
+                  onClick={resetFilters}
+                  className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-lg transition cursor-pointer"
+                  title="Reset all filters"
+                >
+                  <RotateCcw size={12} /> Reset
+                </button>
+              )}
             </div>
+
             <button
               onClick={fetchGrns}
-              className="p-1.5 text-slate-500 hover:text-slate-800 rounded-lg hover:bg-slate-100 border border-slate-200"
+              className="p-1.5 text-slate-500 hover:text-slate-800 rounded-lg hover:bg-slate-100 border border-slate-200 cursor-pointer"
               title="Refresh"
             >
               <RefreshCw size={13} className={loadingGrns ? 'animate-spin' : ''} />
@@ -644,15 +853,15 @@ export const GoodsReceiptPage = () => {
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200 uppercase tracking-wider text-[11px]">
-                    <tr>
-                      <th className="px-4 py-3">GRN #</th>
-                      <th className="px-4 py-3">Receipt Date</th>
-                      <th className="px-4 py-3">Supplier</th>
-                      <th className="px-4 py-3">Supplier Challan #</th>
-                      <th className="px-4 py-3">PO Number</th>
-                      <th className="px-4 py-3 text-right">Lines</th>
-                      <th className="px-4 py-3 text-center">QC Status</th>
+                  <thead className="table-head-std">
+                    <tr className="table-head-row-std">
+                      <th>GRN #</th>
+                      <th>Receipt Date</th>
+                      <th>Supplier</th>
+                      <th>Supplier Challan #</th>
+                      <th>PO Number</th>
+                      <th className="text-right">Lines</th>
+                      <th className="text-center">QC Status</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -670,8 +879,8 @@ export const GoodsReceiptPage = () => {
                         </td>
                         <td className="px-4 py-3 text-slate-700">{g.receipt_date}</td>
                         <td className="px-4 py-3 font-medium text-slate-900">{g.vendorName}</td>
-                        <td className="px-4 py-3 font-mono text-slate-700">{g.supplier_challan_no || '—'}</td>
-                        <td className="px-4 py-3 font-mono text-slate-700">{g.poNumber || '—'}</td>
+                        <td className="px-4 py-3 font-mono text-slate-700">{g.supplier_challan_no || '"”'}</td>
+                        <td className="px-4 py-3 font-mono text-slate-700">{g.poNumber || '"”'}</td>
                         <td className="px-4 py-3 text-right font-semibold text-slate-800">{g.lines?.length || 0}</td>
                         <td className="px-4 py-3 text-center">
                           <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold border ${
@@ -715,14 +924,14 @@ export const GoodsReceiptPage = () => {
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs text-slate-600">
-                <thead className="bg-slate-50 uppercase font-semibold text-slate-500 tracking-wider border-b border-slate-200 text-[11px]">
-                  <tr>
-                    <th className="py-2.5 px-4">Bill Number</th>
-                    <th className="py-2.5 px-4">Supplier</th>
-                    <th className="py-2.5 px-4">Date</th>
-                    <th className="py-2.5 px-4 text-right">Bill Items</th>
-                    <th className="py-2.5 px-4 text-right">Amount</th>
-                    <th className="py-2.5 px-4 text-center">Action</th>
+                <thead className="table-head-std">
+                  <tr className="table-head-row-std">
+                    <th>Bill Number</th>
+                    <th>Supplier</th>
+                    <th>Date</th>
+                    <th className="text-right">Bill Items</th>
+                    <th className="text-right">Amount</th>
+                    <th className="text-center">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -750,7 +959,7 @@ export const GoodsReceiptPage = () => {
         </div>
       )}
 
-      {/* ── Standalone GRN Modal (Phase 2.2 with Taka Breakdown) ── */}
+      {/* â”€â”€ Standalone GRN Modal (Phase 2.2 with Taka Breakdown) â”€â”€ */}
       {standaloneModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
           <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden">
@@ -815,6 +1024,9 @@ export const GoodsReceiptPage = () => {
                       <option key={po.id} value={po.id}>{po.poNumber || po.number} ({po.docDate || po.date})</option>
                     ))}
                   </select>
+                  <div className="mt-1.5 empty:hidden">
+                    <ReceiptTypeNotice po={purchaseOrders.find((p) => String(p.id) === String(standaloneForm.poId))} />
+                  </div>
                 </div>
 
                 <div>
@@ -954,7 +1166,7 @@ export const GoodsReceiptPage = () => {
                           )}
                         </div>
 
-                        <div className="sm:col-span-2">
+                        <div className="sm:col-span-3">
                           <label className="block text-[11px] font-semibold text-slate-700 mb-1">Received (m) *</label>
                           <input
                             type="number"
@@ -967,17 +1179,6 @@ export const GoodsReceiptPage = () => {
                         </div>
 
                         <div className="sm:col-span-2">
-                          <label className="block text-[11px] font-semibold text-slate-500 mb-1">Batch / Lot #</label>
-                          <input
-                            type="text"
-                            value={line.batchNumber}
-                            placeholder="Auto (server)"
-                            onChange={(e) => handleUpdateLine(line.id, 'batchNumber', e.target.value)}
-                            className="w-full px-3 py-1.5 border border-slate-300 rounded-lg bg-white font-mono uppercase text-xs"
-                          />
-                        </div>
-
-                        <div className="sm:col-span-1">
                           <label className="block text-[11px] font-semibold text-slate-500 mb-1">Width (in)</label>
                           <input
                             type="number"
@@ -999,117 +1200,152 @@ export const GoodsReceiptPage = () => {
                         </div>
                       </div>
 
+                      {/* Dedicated Batch & Costing Row (Ek batch kitne me padi) */}
+                      <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end p-2.5 bg-blue-50/40 rounded-xl border border-blue-200/70 shadow-2xs">
+                        <div className="sm:col-span-4">
+                          <label className="block text-[11px] font-semibold text-slate-700 mb-1">Batch / Lot #</label>
+                          <input
+                            type="text"
+                            value={line.batchNumber}
+                            placeholder="Auto (server)"
+                            onChange={(e) => handleUpdateLine(line.id, 'batchNumber', e.target.value)}
+                            className="w-full px-3 py-1.5 border border-slate-300 rounded-lg bg-white font-mono uppercase text-xs"
+                          />
+                        </div>
+
+                        <div className="sm:col-span-3">
+                          <label className="block text-[11px] font-semibold text-slate-700 mb-1 flex items-center justify-between">
+                            <span>Rate (₹ / meter)</span>
+                            {Number(line.poRate) > 0 && (
+                              <span className="text-[9.5px] text-slate-400 font-normal">PO: ₹{line.poRate}</span>
+                            )}
+                          </label>
+                          <div className="relative">
+                            <span className="absolute inset-y-0 left-0 pl-2.5 flex items-center text-slate-400 font-bold text-xs pointer-events-none">
+                              ₹
+                            </span>
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={line.unitCost !== undefined && line.unitCost !== '' ? line.unitCost : ''}
+                              placeholder="0.00"
+                              onChange={(e) => handleUpdateLine(line.id, 'unitCost', e.target.value)}
+                              className="w-full pl-6 pr-2.5 py-1.5 border border-slate-300 rounded-lg bg-white font-mono text-xs font-bold text-slate-900 focus:border-blue-500 focus:outline-none"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="sm:col-span-5">
+                          <div className="flex items-center justify-between mb-1">
+                            <label className="block text-[11px] font-semibold text-blue-900 flex items-center gap-1">
+                              <span>Batch Cost (₹)</span>
+                              <span className="text-[10px] text-blue-600 font-normal">(Rupees me kitne me padi)</span>
+                            </label>
+                            {Number(line.receivedQty) > 0 && Number(line.unitCost) > 0 && (
+                              <span className="text-[10px] text-blue-700 font-bold font-mono">
+                                {Number(line.receivedQty).toLocaleString('en-IN', { maximumFractionDigits: 2 })} m × ₹{Number(line.unitCost).toLocaleString('en-IN', { maximumFractionDigits: 2 })}
+                              </span>
+                            )}
+                          </div>
+                          <div className="relative">
+                            <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-blue-600 font-bold text-sm pointer-events-none">
+                              ₹
+                            </span>
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={
+                                line.totalCost !== undefined && line.totalCost !== ''
+                                  ? line.totalCost
+                                  : (Number(line.receivedQty) > 0 && Number(line.unitCost) > 0)
+                                  ? (Math.round(Number(line.receivedQty) * Number(line.unitCost) * 100) / 100)
+                                  : ''
+                              }
+                              placeholder="0.00"
+                              onChange={(e) => handleUpdateLine(line.id, 'totalCost', e.target.value)}
+                              className="w-full pl-7 pr-3 py-1.5 border-2 border-blue-400 bg-white rounded-lg font-mono text-xs font-black text-blue-900 focus:border-blue-600 focus:outline-none shadow-2xs"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
                       {/* Variance Indicator */}
                       {Number(line.orderedQty) > 0 && (
                         <div className="flex items-center gap-3 text-[11px] pt-1">
                           <span className="text-slate-500 font-medium">Variance vs PO:</span>
                           {shortage > 0 ? (
                             <span className="text-amber-600 font-semibold flex items-center gap-1">
-                              ⚠️ Shortage: {numIN(shortage)} m ({Math.round((shortage / line.orderedQty) * 100)}%)
+                              âš ï¸ Shortage: {numIN(shortage)} m ({Math.round((shortage / line.orderedQty) * 100)}%)
                             </span>
                           ) : excess > 0 ? (
                             <span className="text-blue-600 font-semibold flex items-center gap-1">
-                              ℹ️ Excess: +{numIN(excess)} m ({Math.round((excess / line.orderedQty) * 100)}%)
+                              â„¹ï¸ Excess: +{numIN(excess)} m ({Math.round((excess / line.orderedQty) * 100)}%)
                             </span>
                           ) : (
-                            <span className="text-emerald-600 font-semibold">✓ Exact match with PO</span>
+                            <span className="text-emerald-600 font-semibold">âœ“ Exact match with PO</span>
                           )}
                         </div>
                       )}
 
-                      {/* Taka Breakdown Sub-Table */}
-                      <div className="bg-slate-50 rounded-lg p-3 border border-slate-200 space-y-2 mt-2">
-                        <div className="flex items-center justify-between">
-                          <span className="font-semibold text-slate-700 text-[11px] flex items-center gap-1.5">
-                            <Layers size={13} className="text-blue-600" /> Taka / Roll Breakdown ({line.takas?.length || 0} rolls)
+                      {/* Clean Batch Details Section (Batch-Wise Receiving Only) */}
+                      <div className="bg-slate-50/90 rounded-xl p-3.5 border border-blue-200/80 space-y-3 mt-2 shadow-2xs">
+                        <div className="flex items-center justify-between border-b border-slate-200/80 pb-2">
+                          <span className="font-extrabold text-[#17294e] text-xs flex items-center gap-1.5">
+                            <Package size={14} className="text-blue-700" />
+                            Batch Details "” Auto-Generated Batch
                           </span>
-                          <div className="flex items-center gap-2">
-                            <button
-                              type="button"
-                              onClick={() => handleAutoSplitTakas(line.id)}
-                              className="text-[11px] font-semibold text-blue-600 hover:text-blue-800 underline"
-                            >
-                              Auto Split
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleAddTaka(line.id)}
-                              className="inline-flex items-center gap-1 rounded bg-white px-2 py-1 text-[11px] font-semibold text-slate-700 border border-slate-200 hover:bg-slate-50 shadow-2xs"
-                            >
-                              <Plus size={11} /> Add Taka
-                            </button>
+                          <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-100/70 text-blue-800 font-bold">
+                            Batch Number: Auto (assigned on save)
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                          <div>
+                            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Fabric / Item</span>
+                            <span className="mt-1 block font-bold text-slate-800 text-xs truncate" title={line.itemName}>
+                              {line.itemName}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Actual Rate per Meter (₹)</span>
+                            <div className="relative mt-1">
+                              <span className="absolute inset-y-0 left-0 pl-2.5 flex items-center text-slate-400 font-bold pointer-events-none text-xs">₹</span>
+                              <input
+                                type="number"
+                                step="0.01"
+                                value={line.unitCost ?? ''}
+                                onChange={(e) => {
+                                  const newRate = e.target.value === '' ? '' : Number(e.target.value);
+                                  const rQty = Number(line.receivedQty) || 0;
+                                  const newTotal = newRate !== '' ? Math.round(rQty * Number(newRate) * 100) / 100 : '';
+                                  handleUpdateLine(line.id, 'unitCost', newRate);
+                                  handleUpdateLine(line.id, 'totalCost', newTotal);
+                                }}
+                                className="w-full pl-6 pr-2 py-1.5 border border-slate-300 rounded-lg bg-white font-mono text-xs font-bold text-slate-800 focus:border-blue-600 focus:outline-none"
+                                placeholder="0.00"
+                              />
+                            </div>
+                          </div>
+                          <div>
+                            <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider block">Batch Total Amount</span>
+                            <div className="mt-1 p-1.5 px-3 rounded-lg border-2 border-emerald-400 bg-emerald-50/80 flex items-center justify-between">
+                              <span className="text-[11px] font-semibold text-emerald-800">Batch Total:</span>
+                              <span className="font-mono text-sm font-black text-emerald-950 tabular-nums">
+                                ₹{((Number(line.receivedQty) || 0) * (Number(line.unitCost) || 0)).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </span>
+                            </div>
                           </div>
                         </div>
 
-                        {/* Takas Grid */}
-                        <div className="space-y-1.5">
-                          {(line.takas || []).map((t, tIdx) => (
-                            <div key={t.id} className="grid grid-cols-12 gap-2 items-center text-xs">
-                              <div className="col-span-2">
-                                <input
-                                  type="text"
-                                  placeholder="Roll #"
-                                  value={t.takaNumber}
-                                  onChange={(e) => handleUpdateTaka(line.id, t.id, 'takaNumber', e.target.value)}
-                                  className="w-full px-2 py-1 border border-slate-200 rounded bg-white font-mono text-[11px]"
-                                />
-                              </div>
-                              <div className="col-span-3">
-                                <input
-                                  type="number"
-                                  step="0.01"
-                                  placeholder="Meters *"
-                                  value={t.qty}
-                                  onChange={(e) => handleUpdateTaka(line.id, t.id, 'qty', e.target.value)}
-                                  className="w-full px-2 py-1 border border-slate-300 rounded bg-white font-mono font-semibold text-slate-800 text-[11px]"
-                                />
-                              </div>
-                              <div className="col-span-2">
-                                <input
-                                  type="number"
-                                  step="0.01"
-                                  placeholder="Weight (kg)"
-                                  value={t.weight || ''}
-                                  onChange={(e) => handleUpdateTaka(line.id, t.id, 'weight', e.target.value)}
-                                  className="w-full px-2 py-1 border border-slate-200 rounded bg-white font-mono text-[11px]"
-                                />
-                              </div>
-                              <div className="col-span-4">
-                                <input
-                                  type="text"
-                                  placeholder="Remarks / Defect notes"
-                                  value={t.remarks || ''}
-                                  onChange={(e) => handleUpdateTaka(line.id, t.id, 'remarks', e.target.value)}
-                                  className="w-full px-2 py-1 border border-slate-200 rounded bg-white text-[11px]"
-                                />
-                              </div>
-                              <div className="col-span-1 text-right">
-                                <button
-                                  type="button"
-                                  onClick={() => handleRemoveTaka(line.id, t.id)}
-                                  className="p-1 text-slate-400 hover:text-rose-600 rounded"
-                                >
-                                  <X size={13} />
-                                </button>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-
-                        {/* Taka Sum Validation Banner */}
-                        <div className={`p-2 rounded flex items-center justify-between text-[11px] font-medium ${
-                          takaMatch ? 'bg-emerald-100/60 text-emerald-800' : 'bg-amber-100/80 text-amber-900 border border-amber-300'
-                        }`}>
-                          <span>
-                            Total Taka Rolls: <strong>{line.takas?.length || 0}</strong> • Sum: <strong>{numIN(takaSum)} m</strong>
-                          </span>
-                          {takaMatch ? (
-                            <span className="font-semibold text-emerald-700">✓ Matches line quantity ({numIN(line.receivedQty)} m)</span>
-                          ) : (
-                            <span className="font-bold text-amber-800">
-                              ⚠️ Difference: {takaDiff > 0 ? `-${numIN(takaDiff)} m remaining` : `+${numIN(Math.abs(takaDiff))} m excess`}
-                            </span>
-                          )}
+                        <div>
+                          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Batch Remarks / Notes</span>
+                          <input
+                            type="text"
+                            placeholder="e.g. Batch quality observations or delivery remarks"
+                            value={line.remarks || ''}
+                            onChange={(e) => handleUpdateLine(line.id, 'remarks', e.target.value)}
+                            className="mt-1 w-full px-2.5 py-1.5 border border-slate-200 rounded-lg bg-white text-xs text-slate-700 focus:border-blue-500 focus:outline-none"
+                          />
                         </div>
                       </div>
                     </div>
@@ -1140,14 +1376,14 @@ export const GoodsReceiptPage = () => {
         </div>
       )}
 
-      {/* ── Bill-scoped Receive Modal (Legacy) ── */}
+      {/* â”€â”€ Bill-scoped Receive Modal (Legacy) â”€â”€ */}
       {selectedBill && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
           <div className="bg-white rounded-xl border border-slate-200 shadow-xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
             <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
               <div>
                 <h3 className="font-bold text-slate-900 text-sm">Goods Intake: {selectedBill.billNumber}</h3>
-                <p className="text-xs text-slate-500 mt-0.5">{selectedBill.vendor} • {formatDateDDMMYYYY(selectedBill.date)}</p>
+                <p className="text-xs text-slate-500 mt-0.5">{selectedBill.vendor} "¢ {formatDateDDMMYYYY(selectedBill.date)}</p>
               </div>
               <button onClick={() => setSelectedBill(null)} className="text-slate-400 hover:text-slate-600 p-1 rounded-md">
                 <X size={16} />

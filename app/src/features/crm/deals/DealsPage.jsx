@@ -1813,19 +1813,7 @@ export default function DealsPage() {
             </button>
           )}
 
-          <div className="my-1 border-t border-slate-100" />
 
-          <button
-            type="button"
-            onClick={() => {
-              setDealToDelete(dealMenu.deal);
-              closeDealMenu();
-            }}
-            className="w-full px-3.5 py-2 text-left text-xs font-semibold text-rose-600 hover:bg-rose-50 flex items-center gap-2.5 cursor-pointer"
-          >
-            <Trash2 size={13} className="text-rose-500" />
-            <span>Delete Deal</span>
-          </button>
         </div>,
         document.body
       )}

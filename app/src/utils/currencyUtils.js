@@ -66,14 +66,6 @@ try {
 } catch (e) {}
 
 // ── Base currency ────────────────────────────────────────────────────────────
-//
-// The rate tables below are quoted against USD, which was right while every
-// amount came from USD-denominated mock data. Amounts now come from the API,
-// and api.md §1.6 is explicit that money arrives as a plain number already in
-// the tenant's own currency — so converting it against USD would multiply every
-// figure on screen by the USD→INR rate. `baseCurrency` is that tenant currency;
-// conversions are `target / base`, which makes the common case (display the
-// tenant's own currency) exactly 1.
 let baseCurrency = 'INR';
 
 /** Set from `companyProfile.currency` once the profile loads. */
@@ -92,12 +84,13 @@ function rateFor(code, customRates) {
 }
 
 export function getCurrencyConfig(currencyStr = 'INR (₹)', customRates = null) {
-  const str = String(currencyStr || baseCurrency).toUpperCase();
-  let config = CURRENCY_CONFIGS.USD;
+  const str = String(currencyStr || baseCurrency || 'INR').toUpperCase();
+  // Always default to Indian Rupee (INR / ₹)
+  let config = { ...CURRENCY_CONFIGS.INR };
 
-  if (str.includes('INR') || str.includes('₹') || str.includes('RUPEE')) {
-    config = { ...CURRENCY_CONFIGS.INR };
-    if (customRates?.INR) config.rate = customRates.INR;
+  if (str.includes('USD') || str === '$') {
+    config = { ...CURRENCY_CONFIGS.USD };
+    if (customRates?.USD) config.rate = customRates.USD;
   } else if (str.includes('EUR') || str.includes('€') || str.includes('EURO')) {
     config = { ...CURRENCY_CONFIGS.EUR };
     if (customRates?.EUR) config.rate = customRates.EUR;
@@ -107,6 +100,9 @@ export function getCurrencyConfig(currencyStr = 'INR (₹)', customRates = null)
   } else if (str.includes('CAD')) {
     config = { ...CURRENCY_CONFIGS.CAD };
     if (customRates?.CAD) config.rate = customRates.CAD;
+  } else {
+    config = { ...CURRENCY_CONFIGS.INR };
+    if (customRates?.INR) config.rate = customRates.INR;
   }
 
   // Re-base: the stored amount is in `baseCurrency`, not USD.
@@ -116,6 +112,13 @@ export function getCurrencyConfig(currencyStr = 'INR (₹)', customRates = null)
 export function getCurrencySymbol(currencyStr = 'INR (₹)') {
   return getCurrencyConfig(currencyStr).symbol;
 }
+
+// Indian compact scale steps: Crore → Lakh → Thousand.
+const COMPACT_STEPS = [
+  { limit: 10000000, divisor: 10000000, suffix: 'Cr' },
+  { limit: 100000, divisor: 100000, suffix: 'L' },
+  { limit: 1000, divisor: 1000, suffix: 'K' },
+];
 
 export function formatCurrency(amount, currencyStr = 'INR (₹)', options = {}) {
   const num = typeof amount === 'number' ? amount : parseFloat(amount) || 0;
@@ -128,14 +131,27 @@ export function formatCurrency(amount, currencyStr = 'INR (₹)', options = {}) 
   const isNegative = converted < 0;
   const absVal = Math.abs(converted);
 
-  const formattedNumber = absVal.toLocaleString(config.locale, {
+  // Compact Indian scale: ₹51.30L / ₹66.00K / ₹1.25Cr (opt-in via `compact`).
+  const step = options.compact ? COMPACT_STEPS.find((s) => absVal >= s.limit) : null;
+  const scaledVal = step ? absVal / step.divisor : absVal;
+
+  const formattedNumber = scaledVal.toLocaleString('en-IN', {
     minimumFractionDigits: minDecimals,
     maximumFractionDigits: maxDecimals
   });
+  const suffix = step ? step.suffix : '';
 
   if (options.symbolSuffix) {
-    return `${isNegative ? '-' : ''}${formattedNumber} ${config.symbol}`;
+    return `${isNegative ? '-' : ''}${formattedNumber}${suffix} ${config.symbol}`;
   }
 
-  return `${isNegative ? '-' : ''}${config.symbol}${formattedNumber}`;
+  return `${isNegative ? '-' : ''}${config.symbol}${formattedNumber}${suffix}`;
+}
+
+/**
+ * Compact Indian currency helper: ₹51.30L, ₹5.20L, ₹66.00K, ₹1.10L, ₹22.00K.
+ * Thin wrapper over formatCurrency so both share symbol, rate and decimals.
+ */
+export function formatCompactCurrency(amount, currencyStr = 'INR (₹)', options = {}) {
+  return formatCurrency(amount, currencyStr, { ...options, compact: true });
 }

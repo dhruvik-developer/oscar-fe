@@ -167,17 +167,15 @@ export const HRMS_RESOURCES = {
       phone: e.phone || undefined,
       employeeCode: e.employeeCode || e.empId || undefined,
       departmentId: e.departmentId || e.department_id || undefined,
-      department: e.department || e.dept || undefined,
       designationId: e.designationId || e.designation_id || undefined,
-      designation: e.designation || e.role || undefined,
       managerId: e.managerId || e.manager_id || e.reportingManagerId || undefined,
       locationId: e.locationId || e.location_id || undefined,
-      location: typeof e.location === 'string' ? e.location : undefined,
       joiningDate: isoOut(e.joiningDate || e.joining || e.doj) || undefined,
-      joining: isoOut(e.joiningDate || e.joining || e.doj) || undefined,
       dateOfBirth: isoOut(e.dateOfBirth || e.dob),
       gender: e.gender || undefined,
       employmentType: e.employmentType || undefined,
+      shift: e.shift || undefined,
+      standardSalary: e.standardSalary !== undefined ? num(e.standardSalary) : (e.standard_salary !== undefined ? num(e.standard_salary) : undefined),
       status: e.status || undefined,
       avatar: e.avatar || undefined,
     }),
@@ -197,6 +195,8 @@ export const HRMS_RESOURCES = {
       managerId: row.managerId || row.manager_id || row.reportingManagerId || '',
       reportingManager: row.manager || row.reportingManager || row.reporting_manager || '',
       reportingManagerId: row.managerId || row.manager_id || row.reportingManagerId || '',
+      standardSalary: num(row.standardSalary ?? row.standard_salary ?? 0),
+      shift: row.shift || 'General',
       doj: displayIn(row.joiningDate || row.joining),
       joiningDate: displayIn(row.joiningDate || row.joining),
       joining: displayIn(row.joiningDate || row.joining),
@@ -294,15 +294,22 @@ export const HRMS_RESOURCES = {
   // ── attendance ────────────────────────────────────────────────────────────
   attendance: {
     path: '/hrms/attendance/',
-    toApi: (a) => compact({
-      employeeId: a.employeeId || undefined,
-      date: isoOut(a.date),
-      checkIn: a.checkIn || undefined,
-      checkOut: a.checkOut || undefined,
-      status: a.status || undefined,
-      workLocation: a.workLocation || undefined,
-      notes: a.notes || undefined,
-    }),
+    toApi: (a) => {
+      const date = isoOut(a.date);
+      return compact({
+        employeeId: a.employeeId || undefined,
+        date,
+        checkIn: a.checkIn && /^\d{1,2}:\d{2}/.test(String(a.checkIn))
+          ? clockToDateTime(date, a.checkIn)
+          : (a.checkIn || undefined),
+        checkOut: a.checkOut && /^\d{1,2}:\d{2}/.test(String(a.checkOut))
+          ? clockToDateTime(date, a.checkOut)
+          : (a.checkOut || undefined),
+        status: a.status || undefined,
+        workLocation: a.workLocation || undefined,
+        notes: a.notes || undefined,
+      });
+    },
     fromApi: (row) => ({
       ...asText(row, ['status', 'workLocation', 'notes', 'employeeName']),
       isoDate: row.date || '',
@@ -364,7 +371,6 @@ export const HRMS_RESOURCES = {
       additionalEarnings: p.additionalEarnings !== undefined ? num(p.additionalEarnings) : undefined,
       deductions: p.deductions !== undefined ? num(p.deductions) : undefined,
       advance: p.advance !== undefined ? num(p.advance) : undefined,
-      earnedSalary: p.earnedSalaryOverride !== undefined ? num(p.earnedSalaryOverride) : undefined,
     }),
     fromApi: (row) => ({
       ...row,
@@ -432,10 +438,81 @@ export const HRMS_RESOURCES = {
   recruitmentQuestions: plain('/hrms/recruitment/questions/'),
 
   // ── performance ───────────────────────────────────────────────────────────
-  appraisals: dated('/hrms/performance/appraisals/', ['dueDate', 'completedDate']),
+  appraisals: {
+    path: '/hrms/performance/appraisals/',
+    toApi: (appr) => compact({
+      id: isServerId(appr.id) ? appr.id : undefined,
+      employee: appr.employee || undefined,
+      employeeId: appr.employeeId || undefined,
+      reviewer: appr.reviewer || undefined,
+      managerId: appr.managerId || undefined,
+      cycle: appr.cycle || undefined,
+      cycleId: appr.cycleId || undefined,
+      stage: appr.stage || 'Self Review',
+      status: appr.status || 'Draft',
+      finalRating: appr.rating !== undefined ? Number(appr.rating) : undefined,
+      rating: appr.rating !== undefined ? Number(appr.rating) : undefined,
+      selfRating: appr.selfReview?.rating !== undefined ? Number(appr.selfReview.rating) : undefined,
+      managerRating: appr.managerReview?.rating !== undefined ? Number(appr.managerReview.rating) : undefined,
+      strengths: appr.selfReview?.strengths || appr.managerReview?.strengths || appr.strengths || undefined,
+      areasForImprovement: appr.selfReview?.areasForImprovement || appr.managerReview?.areasForImprovement || appr.areasForImprovement || undefined,
+      developmentFeedback: appr.managerReview?.developmentFeedback || appr.developmentFeedback || undefined,
+      hrComments: appr.hrComments || undefined,
+      selfComments: appr.selfReview?.comments || appr.selfComments || undefined,
+    }),
+    fromApi: (row) => {
+      const rating = Number(row.finalRating ?? row.rating ?? row.managerRating ?? row.selfRating) || 4.0;
+      let label = 'Meets Expectations';
+      if (rating >= 4.5) label = 'Outstanding';
+      else if (rating >= 3.8) label = 'Exceeds Expectations';
+      else if (rating >= 3.0) label = 'Meets Expectations';
+      else if (rating >= 2.0) label = 'Needs Improvement';
+      else label = 'Unsatisfactory';
+
+      return {
+        ...row,
+        employee: row.employee || row.employeeName || '',
+        reviewer: row.reviewer || row.managerName || '',
+        cycle: row.cycle || row.cycleName || 'Annual Review 2026',
+        due: row.due || (row.dueDate ? String(row.dueDate) : '15 Nov 2024'),
+        department: row.department || '',
+        designation: row.designation || '',
+        rating,
+        ratingScaleLabel: row.ratingScaleLabel || label,
+        weightedScore: Number(row.weightedScore) || Math.round((rating / 5) * 100),
+        stage: row.stage || 'Self Review',
+        status: row.status || 'Draft',
+        _synced: true,
+      };
+    },
+  },
   cycles: dated('/hrms/performance/cycles/', ['startDate', 'endDate']),
   goals: dated('/hrms/performance/goals/', ['dueDate']),
-  indicators: plain('/hrms/performance/indicators/'),
+  indicators: {
+    path: '/hrms/performance/indicators/',
+    toApi: (ind) => compact({
+      name: ind.name,
+      category: ind.category || 'Organisational',
+      weight: ind.weight !== undefined ? Number(ind.weight) : undefined,
+      department: ind.department || undefined,
+      location: ind.branch || ind.location || undefined,
+      target: ind.target || undefined,
+      measurementType: ind.measurementType || undefined,
+      assignedEmployee: ind.assignedEmployee || undefined,
+      designation: ind.designation || undefined,
+      description: ind.description || undefined,
+      status: ind.status || undefined,
+    }),
+    fromApi: (row) => ({
+      ...row,
+      rating: Number(row.rating) || 4.0,
+      weight: Number(row.weight) || 0,
+      branch: row.location || row.branch || '',
+      department: row.department || '',
+      createdAt: row.created_at || row.createdAt || '',
+      _synced: true,
+    }),
+  },
   kpis: plain('/hrms/performance/kpis/'),
 
   // ── training ──────────────────────────────────────────────────────────────
@@ -563,7 +640,21 @@ export const HRMS_RESOURCES = {
     }),
   },
   approvalChains: plain('/hrms/approval-chains/'),
-  calendarEvents: dated('/hrms/calendar/events/', ['startDate', 'endDate', 'date']),
+  calendarEvents: {
+    path: '/hrms/calendar/events/',
+    toApi: (row) => {
+      const payload = { ...row, id: undefined, _synced: undefined, _pending: undefined };
+      if (payload.date) payload.date = isoOut(payload.date);
+      if (payload.startDate && !payload.startDate.includes('T')) payload.startDate = isoOut(payload.startDate);
+      if (payload.endDate && !payload.endDate.includes('T')) payload.endDate = isoOut(payload.endDate);
+      return compact(payload);
+    },
+    fromApi: (row) => ({
+      ...row,
+      _synced: true,
+      date: displayIn(row.date),
+    }),
+  },
 
   // ── textile HR operational resources (Oscar Scope) ───────────────────────
   incentives: {
@@ -722,6 +813,7 @@ export const publishJob = (id) => hrmsSync.act('jobs', id, 'publish', {});
 export const assignAsset = (id, payload) => hrmsSync.act('assets', id, 'assign', payload);
 export const returnAsset = (id, payload = {}) => hrmsSync.act('assets', id, 'return', payload);
 export const acknowledgePolicy = (id, payload = {}) => hrmsSync.act('policies', id, 'acknowledge', payload);
+export const fetchPolicyAcknowledgements = (id) => api.get('/hrms/policies/' + id + '/acknowledgements/').then(r => r?.data?.items || r?.data || []);
 export const approvePolicy = (id, payload = {}) => hrmsSync.act('policies', id, 'approve', payload);
 export const archivePolicy = (id, payload = {}) => hrmsSync.act('policies', id, 'archive', payload);
 export const submitPolicyForApproval = (id, payload = {}) =>

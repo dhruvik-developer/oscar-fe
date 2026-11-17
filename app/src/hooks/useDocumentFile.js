@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-
+import api from '../services/api';
 import { useDocumentStore } from '../stores/documentStore';
 
 /**
@@ -11,7 +11,7 @@ export function useDocumentFileUrl(doc) {
   const [state, setState] = useState({ url: null, loading: false, error: '' });
 
   useEffect(() => {
-    if (!doc?.hasFile) {
+    if (!doc?.hasFile && !doc?.fileId) {
       setState({ url: null, loading: false, error: '' });
       return undefined;
     }
@@ -36,13 +36,32 @@ export function useDocumentFileUrl(doc) {
 
 /** Save the stored file under its original name. Rejects with a readable message. */
 export async function downloadDocumentFile(doc) {
-  const blob = await useDocumentStore.getState().fetchDocumentFile(doc);
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = doc.fileName || `${(doc.title || 'document').replace(/[^a-zA-Z0-9_-]/g, '_')}.pdf`;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
+  try {
+    const blob = await useDocumentStore.getState().fetchDocumentFile(doc);
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    const safeTitle = (doc.title || 'document').replace(/[^a-zA-Z0-9_-]/g, '_');
+    link.download = doc.fileName || (safeTitle + '.pdf');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setTimeout(() => URL.revokeObjectURL(url), 3000);
+  } catch (err) {
+    try {
+      const res = await api.get('/hrms/documents/' + doc.id + '/download/');
+      const dlUrl = res?.downloadUrl || res?.data?.downloadUrl;
+      if (dlUrl) {
+        const link = document.createElement('a');
+        link.href = dlUrl;
+        link.download = doc.fileName || 'document.pdf';
+        link.target = '_blank';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        return;
+      }
+    } catch {}
+    throw err;
+  }
 }

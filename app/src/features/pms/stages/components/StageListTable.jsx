@@ -46,16 +46,15 @@ export function StageListTable({ stages = [], onMove, onEdit, onDelete, onToggle
     );
   }
 
-  const th =
-    'px-3 py-2.5 text-left text-[10px] font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap';
+  const th = 'th-std text-left';
   const td = 'px-3 py-2.5 align-middle';
 
   return (
     <div className="rounded-xl border border-[#dce5f4] bg-white shadow-2xs overflow-hidden">
       <div className="overflow-x-auto">
         <table className="w-full border-collapse">
-          <thead className="bg-[#f6f9ff] border-b border-[#dce5f4]">
-            <tr>
+          <thead className="table-head-std border-b border-border">
+            <tr className="table-head-row-std">
               <th className={th}>Seq</th>
               <th className={th}>Stage Name</th>
               <th className={th}>Department</th>

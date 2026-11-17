@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import { modal } from '../../context/ModalContext';
+import { useSearchParams } from 'react-router-dom';
 import {
   Download,
   Printer,
@@ -39,11 +41,11 @@ import { useTableSort } from '../../hooks/useTableSort';
 import SortableTh from '../../components/ui/SortableTh';
 
 const TABS = [
-  { id: 'pl', label: 'Profit & Loss' },
+  { id: 'pl', label: 'Profit & Loss (P&L)' },
   { id: 'bs', label: 'Balance Sheet' },
+  { id: 'ageing', label: 'Outstanding (AR / AP Ageing)' },
   { id: 'cashflow', label: 'Cash Flow' },
   { id: 'gst', label: 'GST Summary (GSTR-1 / 3B)' },
-  { id: 'ageing', label: 'AR / AP Ageing' },
   { id: 'budget', label: 'Budgets & Variances' },
 ];
 
@@ -73,7 +75,15 @@ function LineRow({ label, value, total = false, indent = false }) {
 }
 
 export function FinancialReportsPage() {
-  const [reportType, setReportType] = useState('pl');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const reportType = searchParams.get('tab') || 'pl';
+  const setReportType = (t) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set('tab', t);
+      return next;
+    });
+  };
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [asOf, setAsOf] = useState('');
@@ -151,7 +161,7 @@ export function FinancialReportsPage() {
     } else if (reportType === 'ageing' && ag) {
       exportToCSV(`Ageing_${ageingType}_${stamp}`, ['Document #', 'Party', 'Date', 'Due Date', 'Total', 'Outstanding', 'Days Overdue', 'Bucket'], (ag.rows || []).map((r) => [r.documentNumber, r.partyName, r.date, r.dueDate, r.total, r.outstanding, r.daysOverdue, r.bucket]));
     } else if (reportType === 'budget') {
-      exportToCSV(`Budget_vs_Actual_${stamp}`, ['Account', 'Period start', 'Period end', 'Budget', 'Actual', 'Variance'], budgetRows.map((r) => [r.accountName, r.periodStart, r.periodEnd, r.amount, r.actual, r.variance]));
+      exportToCSV(`Budget_vs_Actual_${stamp}`, ['Account', 'Period start', 'Period end', 'Budget', 'Actual', 'Variance'], budgetRows.map((r) => [r.accountName, r.period_start || r.periodStart, r.period_end || r.periodEnd, r.amount, r.actual, r.variance]));
     }
   };
 
@@ -218,12 +228,13 @@ export function FinancialReportsPage() {
   };
 
   const handleDeleteBudget = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this budget?')) return;
+    const ok = await modal.deleteConfirm('Are you sure you want to delete this budget?', 'Delete Budget');
+    if (!ok) return;
     try {
       await accountingService.deleteBudget(id);
       budgets.reload();
     } catch (err) {
-      alert(describeApiError(err));
+      await modal.error(describeApiError(err), 'Delete Budget Failed');
     }
   };
 
@@ -699,7 +710,7 @@ export function FinancialReportsPage() {
 
       {/* ADD / EDIT BUDGET MODAL */}
       {showBudgetModal && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-3">
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-3">
           <div className="bg-white rounded-2xl border border-slate-200 max-w-md w-full p-5 shadow-2xl text-xs space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-slate-200">
               <h3 className="font-bold text-base text-[#1F2E4A]">

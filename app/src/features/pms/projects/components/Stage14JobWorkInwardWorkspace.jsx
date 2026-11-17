@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { modal } from '../../../../context/ModalContext';
 import {
   Activity,
   AlertCircle,
@@ -549,7 +550,8 @@ export function Stage14JobWorkInwardWorkspace({
 
   // Delete Inward Receipt (if not yet inspected)
   const handleDeleteInward = async (inward) => {
-    if (!window.confirm(`Are you sure you want to delete inward receipt ${inward.no}?`)) return;
+    const ok = await modal.deleteConfirm(`Are you sure you want to delete inward receipt ${inward.no}?`, 'Delete Inward Receipt');
+    if (!ok) return;
     try {
       await deleteJWORow(inward.jwoId, 'inwards', inward.id);
       toast.success(`Inward receipt ${inward.no} deleted.`);

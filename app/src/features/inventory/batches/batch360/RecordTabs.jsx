@@ -120,7 +120,7 @@ export function SalesTab({ batch }) {
 }
 
 /* ---------------------------------------------------------------- Cost */
-export function CostTab({ batch, onBatch }) {
+export function CostTab({ batch, onBatch, readOnly = false }) {
   const c = batch.costing;
   const uom = batch.quantities?.uom || 'm';
   const [charging, setCharging] = useState(false);
@@ -145,7 +145,7 @@ export function CostTab({ batch, onBatch }) {
       <Card
         title="Cost & profit"
         subtitle="From recorded transactions only. Charges awaiting approval are not counted."
-        actions={<button type="button" onClick={() => setCharging(true)} className={btnGhost}>Add charge (freight, dyeing, other)</button>}
+        actions={readOnly ? null : <button type="button" onClick={() => setCharging(true)} className={btnGhost}>Add charge (freight, dyeing, other)</button>}
       >
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <dl className="space-y-1.5">

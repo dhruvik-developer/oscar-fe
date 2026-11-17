@@ -163,10 +163,10 @@ export const PrintBillModal = ({ isOpen, onClose, bill, balanceDue = 0, }) => {
                       <p className="text-[10px] text-slate-500 font-mono">SKU-HW-DEFAULT • Storage Bay A-1</p>
                     </td>
                     <td className="py-2.5 px-3 text-center font-mono font-semibold">1</td>
-                    <td className="py-2.5 px-3 text-right font-mono">${totalAmount.toFixed(2)}</td>
+                    <td className="py-2.5 px-3 text-right font-mono">₹{totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                     <td className="py-2.5 px-3 text-center text-slate-500">0%</td>
                     <td className="py-2.5 px-3 text-right font-mono font-bold text-slate-900">
-                      ${totalAmount.toFixed(2)}
+                      ₹{totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </td>
                   </tr>) : ((bill?.items || []).map((it, idx) => (<tr key={idx} className="hover:bg-slate-50/50">
                       <td className="py-2.5 px-3 text-center font-mono text-slate-500">{idx + 1}</td>
@@ -175,10 +175,10 @@ export const PrintBillModal = ({ isOpen, onClose, bill, balanceDue = 0, }) => {
                         <p className="text-[10px] text-slate-500 font-mono">SKU: {it.itemSku || `SKU-PART-${idx + 1}`}</p>
                       </td>
                       <td className="py-2.5 px-3 text-center font-mono font-semibold text-slate-800">{it.qty}</td>
-                      <td className="py-2.5 px-3 text-right font-mono">${it.rate.toFixed(2)}</td>
+                      <td className="py-2.5 px-3 text-right font-mono">₹{it.rate.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                       <td className="py-2.5 px-3 text-center text-slate-500 font-mono">{it.tax || 0}%</td>
                       <td className="py-2.5 px-3 text-right font-mono font-bold text-slate-900">
-                        ${(it.amount || it.qty * it.rate).toFixed(2)}
+                        ₹{(it.amount || it.qty * it.rate).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </td>
                     </tr>)))}
               </tbody>
@@ -202,27 +202,27 @@ export const PrintBillModal = ({ isOpen, onClose, bill, balanceDue = 0, }) => {
             <div className="w-72 space-y-1.5 font-mono text-xs text-right">
               <div className="flex justify-between text-slate-600">
                 <span>Subtotal (Net Excl. Tax):</span>
-                <span>${totalAmount.toFixed(2)}</span>
+                <span>₹{totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
               </div>
               <div className="flex justify-between text-slate-600">
                 <span>Tax / VAT (0.0%):</span>
-                <span>$0.00</span>
+                <span>₹0.00</span>
               </div>
               <div className="flex justify-between text-slate-600">
                 <span>Freight & Handling:</span>
-                <span>$0.00</span>
+                <span>₹0.00</span>
               </div>
               <div className="flex justify-between text-sm font-bold text-slate-900 pt-2 border-t border-slate-300">
                 <span>Total Billed Amount:</span>
-                <span>${totalAmount.toFixed(2)}</span>
+                <span>₹{totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
               </div>
               <div className="flex justify-between text-xs font-semibold text-emerald-700">
                 <span>Total Disbursed (Paid):</span>
-                <span>-${paidAmount.toFixed(2)}</span>
+                <span>-₹{paidAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
               </div>
               <div className="flex justify-between text-sm font-black text-rose-700 pt-1 border-t-2 border-slate-900 bg-slate-50 p-1.5 rounded">
                 <span>Outstanding Balance Due:</span>
-                <span>${balanceDue.toFixed(2)}</span>
+                <span>₹{balanceDue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
               </div>
             </div>
           </div>

@@ -50,7 +50,7 @@ export default function OfferLetterModal({
         position: offer.position || "",
         jobType: existing?.jobType || offer.jobType || "Full-time",
         dept: offer.dept || "Engineering",
-        salary: existing?.salary || offer.salary || "$95,000 / annum",
+        salary: existing?.salary || offer.salary || "₹95,000 / annum",
         location: existing?.location || offer.location || "New York HQ",
         workMode: existing?.workMode || offer.workMode || "Hybrid",
         joiningDate: offer.joiningDate || "2024-11-01",
@@ -128,7 +128,7 @@ export default function OfferLetterModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 overflow-y-auto print:p-0 print:static print:bg-white print:backdrop-blur-none">
+    <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 overflow-y-auto print:p-0 print:static print:bg-white print:backdrop-blur-none">
       <div className="bg-white rounded-2xl border border-slate-300 shadow-2xl max-w-3xl w-full my-auto overflow-hidden flex flex-col print:border-none print:shadow-none print:w-full print:max-w-none print:rounded-none">
         
         {/* Top Control Bar (Hidden during Print) */}
@@ -321,7 +321,7 @@ export default function OfferLetterModal({
                   </label>
                   <input
                     type="text"
-                    placeholder="e.g. ₹60,000 / month or $95,000 / yr"
+                    placeholder="e.g. ₹60,000 / month or ₹95,000 / yr"
                     value={formData.salary}
                     onChange={(e) =>
                       setFormData({ ...formData, salary: e.target.value })

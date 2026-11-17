@@ -1228,20 +1228,6 @@ export const appGuides = {
     ],
   },
 
-  alertCenter: {
-    title: 'Alert Center & Exception Monitoring',
-    subtitle: 'Automated notification center for stockouts, overdue bills, delayed milestones, and approvals.',
-    purpose: 'Centralized exception monitoring hub that aggregates automated alerts across all modules: low-stock deficits, overdue customer payments, delayed project milestones, and pending managerial approvals.',
-    workflow: ['Inspect Critical Exception Alerts', 'Click Direct Record Link', 'Execute Corrective Action', 'Dismiss / Resolve Alert'],
-    keyTerms: [
-      { term: 'Exception Alert', definition: 'System-generated warning raised when a business metric breaches preconfigured thresholds.' },
-      { term: 'Actionable Notification', definition: 'Alert containing one-click navigation to resolve the underlying condition.' },
-    ],
-    tips: [
-      'Review the Alert Center at the start of each working day to address high-severity operational exceptions.',
-    ],
-  },
-
   approvalsInbox: {
     title: 'Approvals Inbox & Authorizations',
     subtitle: 'Centralized queue for purchase orders, credit overrides, discounts, and leave requests.',
@@ -1612,7 +1598,6 @@ export const TITLE_MAP = {
   'Roles & Permissions': 'rolesPage',
   'System Preferences': 'settingsPage',
   'Settings': 'settingsPage',
-  'Alert Center': 'alertCenter',
   'Approvals Inbox': 'approvalsInbox',
   'Reports': 'reportsHub',
   'Reports Hub': 'reportsHub',

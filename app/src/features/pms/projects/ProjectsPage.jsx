@@ -117,7 +117,7 @@ export default function ProjectsPage() {
 
       {/* Info Modal */}
       {showInfoModal && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white rounded-xl shadow-xl border border-slate-200 max-w-md w-full p-5 space-y-3">
             <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
               <Info size={18} className="text-blue-600" />

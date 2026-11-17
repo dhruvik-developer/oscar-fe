@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { modal } from '../../context/ModalContext';
 import {
   Layers,
   Box,
@@ -550,7 +551,7 @@ export default function LotTakaRegisterPage({
     } catch (err) {
       console.error('Failed to create split takas:', err);
       const errDetail = err?.data?.message || err?.data?.detail || err?.message || 'Failed to create takas from GRN.';
-      alert(`Error creating takas: ${errDetail}`);
+      await modal.error(`Error creating takas: ${errDetail}`, 'GRN Split Error');
     } finally {
       setSubmittingGrnSplit(false);
     }
@@ -786,7 +787,8 @@ export default function LotTakaRegisterPage({
   const handleMergeLots = async () => {
     const ids = [...selectedRowIds];
     if (ids.length < 2) return;
-    if (!window.confirm(`Merge ${ids.length} takas into one lot? Their full available quantity moves to the new lot.`)) return;
+    const ok = await modal.confirm({ title: 'Merge Lots', message: `Merge ${ids.length} takas into one lot? Their full available quantity moves to the new lot.`, confirmLabel: 'Merge Lots', iconType: 'info' });
+    if (!ok) return;
     setMerging(true);
     setMergeMessage('');
     try {
@@ -868,9 +870,9 @@ export default function LotTakaRegisterPage({
   };
 
   // Generate Auto Barcode
-  const handleGenerateBarcode = () => {
+  const handleGenerateBarcode = async () => {
     if (!addForm.lotNo || !addForm.takaRoll) {
-      alert('Enter the lot number and taka / roll first.');
+      await modal.warning('Enter the lot number and taka / roll first.', 'Missing Fields');
       return;
     }
     const lot = addForm.lotNo;
@@ -904,19 +906,19 @@ export default function LotTakaRegisterPage({
   const handleAddSubmit = async (e) => {
     e.preventDefault();
     if (!addForm.itemId) {
-      alert('Please select a fabric item.');
+      await modal.warning('Please select a fabric item.', 'Item Required');
       return;
     }
     if (!addForm.locationId) {
-      alert('Please choose the storage location.');
+      await modal.warning('Please choose the storage location.', 'Location Required');
       return;
     }
     if (!addForm.qcStatus) {
-      alert('Please choose the QC status (Passed goes to stock, Pending goes to QC Hold).');
+      await modal.warning('Please choose the QC status (Passed goes to stock, Pending goes to QC Hold).', 'QC Status Required');
       return;
     }
     if (!addForm.receivedQty || Number(addForm.receivedQty) <= 0) {
-      alert('Please enter a valid received quantity greater than 0.');
+      await modal.warning('Please enter a valid received quantity greater than 0.', 'Quantity Required');
       return;
     }
 
@@ -979,7 +981,7 @@ export default function LotTakaRegisterPage({
         fetchData(true);
       }, 1000);
     } catch (err) {
-      alert(err?.response?.data?.detail || err?.message || 'Failed to create Lot/Taka.');
+      await modal.error(err?.response?.data?.detail || err?.message || 'Failed to create Lot/Taka.', 'Create Lot Error');
     } finally {
       setSubmittingAdd(false);
     }
@@ -1021,7 +1023,7 @@ export default function LotTakaRegisterPage({
         fetchData(true);
       }, 900);
     } catch (err) {
-      alert(err?.response?.data?.detail || err?.message || 'Failed to update Lot.');
+      await modal.error(err?.response?.data?.detail || err?.message || 'Failed to update Lot.', 'Update Lot Error');
     } finally {
       setSubmittingEdit(false);
     }
@@ -1118,13 +1120,13 @@ export default function LotTakaRegisterPage({
             </button>
           )}
           <button
-            onClick={() => {
+            onClick={async () => {
               if (isEmbedded) {
                 const targetRecord = activeLotRecord || (data?.records && data.records[0]);
                 if (targetRecord) {
                   openPrintTagModal(targetRecord);
                 } else {
-                  alert('No takas registered yet for this order. Please inward GRN in Stage 3 and split rolls first.');
+                  await modal.info('No takas registered yet for this order. Please inward GRN in Stage 3 and split rolls first.', 'No Takas Found');
                 }
               } else {
                 navigate('/inventory/taka-tags');
@@ -2856,7 +2858,7 @@ export default function LotTakaRegisterPage({
                 <div className="flex items-center gap-2 ml-auto">
                   <button
                     type="button"
-                    onClick={() => inventoryService.openTakaTagsPdf([tagModalRecord.id]).catch((err) => alert(err?.message || 'Could not download PDF.'))}
+                    onClick={() => inventoryService.openTakaTagsPdf([tagModalRecord.id]).catch((err) => modal.error(err?.message || 'Could not download PDF.', 'PDF Download Error'))}
                     className="inline-flex items-center gap-1 px-3 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-lg text-xs font-semibold shadow-xs cursor-pointer"
                     title="Download 60x40mm thermal label PDF"
                   >

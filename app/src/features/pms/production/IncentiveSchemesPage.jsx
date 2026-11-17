@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { modal } from '../../../context/ModalContext';
 import {
   DollarSign,
   Plus,
@@ -21,6 +22,7 @@ import { Button } from '../../../components/ui/Button';
 import { productionService, hrmsService } from '../../../services/domainServices';
 import MasterSourceLink from '../../../components/common/MasterSourceLink';
 import { formatINR, formatDate, unwrapList, describeApiError } from '../../accounts/accountingShared';
+import { useERP } from '../../../context/ERPContext';
 
 const STATUS_PILLS = {
   Draft: 'bg-slate-100 text-slate-700 border-slate-300',
@@ -37,6 +39,7 @@ const BASIS_LABELS = {
 };
 
 export default function IncentiveSchemesPage() {
+  const { showToast } = useERP();
   const [activeTab, setActiveTab] = useState('schemes'); // 'schemes' | 'calculations'
 
   // Schemes State
@@ -231,18 +234,20 @@ export default function IncentiveSchemesPage() {
   const handleApproveCalc = async (id) => {
     try {
       await productionService.approveIncentiveCalculation(id);
+      showToast('Incentive calculation approved', 'success');
       loadCalculations();
     } catch (err) {
-      alert(describeApiError(err));
+      showToast(describeApiError(err), 'error');
     }
   };
 
   const handlePostCalc = async (id) => {
     try {
       await productionService.postIncentiveCalculation(id);
+      showToast('Incentive calculation posted to payroll', 'success');
       loadCalculations();
     } catch (err) {
-      alert(describeApiError(err));
+      showToast(describeApiError(err), 'error');
     }
   };
 
@@ -255,23 +260,31 @@ export default function IncentiveSchemesPage() {
         payment_mode: payMode,
         reference: payRef,
       });
+      showToast('Incentive payment recorded successfully', 'success');
       setPayTarget(null);
       loadCalculations();
     } catch (err) {
-      alert(describeApiError(err));
+      showToast(describeApiError(err), 'error');
     } finally {
       setPaying(false);
     }
   };
 
   const handleReverseCalc = async (id) => {
-    const reason = prompt('Please specify reversal reason:');
+    const reason = await modal.prompt({
+      title: 'Reverse Incentive Calculation',
+      message: 'Please specify reversal reason:',
+      placeholder: 'Enter reason...',
+      required: true,
+      confirmLabel: 'Reverse Calculation',
+    });
     if (!reason) return;
     try {
       await productionService.reverseIncentiveCalculation(id, { reason });
+      showToast('Incentive calculation reversed', 'success');
       loadCalculations();
     } catch (err) {
-      alert(describeApiError(err));
+      showToast(describeApiError(err), 'error');
     }
   };
 
@@ -552,7 +565,7 @@ export default function IncentiveSchemesPage() {
 
       {/* CREATE / EDIT SCHEME MODAL */}
       {showSchemeModal && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-3">
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-3">
           <div className="bg-white rounded-2xl border border-slate-200 max-w-lg w-full p-5 shadow-2xl text-xs space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-slate-200">
               <h3 className="font-bold text-base text-[#1F2E4A]">
@@ -708,7 +721,7 @@ export default function IncentiveSchemesPage() {
 
       {/* RUN CALCULATION MODAL */}
       {calcModalScheme && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-3">
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-3">
           <div className="bg-white rounded-2xl border border-slate-200 max-w-md w-full p-5 shadow-2xl text-xs space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-slate-200">
               <h3 className="font-bold text-base text-[#1F2E4A]">Run Calculation: {calcModalScheme.name}</h3>
@@ -808,7 +821,7 @@ export default function IncentiveSchemesPage() {
 
       {/* SETTLE PAY MODAL */}
       {payTarget && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-3">
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-3">
           <div className="bg-white rounded-2xl border border-slate-200 max-w-sm w-full p-5 shadow-2xl text-xs space-y-4">
             <h3 className="font-bold text-base text-[#1F2E4A]">Record Payout Settlement</h3>
             <p className="text-slate-600">

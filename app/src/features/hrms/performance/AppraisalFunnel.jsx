@@ -53,7 +53,7 @@ export default function AppraisalFunnel() {
         actions={
           <button
             onClick={() => navigate("/hrms/performance/appraisal")}
-            className="px-3.5 py-1.5 bg-[#16233a] text-white rounded-xl text-[12.5px] font-medium hover:bg-[#0f172a] transition shadow-2xs flex items-center gap-1.5"
+            className="px-3.5 py-1.5 bg-primary hover:bg-primary-hover text-white rounded-xl text-[12.5px] font-medium transition shadow-2xs flex items-center gap-1.5 cursor-pointer"
           >
             Manage Appraisals <ArrowRight size={14} />
           </button>
@@ -69,7 +69,7 @@ export default function AppraisalFunnel() {
               const isBottleneck = s.bottleneck;
               const isCompleted = i === funnelStages.length - 1;
 
-              let barColor = "bg-[#16233a]";
+              let barColor = "bg-primary";
               if (isDraft) barColor = "bg-slate-300";
               else if (isBottleneck) barColor = "bg-[#f59e0b]";
               else if (isCompleted) barColor = "bg-[#10b981]";

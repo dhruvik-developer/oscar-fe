@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useERP } from '../../../context/ERPContext';
+import { ConfirmModal } from '../../../components/ui/ConfirmModal';
 import { Button } from '../../../components/ui/Button';
 import {
   Plus, ClipboardList, X, Search, Clock, CheckCircle2, Package, Layers,
@@ -47,8 +48,9 @@ function normalizeInstruction(item) {
 export default function ProductionInstructionsPage() {
   const {
     purchaseOrders, formatCurrency, formatDateDDMMYYYY,
-    getCurrentISODate,
+    getCurrentISODate, showToast,
   } = useERP();
+  const [deleteConfirmPi, setDeleteConfirmPi] = useState(null);
   const navigate = useNavigate();
 
   const [instructions, setInstructions] = useState([]);
@@ -225,13 +227,15 @@ export default function ProductionInstructionsPage() {
   };
 
   const handleDelete = async (pi) => {
-    if (!window.confirm(`Delete Production Instruction ${pi.piNumber}?`)) return;
     setActionError(null);
     try {
       await api.delete(`/production/instructions/${pi.id}/`);
       setInstructions((prev) => prev.filter((p) => p.id !== pi.id));
+      showToast?.(`Production Instruction ${pi.piNumber} deleted`, 'success');
     } catch (err) {
-      setActionError(`Delete failed for ${pi.piNumber}: ${errorText(err)}`);
+      const msg = `Delete failed for ${pi.piNumber}: ${errorText(err)}`;
+      setActionError(msg);
+      showToast?.(msg, 'error');
     }
   };
 
@@ -325,7 +329,7 @@ export default function ProductionInstructionsPage() {
   };
 
   return (
-    <div className="-m-3 md:-m-5 bg-[#edf3fc] p-3 md:p-5 space-y-4 min-h-[calc(100vh-62px)]">
+    <div className="pms-screen w-full space-y-6">
       <PageHeader
         title="Production Instructions"
         subtitle="Create and manage production instructions for external agencies."
@@ -382,8 +386,8 @@ export default function ProductionInstructionsPage() {
             <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="text-[12px] text-slate-600 outline-none" title="End date to" />
           </div>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[1280px] border-collapse text-left text-[12px]">
+        <div className="pms-table-container">
+          <table className="w-full min-w-[1280px] border-collapse text-left text-[12px] pms-sticky-header">
             <thead>
               <tr className="border-b border-slate-100 text-[10.5px] font-bold uppercase tracking-wide text-slate-400">
                 <th className="px-3 py-2.5 w-10 text-center">#</th>
@@ -451,7 +455,7 @@ export default function ProductionInstructionsPage() {
                               <button onClick={() => { setOpenMenuId(null); navigate(`/pms/daily-production?pi=${encodeURIComponent(pi.id)}`); }} className="block w-full px-3 py-2 text-left text-[12px] font-medium text-slate-700 hover:bg-slate-50">Daily production</button>
                               <button onClick={() => { setOpenMenuId(null); navigate(`/pms/production-completion?pi=${encodeURIComponent(pi.id)}`); }} className="block w-full px-3 py-2 text-left text-[12px] font-medium text-slate-700 hover:bg-slate-50">Open completion</button>
                               {pi.status === 'Draft' && (
-                                <button onClick={() => { setOpenMenuId(null); handleDelete(pi); }} className="block w-full px-3 py-2 text-left text-[12px] font-semibold text-rose-600 hover:bg-rose-50">Delete</button>
+                                <button onClick={() => { setOpenMenuId(null); setDeleteConfirmPi(pi); }} className="block w-full px-3 py-2 text-left text-[12px] font-semibold text-rose-600 hover:bg-rose-50">Delete</button>
                               )}
                             </div>
                           </>
@@ -561,7 +565,17 @@ export default function ProductionInstructionsPage() {
                   </div>
                   <div>
                     <label className="block font-semibold text-slate-700 mb-1">Assigned Qty (Meter) *</label>
-                    <input type="number" min="0" step="any" required value={assignedQty} onChange={(e) => setAssignedQty(e.target.value)} placeholder="Meters" className="w-full border border-slate-300 rounded-lg p-2 bg-white text-slate-800 font-mono" />
+                    <input
+                      type="number"
+                      min="0.01"
+                      step="any"
+                      required
+                      value={assignedQty}
+                      onChange={(e) => setAssignedQty(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === '-' || e.key === 'e' || e.key === '+') e.preventDefault(); }}
+                      placeholder="Meters"
+                      className="w-full border border-slate-300 rounded-lg p-2 bg-white text-slate-800 font-mono"
+                    />
                   </div>
                   <div>
                     <label className="block font-semibold text-slate-700 mb-1">Process Type *</label>
@@ -760,10 +774,12 @@ export default function ProductionInstructionsPage() {
                         <label className="block text-[11px] font-semibold text-slate-600 mb-1">Invoice Quantity (Meters) *</label>
                         <input
                           type="number"
+                          min="0.01"
                           step="0.01"
                           required
                           value={matchQty}
                           onChange={(e) => setMatchQty(e.target.value)}
+                          onKeyDown={(e) => { if (e.key === '-' || e.key === 'e' || e.key === '+') e.preventDefault(); }}
                           className="w-full text-xs border border-slate-300 rounded-lg p-2 bg-white text-slate-800 font-mono"
                         />
                       </div>
@@ -771,10 +787,12 @@ export default function ProductionInstructionsPage() {
                         <label className="block text-[11px] font-semibold text-slate-600 mb-1">Invoice Rate (₹/M) *</label>
                         <input
                           type="number"
+                          min="0"
                           step="0.01"
                           required
                           value={matchRate}
                           onChange={(e) => setMatchRate(e.target.value)}
+                          onKeyDown={(e) => { if (e.key === '-' || e.key === 'e' || e.key === '+') e.preventDefault(); }}
                           className="w-full text-xs border border-slate-300 rounded-lg p-2 bg-white text-slate-800 font-mono"
                         />
                       </div>
@@ -868,7 +886,16 @@ export default function ProductionInstructionsPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">Assigned Qty (Meter) *</label>
-                  <input type="number" min="0" step="any" required value={editQty} onChange={(e) => setEditQty(e.target.value)} className="w-full border border-slate-300 rounded-lg p-2 bg-white text-slate-800 font-mono" />
+                  <input
+                    type="number"
+                    min="0.01"
+                    step="any"
+                    required
+                    value={editQty}
+                    onChange={(e) => setEditQty(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === '-' || e.key === 'e' || e.key === '+') e.preventDefault(); }}
+                    className="w-full border border-slate-300 rounded-lg p-2 bg-white text-slate-800 font-mono"
+                  />
                 </div>
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">Process Type</label>
@@ -919,6 +946,20 @@ export default function ProductionInstructionsPage() {
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={Boolean(deleteConfirmPi)}
+        onClose={() => setDeleteConfirmPi(null)}
+        onConfirm={async () => {
+          const pi = deleteConfirmPi;
+          setDeleteConfirmPi(null);
+          await handleDelete(pi);
+        }}
+        title="Delete Production Instruction"
+        message={deleteConfirmPi ? `Are you sure you want to delete Production Instruction ${deleteConfirmPi.piNumber}? This cannot be undone.` : ''}
+        confirmText="Delete PI"
+        variant="danger"
+      />
     </div>
   );
 }

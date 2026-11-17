@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { modal } from '../../../context/ModalContext';
 import {
   Search,
   Filter,
@@ -324,7 +325,7 @@ export default function QCInspectionRegisterPage() {
   const handleSaveManualQC = async (e) => {
     e.preventDefault();
     if (!newReceivedQty || Number(newReceivedQty) <= 0) {
-      alert('Please enter a valid received quantity');
+      await modal.warning('Please enter a valid received quantity', 'Invalid Quantity');
       return;
     }
     setSubmittingNewQC(true);
@@ -346,7 +347,7 @@ export default function QCInspectionRegisterPage() {
       setNewReceivedQty('');
       await fetchRegister();
     } catch (err) {
-      alert('Could not create QC record: ' + (err.response?.data?.detail || err.message));
+      await modal.error('Could not create QC record: ' + (err.response?.data?.detail || err.message), 'Create QC Error');
     } finally {
       setSubmittingNewQC(false);
     }
@@ -356,7 +357,7 @@ export default function QCInspectionRegisterPage() {
   const handleSaveASTMQC = async (e) => {
     e.preventDefault();
     if (!astmRollMeter || Number(astmRollMeter) <= 0) {
-      alert('Please enter a valid inspected roll length (meters).');
+      await modal.warning('Please enter a valid inspected roll length (meters).', 'Invalid Roll Length');
       return;
     }
     setSubmittingNewQC(true);
@@ -394,7 +395,7 @@ export default function QCInspectionRegisterPage() {
       setAstmDefects([]);
       await fetchRegister();
     } catch (err) {
-      alert('Could not save ASTM QC Inspection: ' + (err.response?.data?.detail || err.message));
+      await modal.error('Could not save ASTM QC Inspection: ' + (err.response?.data?.detail || err.message), 'ASTM QC Error');
     } finally {
       setSubmittingNewQC(false);
     }
@@ -403,7 +404,7 @@ export default function QCInspectionRegisterPage() {
   // Export CSV
   const handleExport = () => {
     if (!filteredRecords.length) {
-      alert('No records available to export.');
+      modal.info('No records available to export.', 'Export CSV');
       return;
     }
     const headers = [
@@ -669,7 +670,6 @@ export default function QCInspectionRegisterPage() {
                 <th className="p-3">Design</th>
                 <th className="p-3">Shade</th>
                 <th className="p-3">Lot No.</th>
-                <th className="p-3 text-center">Taka/Roll</th>
                 <th className="p-3 text-right">Received Qty (m)</th>
                 <th className="p-3 text-right">Inspected Qty (m)</th>
                 <th className="p-3 text-right text-emerald-700">Good (m)</th>
@@ -735,7 +735,6 @@ export default function QCInspectionRegisterPage() {
                     <td className="p-3 text-slate-600">{r.design || '—'}</td>
                     <td className="p-3 text-slate-600">{r.shade || '—'}</td>
                     <td className="p-3 font-mono text-slate-600">{r.lotNo}</td>
-                    <td className="p-3 text-center">{r.takaRoll}</td>
                     <td className="p-3 text-right font-medium">{r.receivedQty?.toLocaleString()}</td>
                     <td className="p-3 text-right font-medium">{r.inspectedQty?.toLocaleString()}</td>
                     <td className="p-3 text-right text-emerald-700 font-semibold">{r.goodQty?.toLocaleString()}</td>

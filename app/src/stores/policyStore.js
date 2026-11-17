@@ -5,6 +5,7 @@ import {
   writeThrough,
   pullTracked,
   acknowledgePolicy as acknowledgePolicyOnServer,
+  fetchPolicyAcknowledgements,
   approvePolicy as approvePolicyOnServer,
   archivePolicy as archivePolicyOnServer,
   isBackendEnabled,
@@ -24,9 +25,23 @@ const usePolicyStoreBase = create((set, get) => ({
       pullTracked("policies"),
       pullTracked("policyCategories"),
     ]);
+    const policies = rows[0] || [];
+    let acks = [];
+    if (isBackendEnabled()) {
+      try {
+        const ackPromises = policies
+          .filter((p) => isServerId(p.id))
+          .map((p) => fetchPolicyAcknowledgements(p.id).catch(() => []));
+        const ackResults = await Promise.all(ackPromises);
+        acks = ackResults.flat().filter(Boolean);
+      } catch (err) {
+        console.warn("[HRMS] Failed to hydrate policy acknowledgements:", err?.message || err);
+      }
+    }
     set((s) => ({
       policies: rows[0] || s.policies,
       categories: rows[1] || s.categories,
+      acknowledgements: acks.length > 0 ? acks : s.acknowledgements,
     }));
     return rows;
   },

@@ -1,4 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { modal } from '../../context/ModalContext';
+import { useSearchParams } from 'react-router-dom';
+import StandaloneNotesPage from './StandaloneNotesPage';
 import { Plus, Trash2, RotateCcw, Search } from 'lucide-react';
 import { api } from '../../services/api';
 import { Button } from '../../components/ui/Button';
@@ -44,6 +47,7 @@ const PAGE_SIZE = 25;
 const TABS = [
   { id: 'journal', label: 'Journal Entries' },
   { id: 'ledger', label: 'Account Ledger' },
+  { id: 'notes', label: 'Debit / Credit Notes' },
   { id: 'trial', label: 'Trial Balance' },
 ];
 
@@ -97,7 +101,13 @@ function JournalTab({ accounts, accountsError, onPosted }) {
   const aggregates = data?.aggregates || {};
 
   const handleReverse = async (entry) => {
-    if (!window.confirm(`Post a reversing entry for ${entry.entryNumber}? The original will be marked Reversed.`)) return;
+    const ok = await modal.confirm({
+      title: 'Post Reversing Entry',
+      message: `Post a reversing entry for ${entry.entryNumber}? The original will be marked Reversed.`,
+      confirmLabel: 'Post Reversal',
+      iconType: 'warning',
+    });
+    if (!ok) return;
     setReversingId(entry.id);
     setActionError('');
     try {
@@ -605,7 +615,15 @@ function TrialBalanceTab({ refreshKey }) {
 
 /* ───────────────────────── Page ───────────────────────── */
 export const GeneralLedgerPage = () => {
-  const [tab, setTab] = useState('journal');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tab = searchParams.get('tab') || 'journal';
+  const setTab = (t) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set('tab', t);
+      return next;
+    });
+  };
   const [accounts, setAccounts] = useState([]);
   const [accountsError, setAccountsError] = useState('');
   const [refreshKey, setRefreshKey] = useState(0);
@@ -645,6 +663,7 @@ export const GeneralLedgerPage = () => {
         <JournalTab accounts={activeAccounts} accountsError={accountsError} onPosted={() => setRefreshKey((k) => k + 1)} />
       )}
       {tab === 'ledger' && <LedgerTab accounts={accounts} accountsError={accountsError} />}
+      {tab === 'notes' && <StandaloneNotesPage embedded />}
       {tab === 'trial' && <TrialBalanceTab refreshKey={refreshKey} />}
     </div>
   );

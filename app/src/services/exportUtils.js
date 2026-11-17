@@ -1,6 +1,8 @@
 /**
  * Universal CSV and Print Export Utility for Horizon ERP
  */
+import { modal } from '../context/ModalContext';
+
 export function exportToCSV(filename, headers, rows) {
     const escapeCell = (cell) => {
         if (cell === null || cell === undefined)

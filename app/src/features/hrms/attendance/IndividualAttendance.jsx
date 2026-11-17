@@ -211,12 +211,36 @@ export default function IndividualAttendance() {
       }
     }
 
+    const monthIdxForQuery = selectedMonth !== "All" ? MONTHS.indexOf(selectedMonth) : new Date().getMonth();
+    const queryMonth = `${yearNum}-${pad(monthIdxForQuery + 1)}`;
+
     pullIndividualAttendance(currentEmp.id, {
+      month: queryMonth,
       date_from,
       date_to,
     }).then((body) => {
-      const rows = Array.isArray(body) ? body : (body?.results || []);
-      setMonthRecords(Array.isArray(rows) ? rows.map(HRMS_RESOURCES.attendance.fromApi) : []);
+      if (body?.days && Array.isArray(body.days)) {
+        const mapped = body.days.map((d) => ({
+          id: d.attendanceId || `gen-${d.date}`,
+          employeeId: currentEmp.id,
+          employee: currentEmp.name,
+          employeeCode: currentEmp.employeeCode || currentEmp.empId,
+          date: d.date,
+          rawDate: d.date,
+          status: d.status,
+          checkIn: d.checkIn,
+          checkOut: d.checkOut,
+          hours: d.hours,
+          overtimeHours: d.overtimeHours,
+          remark: d.remark,
+          notes: d.remark,
+          _synced: true,
+        }));
+        setMonthRecords(mapped);
+      } else {
+        const rows = Array.isArray(body) ? body : (body?.results || []);
+        setMonthRecords(Array.isArray(rows) ? rows.map(HRMS_RESOURCES.attendance.fromApi) : []);
+      }
     }).catch((err) => {
       console.warn("[IndividualAttendance] Failed to fetch month attendance:", err);
     });

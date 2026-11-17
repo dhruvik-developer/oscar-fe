@@ -202,8 +202,8 @@ const usePayrollStoreBase = create((set, get) => ({
   },
 
   /** Change additional earnings / deductions / advance; the server recomputes the payslip. */
-  adjust: async (id, { additionalEarnings, deductions, advance } = {}) => {
-    const row = await hrmsSync.update("payroll", id, { additionalEarnings, deductions, advance });
+  adjust: async (id, { standardSalary, additionalEarnings, deductions, advance } = {}) => {
+    const row = await hrmsSync.update("payroll", id, { standardSalary, additionalEarnings, deductions, advance });
     if (row && row.id) set((s) => ({ employees: replaceRows(s.employees, [row]) }));
     return row;
   },

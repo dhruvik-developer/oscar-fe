@@ -37,7 +37,7 @@ import {
 } from "lucide-react";
 import { useAppStore } from "../../../stores/appStore";
 import { useAttendanceStore } from "../../../stores/attendanceStore";
-import { hrmsSync } from "../../../services/hrmsSync";
+import { hrmsSync, pullDailyAttendance } from "../../../services/hrmsSync";
 import { api } from "../../../services/api";
 import { Badge } from "../../../components/hrms/Badge";
 import { PageInfoButton } from "../../../components/common/PageInfoButton";
@@ -490,8 +490,9 @@ function TeamMarkAttendance() {
       } catch {
         // fallback quietly to direct pull
       }
-      const data = (await hrmsSync.pull("attendance", { date })) || [];
-      setServerRows(data);
+      const data = await pullDailyAttendance(date);
+      const list = Array.isArray(data?.results) ? data.results : (Array.isArray(data) ? data : []);
+      setServerRows(list);
       setEdits({});
       setChecked({});
       await useAttendanceStore.getState().refreshAttendance();
@@ -506,44 +507,28 @@ function TeamMarkAttendance() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [todayPunch?.isPunchedIn, todayPunch?.lastPunchIso]);
 
-  // Everyone on the payroll of people, with the day's row where there is one.
+  // Everyone on the workforce roster, showing accurate names and codes directly
   const rows = useMemo(() => {
-    const byEmployee = new Map(serverRows.map((r) => [String(r.employeeId), r]));
-    const peopleRaw = employees?.length
-      ? employees.filter((e) => !["Resigned", "Terminated"].includes(e.status))
-      : serverRows.map((r) => ({ id: r.employeeId, name: r.name, department: r.dept, empId: r.empId }));
-
-    const peopleMap = new Map();
-    peopleRaw.forEach((p) => {
-      const name = (p.name || "").trim().toLowerCase();
-      const id = String(p.id || p.employeeId || "").trim().toLowerCase();
-      const key = id || name;
-      if (key && !peopleMap.has(key) && (!name || !peopleMap.has(name))) {
-        peopleMap.set(key, p);
-        if (name) peopleMap.set(name, p);
-      }
-    });
-    const people = Array.from(new Set(peopleMap.values()));
-
-    return people.map((e) => {
-      const att = byEmployee.get(String(e.id));
+    return serverRows.map((r) => {
+      const empIdStr = String(r.employeeId || r.id);
       const base = {
-        employeeId: String(e.id),
-        name: e.name || att?.name || "Employee",
-        empId: e.empId || e.employeeCode || att?.empId || "",
-        dept: e.department || e.dept || att?.dept || "",
-        avatar: e.avatar || e.photo || e.img || "",
-        checkIn: toHHMM(att?.checkIn),
-        checkOut: toHHMM(att?.checkOut),
-        status: att?.status || "",
-        remark: att?.remark || "",
-        source: att?.source || "",
-        punchCount: (att?.punches || []).length,
-        marked: Boolean(att),
+        employeeId: empIdStr,
+        name: r.name || "Employee",
+        empId: r.employeeCode || r.empId || "",
+        dept: r.department || r.dept || "",
+        avatar: r.avatar || r.photo || "",
+        checkIn: toHHMM(r.checkIn),
+        checkOut: toHHMM(r.checkOut),
+        status: r.status === "Not Marked" ? "" : (r.status || ""),
+        serverStatus: r.status || "",
+        remark: r.remark || "",
+        source: r.source || "",
+        punchCount: (r.punches || []).length,
+        marked: Boolean(r.marked || (r.status && r.status !== "Not Marked" && r.status !== "Not Joined")),
       };
       return { ...base, ...(edits[base.employeeId] || {}) };
     });
-  }, [employees, serverRows, edits]);
+  }, [serverRows, edits]);
 
   const departments = useMemo(() => ["All", ...new Set(rows.map((r) => r.dept).filter(Boolean))], [rows]);
 

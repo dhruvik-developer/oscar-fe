@@ -41,7 +41,7 @@ function GeneralSettings() {
     const [address, setAddress] = useState(companyProfile?.address || '');
     const [phone, setPhone] = useState(companyProfile?.phone || '');
     const [currency, setCurrency] = useState(globalCurrency || 'INR (₹)');
-    const [fiscalYear, setFiscalYear] = useState('Apr - Mar');
+    const [fiscalYear, setFiscalYear] = useState(companyProfile?.fiscalYear || 'Apr - Mar');
     const [autoReorder, setAutoReorder] = useState(true);
     const [emailAlerts, setEmailAlerts] = useState(true);
     const [greyThreshold, setGreyThreshold] = useState('');
@@ -91,6 +91,7 @@ function GeneralSettings() {
                     pan,
                     address,
                     phone,
+                    fiscalYear,
                 });
             } catch (err) {
                 profileOk = false;

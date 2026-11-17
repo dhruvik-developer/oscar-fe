@@ -205,7 +205,21 @@ export const HRMS_RESOURCES = {
   },
 
   departments: plain('/hrms/departments/'),
-  designations: plain('/hrms/designations/'),
+  designations: {
+    path: '/hrms/designations/',
+    toApi: (d) => compact({
+      name: d.name || d.title || undefined,
+      departmentId: d.departmentId || d.department_id || undefined,
+      level: d.level || undefined,
+    }),
+    fromApi: (row) => ({
+      ...row,
+      title: row.name || row.title || '',
+      name: row.name || row.title || '',
+      department: row.department || '',
+      _synced: true,
+    }),
+  },
   // The server keeps `address` as a JSON object ({line1, city, state, ...});
   // the screens show and edit it as one line of text. Office type has no
   // column, so it rides inside the address object.
@@ -312,6 +326,7 @@ export const HRMS_RESOURCES = {
     },
     fromApi: (row) => ({
       ...asText(row, ['status', 'workLocation', 'notes', 'employeeName']),
+      employeeId: row.employeeId || row.employee_id || row.id || '',
       isoDate: row.date || '',
       date: displayIn(row.date),
       employee: row.employeeName || row.employee || '',
@@ -394,7 +409,23 @@ export const HRMS_RESOURCES = {
     // Payslips are generated, not created by hand.
     omitOnUpdate: ['employeeId', 'month', 'year'],
   },
-  salaryStructures: plain('/hrms/payroll/salary-structures/'),
+  salaryStructures: {
+    path: '/hrms/payroll/salary-structures/',
+    toApi: (s) => compact({
+      name: s.name,
+      basic_pct: s.basic_pct !== undefined ? s.basic_pct : (s.basicPct !== undefined ? s.basicPct : 50),
+      hra_pct: s.hra_pct !== undefined ? s.hra_pct : (s.hraPct !== undefined ? s.hraPct : 20),
+      components: Array.isArray(s.components) ? s.components : [],
+      is_active: s.is_active !== undefined ? s.is_active : (s.status ? s.status === 'Active' : true),
+    }),
+    fromApi: (row) => ({
+      ...row,
+      basicPct: row.basic_pct || 50,
+      hraPct: row.hra_pct || 20,
+      status: row.is_active ? 'Active' : 'Inactive',
+      _synced: true,
+    }),
+  },
   advances: dated('/hrms/payroll/advances/', ['requestDate', 'date']),
 
   // ── recruitment ───────────────────────────────────────────────────────────

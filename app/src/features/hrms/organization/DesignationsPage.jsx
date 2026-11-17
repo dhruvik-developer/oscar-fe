@@ -16,7 +16,7 @@ export function DesignationsPage() {
   const [q, setQ] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingDesig, setEditingDesig] = useState(null);
-  const [newDesig, setNewDesig] = useState({ title: '', level: 'L4', department: 'Engineering' });
+  const [newDesig, setNewDesig] = useState({ title: '', department: 'Engineering' });
 
   useEffect(() => {
     let active = true;
@@ -38,8 +38,7 @@ export function DesignationsPage() {
   const filtered = designations.filter(
     (d) =>
       String(d.title ?? '').toLowerCase().includes(q.toLowerCase()) ||
-      String(d.department ?? '').toLowerCase().includes(q.toLowerCase()) ||
-      String(d.level ?? '').toLowerCase().includes(q.toLowerCase())
+      String(d.department ?? '').toLowerCase().includes(q.toLowerCase())
   );
 
   const sort = useTableSort(filtered, { accessors: { count: (d) => d.count || 0 } });
@@ -66,7 +65,7 @@ export function DesignationsPage() {
       );
       try {
         if (isBackendEnabled()) {
-          await hrmsSync.update('designations', editingDesig.id, newDesig);
+          await hrmsSync.update('designations', editingDesig.id, { ...newDesig, name: newDesig.title });
         }
       } catch (err) {
         console.warn('[DesignationsPage] Failed to update designation on server:', err);
@@ -77,7 +76,7 @@ export function DesignationsPage() {
       setDesignations([created, ...designations]);
       try {
         if (isBackendEnabled()) {
-          const saved = await hrmsSync.create('designations', created);
+          const saved = await hrmsSync.create('designations', { ...created, name: created.title });
           if (saved?.id) {
             setDesignations((prev) => prev.map((d) => (d.id === created.id ? saved : d)));
           }
@@ -89,14 +88,13 @@ export function DesignationsPage() {
     }
     setIsModalOpen(false);
     setEditingDesig(null);
-    setNewDesig({ title: '', level: 'L4', department: 'Engineering' });
+    setNewDesig({ title: '', department: 'Engineering' });
   }
 
   function handleOpenEdit(desig) {
     setEditingDesig(desig);
     setNewDesig({
-      title: desig.title || '',
-      level: desig.level || 'L4',
+      title: desig.title || desig.name || '',
       department: desig.department || 'Engineering',
     });
     setIsModalOpen(true);
@@ -104,7 +102,7 @@ export function DesignationsPage() {
 
   function handleOpenCreate() {
     setEditingDesig(null);
-    setNewDesig({ title: '', level: 'L4', department: 'Engineering' });
+    setNewDesig({ title: '', department: 'Engineering' });
     setIsModalOpen(true);
   }
 
@@ -144,7 +142,7 @@ export function DesignationsPage() {
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Search by title, level, or department..."
+            placeholder="Search by title or department..."
             className="pl-9 pr-4 h-9 w-full sm:w-72 bg-off border border-bdr rounded-xl text-[13px] focus:outline-none focus:border-navy"
           />
         </div>
@@ -166,7 +164,6 @@ export function DesignationsPage() {
               <thead className="bg-off border-b border-bdr text-[11px] uppercase text-muted">
                 <tr>
                   <SortableTh sort={sort} sortKey="title" className="py-3 px-5">Job Title</SortableTh>
-                  <SortableTh sort={sort} sortKey="level" className="py-3 px-5">Level</SortableTh>
                   <SortableTh sort={sort} sortKey="department" className="py-3 px-5">Department</SortableTh>
                   <SortableTh sort={sort} sortKey="count" className="py-3 px-5">Assigned Employees</SortableTh>
                   <th className="py-3 px-5 text-right">Actions</th>
@@ -246,29 +243,10 @@ export function DesignationsPage() {
               className="w-full px-3.5 py-2 bg-off border border-bdr rounded-xl text-[13.5px] focus:outline-none focus:border-navy"
             />
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-[12.5px] font-semibold text-slate-700 mb-1.5">
-                Level Framework
-              </label>
-              <select
-                value={newDesig.level}
-                onChange={(e) => setNewDesig({ ...newDesig, level: e.target.value })}
-                className="w-full px-3.5 py-2 bg-white border border-bdr rounded-xl text-[13.5px] focus:outline-none focus:border-navy"
-              >
-                <option value="L1">L1 — Associate</option>
-                <option value="L2">L2 — Junior</option>
-                <option value="L3">L3 — Mid-Level</option>
-                <option value="L4">L4 — Senior</option>
-                <option value="L5">L5 — Staff / Lead</option>
-                <option value="L6">L6 — Director / Head</option>
-                <option value="L7">L7 — Executive</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-[12.5px] font-semibold text-slate-700 mb-1.5">
-                Department
-              </label>
+          <div>
+            <label className="block text-[12.5px] font-semibold text-slate-700 mb-1.5">
+              Department
+            </label>
               <select
                 value={newDesig.department}
                 onChange={(e) => setNewDesig({ ...newDesig, department: e.target.value })}
@@ -282,7 +260,6 @@ export function DesignationsPage() {
                 <option>Marketing</option>
               </select>
             </div>
-          </div>
           <div className="flex justify-end gap-2 mt-3 pt-3 border-t border-bdr">
             <button
               type="button"

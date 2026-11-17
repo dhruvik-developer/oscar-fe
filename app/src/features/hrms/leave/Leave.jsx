@@ -504,7 +504,7 @@ export default function Leave() {
         guide={hrmsGuides.leave}
         actions={
           <>
-            {/* <button
+            <button
               type="button"
               onClick={() => setCompOffModalOpen(true)}
               className="inline-flex items-center gap-1.5 px-3.5 py-2.5 bg-white border border-slate-300 text-slate-700 rounded-xl text-[13px] font-medium shadow-2xs hover:bg-slate-50 transition-colors cursor-pointer"
@@ -519,7 +519,7 @@ export default function Leave() {
             >
               <Coins size={15} className="text-emerald-700" />
               Encash Leave
-            </button> */}
+            </button>
             <button
               type="button"
               onClick={() => setApplyModalOpen(true)}

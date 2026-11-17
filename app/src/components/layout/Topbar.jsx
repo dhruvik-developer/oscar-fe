@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { usePunchActions } from '../../features/hrms/attendance/usePunchActions';
 import { EarlyPunchOutModal } from '../../features/hrms/attendance/components/EarlyPunchOutModal';
+import { formatClock12 } from '../../services/hrmsSync';
 import { useAppStore } from '../../stores/appStore';
 import { useSharedPolling } from '../../hooks/usePolling';
 import { approvalService } from '../../services/domainServices';
@@ -383,7 +384,7 @@ export default function Topbar() {
                     <div className="max-h-28 overflow-y-auto space-y-1 pr-1">
                       {todayPunch.punches.map((p, idx) => (
                         <div key={p.id || idx} className="flex items-center justify-between text-xs p-1.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700/60 shadow-2xs">
-                          <span className="font-mono text-slate-600 dark:text-slate-300 font-medium text-[11.5px]">{p.timeDisplay || p.punchTime?.slice(11, 16)}</span>
+                          <span className="font-mono text-slate-600 dark:text-slate-300 font-medium text-[11.5px]">{p.timeDisplay || formatClock12(p.punchTime) || (p.punchTime ? p.punchTime.slice(11, 16) : '--:--')}</span>
                           <span className="text-slate-300 dark:text-slate-600">→</span>
                           <span className={`font-semibold text-[11.5px] ${
                             p.punchType === 'IN' ? 'text-emerald-600' :

@@ -425,7 +425,7 @@ export default function Payroll() {
   const [selectedPayslip, setSelectedPayslip] = useState(null);
   const [showGenerateModal, setShowGenerateModal] = useState(false);
   const [showAddStructureModal, setShowAddStructureModal] = useState(false);
-  const [newStructure, setNewStructure] = useState({ name: "", department: "", employees: "" });
+  const [newStructure, setNewStructure] = useState({ name: "", basicPct: 50, hraPct: 20 });
 
   // Bulk approve / pay confirmation: { kind: 'approve' | 'pay', ids, scope }
   const [confirmBulk, setConfirmBulk] = useState(null);
@@ -437,6 +437,7 @@ export default function Payroll() {
 
   // Adjustment modal (earnings / deductions / advance only)
   const [editingId, setEditingId] = useState(null);
+  const [editStandardSalary, setEditStandardSalary] = useState(0);
   const [editAdvance, setEditAdvance] = useState(0);
   const [editEarnings, setEditEarnings] = useState(0);
   const [editDeductions, setEditDeductions] = useState(0);
@@ -710,16 +711,19 @@ export default function Payroll() {
     if (!newStructure.name) return;
     addStructure({
       name: newStructure.name,
-      department: newStructure.department || undefined,
-      employees: Number(newStructure.employees) || undefined,
+      basic_pct: Number(newStructure.basicPct) || 50,
+      hra_pct: Number(newStructure.hraPct) || 20,
+      basicPct: Number(newStructure.basicPct) || 50,
+      hraPct: Number(newStructure.hraPct) || 20,
     });
-    setNewStructure({ name: "", department: "", employees: "" });
+    setNewStructure({ name: "", basicPct: 50, hraPct: 20 });
     setShowAddStructureModal(false);
     showToast("New salary structure added");
   };
 
   const openEditModal = (emp) => {
     setEditingId(emp.id);
+    setEditStandardSalary(Number(emp.standardSalary) || 0);
     setEditAdvance(Number(emp.advance) || 0);
     setEditEarnings(Number(emp.additionalEarnings) || 0);
     setEditDeductions(Number(emp.deductions) || 0);
@@ -731,6 +735,7 @@ export default function Payroll() {
     setSavingEdit(true);
     try {
       await adjust(editingEmployee.id, {
+        standardSalary: Math.max(0, Number(editStandardSalary) || 0),
         additionalEarnings: Math.max(0, Number(editEarnings) || 0),
         deductions: Math.max(0, Number(editDeductions) || 0),
         advance: Math.max(0, Number(editAdvance) || 0),
@@ -2110,9 +2115,16 @@ export default function Payroll() {
 
             {/* Attendance (read-only, from the attendance register) */}
             <div className="bg-slate-50/80 p-3.5 rounded-xl border border-slate-200/80 space-y-2.5">
-              <div className="flex justify-between items-center text-[12.5px]">
-                <span className="text-slate-600 font-medium">Standard Monthly Salary:</span>
-                <span className="font-bold text-slate-900 text-[13.5px]">{formatINR(editingEmployee.standardSalary)}</span>
+              <div className="flex justify-between items-center text-[12.5px] gap-3">
+                <span className="text-slate-600 font-medium shrink-0">Standard Monthly Salary:</span>
+                <input
+                  type="number"
+                  min="0"
+                  disabled={!editable}
+                  value={editStandardSalary}
+                  onChange={(e) => setEditStandardSalary(e.target.value)}
+                  className="w-36 h-8 px-2.5 bg-white border border-slate-300 rounded-lg text-right font-bold text-[13px] text-slate-900 focus:outline-none focus:border-navy"
+                />
               </div>
 
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-slate-200/60 text-center">

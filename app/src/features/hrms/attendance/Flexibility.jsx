@@ -1,3 +1,13 @@
+function addMinutesToClock(baseTime = "09:30", minutes = 10) {
+  const match = String(baseTime).match(/(\d{1,2}):(\d{2})/);
+  const h = match ? parseInt(match[1], 10) : 9;
+  const m = match ? parseInt(match[2], 10) : 30;
+  const total = (h * 60 + m + Number(minutes)) % 1440;
+  const newH = String(Math.floor(total / 60)).padStart(2, "0");
+  const newM = String(total % 60).padStart(2, "0");
+  return `${newH}:${newM}`;
+}
+
 import { useState, useEffect } from "react";
 import {
   Clock,
@@ -82,11 +92,12 @@ export default function Flexibility() {
   // Quick preset loader
   function applyPreset(preset) {
     setActivePreset(preset);
+    const start = flexibility?.shiftStart || "09:30";
     if (preset === "Strict (9-5 Corporate)") {
       setForm({
         ...form,
         gracePeriod: "5 minutes",
-        lateAfter: "09:05",
+        lateAfter: addMinutesToClock("09:00", 5),
         halfDayThreshold: "4 hours",
         minimumWorkingHours: "8 hours",
         flexibleWorkingHours: "09:00 - 18:00 (Fixed)",
@@ -99,7 +110,7 @@ export default function Flexibility() {
       setForm({
         ...form,
         gracePeriod: "30 minutes",
-        lateAfter: "10:00",
+        lateAfter: addMinutesToClock(start, 30),
         halfDayThreshold: "4 hours",
         minimumWorkingHours: "8 hours",
         flexibleWorkingHours: "08:00 - 20:00 (Core 10-4)",
@@ -113,7 +124,7 @@ export default function Flexibility() {
       setForm({
         ...form,
         gracePeriod: "10 minutes",
-        lateAfter: "09:10",
+        lateAfter: addMinutesToClock(start, 10),
         halfDayThreshold: "4 hours",
         minimumWorkingHours: "8 hours",
         flexibleWorkingHours: "09:00 - 18:00 (Flexible)",
@@ -256,7 +267,13 @@ export default function Flexibility() {
                   <select
                     disabled={!canEdit}
                     value={form.gracePeriod || "10 minutes"}
-                    onChange={(e) => setForm({ ...form, gracePeriod: e.target.value })}
+                    onChange={(e) => {
+                      const graceVal = e.target.value;
+                      const mins = parseInt(graceVal, 10) || 0;
+                      const start = flexibility?.shiftStart || "09:30";
+                      const newLate = addMinutesToClock(start, mins);
+                      setForm({ ...form, gracePeriod: graceVal, lateAfter: newLate });
+                    }}
                     className="w-full h-10 px-3.5 bg-white border border-[#cbd5e1] rounded-xl text-[13px] text-slate-800 disabled:bg-[#f8fafc] focus:outline-none focus:border-[#1e3a8a] cursor-pointer"
                   >
                     <option value="0 minutes">None (0 min strict)</option>

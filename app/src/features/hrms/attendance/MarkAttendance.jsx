@@ -651,6 +651,7 @@ function TeamMarkAttendance() {
 
   async function handleStatusChange(employeeId, newStatus) {
     const r = rows.find((row) => row.employeeId === employeeId);
+    if (!r) return;
     const defaultIn = flexibility?.shiftStart || "09:00";
     const defaultOut = flexibility?.shiftEnd || "18:00";
 
@@ -659,7 +660,12 @@ function TeamMarkAttendance() {
       checkIn: newStatus === "Absent" ? "" : (r?.checkIn || (newStatus === "Present" ? defaultIn : "")),
       checkOut: newStatus === "Absent" ? "" : (r?.checkOut || (newStatus === "Present" ? defaultOut : "")),
     };
-    edit(employeeId, patch);
+
+    // Instant optimistic update directly into serverRows & edits
+    setServerRows((prev) =>
+      prev.map((row) => (String(row.employeeId || row.id) === String(employeeId) ? { ...row, ...patch } : row))
+    );
+    resetEdit(employeeId);
 
     if (newStatus) {
       setRowSavingId(employeeId);
@@ -676,11 +682,12 @@ function TeamMarkAttendance() {
             },
           ],
         });
-        resetEdit(employeeId);
-        await useAttendanceStore.getState().refreshAttendance();
-        await load({ preserveSelection: true });
+        useAttendanceStore.getState().refreshAttendance();
         showToast?.(`Updated status for ${r?.name || "employee"} to ${newStatus}`);
       } catch (err) {
+        setServerRows((prev) =>
+          prev.map((row) => (String(row.employeeId || row.id) === String(employeeId) ? { ...row, ...r } : row))
+        );
         showToast?.(`Failed to update status — ${err?.payload?.message || err?.message || "try again"}`);
       } finally {
         setRowSavingId(null);
@@ -690,6 +697,7 @@ function TeamMarkAttendance() {
 
   async function quickMark(employeeId, newStatus) {
     const current = rows.find((r) => r.employeeId === employeeId);
+    if (!current) return;
     const defaultIn = flexibility?.shiftStart || "09:00";
     const defaultOut = flexibility?.shiftEnd || "18:00";
 
@@ -705,7 +713,13 @@ function TeamMarkAttendance() {
       checkIn: inTime,
       checkOut: outTime,
     };
-    edit(employeeId, patch);
+
+    // 1. Instantly update serverRows so UI updates without flicker or reverting
+    setServerRows((prev) =>
+      prev.map((r) => (String(r.employeeId || r.id) === String(employeeId) ? { ...r, ...patch } : r))
+    );
+    // 2. Clear pending draft edit so it renders the updated server row cleanly
+    resetEdit(employeeId);
     setRowSavingId(employeeId);
 
     try {
@@ -721,11 +735,14 @@ function TeamMarkAttendance() {
           },
         ],
       });
-      resetEdit(employeeId);
-      await useAttendanceStore.getState().refreshAttendance();
-      await load({ preserveSelection: true });
+      // Refresh attendance store silently in the background
+      useAttendanceStore.getState().refreshAttendance();
       showToast?.(`Marked ${current?.name || "employee"} as ${newStatus}`);
     } catch (err) {
+      // Revert to original row state on failure
+      setServerRows((prev) =>
+        prev.map((r) => (String(r.employeeId || r.id) === String(employeeId) ? { ...r, ...current } : r))
+      );
       showToast?.(`Failed to update attendance — ${err?.payload?.message || err?.message || "try again"}`);
     } finally {
       setRowSavingId(null);
@@ -737,11 +754,17 @@ function TeamMarkAttendance() {
     if (!r) return;
 
     if (r.checkIn && r.checkOut && r.checkOut <= r.checkIn) {
-      showToast?.(`Cannot save: Check-out (${r.checkOut}) must be after Check-in (${r.checkIn}) for ${r.name || "employee"}.`, "error");
+      showToast?.(`Cannot save: Check-out (${r.checkOut}) must be after Check-in (${r.checkIn}) for ${r.name || "employee"}`);
       return;
     }
 
+    const payloadStatus = r.status || (r.checkIn ? "Present" : "Absent");
+    setServerRows((prev) =>
+      prev.map((row) => (String(row.employeeId || row.id) === String(employeeId) ? { ...row, status: payloadStatus } : row))
+    );
+    resetEdit(employeeId);
     setRowSavingId(employeeId);
+
     try {
       await api.post("/hrms/attendance/bulk/", {
         date,
@@ -750,14 +773,12 @@ function TeamMarkAttendance() {
             employeeId,
             checkIn: r.checkIn || null,
             checkOut: r.checkOut || null,
-            status: r.status || (r.checkIn ? "Present" : "Absent"),
+            status: payloadStatus,
             remark: r.remark || null,
           },
         ],
       });
-      resetEdit(employeeId);
-      await useAttendanceStore.getState().refreshAttendance();
-      await load({ preserveSelection: true });
+      useAttendanceStore.getState().refreshAttendance();
       showToast?.(`Saved attendance for ${r.name || "employee"}`);
     } catch (err) {
       showToast?.(`Failed to save attendance — ${err?.payload?.message || err?.message || "try again"}`);

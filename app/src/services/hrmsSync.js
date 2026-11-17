@@ -512,6 +512,11 @@ export const HRMS_RESOURCES = {
       month: p.month || undefined,
       year: p.year !== undefined ? num(p.year) : undefined,
       status: p.status || undefined,
+      standardSalary: p.standardSalary !== undefined ? num(p.standardSalary) : undefined,
+      additionalEarnings: p.additionalEarnings !== undefined ? num(p.additionalEarnings) : undefined,
+      deductions: p.deductions !== undefined ? num(p.deductions) : undefined,
+      advance: p.advance !== undefined ? num(p.advance) : undefined,
+      earnedSalaryOverride: p.earnedSalaryOverride !== undefined ? num(p.earnedSalaryOverride) : undefined,
     }),
     fromApi: (row) => ({ ...row, _synced: true }),
     // Payslips are generated, not created by hand.

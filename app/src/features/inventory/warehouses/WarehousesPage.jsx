@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Download, Plus, RotateCcw, X } from 'lucide-react';
+import { Download, Plus, RotateCcw, X, Warehouse, Package, CheckCircle2, Clock, Truck, AlertTriangle } from 'lucide-react';
 import PageHeader from '../../../components/ui/PageHeader';
+import KpiCard from '../../../components/ui/KpiCard';
 import AppPagination from '../../../components/ui/AppPagination';
 import { useERP } from '../../../context/ERPContext';
 import { inventoryService } from '../../../services/domainServices';
@@ -36,12 +37,12 @@ export default function WarehousesPage() {
 
   const uomMain = dash?.byUom?.[0];
   const kpis = [
-    ['Total warehouses', dash ? `${dash.totalWarehouses}${dash.inactiveWarehouses ? ` (+${dash.inactiveWarehouses} inactive)` : ''}` : '—'],
-    ['Physical stock', uomMain ? `${n(uomMain.physical)} ${uomMain.uom}` : '—'],
-    ['Available', uomMain ? `${n(uomMain.available)} ${uomMain.uom}` : '—'],
-    ['Reserved', uomMain ? `${n(uomMain.reserved)} ${uomMain.uom}` : '—'],
-    ['Pending transfers', dash ? `${dash.pendingTransfers}${dash.draftTransfers ? ` · ${dash.draftTransfers} draft` : ''}` : '—'],
-    ['Low-stock items', dash ? String(dash.lowStockItems) : '—'],
+    ['Total warehouses', dash ? `${dash.totalWarehouses}${dash.inactiveWarehouses ? ` (+${dash.inactiveWarehouses} inactive)` : ''}` : '—', Warehouse],
+    ['Physical stock', uomMain ? `${n(uomMain.physical)} ${uomMain.uom}` : '—', Package],
+    ['Available', uomMain ? `${n(uomMain.available)} ${uomMain.uom}` : '—', CheckCircle2],
+    ['Reserved', uomMain ? `${n(uomMain.reserved)} ${uomMain.uom}` : '—', Clock],
+    ['Pending transfers', dash ? `${dash.pendingTransfers}${dash.draftTransfers ? ` · ${dash.draftTransfers} draft` : ''}` : '—', Truck],
+    ['Low-stock items', dash ? String(dash.lowStockItems) : '—', AlertTriangle],
   ];
 
   return (
@@ -52,12 +53,15 @@ export default function WarehousesPage() {
         actions={<Link to="/inventory/transfers" className="h-9 px-3 inline-flex items-center rounded-lg border border-slate-200 font-semibold hover:bg-slate-50">Transfers →</Link>}
       />
       {error && <div role="alert" className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-700">{error}</div>}
-      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
-        {kpis.map(([label, value]) => (
-          <div key={label} className="rounded-xl border border-slate-200 bg-white p-3">
-            <div className="text-[10px] uppercase text-slate-400 font-semibold">{label}</div>
-            <div className="text-base font-bold tabular-nums mt-1">{value}</div>
-          </div>
+      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3.5">
+        {kpis.map(([label, value, icon], idx) => (
+          <KpiCard
+            key={label}
+            index={idx}
+            label={label}
+            value={value}
+            icon={icon}
+          />
         ))}
       </div>
       {dash?.byUom?.length > 1 && (

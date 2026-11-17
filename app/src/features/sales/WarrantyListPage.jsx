@@ -338,23 +338,27 @@ export const WarrantyListPage = () => {
             />
 
             {/* Summary Stat Cards */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
                 <StatCard
+                    index={0}
                     label="Active Warranties"
                     value={`${activeCount} Cards`}
                     icon={ShieldCheck}
                 />
                 <StatCard
+                    index={1}
                     label="Expiring Soon (60 Days)"
                     value={`${expiringSoonCount} Units`}
                     icon={Clock}
                 />
                 <StatCard
+                    index={2}
                     label="Suspended / On Hold"
                     value={`${suspendedCount} Cards`}
                     icon={PauseCircle}
                 />
                 <StatCard
+                    index={3}
                     label="Draft Certificates"
                     value={`${draftCount} Drafts`}
                     icon={FileText}

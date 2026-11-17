@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import KpiCard from '../../components/ui/KpiCard';
 import {
   Warehouse,
   MapPin,

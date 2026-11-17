@@ -7,25 +7,19 @@ import {
 import { usePurchaseDashboardLists, DASHBOARD_ROW_LIMIT } from './usePurchaseDashboardLists';
 import { formatCompactCurrency } from '../../utils/currencyUtils';
 import { toISODate } from '../../utils/dateUtils';
+import KpiCard from '../../components/ui/KpiCard';
 
-// ── Helper: compact KPI card ────────────────────────────────────────────────
-function MiniKpi({ icon: Icon, value, label, iconBg, iconColor, border }) {
+// ── Helper: standardized global KPI card ───────────────────────────────────
+function MiniKpi({ icon: Icon, value, label, index, tone, sub }) {
   return (
-    <div
-      className="flex items-center gap-3 rounded-xl border bg-white p-3 shadow-[0_1px_2px_rgba(16,42,82,0.05)] transition-shadow hover:shadow-sm"
-      style={{ borderColor: border || '#e2eaf5' }}
-    >
-      <div
-        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg"
-        style={{ background: iconBg || '#eff6ff' }}
-      >
-        <Icon size={16} style={{ color: iconColor || '#2563eb' }} />
-      </div>
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-[10.5px] font-semibold text-slate-500">{label}</p>
-        <p className="mt-0.5 truncate font-mono text-[13px] font-extrabold text-[#17294e]">{value}</p>
-      </div>
-    </div>
+    <KpiCard
+      icon={Icon}
+      value={value}
+      label={label}
+      index={index}
+      tone={tone}
+      sub={sub}
+    />
   );
 }
 
@@ -343,19 +337,19 @@ export function PurchaseOverviewDashboard({
     <div className="space-y-4">
 
       {/* ── KPI Cards (10 Core Metrics) ────────────────────────────────────── */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-        <MiniKpi icon={ShoppingCart} label="Total PO Value" value={totalPoValue ? fmtCompact(totalPoValue) : '₹0.00'} iconBg="#eff6ff" iconColor="#2563eb" border="#bfdbfe" />
-        <MiniKpi icon={FileText} label="Total Purchase Orders" value={kpis.totalCount.toString()} iconBg="#eff6ff" iconColor="#2563eb" />
-        <MiniKpi icon={Layers} label="Open Purchase Orders" value={kpis.openCount.toString()} iconBg="#eff6ff" iconColor="#2563eb" border="#bfdbfe" />
-        <MiniKpi icon={Clock} label="Draft Purchase Orders" value={kpis.draftCount.toString()} iconBg="#fffbeb" iconColor="#d97706" border="#fde68a" />
-        <MiniKpi icon={CheckCircle2} label="Fully Received Orders" value={kpis.fullyRecdCount.toString()} iconBg="#ecfdf5" iconColor="#059669" border="#a7f3d0" />
+      <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-3 lg:grid-cols-5">
+        <MiniKpi icon={ShoppingCart} label="Total PO Value" value={totalPoValue ? fmtCompact(totalPoValue) : '₹0.00'} index={0} />
+        <MiniKpi icon={FileText} label="Total Purchase Orders" value={kpis.totalCount.toString()} index={1} />
+        <MiniKpi icon={Layers} label="Open Purchase Orders" value={kpis.openCount.toString()} index={2} />
+        <MiniKpi icon={Clock} label="Draft Purchase Orders" value={kpis.draftCount.toString()} index={3} />
+        <MiniKpi icon={CheckCircle2} label="Fully Received Orders" value={kpis.fullyRecdCount.toString()} index={4} />
       </div>
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-        <MiniKpi icon={AlertCircle} label="Partially Received" value={kpis.partialRecdCount.toString()} iconBg="#fff7ed" iconColor="#ea580c" border="#fed7aa" />
-        <MiniKpi icon={RefreshCw} label="Pending Approval" value={kpis.pendingApprovalCount.toString()} iconBg="#fefce8" iconColor="#ca8a04" border="#fde047" />
-        <MiniKpi icon={Package} label="Total Ordered Quantity" value={kpis.totalOrderedQtyStr} iconBg="#eff6ff" iconColor="#2563eb" />
-        <MiniKpi icon={PackageCheck} label="Total Received Quantity" value={kpis.totalReceivedQtyStr} iconBg="#ecfdf5" iconColor="#059669" />
-        <MiniKpi icon={Truck} label="Pending Receipt Quantity" value={kpis.pendingQty > 0 ? kpis.pendingQty.toLocaleString('en-IN') : '0'} iconBg={kpis.pendingQty > 0 ? '#fff7ed' : '#f8fafc'} iconColor={kpis.pendingQty > 0 ? '#ea580c' : '#94a3b8'} border={kpis.pendingQty > 0 ? '#fed7aa' : '#e2eaf5'} />
+      <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-3 lg:grid-cols-5">
+        <MiniKpi icon={AlertCircle} label="Partially Received" value={kpis.partialRecdCount.toString()} index={0} />
+        <MiniKpi icon={RefreshCw} label="Pending Approval" value={kpis.pendingApprovalCount.toString()} index={1} />
+        <MiniKpi icon={Package} label="Total Ordered Quantity" value={kpis.totalOrderedQtyStr} index={2} />
+        <MiniKpi icon={PackageCheck} label="Total Received Quantity" value={kpis.totalReceivedQtyStr} index={3} />
+        <MiniKpi icon={Truck} label="Pending Receipt Quantity" value={kpis.pendingQty > 0 ? kpis.pendingQty.toLocaleString('en-IN') : '0'} index={4} />
       </div>
 
       {/* ── Row 1: Status Overview + Monthly Trend + Fabric Quantity ───────── */}

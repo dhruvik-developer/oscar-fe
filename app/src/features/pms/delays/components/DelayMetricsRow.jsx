@@ -12,37 +12,32 @@ export function DelayMetricsRow({ metrics }) {
   const bottleneck = metrics?.bottleneck;
 
   return (
-    <section className="grid gap-4 grid-cols-2 lg:grid-cols-4" aria-label="Delay summary metrics">
+    <section className="grid gap-3.5 grid-cols-2 lg:grid-cols-4" aria-label="Delay summary metrics">
       <KpiCard
         label="Delayed Projects"
         value={metrics?.delayedProjects ?? 0}
         icon={AlertCircle}
-        tone="rose"
+        index={0}
       />
       <KpiCard
         label="Delayed Stages"
         value={metrics?.delayedStages ?? 0}
         icon={Layers}
-        tone="orange"
+        index={1}
       />
       <KpiCard
         label="Avg Delay"
         value={metrics?.avgDelayLabel ?? '—'}
         icon={Timer}
-        tone="amber"
+        index={2}
       />
       <KpiCard
         label="Bottleneck Dept"
         value={bottleneck?.department ?? '—'}
         icon={Building2}
-        tone="purple"
-      >
-        {bottleneck && (
-          <span className="block text-[10px] text-slate-500 mt-0.5">
-            {bottleneck.count} {bottleneck.count === 1 ? 'stage' : 'stages'} held up
-          </span>
-        )}
-      </KpiCard>
+        index={3}
+        sub={bottleneck ? `${bottleneck.count} ${bottleneck.count === 1 ? 'stage' : 'stages'} held up` : undefined}
+      />
     </section>
   );
 }

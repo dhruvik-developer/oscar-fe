@@ -4,7 +4,7 @@ import { ExternalLink, Printer } from 'lucide-react';
 import Drawer from '../../../components/ui/Drawer';
 import { batchHistoryUrl, printBatchTags } from './printBatchTag';
 
-/** A batch's QR code; scanning it opens the batch's A to Z page. */
+/** A batch's QR code; scanning it opens the batch's public Batch Passport directly without login. */
 export function BatchQrCard({ batch }) {
   const [src, setSrc] = useState('');
   const [error, setError] = useState('');
@@ -32,7 +32,7 @@ export function BatchQrCard({ batch }) {
       {error && <p role="alert" className="text-xs text-rose-700">{error}</p>}
       <div className="flex gap-2">
         <a href={url} target="_blank" rel="noreferrer" className="h-9 px-3 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold inline-flex items-center gap-1.5">
-          <ExternalLink size={13} /> Open
+          <ExternalLink size={13} /> Open Passport
         </a>
         <button type="button" onClick={print} className="h-9 px-3 rounded-lg border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 inline-flex items-center gap-1.5 cursor-pointer">
           <Printer size={13} /> Print Tag
@@ -44,7 +44,7 @@ export function BatchQrCard({ batch }) {
 
 export default function BatchQrModal({ batch, onClose }) {
   return (
-    <Drawer isOpen onClose={onClose} width={400} title={batch.batchCode} subtitle="Scan to see this batch from PO to sale. Sign-in is required.">
+    <Drawer isOpen onClose={onClose} width={400} title={batch.batchCode} subtitle="Public Batch Passport: Scan with any mobile camera to view full traceability. No sign-in required.">
       <BatchQrCard batch={batch} />
     </Drawer>
   );

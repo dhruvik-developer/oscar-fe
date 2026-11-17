@@ -6,6 +6,7 @@ import { DataTable } from "../../../components/hrms/DataTable";
 import { Modal } from "../../../components/hrms/Modal";
 import { Button } from "../../../components/hrms/Button";
 import PageHeader from "../../../components/ui/PageHeader";
+import KpiCard from "../../../components/ui/KpiCard";
 import StatusBadge from "../../../components/ui/StatusBadge";
 import {
   Search,
@@ -310,7 +311,6 @@ export default function Jobs() {
         title="Job Requisitions"
         subtitle={`Manage job requisitions, headcount targets, and staffing statuses. Showing ${filtered.length} of ${jobs.length} jobs.`}
         breadcrumb={[
-          { label: "Dashboard", path: "/dashboard" },
           { label: "HRMS", path: "/hrms" },
           { label: "Recruitment", path: "/hrms/recruitment" },
           { label: "Jobs", path: "/hrms/recruitment/jobs" },
@@ -325,30 +325,34 @@ export default function Jobs() {
 
       {/* KPI Overview Strip */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
-        <div className="bg-card border border-border rounded-2xl p-4 shadow-2xs">
-          <span className="text-[11px] font-bold uppercase tracking-wider text-muted">Total Requisitions</span>
-          <div className="text-2xl font-black text-text mt-1">{jobs.length}</div>
-          <span className="text-[11px] text-muted font-medium">All department records</span>
-        </div>
-        <div className="bg-card border border-border rounded-2xl p-4 shadow-2xs">
-          <span className="text-[11px] font-bold uppercase tracking-wider text-muted">Active Openings</span>
-          <div className="text-2xl font-black text-blue-600 mt-1">
-            {jobs.filter((j) => j.status === "Open" || j.status === "Active").length}
-          </div>
-          <span className="text-[11px] text-muted font-medium">{totalOpeningsCount} target headcount</span>
-        </div>
-        <div className="bg-card border border-border rounded-2xl p-4 shadow-2xs">
-          <span className="text-[11px] font-bold uppercase tracking-wider text-muted">Total Applicants</span>
-          <div className="text-2xl font-black text-emerald-600 mt-1">{totalApplicantsCount}</div>
-          <span className="text-[11px] text-muted font-medium">Across all open roles</span>
-        </div>
-        <div className="bg-card border border-border rounded-2xl p-4 shadow-2xs">
-          <span className="text-[11px] font-bold uppercase tracking-wider text-muted">Draft Requisitions</span>
-          <div className="text-2xl font-black text-slate-500 mt-1">
-            {jobs.filter((j) => j.status === "Draft").length}
-          </div>
-          <span className="text-[11px] text-muted font-medium">Pending approval</span>
-        </div>
+        <KpiCard
+          index={0}
+          label="Total Requisitions"
+          value={jobs.length}
+          sub="All department records"
+          icon={Briefcase}
+        />
+        <KpiCard
+          index={1}
+          label="Active Openings"
+          value={jobs.filter((j) => j.status === "Open" || j.status === "Active").length}
+          sub={`${totalOpeningsCount} target headcount`}
+          icon={Users}
+        />
+        <KpiCard
+          index={2}
+          label="Total Applicants"
+          value={totalApplicantsCount}
+          sub="Across all open roles"
+          icon={Users}
+        />
+        <KpiCard
+          index={3}
+          label="Draft Requisitions"
+          value={jobs.filter((j) => j.status === "Draft").length}
+          sub="Pending approval"
+          icon={FileText}
+        />
       </div>
 
       {/* Modern FilterBar */}

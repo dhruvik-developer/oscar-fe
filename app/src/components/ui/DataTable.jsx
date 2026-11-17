@@ -214,11 +214,11 @@ export function DataTable({
         return col.render(row, row);
       } catch (err) {
         console.warn('Error in DataTable renderCell:', err);
-        return val != null ? String(val) : '"”';
+        return val != null ? String(val) : '-';
       }
     }
 
-    return val != null ? String(val) : '"”';
+    return val != null ? String(val) : '-';
   }
 
   return (

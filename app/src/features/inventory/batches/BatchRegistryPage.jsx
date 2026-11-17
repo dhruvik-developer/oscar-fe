@@ -7,6 +7,7 @@ import {
   AlertCircle, Droplets, ChevronRight, Package, FileText, Ban, Receipt, Check, RefreshCw,
 } from 'lucide-react';
 import PageHeader from '../../../components/ui/PageHeader';
+import KpiCard from '../../../components/ui/KpiCard';
 import AppPagination from '../../../components/ui/AppPagination';
 import { inventoryService } from '../../../services/domainServices';
 import { formatINR, formatNumberIN, describeApiError } from '../../accounts/accountingShared';
@@ -634,7 +635,6 @@ export default function BatchRegistryPage() {
           ? `Central hub for managing goods receipts, batch tracking, quality control inspections, and dispatches for ${selectedPoGroup.poNumber}.`
           : "Every grey and dyed fabric batch — its ID, QR tag, where its metres are now and its status. Click a batch for its QR code."}
         breadcrumb={selectedPoGroup ? [
-          { label: 'Dashboard', path: '/dashboard' },
           { label: 'Inventory', path: '/inventory/dashboard' },
           { label: 'Batch Registry', path: '/inventory/batches' },
           { label: selectedPoGroup.poNumber },
@@ -742,32 +742,41 @@ export default function BatchRegistryPage() {
         />
       )}
 
-      {/* Eligible-batch stock summary from the registry API */}
+      {/* Eligible-batch stock summary from the registry API (Standard OSCAR ERP Pastel Cards) */}
       {!selectedPoGroup && s && (
-        <section className="grid grid-cols-2 xl:grid-cols-4 gap-3" aria-label="Batch registry summary">
-          {[
-            ['QC-Passed Batches', data.batchCount, 'QC passed and posted', Boxes, 'text-blue-700', 'bg-blue-50'],
-            ['Available Stock', s.available, 'Ready to use', CheckCircle2, 'text-emerald-700', 'bg-emerald-50'],
-            ['Reserved Stock', s.reserved, 'Held for orders', Bookmark, 'text-indigo-700', 'bg-indigo-50'],
-            ['At Job Worker', s.withJobWorker, 'Currently with job worker', Truck, 'text-slate-700', 'bg-slate-100'],
-          ].map(([label, value, subtitle, Icon, tone, tint]) => {
-            const isBatchCount = label === 'QC-Passed Batches';
-            const numericValue = Number(value || 0);
-            return (
-              <article key={label} className="rounded-xl border border-slate-200 bg-slate-50/80 px-3.5 py-3 shadow-2xs">
-                <div className="flex items-center gap-2.5">
-                  <span className={`grid place-items-center w-8 h-8 rounded-lg ${tint}`}><Icon size={16} /></span>
-                  <div className="min-w-0">
-                    <h2 className="text-[11px] font-semibold uppercase tracking-wide text-slate-600">{label}</h2>
-                    <div className={`mt-0.5 text-lg leading-5 font-bold tabular-nums ${tone}`}>
-                      {formatNumberIN(numericValue)}{!isBatchCount && <span className="ml-1 text-[11px] font-medium text-slate-500">m</span>}
-                    </div>
-                    <p className="mt-0.5 text-[10px] text-slate-500">{subtitle}</p>
-                  </div>
-                </div>
-              </article>
-            );
-          })}
+        <section className="grid grid-cols-2 xl:grid-cols-4 gap-3.5" aria-label="Batch registry summary">
+          <KpiCard
+            label="QC-Passed Batches"
+            value={data.batchCount}
+            sub="QC passed and posted"
+            icon={Boxes}
+            tone="blue"
+            index={0}
+          />
+          <KpiCard
+            label="Available Stock"
+            value={`${formatNumberIN(Number(s.available || 0))} m`}
+            sub="Ready to use"
+            icon={CheckCircle2}
+            tone="green"
+            index={1}
+          />
+          <KpiCard
+            label="Reserved Stock"
+            value={`${formatNumberIN(Number(s.reserved || 0))} m`}
+            sub="Held for orders"
+            icon={Bookmark}
+            tone="purple"
+            index={2}
+          />
+          <KpiCard
+            label="At Job Worker"
+            value={`${formatNumberIN(Number(s.withJobWorker || 0))} m`}
+            sub="Currently with job worker"
+            icon={Truck}
+            tone="orange"
+            index={3}
+          />
         </section>
       )}
 

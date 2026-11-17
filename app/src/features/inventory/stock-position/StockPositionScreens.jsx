@@ -17,8 +17,20 @@ import BatchDrawer from './BatchDrawer';
 
 /** `?type=` values the sidebar already links to -> screen keys. */
 const TYPE_TO_SCREEN = {
-  good: 'usable', sample: 'samples', shortage: 'scrap', reprocess: 'reprocessing', 'customer-return': 'customer-returns', '': 'usable', wastage: 'scrap',
-
+  good: 'usable',
+  finished: 'usable',
+  usable: 'usable',
+  sample: 'samples',
+  samples: 'samples',
+  shortage: 'scrap',
+  scrap: 'scrap',
+  rejected: 'scrap',
+  wastage: 'scrap',
+  reprocess: 'reprocessing',
+  reprocessing: 'reprocessing',
+  'customer-return': 'customer-returns',
+  'customer-returns': 'customer-returns',
+  '': 'usable',
 };
 const SCREEN_TO_TYPE = Object.fromEntries(Object.entries(TYPE_TO_SCREEN).map(([k, v]) => [v, k]));
 
@@ -224,6 +236,19 @@ function StockTable({ columns, rows, rowKey, loading, emptyTitle, emptyText, onO
 export default function StockPositionScreens() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+
+  // Route grey, qc-hold, and external-wip to their respective dedicated pages
+  useEffect(() => {
+    const rawType = (searchParams.get('type') || '').toLowerCase();
+    if (rawType === 'grey') {
+      navigate('/inventory/grey', { replace: true });
+    } else if (rawType === 'qc-hold' || rawType === 'qchold' || rawType === 'hold') {
+      navigate('/inventory/qc/dashboard?tab=On+Hold', { replace: true });
+    } else if (rawType === 'wip' || rawType === 'external-wip') {
+      navigate('/job-work/pending-register', { replace: true });
+    }
+  }, [searchParams, navigate]);
+
   const screen = TYPE_TO_SCREEN[searchParams.get('type') || ''] || 'overview';
   const config = SCREENS[screen];
   const { items = [], locations = [] } = useERP() || {};

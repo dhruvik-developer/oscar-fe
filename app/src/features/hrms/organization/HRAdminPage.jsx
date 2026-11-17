@@ -3,6 +3,7 @@ import { useState, useRef, useEffect, useMemo } from "react";
 import { hrmsSync, isBackendEnabled, isServerId, pullHrmsSettings, pushHrmsSettings } from '../../../services/hrmsSync';
 import { Link, useSearchParams } from "react-router-dom";
 import MasterSourceLink from "../../../components/common/MasterSourceLink";
+import KpiCard from "../../../components/ui/KpiCard";
 import {
   ShieldCheck,
   Users,
@@ -1204,39 +1205,22 @@ export default function HRAdminPage({ defaultTab }) {
       {/* ── TOP BUTTONS: Interactive 9 KPI Buttons ── */}
       {/* Clicking any button immediately switches the view */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3">
-        {TOP_KPI_BUTTONS.map((btn) => {
+        {TOP_KPI_BUTTONS.map((btn, idx) => {
           const isActive = activeTab === btn.id;
-          const Icon = btn.icon;
           return (
-            <button
+            <KpiCard
               key={btn.id}
-              type="button"
+              label={btn.label}
+              value={btn.count}
+              sub={btn.subtext}
+              icon={btn.icon}
+              index={idx}
               onClick={() => {
                 setActiveTab(btn.id);
                 setSearch("");
               }}
-              title={`Switch to ${btn.label} view`}
-              className={`text-left p-3.5 rounded-xl border transition-all cursor-pointer relative overflow-hidden group ${
-                isActive
-                  ? "bg-white border-navy ring-2 ring-navy/20 shadow-xs"
-                  : "bg-white border-bdr hover:border-slate-300 hover:shadow-xs hover:-translate-y-0.5"
-              }`}
-            >
-              {isActive && <span className="absolute top-0 left-0 right-0 h-1 bg-navy" />}
-              <div className="text-[11.5px] text-muted flex items-center justify-between font-medium">
-                <span className={isActive ? "font-bold text-slate-900" : ""}>{btn.label}</span>
-                <Icon size={15} className={btn.iconColor} />
-              </div>
-              <div className={`text-[20px] font-bold mt-1 ${isActive ? "text-navy" : "text-slate-900"}`}>
-                {btn.count}
-              </div>
-              <div className="text-[10.5px] text-muted flex items-center justify-between mt-0.5">
-                <span>{btn.subtext}</span>
-                {isActive && (
-                  <span className="w-1.5 h-1.5 rounded-full bg-navy animate-pulse" title="Active View" />
-                )}
-              </div>
-            </button>
+              className={isActive ? "ring-2 ring-blue-600 shadow-md font-bold" : "hover:-translate-y-0.5"}
+            />
           );
         })}
       </div>
@@ -2362,49 +2346,35 @@ export default function HRAdminPage({ defaultTab }) {
           </div>
 
           {/* Quick Metrics Bar (4 Metrics) */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            <div className="bg-white border border-bdr rounded-xl p-3.5 shadow-xs flex items-center justify-between">
-              <div>
-                <div className="text-[11.5px] font-medium text-muted">Configured Departments</div>
-                <div className="text-[20px] font-bold text-slate-900 mt-0.5">{departmentsConfig.length} Departments</div>
-              </div>
-              <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center border border-blue-200">
-                <Building2 size={18} />
-              </div>
-            </div>
-
-            <div className="bg-white border border-bdr rounded-xl p-3.5 shadow-xs flex items-center justify-between">
-              <div>
-                <div className="text-[11.5px] font-medium text-muted">Standard Working Days</div>
-                <div className="text-[20px] font-bold text-slate-900 mt-0.5">24 Days / Month</div>
-              </div>
-              <div className="w-9 h-9 rounded-xl bg-purple-50 text-purple-700 flex items-center justify-center border border-purple-200">
-                <Calendar size={18} />
-              </div>
-            </div>
-
-            <div className="bg-white border border-bdr rounded-xl p-3.5 shadow-xs flex items-center justify-between">
-              <div>
-                <div className="text-[11.5px] font-medium text-muted">Standard Daily Hours</div>
-                <div className="text-[20px] font-bold text-slate-900 mt-0.5">8.0 Hours / Day</div>
-              </div>
-              <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center border border-amber-200">
-                <Clock size={18} />
-              </div>
-            </div>
-
-            <div className="bg-white border border-bdr rounded-xl p-3.5 shadow-xs flex items-center justify-between">
-              <div>
-                <div className="text-[11.5px] font-medium text-muted">Payroll Attendance Sync</div>
-                <div className="text-[13px] font-bold text-emerald-700 flex items-center gap-1.5 mt-1">
-                  <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse" />
-                  Live Reactive Calculations
-                </div>
-              </div>
-              <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center border border-emerald-200">
-                <CheckCircle2 size={18} />
-              </div>
-            </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+            <KpiCard
+              label="Configured Departments"
+              value={`${departmentsConfig.length} Depts`}
+              sub="Across active branches"
+              icon={Building2}
+              color="blue"
+            />
+            <KpiCard
+              label="Standard Working Days"
+              value="24 Days / Month"
+              sub="Standard company month"
+              icon={Calendar}
+              color="purple"
+            />
+            <KpiCard
+              label="Standard Daily Hours"
+              value="8.0 Hours / Day"
+              sub="Standard shift duration"
+              icon={Clock}
+              color="orange"
+            />
+            <KpiCard
+              label="Payroll Attendance Sync"
+              value="Live Sync"
+              sub="● Live Reactive Calculations"
+              icon={CheckCircle2}
+              color="green"
+            />
           </div>
 
           {/* Department Working Days & Hours Table */}

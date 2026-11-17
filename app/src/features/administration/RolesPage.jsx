@@ -635,29 +635,29 @@ export function RolesPage() {
         text="Group permissions into roles to control which modules and actions users can access. Select a role to review its permissions and keep access consistent for people with similar responsibilities."
       />
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <KpiCard label="Total Roles" value={stats.totalRoles} icon={Users} tone="blue">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+        <KpiCard index={0} label="Total Roles" value={stats.totalRoles} icon={Users} tone="blue">
             <div className="text-[11px] font-semibold text-emerald-600 mt-1 flex items-center gap-1">
               <span>↑ 12%</span>
               <span className="text-slate-400 font-normal">vs last month</span>
             </div>
         </KpiCard>
 
-        <KpiCard label="Total Users" value={stats.totalUsers} icon={Users} tone="emerald">
+        <KpiCard index={1} label="Total Users" value={stats.totalUsers} icon={Users} tone="emerald">
             <div className="text-[11px] font-semibold text-emerald-600 mt-1 flex items-center gap-1">
               <span>↑ 5%</span>
               <span className="text-slate-400 font-normal">vs last month</span>
             </div>
         </KpiCard>
 
-        <KpiCard label="Total Permissions" value={stats.totalPermissions} icon={Shield} tone="sky">
+        <KpiCard index={2} label="Total Permissions" value={stats.totalPermissions} icon={Shield} tone="sky">
             <div className="text-[11px] font-semibold text-emerald-600 mt-1 flex items-center gap-1">
               <span>↑ 8%</span>
               <span className="text-slate-400 font-normal">vs last month</span>
             </div>
         </KpiCard>
 
-        <KpiCard label="Active Modules" value={stats.activeModules} icon={Clock} tone="purple">
+        <KpiCard index={3} label="Active Modules" value={stats.activeModules} icon={Clock} tone="purple">
             <div className="text-[11px] font-semibold text-slate-700 mt-1 flex items-center gap-1">
               <span className="text-slate-900 font-bold">100%</span>
               <span className="text-slate-400 font-normal">System Coverage</span>

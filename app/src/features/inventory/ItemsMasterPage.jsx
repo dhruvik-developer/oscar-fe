@@ -4,6 +4,7 @@ import { useERP } from '../../context/ERPContext';
 import { StatusBadge } from '../../components/ui/StatusBadge';
 import { Button } from '../../components/ui/Button';
 import AppPagination from '../../components/ui/AppPagination';
+import KpiCard from '../../components/ui/KpiCard';
 import {
   Plus, MapPin, AlertTriangle, Layers, Tag, Zap, CheckCircle2, Upload,
   DollarSign, Package, Cpu, QrCode, Shirt, Palette, ShoppingCart, Trash2,
@@ -504,7 +505,7 @@ export const ItemsMasterPage = () => {
     }
   };
 
-  // â”€â”€ Purchase Order Creation Integration â”€â”€
+  // ──── Purchase Order Creation Integration ────
   // 1. Open PO modal for a single item row
   const handleOpenPoForSingleItem = (item) => {
     const avail = Number(item.availableQty ?? item.stock ?? 0);
@@ -599,7 +600,7 @@ export const ItemsMasterPage = () => {
 
   return (
     <div className="space-y-5 pb-12">
-      {/* â”€â”€ Top Header / Breadcrumb â”€â”€ */}
+      {/* ──── Top Header / Breadcrumb ──── */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           {/* Breadcrumb matching image */}
@@ -658,79 +659,38 @@ export const ItemsMasterPage = () => {
         </div>
       </div>
 
-      {/* â”€â”€ KPI Stat Cards & Shortage Alert Banner (Matching Attached Reference Image) â”€â”€ */}
+      {/* ──── KPI Stat Cards & Shortage Alert Banner (Matching Attached Reference Image) ──── */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 items-stretch">
         {/* 4 Stat Cards */}
-        <div className="lg:col-span-8 grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {/* Card 1: Total Grey Fabric Stock */}
-          <div className="bg-white border border-slate-200/80 rounded-xl p-3.5 shadow-2xs flex flex-col justify-between hover:border-blue-300 transition-colors">
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
-                <Shirt size={16} />
-              </div>
-              <span className="text-[11px] font-semibold text-slate-500 leading-tight">Total Grey Fabric Stock</span>
-            </div>
-            <div className="mt-2.5">
-              <span className="text-xl font-black text-slate-900 tracking-tight">
-                {formatQtyNumber(combinedStockData.availableGrey)} m
-              </span>
-              <span className="text-[11px] text-slate-400 block mt-0.5">Available for processing</span>
-            </div>
-          </div>
-
-          {/* Card 2: Minimum Stock Level */}
-          <div className="bg-white border border-slate-200/80 rounded-xl p-3.5 shadow-2xs flex flex-col justify-between hover:border-amber-300 transition-colors">
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
-                <Clock size={16} />
-              </div>
-              <span className="text-[11px] font-semibold text-slate-500 leading-tight">Minimum Stock Level</span>
-            </div>
-            <div className="mt-2.5">
-              <span className="text-xl font-black text-slate-900 tracking-tight">
-                {combinedStockData.isConfigured ? `${formatQtyNumber(combinedStockData.threshold)} m` : 'Not Set'}
-              </span>
-              <span className="text-[11px] text-slate-400 block mt-0.5">Configured for grey fabric</span>
-            </div>
-          </div>
-
-          {/* Card 3: Shortage */}
-          <div className="bg-white border border-slate-200/80 rounded-xl p-3.5 shadow-2xs flex flex-col justify-between hover:border-rose-300 transition-colors">
-            <div className="flex items-center gap-2.5">
-              <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
-                combinedStockData.shortage > 0 ? 'bg-rose-50 text-rose-600' : 'bg-emerald-50 text-emerald-600'
-              }`}>
-                <AlertTriangle size={16} />
-              </div>
-              <span className="text-[11px] font-semibold text-slate-500 leading-tight">Shortage</span>
-            </div>
-            <div className="mt-2.5">
-              <span className={`text-xl font-black tracking-tight ${
-                combinedStockData.shortage > 0 ? 'text-rose-600' : 'text-emerald-700'
-              }`}>
-                {formatQtyNumber(combinedStockData.shortage)} m
-              </span>
-              <span className="text-[11px] text-slate-400 block mt-0.5">
-                {combinedStockData.shortage > 0 ? 'Below minimum level' : 'Sufficient safety buffer'}
-              </span>
-            </div>
-          </div>
-
-          {/* Card 4: Total Fabric Types */}
-          <div className="bg-white border border-slate-200/80 rounded-xl p-3.5 shadow-2xs flex flex-col justify-between hover:border-indigo-300 transition-colors">
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
-                <Layers size={16} />
-              </div>
-              <span className="text-[11px] font-semibold text-slate-500 leading-tight">Total Fabric Types</span>
-            </div>
-            <div className="mt-2.5">
-              <span className="text-xl font-black text-slate-900 tracking-tight">
-                {combinedStockData.qualitiesCount || uniqueQualities.length || 12}
-              </span>
-              <span className="text-[11px] text-slate-400 block mt-0.5">Grey fabric qualities</span>
-            </div>
-          </div>
+        <div className="lg:col-span-8 grid grid-cols-2 sm:grid-cols-4 gap-3.5">
+          <KpiCard
+            index={0}
+            label="Total Grey Fabric Stock"
+            value={`${formatQtyNumber(combinedStockData.availableGrey)} m`}
+            icon={Shirt}
+            sub="Available for processing"
+          />
+          <KpiCard
+            index={1}
+            label="Minimum Stock Level"
+            value={combinedStockData.isConfigured ? `${formatQtyNumber(combinedStockData.threshold)} m` : 'Not Set'}
+            icon={Clock}
+            sub="Configured for grey fabric"
+          />
+          <KpiCard
+            index={2}
+            label="Shortage"
+            value={`${formatQtyNumber(combinedStockData.shortage)} m`}
+            icon={AlertTriangle}
+            sub={combinedStockData.shortage > 0 ? 'Below minimum level' : 'Sufficient safety buffer'}
+          />
+          <KpiCard
+            index={3}
+            label="Total Fabric Types"
+            value={combinedStockData.qualitiesCount || uniqueQualities.length || 12}
+            icon={Layers}
+            sub="Grey fabric qualities"
+          />
         </div>
 
         {/* Right Alert Banner Card (Red Box from Image) */}
@@ -827,7 +787,7 @@ export const ItemsMasterPage = () => {
         </div>
       </div>
 
-      {/* â”€â”€ Filter Controls Row (Matching Attached Reference Image) â”€â”€ */}
+      {/* ──── Filter Controls Row (Matching Attached Reference Image) ──── */}
       <div className="bg-white p-3.5 rounded-xl border border-slate-200/80 shadow-2xs">
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
           {/* 1. Fabric Quality */}
@@ -929,7 +889,7 @@ export const ItemsMasterPage = () => {
         </div>
       </div>
 
-      {/* â”€â”€ Fabric Inventory Table (Exact Columns & Design from Reference Image) â”€â”€ */}
+      {/* ──── Fabric Inventory Table (Exact Columns & Design from Reference Image) ──── */}
       <div className="bg-white border border-slate-200/80 rounded-2xl shadow-xs overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse text-xs">
@@ -1142,7 +1102,7 @@ export const ItemsMasterPage = () => {
           </table>
         </div>
 
-        {/* â”€â”€ Table Footer & Pagination (Matching Reference Image) â”€â”€ */}
+        {/* ──── Table Footer & Pagination (Matching Reference Image) ──── */}
         <AppPagination
           total={filteredItems.length}
           page={currentPage}
@@ -1153,7 +1113,7 @@ export const ItemsMasterPage = () => {
         />
       </div>
 
-      {/* â”€â”€ Table Row Action Menu Portal â”€â”€ */}
+      {/* ──── Table Row Action Menu Portal ──── */}
       {menuAnchor && createPortal(
         <div
           className="item-row-action-menu fixed z-[9999] w-44 bg-white border border-slate-200 rounded-xl shadow-xl py-1 text-xs animate-in fade-in zoom-in-95 duration-100"
@@ -1210,7 +1170,7 @@ export const ItemsMasterPage = () => {
         document.body
       )}
 
-      {/* â”€â”€ Floating Bulk Action Bar when checkboxes are selected â”€â”€ */}
+      {/* ──── Floating Bulk Action Bar when checkboxes are selected ──── */}
       {selectedIds.size > 0 && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-slate-900 text-white px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-3.5 border border-slate-700 animate-in fade-in slide-in-from-bottom-4 duration-200">
           <div className="flex items-center gap-2 pr-2 border-r border-slate-700">
@@ -1259,7 +1219,7 @@ export const ItemsMasterPage = () => {
         </div>
       )}
 
-      {/* â”€â”€ Purchase Order Creation Modal (Direct from Total Inventory) â”€â”€ */}
+      {/* ──── Purchase Order Creation Modal (Direct from Total Inventory) ──── */}
       {poModalConfig && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in duration-150">
           <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-2xl w-full p-5 sm:p-6 space-y-4 max-h-[90vh] overflow-y-auto">
@@ -1453,7 +1413,7 @@ export const ItemsMasterPage = () => {
         </div>
       )}
 
-      {/* â”€â”€ Minimum Threshold Settings Modal â”€â”€ */}
+      {/* ──── Minimum Threshold Settings Modal ──── */}
       {showThresholdModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in duration-150">
           <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-md w-full p-5 space-y-4">
@@ -1531,7 +1491,7 @@ export const ItemsMasterPage = () => {
         </div>
       )}
 
-      {/* â”€â”€ Shortage Details Modal â”€â”€ */}
+      {/* ──── Shortage Details Modal ──── */}
       {showShortageModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in duration-150">
           <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-lg w-full p-5 space-y-4">
@@ -1629,7 +1589,7 @@ export const ItemsMasterPage = () => {
         </div>
       )}
 
-      {/* â”€â”€ Page Guide Modal â”€â”€ */}
+      {/* ──── Page Guide Modal ──── */}
       {showGuideModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in duration-150">
           <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-lg w-full p-5 space-y-4">
@@ -1676,7 +1636,7 @@ export const ItemsMasterPage = () => {
         </div>
       )}
 
-      {/* â”€â”€ Delete Confirmation Modal â”€â”€ */}
+      {/* ──── Delete Confirmation Modal ──── */}
       {deleteModalConfig.isOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in duration-150">
           <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-md w-full p-6 space-y-4">

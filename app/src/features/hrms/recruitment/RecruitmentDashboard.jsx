@@ -3,6 +3,7 @@ import { useAppStore } from "../../../stores/appStore";
 import { useNavigate } from "react-router-dom";
 import { CandidatePipeline } from "../../../components/hrms/CandidatePipeline";
 import PageHeader from "../../../components/ui/PageHeader";
+import KpiCard from "../../../components/ui/KpiCard";
 import {
   Users,
   Briefcase,
@@ -122,7 +123,6 @@ export default function RecruitmentDashboard() {
         title="Recruitment Operations"
         subtitle="Manage candidate pipeline, conduct interviews, formulate offers, and oversee onboarding handoffs."
         breadcrumb={[
-          { label: "Dashboard", path: "/dashboard" },
           { label: "HRMS", path: "/hrms" },
           { label: "Recruitment", path: "/hrms/recruitment" },
         ]}
@@ -151,31 +151,16 @@ export default function RecruitmentDashboard() {
 
       {/* KPI Metric Cards */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3.5">
-        {kpis.map((k) => (
-          <button
+        {kpis.map((k, idx) => (
+          <KpiCard
             key={k.label}
-            type="button"
             onClick={() => navigate(k.to)}
-            className="bg-card border border-border rounded-2xl p-4 shadow-2xs hover:shadow-xs hover:border-primary/40 transition-all text-left group cursor-pointer flex flex-col justify-between"
-          >
-            <div className="flex justify-between items-start">
-              <span className="text-[11px] font-bold tracking-wider uppercase text-muted">
-                {k.label}
-              </span>
-              <div
-                className={`w-9 h-9 rounded-xl ${k.badgeBg} ${k.badgeFg} border ${k.borderCol} flex items-center justify-center transition-transform group-hover:scale-105`}
-              >
-                <k.icon size={16} strokeWidth={2.2} />
-              </div>
-            </div>
-            <div className="mt-3">
-              <div className="text-2xl font-black text-text tracking-tight">{k.value}</div>
-              <div className="flex items-center gap-1 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 mt-1">
-                <TrendingUp size={12} />
-                <span>{k.sub}</span>
-              </div>
-            </div>
-          </button>
+            label={k.label}
+            value={k.value}
+            sub={k.sub}
+            icon={k.icon}
+            index={idx}
+          />
         ))}
       </div>
 

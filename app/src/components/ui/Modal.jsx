@@ -85,8 +85,9 @@ export function Modal({
       const minH = 240;
       const maxH = window.innerHeight - 32;
 
-      const newWidth = Math.min(Math.max(minW, startWidth + deltaX), maxW);
-      const newHeight = Math.min(Math.max(minH, startHeight + deltaY), maxH);
+      // Because modal is centered in viewport, expand symmetrically so corner tracks mouse 1:1
+      const newWidth = Math.min(Math.max(minW, startWidth + deltaX * 2), maxW);
+      const newHeight = Math.min(Math.max(minH, startHeight + deltaY * 2), maxH);
 
       setCustomSize({
         width: `${Math.round(newWidth)}px`,
@@ -212,7 +213,7 @@ export function Modal({
             role="button"
             tabIndex={-1}
             aria-label="Resize modal"
-            title="Drag to resize modal (double-click to reset)"
+            title="Drag corner arrow to resize popup (double-click to reset size)"
             onPointerDown={handleResizeStart}
             onMouseDown={handleResizeStart}
             onTouchStart={handleResizeStart}
@@ -220,15 +221,19 @@ export function Modal({
             className="modal-resize-handle"
           >
             <svg
-              width="12"
-              height="12"
-              viewBox="0 0 12 12"
+              width="14"
+              height="14"
+              viewBox="0 0 16 16"
               fill="none"
               stroke="currentColor"
-              strokeWidth="1.5"
+              strokeWidth="2"
               strokeLinecap="round"
+              strokeLinejoin="round"
+              className="pointer-events-none"
             >
-              <path d="M11 4L4 11M11 7L7 11M11 10L10 11" />
+              <path d="M14 9v5h-5" />
+              <path d="M2 7V2h5" />
+              <line x1="2.5" y1="2.5" x2="13.5" y2="13.5" />
             </svg>
           </div>
         )}

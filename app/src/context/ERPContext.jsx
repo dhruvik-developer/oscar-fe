@@ -340,6 +340,7 @@ export const ERPProvider = ({ children, }) => {
         return () => {
             cancelled = true;
             if (flushHandleRef.current) clearTimeout(flushHandleRef.current);
+            queuedKeysRef.current.clear();
             window.removeEventListener('evenmore:authorized', onSession);
             window.removeEventListener('storage', onSession);
         };
@@ -778,16 +779,21 @@ export const ERPProvider = ({ children, }) => {
         const inv = invoices.find((i) => i?.id === invoiceIdOrNum || (i?.invoiceNumber && String(i.invoiceNumber ?? '').toLowerCase() === query));
         if (!inv)
             return { total: 0, paid: 0, balanceDue: 0, status: 'Unpaid' };
+        
+        const serverBalanceDue = (inv.balanceDue !== undefined && inv.balanceDue !== null) ? Number(inv.balanceDue) : null;
+        const discount = Number(inv.settlementDiscount || inv.settlement_discount || 0);
+
         // Sum all payments received for this invoice
         const relatedPayments = paymentIns.filter((p) => p.invoiceId === inv.id || (p.invoiceNumber && inv.invoiceNumber && String(p.invoiceNumber ?? '').toLowerCase() === String(inv.invoiceNumber ?? '').toLowerCase()));
-        const paid = relatedPayments.reduce((acc, p) => acc + (p.amount || 0), 0) + (inv.paidAmount && relatedPayments.length === 0 ? inv.paidAmount : 0);
-        const total = inv.total || 0;
-        const balanceDue = Math.max(0, total - paid);
+        const paid = relatedPayments.reduce((acc, p) => acc + (p.amount || 0), 0) + (inv.paidAmount && relatedPayments.length === 0 ? Number(inv.paidAmount) : (inv.amountPaid && relatedPayments.length === 0 ? Number(inv.amountPaid) : 0));
+        const total = Number(inv.total || 0);
+        const computedBalance = Math.max(0, Math.round((total - paid - discount) * 100) / 100);
+        const balanceDue = serverBalanceDue !== null ? serverBalanceDue : computedBalance;
         let status = 'Unpaid';
         if (balanceDue <= 0.01) {
             status = 'Paid';
         }
-        else if (paid > 0) {
+        else if (paid > 0 || discount > 0) {
             status = 'Partially Paid';
         }
         else {
@@ -3172,10 +3178,8 @@ export const ERPProvider = ({ children, }) => {
                     return null;
                 }
                 const remainingBal = targetInv.balanceDue !== undefined ? targetInv.balanceDue : Math.max(0, targetInv.total - (targetInv.paidAmount || 0));
-                if (payAmt > remainingBal + 0.01) {
-                    showToast(`Payment amount (${formatCurrency(payAmt)}) exceeds remaining invoice balance (${formatCurrency(remainingBal)}).`);
-                    return null;
-                }
+                // Allow overpayment -- excess money will be retained as customer advance on their account
+                const allocAmt = Math.min(payAmt, remainingBal);
             }
         }
 
@@ -3183,6 +3187,7 @@ export const ERPProvider = ({ children, }) => {
             customers.find(c => String(c.name || '').toLowerCase() === String(pay.customer || targetInv?.customer || '').toLowerCase())?.id ||
             parties.find(p => String(p.name || '').toLowerCase() === String(pay.customer || targetInv?.customer || '').toLowerCase())?.id;
 
+        const allocAmtToInv = targetInv ? Math.min(payAmt, targetInv.balanceDue !== undefined ? targetInv.balanceDue : Math.max(0, targetInv.total - (targetInv.paidAmount || 0))) : 0;
         const newPay = {
             id: pay.id || `pay-${Date.now()}`,
             receiptNumber: pay.receiptNumber || '', // allocated by the server
@@ -3193,6 +3198,9 @@ export const ERPProvider = ({ children, }) => {
             date: pay.date || getCurrentDateFormatted(),
             mode: pay.mode || 'Bank Wire Direct',
             amount: payAmt,
+            allocatedAmount: targetInv ? allocAmtToInv : 0,
+            unallocatedAmount: Math.max(0, Math.round((payAmt - (targetInv ? allocAmtToInv : 0)) * 100) / 100),
+            allocations: targetInv && allocAmtToInv > 0 ? [{ invoiceId: targetInv.id, amount: allocAmtToInv }] : [],
             reference: pay.reference || `WIRE-${Date.now().toString().slice(-6)}`,
             referenceNumber: pay.reference || `WIRE-${Date.now().toString().slice(-6)}`,
             status: 'Paid',
@@ -3228,7 +3236,9 @@ export const ERPProvider = ({ children, }) => {
                 setInvoices((prev) => prev.map((inv) => {
                     if (inv.invoiceNumber === newPay.invoiceNumber || (newPay.invoiceId && inv.id === newPay.invoiceId)) {
                         const currentPaid = Number(inv.amountPaid ?? inv.paidAmount ?? 0);
-                        const updatedPaid = currentPaid + payAmt;
+                        const remainingBal = inv.balanceDue !== undefined ? inv.balanceDue : Math.max(0, (inv.total || 0) - currentPaid);
+                        const appliedAmt = Math.min(payAmt, remainingBal);
+                        const updatedPaid = currentPaid + appliedAmt;
                         const totalInvoice = Number(inv.total ?? inv.amount ?? 0);
                         const isFull = updatedPaid >= (totalInvoice - 0.01);
                         const derivedStatus = updatedPaid <= 0 ? (inv.status === 'Draft' ? 'Draft' : 'Unpaid') : isFull ? 'Paid' : 'Partially Paid';
@@ -4158,6 +4168,36 @@ export const ERPProvider = ({ children, }) => {
             .reduce((s, p) => s + (Number(p.unallocatedAmount) || 0), 0);
         return Math.max(0, Math.round(open * 100) / 100);
     };
+    // Customer advance balance = unallocated sum of active incoming receipts for this customer
+    const getCustomerAdvanceBalance = (customerId) => {
+        if (!customerId) return 0;
+        const open = paymentIns
+            .filter((p) => (p.customerId === customerId || p.partyId === customerId) && p.status !== 'Cancelled')
+            .reduce((s, p) => s + (Number(p.unallocatedAmount ?? p.unallocated_amount) || 0), 0);
+        return Math.max(0, Math.round(open * 100) / 100);
+    };
+
+    // Apply customer advance to a sales invoice — server action, adjusts advance liability to receivable
+    const applyCustomerAdvanceToInvoice = async (invoiceId, amount) => {
+        const invoice = invoices.find((inv) => inv.id === invoiceId);
+        if (!invoice) throw rejectCreate('Invoice not found.');
+        const applyAmt = Number(amount);
+        if (!(applyAmt > 0)) throw rejectCreate('Enter an amount to apply.');
+        if (!isBackendEnabled() || !isServerId(invoice.id)) throw rejectCreate('Advance not applied — this invoice is not saved on the server.');
+        let saved;
+        try {
+            const body = await api.post(`${RESOURCES.invoices.path}${invoice.id}/apply-advance/`, { amount: applyAmt });
+            saved = RESOURCES.invoices.fromApi ? RESOURCES.invoices.fromApi(body) : body;
+        } catch (err) {
+            console.warn('[ERP] apply-advance failed:', err);
+            throw rejectCreate(`Advance not applied — ${describeError(err)}`);
+        }
+        reconcile(setInvoices, invoice.id, saved);
+        refreshCollections(['paymentIns', 'invoices', 'journalEntries', 'parties', 'customers']);
+        showToast(`Customer advance of ${formatCurrency(applyAmt)} applied to invoice ${invoice.invoiceNumber}`);
+        return saved;
+    };
+
     // Apply existing advances to a bill — server action, no new cash flow.
     const applyVendorAdvanceToBill = async (billId, amount) => {
         const bill = purchaseBills.find((b) => b.id === billId);
@@ -4828,6 +4868,8 @@ export const ERPProvider = ({ children, }) => {
             // [PHASE-2D] advance-vs-final payment support, PO-linked advances & advance adjustment
             getVendorAdvanceBalance,
             applyVendorAdvanceToBill,
+            getCustomerAdvanceBalance,
+            applyCustomerAdvanceToInvoice,
             // [PHASE-2C] QC status control, dispatch gate & quality standards master
             qualityStandards,
             addQualityStandard,

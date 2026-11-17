@@ -315,15 +315,15 @@ export default function ReprocessPage() {
       />
 
       {/* Summary cards — all derived from the rows below */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3">
-        {summaryCards.map((c) => (
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3.5">
+        {summaryCards.map((c, i) => (
           <KpiCard
             key={c.label}
             label={c.label}
             value={c.value}
             unit={c.suffix}
             icon={c.icon}
-            tone={c.tone}
+            index={i}
           />
         ))}
       </div>

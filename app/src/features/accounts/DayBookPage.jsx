@@ -243,69 +243,69 @@ export default function DayBookPage() {
       {error && <ErrorState message={error} onRetry={fetchData} />}
 
       {/* KPI Business Position Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3.5">
         <KpiCard
           label="Sales (Today)"
           value={formatINR(summary.salesTotal)}
           sub={`Billed invoices on ${formatDate(asOfDate)}`}
           icon={ArrowUpRight}
-          tone="emerald"
+          index={0}
         />
         <KpiCard
           label="Collections (In)"
           value={formatINR(summary.collectionTotal)}
           sub="Customer payments received"
           icon={ArrowDownLeft}
-          tone="teal"
+          index={1}
         />
         <KpiCard
           label="Purchases"
           value={formatINR(summary.purchaseTotal)}
           sub="Vendor bills received"
           icon={Receipt}
-          tone="amber"
+          index={2}
         />
         <KpiCard
           label="Disbursements (Out)"
           value={formatINR(summary.disbursementTotal)}
           sub="Supplier & expense payouts"
           icon={ArrowUpRight}
-          tone="rose"
+          index={3}
         />
         <KpiCard
           label="Freight & Trips"
           value={formatINR(summary.freightTotal)}
           sub="Tempo freight charges"
           icon={Truck}
-          tone="blue"
+          index={4}
         />
         <KpiCard
           label="Cash & Bank Bal"
           value={formatINR(summary.cashBankBalance)}
           sub="Net liquid asset balance"
           icon={Landmark}
-          tone="indigo"
+          index={0}
         />
         <KpiCard
           label="Total Receivables"
           value={formatINR(summary.totalReceivable)}
           sub="Total customer book debt"
           icon={CreditCard}
-          tone="cyan"
+          index={1}
         />
         <KpiCard
           label="Total Payables"
           value={formatINR(summary.totalPayable)}
           sub="Total vendor creditor balance"
           icon={Building2}
-          tone="orange"
+          index={2}
         />
         <KpiCard
           label="Stock Valuation"
           value={formatINR(summary.stockValue)}
           sub="On-hand inventory landed value"
           icon={PackageCheck}
-          tone="purple"
+          index={3}
           className="col-span-2 sm:col-span-1"
         />
       </div>

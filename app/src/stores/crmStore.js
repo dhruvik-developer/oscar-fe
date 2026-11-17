@@ -19,6 +19,8 @@ import {
   pullTeamRoster,
   pullLeadStats,
   convertLead as convertLeadRequest,
+  reopenLead as reopenLeadRequest,
+  bulkReopenLeads as bulkReopenLeadsRequest,
   setLeadPinned,
   completeTask as completeTaskRequest,
   bulkDeleteLeads,
@@ -286,6 +288,32 @@ const useCrmStoreBase = create((set, get) => ({
   /** The server creates the party and/or deal, so both collections re-read. */
   convertLead: async (id, payload) => {
     const result = await convertLeadRequest(id, payload);
+    await Promise.all([get().refresh('leads'), get().refresh('deals')]);
+    return result;
+  },
+
+  reopenLead: async (id, payload = {}) => {
+    if (!isBackendEnabled()) {
+      set((s) => ({
+        leads: (s.leads || []).map((l) => (l.id === id ? { ...l, status: 'Draft', isLost: false, lostReason: undefined } : l)),
+        deals: (s.deals || []).map((d) => (d.leadId === id ? { ...d, stage: 'Draft', tag: '' } : d)),
+      }));
+      return { success: true };
+    }
+    const result = await reopenLeadRequest(id, payload);
+    await Promise.all([get().refresh('leads'), get().refresh('deals')]);
+    return result;
+  },
+
+  bulkReopenLeads: async (ids, payload = {}) => {
+    if (!isBackendEnabled()) {
+      set((s) => ({
+        leads: (s.leads || []).map((l) => (ids.includes(l.id) ? { ...l, status: 'Draft', isLost: false, lostReason: undefined } : l)),
+        deals: (s.deals || []).map((d) => (ids.includes(d.leadId) ? { ...d, stage: 'Draft', tag: '' } : d)),
+      }));
+      return { success: true };
+    }
+    const result = await bulkReopenLeadsRequest(ids, payload);
     await Promise.all([get().refresh('leads'), get().refresh('deals')]);
     return result;
   },

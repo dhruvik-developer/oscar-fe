@@ -33,6 +33,11 @@ export default function RequireAuth() {
   }, [location]);
 
   if (!signedIn) {
+    // If scanning a batch QR code or A-to-Z traceability without sign-in, redirect directly to public passport
+    const batchMatch = location.pathname.match(/^\/inventory\/batches\/([^/]+)(\/a-to-z)?\/?$/i);
+    if (batchMatch) {
+      return <Navigate to={`/public/batch/${encodeURIComponent(batchMatch[1])}${location.search}`} replace />;
+    }
     const returnTo = location.pathname + location.search;
     return <Navigate to={`/login?returnTo=${encodeURIComponent(returnTo)}`} replace />;
   }

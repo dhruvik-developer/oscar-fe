@@ -12,6 +12,7 @@ import MasterSourceLink from "../../../components/common/MasterSourceLink";
 import { useTableSort } from "../../../hooks/useTableSort";
 import SortableTh from "../../../components/ui/SortableTh";
 import AppPagination from "../../../components/ui/AppPagination";
+import KpiCard from "../../../components/ui/KpiCard";
 import {
   Calendar,
   Search,
@@ -563,61 +564,28 @@ export default function Leave() {
                 : "No leave types are set up yet."}
             </div>
           )}
-          {balances.map((item) => {
+          {balances.map((item, idx) => {
             const isPaid = item.isPaid !== false;
             const total = Number(item.total) || 0;
             const available = Number(item.available) || 0;
             const used = Number(item.used) || 0;
             const pending = Number(item.pending) || 0;
             const carried = Number(item.carriedForward) || 0;
-            const percent = isPaid && total > 0 ? Math.max(0, Math.min(100, Math.round((available / total) * 100))) : 0;
             const IconComp = leaveTypeIcon(item.leaveType, item.code);
+            const valText = isPaid ? `${formatDays(available)}` : `${formatDays(used)}`;
+            const subText = isPaid ? `/ ${formatDays(total)} left · ${formatDays(used)} used` : `unpaid · ${formatDays(used)} used`;
+            const compText = pending > 0 ? `${formatDays(pending)} pending` : carried > 0 ? `+${formatDays(carried)} carried` : !isPaid ? "Deducted as LOP" : undefined;
 
             return (
-              <div
+              <KpiCard
                 key={item.leaveTypeId}
-                className="bg-white border border-bdr rounded-2xl p-4 shadow-xs flex flex-col justify-between transition-all hover:border-slate-300"
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-[11.5px] font-semibold text-slate-600 uppercase tracking-wide">
-                    {item.leaveType}
-                  </span>
-                  <div className="w-8 h-8 rounded-xl bg-slate-100 flex items-center justify-center text-slate-700">
-                    <IconComp size={15} />
-                  </div>
-                </div>
-                <div className="mt-2.5 flex items-baseline justify-between">
-                  {isPaid ? (
-                    <div className="flex items-baseline gap-1.5">
-                      <span className="text-[24px] font-extrabold text-slate-900 tracking-tight leading-none">
-                        {formatDays(available)}
-                      </span>
-                      <span className="text-[11.5px] text-muted font-medium">/ {formatDays(total)} left</span>
-                    </div>
-                  ) : (
-                    <div className="flex items-baseline gap-1.5">
-                      <span className="text-[24px] font-extrabold text-slate-900 tracking-tight leading-none">
-                        {formatDays(used)}
-                      </span>
-                      <span className="text-[11.5px] text-muted font-medium">days taken · unpaid</span>
-                    </div>
-                  )}
-                  <span className="text-[10.5px] font-bold px-2 py-0.5 rounded-md bg-slate-100 text-slate-700">
-                    {formatDays(used)} used
-                  </span>
-                </div>
-                <div className="mt-1.5 flex flex-wrap gap-x-2 text-[10.5px] font-semibold">
-                  {pending > 0 && <span className="text-amber-700">{formatDays(pending)} pending</span>}
-                  {carried > 0 && <span className="text-emerald-700">+{formatDays(carried)} carried over</span>}
-                  {!isPaid && <span className="text-slate-500">No quota — deducted as LOP</span>}
-                </div>
-                <div className="w-full h-1.5 bg-slate-100 rounded-full mt-2.5 overflow-hidden">
-                  <div
-                    className="h-full bg-navy rounded-full transition-all duration-300"
-                    style={{ width: `${percent}%` }}
-                  />
-                </div>
-              </div>
+                label={item.leaveType}
+                value={valText}
+                sub={subText}
+                comparison={compText}
+                icon={IconComp}
+                index={idx}
+              />
             );
           })}
         </div>

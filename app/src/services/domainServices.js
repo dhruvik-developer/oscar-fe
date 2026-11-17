@@ -199,6 +199,8 @@ export const receivablesService = {
   getTermsHistory: (invoiceId) => api.get(`/sales/invoices/${invoiceId}/terms-history/`),
   getPayments: (query) => api.get('/sales/payments/', { query }),
   recordPayment: (data, idempotencyKey) => api.post('/sales/payments/', data, idempotencyKey ? { idempotencyKey } : undefined),
+  getCustomerAdvanceBalance: (customerId) => api.get(`/masters/parties/${customerId}/advance-balance/`),
+  applyCustomerAdvance: (invoiceId, data) => api.post(`/sales/invoices/${invoiceId}/apply-advance/`, data),
   getBankAccounts: () => api.get('/accounts/bank-accounts/', { query: { page_size: 200 } }),
   getDiscountRequests: (query) => api.get('/sales/discount-requests/', { query }),
   getDiscountRequest: (id) => api.get(`/sales/discount-requests/${id}/`),
@@ -360,6 +362,8 @@ export const inventoryService = {
   createBatch: (data) => api.post('/inventory/batches/', data),
   // `code` may be a batch code, a taka ID or a lot number.
   getBatch: (code) => api.get(`/inventory/batches/${encodeURIComponent(code)}/`),
+  // Public Batch Passport without login
+  getPublicBatch: (token) => api.get(`/public/batches/${encodeURIComponent(token)}/`, { clearAuthOnUnauthorized: false }),
   // { ownership: OSCAR|CUSTOMER|THIRD_PARTY, ownerPartyId?, reason? }
   setBatchOwnership: (code, data) => api.patch(`/inventory/batches/${encodeURIComponent(code)}/`, data),
   // Rejections: classify by cause (normal loss vs supplier / job worker / process fault) and track claims.

@@ -16,6 +16,7 @@ import Modal from "../../../components/ui/Modal";
 import MasterSourceLink from "../../../components/common/MasterSourceLink";
 import PageHeader from "../../../components/ui/PageHeader";
 import AppPagination from "../../../components/ui/AppPagination";
+import KpiCard from "../../../components/ui/KpiCard";
 import { hrmsGuides } from "../../../data/hrms/hrmsGuides";
 import { Avatar } from "../../../components/hrms/Avatar";
 import {
@@ -626,68 +627,35 @@ export function DocumentsPage() {
       />
 
       {/* KPI Overview Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-white border border-bdr rounded-2xl p-4.5 shadow-xs flex items-center justify-between">
-          <div>
-            <span className="text-[12px] font-semibold text-slate-500 uppercase tracking-wide">
-              Total Documents
-            </span>
-            <div className="text-[26px] font-extrabold text-slate-900 mt-1 leading-none">
-              {total}
-            </div>
-            <span className="text-[11.5px] text-muted mt-1 inline-block">Format: PDF</span>
-          </div>
-          <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-700">
-            <Folder size={20} />
-          </div>
-        </div>
-
-        <div className="bg-white border border-bdr rounded-2xl p-4.5 shadow-xs flex items-center justify-between">
-          <div>
-            <span className="text-[12px] font-semibold text-emerald-700 uppercase tracking-wide">
-              Valid &amp; Active
-            </span>
-            <div className="text-[26px] font-extrabold text-emerald-950 mt-1 leading-none">
-              {valid}
-            </div>
-            <span className="text-[11.5px] text-emerald-700 mt-1 inline-block">
-              {total > 0 ? Math.round((valid / total) * 100) : 0}% verified
-            </span>
-          </div>
-          <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
-            <CheckCircle2 size={20} />
-          </div>
-        </div>
-
-        <div className="bg-white border border-bdr rounded-2xl p-4.5 shadow-xs flex items-center justify-between">
-          <div>
-            <span className="text-[12px] font-semibold text-amber-700 uppercase tracking-wide">
-              Expiring Soon
-            </span>
-            <div className="text-[26px] font-extrabold text-amber-950 mt-1 leading-none">
-              {expiringSoon}
-            </div>
-            <span className="text-[11.5px] text-amber-700 mt-1 inline-block">Needs renewal</span>
-          </div>
-          <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
-            <Clock size={20} />
-          </div>
-        </div>
-
-        <div className="bg-white border border-bdr rounded-2xl p-4.5 shadow-xs flex items-center justify-between">
-          <div>
-            <span className="text-[12px] font-semibold text-rose-700 uppercase tracking-wide">
-              Expired / Action Req.
-            </span>
-            <div className="text-[26px] font-extrabold text-rose-950 mt-1 leading-none">
-              {expired}
-            </div>
-            <span className="text-[11.5px] text-rose-700 mt-1 inline-block">Re-upload PDF</span>
-          </div>
-          <div className="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center">
-            <AlertTriangle size={20} />
-          </div>
-        </div>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5">
+        <KpiCard
+          label="Total Documents"
+          value={total}
+          sub="Format: PDF"
+          icon={Folder}
+          color="blue"
+        />
+        <KpiCard
+          label="Valid & Active"
+          value={valid}
+          sub={`${total > 0 ? Math.round((valid / total) * 100) : 0}% verified`}
+          icon={CheckCircle2}
+          color="green"
+        />
+        <KpiCard
+          label="Expiring Soon"
+          value={expiringSoon}
+          sub="Needs renewal"
+          icon={Clock}
+          color="orange"
+        />
+        <KpiCard
+          label="Expired / Action Req."
+          value={expired}
+          sub="Re-upload PDF"
+          icon={AlertTriangle}
+          color="pink"
+        />
       </div>
 
       {/* Main Section Navigation Tabs */}

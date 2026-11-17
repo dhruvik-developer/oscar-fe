@@ -29,11 +29,11 @@ export const ZoneRequestsPage = () => {
       <PageHeader title="Assembly Bay & Zone Requisitions" subtitle="Monitor shop-floor requests, verify central storage availability, review supervisor approvals, and dispatch materials." guide={zoneGuide} />
 
       {/* Zone Requests KPI Stat Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard label="Total Requisitions" value={`${zoneRequests.length} Requests`} icon={Send} />
-        <StatCard label="Pending Floor Approvals" value={`${pendingCount} Pending`} icon={Clock} trend={{ positive: pendingCount === 0, text: pendingCount > 0 ? 'Requires supervisor action' : 'All approved' }} highlight={pendingCount > 0} />
-        <StatCard label="Approved / Staging" value={`${inTransitCount} In Progress`} icon={Truck} subtext="Picking from Central" />
-        <StatCard label="Fulfilled Requisitions" value={`${fulfilledCount} Delivered`} icon={CheckCircle2} trend={{ positive: true, text: 'Dispatched to Bay' }} />
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+        <StatCard index={0} label="Total Requisitions" value={`${zoneRequests.length} Requests`} icon={Send} />
+        <StatCard index={1} label="Pending Floor Approvals" value={`${pendingCount} Pending`} icon={Clock} trend={{ positive: pendingCount === 0, text: pendingCount > 0 ? 'Requires supervisor action' : 'All approved' }} highlight={pendingCount > 0} />
+        <StatCard index={2} label="Approved / Staging" value={`${inTransitCount} In Progress`} icon={Truck} subtext="Picking from Central" />
+        <StatCard index={3} label="Fulfilled Requisitions" value={`${fulfilledCount} Delivered`} icon={CheckCircle2} trend={{ positive: true, text: 'Dispatched to Bay' }} />
       </div>
 
       <ZoneRequestsView requests={zoneRequests} onRequestUpdate={updateZoneRequest} onAddRequest={addZoneRequest}/>

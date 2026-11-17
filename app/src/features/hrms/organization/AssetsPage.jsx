@@ -12,6 +12,7 @@ import MasterSourceLink from "../../../components/common/MasterSourceLink";
 import { useTableSort } from "../../../hooks/useTableSort";
 import SortableTh from "../../../components/ui/SortableTh";
 import AppPagination from "../../../components/ui/AppPagination";
+import KpiCard from "../../../components/ui/KpiCard";
 import {
   Laptop,
   Monitor,
@@ -941,26 +942,23 @@ export function AssetsPage() {
           {/* KPI Stats Grid */}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
             {[
-              { key: "All", label: "Total Assets", value: total, hint: "All registered units", icon: <Box size={16} className="text-slate-400" />, tone: "text-slate-900", ring: "border-navy ring-1 ring-navy/10" },
-              { key: "Assigned", label: "Assigned", value: assignedCount, hint: "Active with staff", icon: <UserCheck size={16} className="text-emerald-500" />, tone: "text-emerald-600", ring: "border-emerald-500 ring-1 ring-emerald-500/10" },
-              { key: "Available", label: "Available Stock", value: availableCount, hint: "Ready for deployment", icon: <CheckCircle2 size={16} className="text-blue-500" />, tone: "text-blue-600", ring: "border-blue-500 ring-1 ring-blue-500/10" },
-              { key: "Maintenance", label: "Maintenance", value: maintenanceCount, hint: "Maintenance or repair", icon: <Wrench size={16} className="text-amber-500" />, tone: "text-amber-600", ring: "border-amber-500 ring-1 ring-amber-500/10" },
-              { key: "Lost/Damaged", label: "Lost / Damaged", value: lostDamagedCount, hint: "Incident reported", icon: <AlertTriangle size={16} className="text-red-500" />, tone: "text-red-600", ring: "border-red-500 ring-1 ring-red-500/10" },
-            ].map((card) => (
-              <div
+              { key: "All", label: "Total Assets", value: total, hint: "All registered units", icon: Box, color: "blue" },
+              { key: "Assigned", label: "Assigned", value: assignedCount, hint: "Active with staff", icon: UserCheck, color: "green" },
+              { key: "Available", label: "Available Stock", value: availableCount, hint: "Ready for deployment", icon: CheckCircle2, color: "teal" },
+              { key: "Maintenance", label: "Maintenance", value: maintenanceCount, hint: "Maintenance or repair", icon: Wrench, color: "orange" },
+              { key: "Lost/Damaged", label: "Lost / Damaged", value: lostDamagedCount, hint: "Incident reported", icon: AlertTriangle, color: "pink" },
+            ].map((card, idx) => (
+              <KpiCard
                 key={card.key}
+                label={card.label}
+                value={card.value}
+                sub={card.hint}
+                icon={card.icon}
+                color={card.color}
+                index={idx}
                 onClick={() => setStatusFilter(card.key)}
-                className={`bg-white border rounded-xl p-4 shadow-xs transition-all cursor-pointer ${
-                  statusFilter === card.key ? card.ring : "border-bdr hover:border-slate-300"
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-[12px] font-medium text-muted">{card.label}</span>
-                  {card.icon}
-                </div>
-                <div className={`text-[22px] font-bold mt-1 ${card.tone}`}>{card.value}</div>
-                <div className="text-[11px] text-muted mt-0.5">{card.hint}</div>
-              </div>
+                className={statusFilter === card.key ? "ring-2 ring-blue-600 shadow-sm font-bold" : ""}
+              />
             ))}
           </div>
 
@@ -1224,26 +1222,23 @@ export function AssetsPage() {
           {/* Requests KPI Stats Grid */}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
             {[
-              { key: "All", label: "All Requests", value: reqTotal, hint: reqCancelled > 0 ? `${reqActive} active · ${reqCancelled} withdrawn` : "Submitted requisitions", icon: <ClipboardList size={16} className="text-slate-400" />, tone: "text-slate-900", ring: "border-navy ring-1 ring-navy/10" },
-              { key: "Pending", label: "Pending Review", value: reqPending, hint: "Awaiting HR / IT action", icon: <Clock size={16} className="text-amber-500" />, tone: "text-amber-600", ring: "border-amber-500 ring-1 ring-amber-500/10" },
-              { key: "Approved", label: "Approved", value: reqApproved, hint: "Awaiting fulfilment from stock", icon: <CheckCircle2 size={16} className="text-blue-500" />, tone: "text-blue-600", ring: "border-blue-500 ring-1 ring-blue-500/10" },
-              { key: "Fulfilled", label: "Fulfilled", value: reqFulfilled, hint: "Asset handed over", icon: <UserCheck size={16} className="text-emerald-500" />, tone: "text-emerald-600", ring: "border-emerald-500 ring-1 ring-emerald-500/10" },
-              { key: "Closed", label: "Rejected / Withdrawn", value: reqRejected + reqCancelled, hint: `${reqRejected} rejected · ${reqCancelled} withdrawn`, icon: <AlertTriangle size={16} className="text-red-500" />, tone: "text-red-600", ring: "border-red-500 ring-1 ring-red-500/10" },
-            ].map((card) => (
-              <div
+              { key: "All", label: "All Requests", value: reqTotal, hint: reqCancelled > 0 ? `${reqActive} active · ${reqCancelled} withdrawn` : "Submitted requisitions", icon: ClipboardList, color: "blue" },
+              { key: "Pending", label: "Pending Review", value: reqPending, hint: "Awaiting HR / IT action", icon: Clock, color: "orange" },
+              { key: "Approved", label: "Approved", value: reqApproved, hint: "Awaiting fulfilment from stock", icon: CheckCircle2, color: "purple" },
+              { key: "Fulfilled", label: "Fulfilled", value: reqFulfilled, hint: "Asset handed over", icon: UserCheck, color: "green" },
+              { key: "Closed", label: "Rejected / Withdrawn", value: reqRejected + reqCancelled, hint: `${reqRejected} rejected · ${reqCancelled} withdrawn`, icon: AlertTriangle, color: "pink" },
+            ].map((card, idx) => (
+              <KpiCard
                 key={card.key}
+                label={card.label}
+                value={card.value}
+                sub={card.hint}
+                icon={card.icon}
+                color={card.color}
+                index={idx}
                 onClick={() => setReqStatusFilter(card.key)}
-                className={`bg-white border rounded-xl p-4 shadow-xs transition-all cursor-pointer ${
-                  reqStatusFilter === card.key ? card.ring : "border-bdr hover:border-slate-300"
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-[12px] font-medium text-muted">{card.label}</span>
-                  {card.icon}
-                </div>
-                <div className={`text-[22px] font-bold mt-1 ${card.tone}`}>{card.value}</div>
-                <div className="text-[11px] text-muted mt-0.5">{card.hint}</div>
-              </div>
+                className={reqStatusFilter === card.key ? "ring-2 ring-blue-600 shadow-sm font-bold" : ""}
+              />
             ))}
           </div>
 

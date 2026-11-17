@@ -1297,41 +1297,41 @@ export default function LotTakaRegisterPage({
       )}
 
       {/* ── 5 TOP SUMMARY CARDS (Image 1) ──────────────────────────────────── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3.5">
         <KpiCard
           label="Total Lots / Taka"
           value={summary.totalLots?.count ? summary.totalLots.count.toLocaleString('en-IN') : '0'}
           sub={`Active ${summary.totalLots?.active || 0} | Closed ${summary.totalLots?.closed || 0}`}
           icon={Layers}
-          tone="blue"
+          index={0}
         />
         <KpiCard
           label="Total Quantity"
           value={formatQty(summary.totalQuantity?.qty, summary.totalQuantity?.uom || 'm')}
           sub={`In Stock ${formatQty(summary.totalQuantity?.inStock, summary.totalQuantity?.uom || 'm')}`}
           icon={Package}
-          tone="emerald"
+          index={1}
         />
         <KpiCard
           label="Total Value"
           value={formatINR(summary.totalValue?.val)}
           sub={`Avg. Rate ₹ ${summary.totalValue?.avgRate?.toFixed(2) || '0.00'}/m`}
           icon={Wallet}
-          tone="sky"
+          index={2}
         />
         <KpiCard
           label="Pending QC"
           value={formatQty(summary.pendingQC?.qty, summary.pendingQC?.uom || 'm')}
           sub={`${summary.pendingQC?.lots || 0} Lots`}
           icon={Clock}
-          tone="purple"
+          index={3}
         />
         <KpiCard
           label="On Hold"
           value={formatQty(summary.onHold?.qty, summary.onHold?.uom || 'm')}
           sub={`${summary.onHold?.lots || 0} Lots`}
           icon={AlertTriangle}
-          tone="amber"
+          index={4}
         />
       </div>
 

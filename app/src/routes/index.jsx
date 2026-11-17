@@ -194,6 +194,7 @@ const ServiceOrdersPage = lazy(() => import('../features/jobwork/service-orders/
 const LotTakaRegisterPage = lazy(() => import('../features/inventory/LotTakaRegisterPage'));
 const TakaTagPrintPage = lazy(() => import('../features/inventory/TakaTagPrintPage'));
 const BatchRegistryPage = lazy(() => import('../features/inventory/batches/BatchRegistryPage'));
+const BatchProfitabilityPage = lazy(() => import('../features/inventory/batches/BatchProfitabilityPage'));
 const PublicBatchPassportPage = lazy(() => import('../features/inventory/batches/PublicBatchPassportPage'));
 const BatchQrPage = lazy(() => import('../features/inventory/batches/BatchQrPage'));
 const BatchAtoZPage = lazy(() => import('../features/inventory/batches/BatchAtoZPage'));
@@ -550,6 +551,8 @@ const router = createBrowserRouter([
       { path: 'inventory/lots-takas', element: <Navigate to="/inventory/batches" replace /> },
       { path: 'inventory/taka-tags', element: <Navigate to="/inventory/batches" replace /> },
       { path: 'inventory/batches', element: <Page component={BatchRegistryPage} title="Batch Registry" /> },
+      { path: 'inventory/batch-profitability', element: <Page component={BatchProfitabilityPage} title="Batch Profitability" /> },
+      { path: 'inventory/batches/profitability', element: <Navigate to="/inventory/batch-profitability" replace /> },
       { path: 'inventory/production-runs', element: <Page component={ProductionRunsPage} title="Production Runs" /> },
       // A batch QR opens this (signed in; cost shown only with ledger access).
       { path: 'inventory/batches/:code/a-to-z', element: <Page component={BatchAtoZPage} title="Batch A to Z" /> },

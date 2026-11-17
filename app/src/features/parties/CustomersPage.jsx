@@ -158,10 +158,10 @@ export const CustomersPage = () => {
           </Button>}/>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard label="Total Customers" value={customers.length} icon={Users}/>
-        <StatCard label="Accounts Receivable" value={formatCurrency(totalOutstanding)} icon={DollarSign}/>
-        <StatCard label="Customer Advances" value={formatCurrency(totalAdvances)} icon={DollarSign}/>
-        <StatCard label="Active Accounts" value={customers.filter((c) => c.status === 'Active').length} icon={ShieldAlert}/>
+        <StatCard index={0} label="Total Customers" value={customers.length} icon={Users}/>
+        <StatCard index={1} label="Accounts Receivable" value={formatCurrency(totalOutstanding)} icon={DollarSign}/>
+        <StatCard index={2} label="Customer Advances" value={formatCurrency(totalAdvances)} icon={DollarSign}/>
+        <StatCard index={3} label="Active Accounts" value={customers.filter((c) => c.status === 'Active').length} icon={ShieldAlert}/>
       </div>
 
       <DataTable

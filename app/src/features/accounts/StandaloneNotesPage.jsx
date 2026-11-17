@@ -291,21 +291,24 @@ export default function StandaloneNotesPage({ embedded = false }) {
       )}
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard label="Total Notes" value={loading ? '…' : stats.totalCount} icon={FileText} />
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+        <StatCard index={0} label="Total Notes" value={loading ? '…' : stats.totalCount} icon={FileText} />
         <StatCard
+          index={1}
           label="Pending Approval / Draft"
           value={loading ? '…' : stats.pendingCount}
           icon={Clock}
           tone="amber"
         />
         <StatCard
+          index={2}
           label="Total Credit Notes"
           value={loading ? '…' : formatINR(stats.creditTotal)}
           icon={DollarSign}
           tone="blue"
         />
         <StatCard
+          index={3}
           label="Total Debit Notes"
           value={loading ? '…' : formatINR(stats.debitTotal)}
           icon={DollarSign}

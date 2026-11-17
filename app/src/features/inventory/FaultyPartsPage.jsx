@@ -31,11 +31,11 @@ export const FaultyPartsPage = () => {
       <PageHeader title="Quarantine & Defective Parts" subtitle="Segregate failed components, inspect defect telemetry, initiate vendor RMA warranty claims, and authorize replacements." guide={faultyGuide} />
 
       {/* Faulty Parts KPI Stat Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard label="Total Quarantined Units" value={`${totalDefectiveUnits} Units`} icon={AlertTriangle} highlight={totalDefectiveUnits > 0} />
-        <StatCard label="Awaiting RMA Dispatch" value={`${reportedCount} Reported`} icon={Clock} trend={{ positive: reportedCount === 0, text: reportedCount > 0 ? 'Requires vendor contact' : 'All dispatched' }} />
-        <StatCard label="Sent for Replacement" value={`${inTransitCount} with Vendor`} icon={Truck} subtext="Vendor RMA in-progress" />
-        <StatCard label="Resolved & Restocked" value={`${resolvedCount} Replaced`} icon={CheckCircle2} trend={{ positive: true, text: 'Stock replenished' }} />
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+        <StatCard index={0} label="Total Quarantined Units" value={`${totalDefectiveUnits} Units`} icon={AlertTriangle} highlight={totalDefectiveUnits > 0} />
+        <StatCard index={1} label="Awaiting RMA Dispatch" value={`${reportedCount} Reported`} icon={Clock} trend={{ positive: reportedCount === 0, text: reportedCount > 0 ? 'Requires vendor contact' : 'All dispatched' }} />
+        <StatCard index={2} label="Sent for Replacement" value={`${inTransitCount} with Vendor`} icon={Truck} subtext="Vendor RMA in-progress" />
+        <StatCard index={3} label="Resolved & Restocked" value={`${resolvedCount} Replaced`} icon={CheckCircle2} trend={{ positive: true, text: 'Stock replenished' }} />
       </div>
 
       <FaultyPartsView

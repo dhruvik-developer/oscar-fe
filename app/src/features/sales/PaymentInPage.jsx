@@ -34,7 +34,7 @@ const paymentInGuide = {
     ],
 };
 export const PaymentInPage = ({ embedded = false }) => {
-    const { paymentIns, invoices, customers, addPaymentIn, getInvoiceOutstanding, formatCurrency, formatDateDDMMYYYY, getCurrentDateFormatted } = useERP();
+    const { paymentIns, invoices, customers, addPaymentIn, getInvoiceOutstanding, getCustomerAdvanceBalance, applyCustomerAdvanceToInvoice, formatCurrency, formatDateDDMMYYYY, getCurrentDateFormatted } = useERP();
     const [showAddModal, setShowAddModal] = useState(false);
     const [selectedInvoiceId, setSelectedInvoiceId] = useState(invoices[0]?.id || '');
     const [amount, setAmount] = useState(0);
@@ -163,11 +163,11 @@ export const PaymentInPage = ({ embedded = false }) => {
       )}
 
       {/* Payment In KPI Stat Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard label="Total Received Collections" value={formatCurrency(totalCollected)} icon={IndianRupee} highlight />
-        <StatCard label="Total Vouchers Issued" value={`${paymentIns.length} Receipts`} icon={Receipt} trend={{ positive: true, text: 'Cleared to Ledger' }} />
-        <StatCard label="Avg Receipt Amount" value={formatCurrency(avgReceipt)} icon={TrendingUp} />
-        <StatCard label="Bank & Wire Transfers" value={`${wireCount} Settlements`} icon={CheckCircle2} subtext="Direct Treasury intake" />
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+        <StatCard index={0} label="Total Received Collections" value={formatCurrency(totalCollected)} icon={IndianRupee} highlight />
+        <StatCard index={1} label="Total Vouchers Issued" value={`${paymentIns.length} Receipts`} icon={Receipt} trend={{ positive: true, text: 'Cleared to Ledger' }} />
+        <StatCard index={2} label="Avg Receipt Amount" value={formatCurrency(avgReceipt)} icon={TrendingUp} />
+        <StatCard index={3} label="Bank & Wire Transfers" value={`${wireCount} Settlements`} icon={CheckCircle2} subtext="Direct Treasury intake" />
       </div>
 
       <DataTable title="Cleared Customer Collections" columns={columns} data={paymentIns} keyExtractor={(p) => p.id} searchPlaceholder="Search receipt #, customer, or invoice..." searchFilter={(p, term) => String(p.receiptNumber ?? '').toLowerCase().includes(term) ||
@@ -225,15 +225,24 @@ export const PaymentInPage = ({ embedded = false }) => {
                   step="0.01"
                   required
                   min="0.01"
-                  max={Math.max(0.01, selectedOutstanding.balanceDue)}
                   value={amount}
                   onChange={(e) => setAmount(Number(e.target.value))}
                   className="w-full border border-slate-300 rounded-lg p-2 bg-white font-mono font-bold text-sm text-slate-900"
                 />
                 {amount > selectedOutstanding.balanceDue + 0.01 && selectedOutstanding.balanceDue > 0 && (
-                  <p className="text-[11px] text-rose-600 font-medium mt-1">
-                    ⚠ Overpayment: amount exceeds outstanding balance by {formatCurrency(amount - selectedOutstanding.balanceDue)}.
-                  </p>
+                  <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-2.5 text-xs space-y-1 mt-2">
+                    <div className="flex justify-between text-indigo-900 font-semibold">
+                      <span>Applied to Invoice {selectedInv?.invoiceNumber}:</span>
+                      <span className="font-mono">{formatCurrency(selectedOutstanding.balanceDue)}</span>
+                    </div>
+                    <div className="flex justify-between text-indigo-700 font-medium">
+                      <span>Customer Advance (Unallocated):</span>
+                      <span className="font-mono font-bold">+{formatCurrency(amount - selectedOutstanding.balanceDue)}</span>
+                    </div>
+                    <p className="text-[10.5px] text-indigo-600 mt-0.5">
+                      The invoice will be fully paid, and the extra money will be retained as customer advance for future invoices.
+                    </p>
+                  </div>
                 )}
               </div>
 
@@ -259,10 +268,12 @@ export const PaymentInPage = ({ embedded = false }) => {
                 </button>
                 <button
                   type="submit"
-                  disabled={amount <= 0 || amount > selectedOutstanding.balanceDue + 0.01}
+                  disabled={amount <= 0}
                   className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg font-bold shadow-sm"
                 >
-                  {amount > selectedOutstanding.balanceDue + 0.01 ? '⚠ Amount Exceeds Balance' : 'Post Payment & Update Ledger'}
+                  {amount > selectedOutstanding.balanceDue + 0.01 && selectedOutstanding.balanceDue > 0
+                    ? `Post Receipt & Advance (${formatCurrency(amount)})`
+                    : 'Post Payment & Update Ledger'}
                 </button>
               </div>
             </form>

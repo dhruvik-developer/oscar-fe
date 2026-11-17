@@ -235,11 +235,11 @@ export default function ContractsPage() {
       {error && <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs text-rose-700">{error}</p>}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5 my-4">
-        <KpiCard label="Total Contracts" value={stats.total} icon={FileText} tone="sky" />
-        <KpiCard label="Active Contracts" value={stats.active} icon={FileCheck2} tone="emerald" />
-        <KpiCard label="Expiring Soon (30 days)" value={stats.expiring} icon={AlertTriangle} tone="amber" />
-        <KpiCard label="Expired Contracts" value={stats.expired} icon={XCircle} tone="rose" />
-        <KpiCard label="Total Contract Value" value={formatContractMoney(stats.value)} icon={IndianRupee} tone="blue" />
+        <KpiCard index={0} label="Total Contracts" value={stats.total} icon={FileText} tone="sky" />
+        <KpiCard index={1} label="Active Contracts" value={stats.active} icon={FileCheck2} tone="emerald" />
+        <KpiCard index={2} label="Expiring Soon (30 days)" value={stats.expiring} icon={AlertTriangle} tone="amber" />
+        <KpiCard index={3} label="Expired Contracts" value={stats.expired} icon={XCircle} tone="rose" />
+        <KpiCard index={4} label="Total Contract Value" value={formatContractMoney(stats.value)} icon={IndianRupee} tone="blue" />
       </div>
 
       <div className="card p-4">

@@ -223,7 +223,6 @@ export default function JobWorkOrdersPage() {
         title="Job Work Orders"
         subtitle="Manage job work orders assigned to external processors."
         breadcrumb={[
-          { label: 'Dashboard', path: '/dashboard' },
           { label: 'PMS', path: '/pms' },
           { label: 'Job Work / Processing' },
           { label: 'Job Work Orders' },
@@ -239,7 +238,7 @@ export default function JobWorkOrdersPage() {
       />
 
       {/* KPI strip */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3.5">
         {kpiCards.map((c) => (
           <KpiCard
             key={c.label}

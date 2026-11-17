@@ -155,7 +155,6 @@ export default function Employees() {
         subtitle={`${filtered.length} employees • 12 departments`}
         guide={hrmsGuides.employees}
         breadcrumb={[
-          { label: 'Dashboard', path: '/dashboard' },
           { label: 'HRMS' },
           { label: 'Employee Setup' },
         ]}

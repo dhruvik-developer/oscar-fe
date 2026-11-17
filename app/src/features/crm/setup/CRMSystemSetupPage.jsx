@@ -229,7 +229,6 @@ export default function CRMSystemSetupPage() {
         title="CRM System Setup"
         subtitle="Manage Lead Stages for your business process."
         breadcrumb={[
-          { label: 'Dashboard', path: '/dashboard' },
           { label: 'CRM', path: '/crm/leads' },
           { label: 'CRM System Setup' }
         ]}

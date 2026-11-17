@@ -324,11 +324,11 @@ export default function IncentiveSchemesPage() {
       />
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard label="Active Schemes" value={loadingSchemes ? '…' : `${stats.activeSchemes} / ${stats.totalSchemes}`} icon={Layers} />
-        <StatCard label="Total Calculations" value={loadingCalcs ? '…' : calculations.length} icon={Clock} tone="amber" />
-        <StatCard label="Pending Payouts" value={loadingCalcs ? '…' : formatINR(stats.pendingPayout)} icon={DollarSign} tone="blue" />
-        <StatCard label="Settled Payouts" value={loadingCalcs ? '…' : formatINR(stats.settledPayout)} icon={CheckCircle2} tone="emerald" />
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+        <StatCard index={0} label="Active Schemes" value={loadingSchemes ? '…' : `${stats.activeSchemes} / ${stats.totalSchemes}`} icon={Layers} />
+        <StatCard index={1} label="Total Calculations" value={loadingCalcs ? '…' : calculations.length} icon={Clock} tone="amber" />
+        <StatCard index={2} label="Pending Payouts" value={loadingCalcs ? '…' : formatINR(stats.pendingPayout)} icon={DollarSign} tone="blue" />
+        <StatCard index={3} label="Settled Payouts" value={loadingCalcs ? '…' : formatINR(stats.settledPayout)} icon={CheckCircle2} tone="emerald" />
       </div>
 
       {/* Navigation Tabs */}

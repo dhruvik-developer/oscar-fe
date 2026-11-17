@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { modal } from '../../context/ModalContext';
 import { Link } from 'react-router-dom';
+import KpiCard from '../../components/ui/KpiCard';
 import {
   UserCheck,
   Calendar,
@@ -1729,31 +1730,10 @@ export default function EmployeePortal() {
 
       {/* KPI Counters */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
-        <div className="bg-white border border-bdr rounded-2xl p-4 shadow-xs">
-          <div className="text-[11px] font-bold uppercase tracking-wider text-muted">Total Requests</div>
-          <div className="text-2xl font-extrabold text-slate-900 mt-1">{stats.total}</div>
-          <p className="text-[11.5px] text-muted mt-1">Submitted requests</p>
-        </div>
-
-        <div className="bg-white border border-bdr rounded-2xl p-4 shadow-xs">
-          <div className="text-[11px] font-bold uppercase tracking-wider text-amber-700">Pending HR Review</div>
-          <div className="text-2xl font-extrabold text-amber-700 mt-1">{stats.pending}</div>
-          <p className="text-[11.5px] text-amber-600 font-medium mt-1">Awaiting verification</p>
-        </div>
-
-        <div className="bg-white border border-bdr rounded-2xl p-4 shadow-xs">
-          <div className="text-[11px] font-bold uppercase tracking-wider text-emerald-700">Approved by HR</div>
-          <div className="text-2xl font-extrabold text-emerald-700 mt-1">{stats.approved}</div>
-          <p className="text-[11.5px] text-emerald-600 font-medium mt-1">Approved & credited</p>
-        </div>
-
-        <div className="bg-white border border-bdr rounded-2xl p-4 shadow-xs">
-          <div className="text-[11px] font-bold uppercase tracking-wider text-indigo-700">Leave Balance</div>
-          <div className="text-2xl font-extrabold text-indigo-700 mt-1">
-            {currentEmployee?.leaveBalance || '12'} Days
-          </div>
-          <p className="text-[11.5px] text-indigo-600 font-medium mt-1">Available balance</p>
-        </div>
+        <KpiCard index={0} label="Total Requests" value={stats.total} icon={FileText} sub="Submitted requests" />
+        <KpiCard index={1} label="Pending HR Review" value={stats.pending} icon={Clock} sub="Awaiting verification" />
+        <KpiCard index={2} label="Approved by HR" value={stats.approved} icon={CheckCircle2} sub="Approved & credited" />
+        <KpiCard index={3} label="Leave Balance" value={`${currentEmployee?.leaveBalance || '12'} Days`} icon={Calendar} sub="Available balance" />
       </div>
 
       {/* Recognition & Milestone Notification Banner */}

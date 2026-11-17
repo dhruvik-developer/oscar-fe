@@ -37,10 +37,12 @@
   --shadow-modal: var(--shadow-modal);
   --shadow-popover: var(--shadow-popover);
 
-  /* Canonical control sizes "” one value for every button / KPI */
+  /* Canonical control sizes — one value for every button / KPI */
   --btn-height: 38px;
-  --kpi-min-height: 92px;
-  --kpi-badge: 44px;
+  --kpi-min-height: 145px;
+  --kpi-card-height: 145px;
+  --kpi-card-gap: 14px;
+  --kpi-badge: 28px;
   --table-header-height: 44px;
 }
 
@@ -109,7 +111,7 @@
    Design System Baseline: CRM Application & Multi-Theme Engine
    ========================================================= */
 
-/* â”€â”€ CSS Custom Properties (Multi-Theme System) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ──── CSS Custom Properties (Multi-Theme System) ────────────────────── */
 :root, [data-theme="light"] {
   font-family: "Manrope", "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --primary: #1f6bff;
@@ -254,7 +256,7 @@
   --body-bg: radial-gradient(circle at top left, rgba(16, 185, 129, 0.12), transparent 35%), linear-gradient(180deg, #051611 0%, #030e0b 100%);
 }
 
-/* â”€â”€ Oscar theme: light pages + navy sidebar, matching the login page â”€â”€â”€ */
+/* ──── Oscar theme: light pages + navy sidebar, matching the login page ────── */
 [data-theme="oscar"] {
   --primary: #1B5FD6;
   --primary-dark: #1747C4;
@@ -293,7 +295,7 @@
   --body-bg: radial-gradient(circle at top left, rgba(202, 222, 255, 0.35), transparent 28%), linear-gradient(180deg, #fbfdff 0%, #f3f7ff 100%);
 }
 
-/* â”€â”€ Oscar sidebar: login-page blue gradient pill + blue accents â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ──── Oscar sidebar: login-page blue gradient pill + blue accents ────────────────── */
 /* The login page's fabric photo under a slate-navy veil, so the shell
    carries the same texture and tone as the sign-in screen. */
 [data-theme="oscar"] .sidebar {
@@ -342,7 +344,7 @@
 }
 }
 
-/* â”€â”€ Theme Adaptations for Dark / Midnight / Emerald Modes (Global Specificity) â”€â”€ */
+/* ──── Theme Adaptations for Dark / Midnight / Emerald Modes (Global Specificity) ──── */
 [data-theme="dark"],
 [data-theme="midnight"],
 [data-theme="emerald"],
@@ -725,10 +727,10 @@ button.bg-\[\#16233a\]:hover {
 
 
 
-/* â”€â”€ Reset â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ──── Reset ──────────────────────────────────────────────────────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; }
 
-/* â”€â”€ Caret visibility â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+/* ──── Caret visibility ──────────────────────────────────────────────────────────────────────────────
    Read-only text (titles, headers, KPIs, table cells) must never render a
    text-insertion caret when clicked (e.g. when the browser's caret-browsing
    mode is on). Editable surfaces keep their normal caret. */
@@ -762,7 +764,7 @@ button { cursor: pointer; }
 a { text-decoration: none; color: inherit; }
 img { display: block; max-width: 100%; }
 
-/* â”€â”€ App Shell â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ──── App Shell ──────────────────────────────────────────────────────────────────────────────────────── */
 /* Mobile-first: one column below lg; the sidebar becomes an off-canvas
    drawer (see "Mobile Sidebar Drawer" below). */
 .app-shell {
@@ -824,7 +826,7 @@ img { display: block; max-width: 100%; }
   }
 }
 
-/* â”€â”€ Custom Scrollbars & Arrow Suppression â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ──── Custom Scrollbars & Arrow Suppression ────────────────────────────────── */
 /* Hide native Windows scrollbar arrow buttons across the entire app */
 ::-webkit-scrollbar-button {
   display: none !important;
@@ -832,7 +834,7 @@ img { display: block; max-width: 100%; }
   height: 0 !important;
 }
 
-/* â”€â”€ Sidebar Custom Styling â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ──── Sidebar Custom Styling ────────────────────────────────────────────────────────────── */
 .sidebar {
   background: linear-gradient(180deg, var(--sidebar-bg-from) 0%, var(--sidebar-bg-to) 100%);
   color: var(--sidebar-text);
@@ -942,7 +944,7 @@ img { display: block; max-width: 100%; }
 
 .brand-menu:hover { background: rgba(255, 255, 255, 0.08); }
 
-/* â”€â”€ Sidebar Navigation Hierarchy â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ──── Sidebar Navigation Hierarchy ────────────────────────────────────────────────── */
 .side-nav {
   display: flex;
   flex-direction: column;
@@ -1175,7 +1177,7 @@ img { display: block; max-width: 100%; }
   flex: 1;
 }
 
-/* â”€â”€ Accent nav items (Inventory → Stock Position) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+/* ──── Accent nav items (Inventory → Stock Position) ──────────────────────────────────────────
    A nav item that sets `accent` renders its icon as a tinted chip and gets
    a colour-matched active state, hover arrow and guide line. Items without
    `accent` are untouched by everything below. Colours arrive as `--chip`
@@ -1325,7 +1327,7 @@ img { display: block; max-width: 100%; }
 
 .sidebar-resize-handle:hover .resize-thumb { opacity: 1; }
 
-/* â”€â”€ Mobile Sidebar Drawer (below lg) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ──── Mobile Sidebar Drawer (below lg) ────────────────────────────────────────── */
 .sidebar-backdrop {
   display: none;
 }
@@ -1385,7 +1387,7 @@ img { display: block; max-width: 100%; }
   to { opacity: 1; }
 }
 
-/* â”€â”€ Topbar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ──── Topbar ──────────────────────────────────────────────────────────────────────────────────────────────── */
 .topbar {
   height: 62px;
   background: var(--topbar-bg);
@@ -1603,7 +1605,7 @@ img { display: block; max-width: 100%; }
   }
 }
 
-/* â”€â”€ Notification center rows: actions replace the time on hover / focus;
+/* ──── Notification center rows: actions replace the time on hover / focus;
    on touch screens (no hover) they stay visible and the time moves to the meta line. */
 .notif-panel {
   max-height: min(640px, calc(100dvh - 88px));
@@ -1681,7 +1683,7 @@ img { display: block; max-width: 100%; }
 .profile-text small { font-size: 0.82rem; color: var(--muted); }
 .profile-chev { color: var(--text-secondary); }
 
-/* â”€â”€ Page Header â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ──── Page Header ────────────────────────────────────────────────────────────────────────────────────── */
 .page-head {
   padding: 16px 24px 12px;
   border-bottom: 1px solid var(--border);
@@ -1734,7 +1736,7 @@ img { display: block; max-width: 100%; }
   flex-shrink: 0;
 }
 
-/* â”€â”€ Buttons â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ──── Buttons ────────────────────────────────────────────────────────────────────────────────────────────── */
 /* Canonical size: every text button is 38px tall, 13px font "” no variants. */
 .btn-primary, .btn-outline, .btn-ghost, .btn-danger {
   height: 38px;
@@ -1822,7 +1824,7 @@ img { display: block; max-width: 100%; }
   border-radius: 10px;
 }
 
-/* â”€â”€ Cards â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ──── Cards ────────────────────────────────────────────────────────────────────────────────────────────────── */
 .card {
   background: var(--card);
   border: 1px solid var(--border);
@@ -1855,7 +1857,7 @@ img { display: block; max-width: 100%; }
   }
 }
 
-/* â”€â”€ Stat Cards â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ──── Stat Cards ──────────────────────────────────────────────────────────────────────────────────────── */
 /* Canonical KPI size: every KPI card is min 92px tall, 14/16px padding,
    44px icon badge, 20px value, 11px label "” identical everywhere. */
 .stat-card {
@@ -1972,14 +1974,14 @@ img { display: block; max-width: 100%; }
   }
 }
 
-/* â”€â”€ KPI size guardrail: every KPI variant shares the canonical box â”€â”€ */
+/* ──── KPI size guardrail: every KPI variant shares the canonical box ──── */
 .hrms-stat-card {
   min-height: 92px;
   padding: 14px 16px;
   border-radius: var(--radius-lg);
 }
 
-/* â”€â”€ Table â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ──── Table ────────────────────────────────────────────────────────────────────────────────────────────────── */
 .table-card {
   background: var(--card);
   border: 1px solid var(--border);
@@ -2202,7 +2204,7 @@ table:not(.printable-document table):not(.no-standard-header table) thead .stick
 }
 .row-more:hover { background: var(--soft); }
 
-/* â”€â”€ Badge / Status â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ──── Badge / Status ──────────────────────────────────────────────────────────────────────────────── */
 .badge {
   display: inline-flex;
   align-items: center;
@@ -2222,7 +2224,7 @@ table:not(.printable-document table):not(.no-standard-header table) thead .stick
 .badge-orange { background: rgba(249, 115, 22, 0.16); color: #fb923c; }
 .badge-cyan { background: rgba(6, 182, 212, 0.16); color: var(--info); }
 
-/* â”€â”€ Modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ──── Modal ────────────────────────────────────────────────────────────────────────────────────────────────── */
 .modal-backdrop {
   position: fixed;
   inset: 0;
@@ -2314,26 +2316,33 @@ table:not(.printable-document table):not(.no-standard-header table) thead .stick
 
 .modal-resize-handle {
   position: absolute;
-  right: 3px;
-  bottom: 3px;
-  width: 18px;
-  height: 18px;
+  right: 6px;
+  bottom: 6px;
+  width: 24px;
+  height: 24px;
   cursor: nwse-resize;
   display: flex;
   align-items: center;
   justify-content: center;
   user-select: none;
-  z-index: 30;
-  opacity: 0.55;
-  color: var(--text-secondary, #64748b);
-  transition: opacity 0.15s ease, color 0.15s ease, transform 0.15s ease;
+  z-index: 40;
+  color: #64748b;
+  background: var(--card, #ffffff);
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 6px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  opacity: 0.85;
+  transition: all 0.15s ease;
 }
 
 .modal-resize-handle:hover,
 .modal-resize-handle:active {
   opacity: 1;
   color: #2563eb;
-  transform: scale(1.15);
+  background: #eff6ff;
+  border-color: #93c5fd;
+  transform: scale(1.12);
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.25);
 }
 
 .lead-create-modal {
@@ -2775,7 +2784,7 @@ table:not(.printable-document table):not(.no-standard-header table) thead .stick
   }
 }
 
-/* â”€â”€ Forms â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ──── Forms ────────────────────────────────────────────────────────────────────────────────────────────────── */
 .form-group { display: grid; gap: 6px; }
 .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 .form-row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
@@ -2840,7 +2849,7 @@ table:not(.printable-document table):not(.no-standard-header table) thead .stick
   margin: 0 0 12px;
 }
 
-/* â”€â”€ Filter Panel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ──── Filter Panel ──────────────────────────────────────────────────────────────────────────────────── */
 .filter-card {
   background: var(--card);
   border: 1px solid var(--border);
@@ -2923,7 +2932,7 @@ table:not(.printable-document table):not(.no-standard-header table) thead .stick
   margin-top: 18px;
 }
 
-/* â”€â”€ Dashboard â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ──── Dashboard ────────────────────────────────────────────────────────────────────────────────────────── */
 .dashboard-view { padding: 0; display: grid; gap: 16px; }
 
 .dashboard-stats {
@@ -3159,7 +3168,7 @@ table:not(.printable-document table):not(.no-standard-header table) thead .stick
 .view-all-link { border: 0; background: transparent; color: var(--primary); font-size: 0.84rem; font-weight: 600; }
 .view-all-link:hover { text-decoration: underline; }
 
-/* â”€â”€ Leads / CRM Specifics â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ──── Leads / CRM Specifics ──────────────────────────────────────────────────────────────────── */
 .content-grid {
   display: grid;
   grid-template-columns: 280px minmax(0, 1fr);
@@ -3436,7 +3445,7 @@ table:not(.printable-document table):not(.no-standard-header table) thead .stick
 
 .pager-wrap { margin-top: 10px; }
 
-/* â”€â”€ Leads table: screenshot format (row actions + hover tooltips) â”€â”€ */
+/* ──── Leads table: screenshot format (row actions + hover tooltips) ──── */
 .screenshot-table thead th { text-transform: none; letter-spacing: 0; font-weight: 600; }
 
 .lead-row-actions { white-space: nowrap; vertical-align: middle; }
@@ -3492,7 +3501,7 @@ table:not(.printable-document table):not(.no-standard-header table) thead .stick
 }
 .activity-menu button:hover { background: var(--soft); }
 
-/* â”€â”€ Leads row â‹® menu (floating, portal-rendered) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ──── Leads row … menu (floating, portal-rendered) ──────────────────────────── */
 .lead-row-menu {
   position: fixed;
   z-index: 90;
@@ -3745,7 +3754,7 @@ tr:hover .lead-pin-btn {
   transform: translateX(-50%) translateY(0);
 }
 
-/* â”€â”€ Sort By popover (screenshot format) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ──── Sort By popover (screenshot format) ────────────────────────────────────── */
 .sort-popover-wrap {
   position: relative;
   display: inline-flex;
@@ -3913,7 +3922,7 @@ tr:hover .lead-pin-btn {
   gap: 8px;
 }
 
-/* â”€â”€ Grid-view table (bordered screenshot format) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ──── Grid-view table (bordered screenshot format) ──────────────────────── */
 .grid-table-card .leads-table thead th + th { box-shadow: none; }
 
 .grid-table-card .leads-table thead th {
@@ -3961,7 +3970,7 @@ tr:hover .lead-pin-btn {
   text-overflow: ellipsis;
 }
 
-/* â”€â”€ Tile-view lead cards (screenshot format) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ──── Tile-view lead cards (screenshot format) ──────────────────────────────── */
 .lead-tile-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));
@@ -4111,7 +4120,7 @@ tr:hover .lead-pin-btn {
   color: var(--muted);
 }
 
-/* â”€â”€ Compact lead grid view â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ──── Compact lead grid view ──────────────────────────────────────────────────────────────── */
 .lead-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr));
@@ -4763,7 +4772,7 @@ tr:hover .lead-pin-btn {
   .lead-tile-card { padding: 14px; }
 }
 
-/* â”€â”€ Leads Map view (screenshot format) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ──── Leads Map view (screenshot format) ──────────────────────────────────────────── */
 .leads-map-page {
   display: flex;
   flex-direction: column;
@@ -5219,7 +5228,7 @@ tr:hover .lead-pin-btn {
   border: 0;
 }
 
-/* â”€â”€ Shared Section Layout â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ──── Shared Section Layout ──────────────────────────────────────────────────────────────────── */
 .section-wrap {
   padding: 14px 16px;
   display: grid;
@@ -5246,7 +5255,7 @@ tr:hover .lead-pin-btn {
   margin: 4px 0 0;
 }
 
-/* â”€â”€ Loading / Empty / Error States â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ──── Loading / Empty / Error States ──────────────────────────────────────────────── */
 .loading-wrap {
   display: flex;
   align-items: center;
@@ -5288,7 +5297,7 @@ tr:hover .lead-pin-btn {
   color: #ffffff !important;
 }
 
-/* â”€â”€ Toast â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ──── Toast ────────────────────────────────────────────────────────────────────────────────────────────────── */
 .toast {
   position: fixed;
   bottom: 20px;
@@ -5310,7 +5319,7 @@ tr:hover .lead-pin-btn {
   to { transform: translateY(0); opacity: 1; }
 }
 
-/* â”€â”€ Search Bar (in-page) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ──── Search Bar (in-page) ──────────────────────────────────────────────────────────────────── */
 .search-bar {
   display: flex;
   align-items: center;
@@ -5336,7 +5345,7 @@ tr:hover .lead-pin-btn {
   box-shadow: 0 0 0 3px var(--primary-subtle);
 }
 
-/* â”€â”€ Print Styles (from ERP) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ──── Print Styles (from ERP) ────────────────────────────────────────────────────────────── */
 @media print {
   @page { size: A4 portrait; margin: 10mm 15mm; }
 
@@ -5414,7 +5423,7 @@ tr:hover .lead-pin-btn {
   table, tr, td, th { page-break-inside: avoid !important; }
 }
 
-/* â”€â”€ Utilities â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ──── Utilities ────────────────────────────────────────────────────────────────────────────────────────── */
 /* Horizontal swipe strips (breadcrumbs, tab bars) without a visible bar. */
 @utility scrollbar-none {
   scrollbar-width: none;
@@ -5432,7 +5441,7 @@ tr:hover .lead-pin-btn {
   .rounded { border-radius: var(--radius); }
 }
 
-/* â”€â”€ Sleek Custom Scrollbars â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ──── Sleek Custom Scrollbars ────────────────────────────────────────────────────────────── */
 .custom-scrollbar::-webkit-scrollbar {
   width: 5px;
   height: 5px;
@@ -5453,26 +5462,34 @@ tr:hover .lead-pin-btn {
 }
 
 
-/* â”€â”€ KPI cards (components/ui/KpiCard.jsx) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+/* ──── KPI cards (components/ui/KpiCard.jsx) ──────────────────────────────────
    Theme-driven surface; --kpi-accent is set per card from its tone. */
-@layer components {
-  .kpi-card {
-    background: var(--card);
-    border-color: var(--border);
-    box-shadow: var(--shadow-card);
-  }
-  .kpi-card:hover {
-    border-color: color-mix(in srgb, var(--kpi-accent) 45%, var(--border));
-    box-shadow: var(--shadow-card-hover);
-  }
-  .kpi-card:focus-visible {
-    outline: 2px solid var(--kpi-accent);
-    outline-offset: 2px;
-  }
+.kpi-card {
+  box-shadow: 0 4px 14px -1px rgba(15, 23, 42, 0.08), 0 2px 6px -1px rgba(15, 23, 42, 0.04) !important;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s ease !important;
+}
+.kpi-card:hover {
+  border-color: color-mix(in srgb, var(--kpi-accent, #3b82f6) 45%, var(--border, #e2e8f0)) !important;
+  box-shadow: 0 10px 25px -3px rgba(15, 23, 42, 0.12), 0 4px 10px -2px rgba(15, 23, 42, 0.05) !important;
+  transform: translateY(-2px);
+}
+.kpi-card:active {
+  transform: translateY(0);
+}
+.kpi-card:focus-visible {
+  outline: 2px solid var(--kpi-accent, #3b82f6);
+  outline-offset: 2px;
+}
+
+.dark .kpi-card {
+  box-shadow: 0 4px 16px -1px rgba(0, 0, 0, 0.4), 0 2px 6px -1px rgba(0, 0, 0, 0.25) !important;
+}
+.dark .kpi-card:hover {
+  box-shadow: 0 10px 25px -3px rgba(0, 0, 0, 0.55), 0 4px 10px -2px rgba(0, 0, 0, 0.3) !important;
 }
 
 
-/* â”€â”€ Global ERP Responsive & Adaptive Design System â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ──── Global ERP Responsive & Adaptive Design System ────────────────── */
 :root {
   --fluid-h1: clamp(1.25rem, 1.1rem + 0.75vw, 1.625rem);
   --fluid-h2: clamp(1.1rem, 0.95rem + 0.6vw, 1.375rem);
@@ -5623,7 +5640,7 @@ textarea:focus::placeholder {
   opacity: 0 !important;
 }
 
-/* â”€â”€ PMS Loom & Production Section Styling â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ──── PMS Loom & Production Section Styling ──────────────────────────────────────────────────────────────── */
 .pms-screen {
   width: 100%;
   max-width: 100%;

@@ -37,7 +37,7 @@ import { ReceiptTypeNotice } from './DyeingColourField';
 
 const goodsReceiptGuide = {
   title: 'Goods Receipt Notes (GRN)',
-  subtitle: 'Physical intake verification, roll/taka breakdown, 3-way matching (PO â‡„ GRN â‡„ Bill), and QC checkpoint.',
+  subtitle: 'Physical intake verification, roll/taka breakdown, 3-way matching (PO → GRN → Bill), and QC checkpoint.',
   purpose: 'Every purchase order and delivery from suppliers/mills is received through physical GRN verification. This screen captures taka rolls per line, compares received meters against ordered PO meterage, records shortage/excess, and routes goods to QC inspection before stock release.',
   keyTerms: [
     { term: 'GRN (Goods Receipt Note)', definition: 'The physical intake document capturing roll-by-roll actual meters, kg, width, and lot numbers.' },
@@ -278,7 +278,7 @@ export const GoodsReceiptPage = () => {
     fetchGrns();
   };
 
-  // â”€â”€ Standalone GRN Form Handlers (Phase 2.2) â”€â”€
+  // ──── Standalone GRN Form Handlers (Phase 2.2) ────
   const openStandaloneModal = (prefill = {}) => {
     setStandaloneError('');
     setStandaloneSuccess('');
@@ -712,8 +712,9 @@ export const GoodsReceiptPage = () => {
       />
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
         <StatCard
+          index={0}
           label="Awaiting Receipt"
           value={pendingIntakeLabel}
           icon={Truck}
@@ -721,18 +722,21 @@ export const GoodsReceiptPage = () => {
           note={pendingPOs.length > 0 ? `${pendingPOs.length} POs pending intake` : undefined}
         />
         <StatCard
+          index={1}
           label="Pending Qty"
           value={pendingQtyText}
           icon={Boxes}
           tone="blue"
         />
         <StatCard
+          index={2}
           label="Receivable Value"
           value={formatCurrency(pendingValue)}
           icon={ClipboardCheck}
           tone="blue"
         />
         <StatCard
+          index={3}
           label="Received GRNs"
           value={`${totalGrnDisplayCount} Notes`}
           icon={ShieldCheck}
@@ -959,7 +963,7 @@ export const GoodsReceiptPage = () => {
         </div>
       )}
 
-      {/* â”€â”€ Standalone GRN Modal (Phase 2.2 with Taka Breakdown) â”€â”€ */}
+      {/* ──── Standalone GRN Modal (Phase 2.2 with Taka Breakdown) ──── */}
       {standaloneModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
           <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden">
@@ -1378,7 +1382,7 @@ export const GoodsReceiptPage = () => {
         </div>
       )}
 
-      {/* â”€â”€ Bill-scoped Receive Modal (Legacy) â”€â”€ */}
+      {/* ──── Bill-scoped Receive Modal (Legacy) ──── */}
       {selectedBill && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
           <div className="bg-white rounded-xl border border-slate-200 shadow-xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">

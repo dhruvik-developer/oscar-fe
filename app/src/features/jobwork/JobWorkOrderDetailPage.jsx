@@ -1065,7 +1065,7 @@ export default function JobWorkOrderDetailPage() {
       </div>
 
       {/* ── Bottom Summary Cards (matching reference screenshot) ── */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 pt-1">
+      <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-4 pt-1">
         <KpiCard
           label="Total Inward"
           value={`${numIN(totalInwardQty)} M`}
@@ -1372,7 +1372,7 @@ export default function JobWorkOrderDetailPage() {
       </div>
 
       {/* ── Bottom Summary Cards for Charges ── */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 pt-1">
+      <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-4 pt-1">
         <KpiCard
           label="Total Charges"
           value={`₹ ${numIN(charges.reduce((s, c) => s + (Number(c.amount) || 0), 0))}`}
@@ -1656,7 +1656,6 @@ export default function JobWorkOrderDetailPage() {
       <PageHeader
         title={`${jwo.process} Job Work Order - ${jwo.jwoNo}`}
         breadcrumb={[
-          { label: 'Dashboard', path: '/dashboard' },
           { label: 'PMS', path: '/pms' },
           { label: 'Job Work / Processing' },
           { label: 'Job Work Orders', path: '/job-work/orders' },

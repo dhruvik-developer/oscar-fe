@@ -36,6 +36,7 @@ import { SignatureSlot, useDocumentSignatures } from '../../components/common/Si
 import { inventoryService } from '../../services/domainServices';
 import { useERP } from '../../context/ERPContext';
 import PageInfoButton from '../../components/ui/PageInfoButton';
+import KpiCard from '../../components/ui/KpiCard';
 import AppPagination from '../../components/ui/AppPagination';
 import MasterSourceLink from '../../components/common/MasterSourceLink';
 import GreyQcInlineSlide from '../purchase/GreyQcInlineSlide';
@@ -1041,40 +1042,22 @@ export function StockPositionPage() {
       </div>
 
       {/* ── 8 TOP KPI CARDS ───────────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-8 gap-3">
-        {summaryCards.map((card) => {
-          const Icon = card.icon;
+      <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-8 gap-3.5">
+        {summaryCards.map((card, idx) => {
           const isActive =
             card.tabKey === activeTab && (card.tabKey !== 'overview' || card.id === 'overview');
 
           return (
-            <button
+            <KpiCard
               key={card.id}
               onClick={() => setTab(card.tabKey)}
-              className={`p-3 rounded-xl border text-left transition flex flex-col justify-between shadow-xs cursor-pointer ${
-                isActive
-                  ? 'bg-white border-blue-600 ring-2 ring-blue-500/20 shadow-sm'
-                  : 'bg-white border-slate-200/90 hover:border-slate-300'
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-[10.5px] font-semibold text-slate-600 truncate max-w-[110px]" title={card.label}>
-                  {card.label}
-                </span>
-                <div className={`w-6 h-6 rounded-md grid place-items-center shrink-0 ${card.bg}`}>
-                  <Icon size={12} className={card.color} />
-                </div>
-              </div>
-
-              <div className="mt-2">
-                <div className="text-base font-extrabold text-slate-900 tracking-tight font-mono">
-                  {formatQty(card.qty, card.uom)}
-                </div>
-                <div className="text-[10px] font-medium text-slate-400 mt-0.5 truncate">
-                  {formatINR(card.val)} ({card.pct}%)
-                </div>
-              </div>
-            </button>
+              label={card.label}
+              value={formatQty(card.qty, card.uom)}
+              sub={`${formatINR(card.val)} (${card.pct}%)`}
+              icon={card.icon}
+              index={idx}
+              className={isActive ? 'ring-2 ring-blue-500 shadow-sm' : ''}
+            />
           );
         })}
       </div>

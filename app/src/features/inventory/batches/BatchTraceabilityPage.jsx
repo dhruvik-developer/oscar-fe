@@ -112,7 +112,6 @@ export default function BatchTraceabilityPage() {
         title={batch.batchCode}
         subtitle={`${batch.item || 'Fabric'} · ${batch.fabricTypeLabel || 'Grey fabric'} · ${batch.origin} · created ${batch.createdOn}`}
         breadcrumb={[
-          { label: 'Dashboard', path: '/dashboard' },
           { label: 'Inventory', path: '/inventory/dashboard' },
           { label: 'Batch Registry', path: '/inventory/batches' },
           { label: batch.batchCode },

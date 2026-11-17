@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import KpiCard from '../../../../components/ui/KpiCard';
 import { modal } from '../../../../context/ModalContext';
 import {
   Activity,
@@ -593,86 +594,15 @@ export function Stage15QualityStockWorkspace({
       </div>
 
       {/* 2. SUMMARY KPI CARDS (8 Cards matching exact layout of Stage 11 & Stage 14) */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-8 gap-3">
-        {/* Card 1: Total Inward Qty */}
-        <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-xs hover:border-blue-300 transition-colors">
-          <div className="flex items-center justify-between text-blue-600 mb-1.5">
-            <span className="text-xs font-semibold text-slate-600">Total Inward Qty</span>
-            <Box size={16} />
-          </div>
-          <div className="text-lg font-bold font-mono text-slate-900">{n(summary.totalInwardQty)}</div>
-          <div className="text-[11px] text-slate-500 mt-0.5">Stage 14 dock received</div>
-        </div>
-
-        {/* Card 2: QC Pending Qty */}
-        <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-xs hover:border-amber-300 transition-colors">
-          <div className="flex items-center justify-between text-amber-600 mb-1.5">
-            <span className="text-xs font-semibold text-slate-600">QC Pending</span>
-            <Clock size={16} />
-          </div>
-          <div className="text-lg font-bold font-mono text-amber-700">{n(summary.qcPendingQty)}</div>
-          <div className="text-[11px] text-amber-600/80 mt-0.5 font-medium">Awaiting inspection</div>
-        </div>
-
-        {/* Card 3: QC Passed Qty */}
-        <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-xs hover:border-emerald-300 transition-colors">
-          <div className="flex items-center justify-between text-emerald-600 mb-1.5">
-            <span className="text-xs font-semibold text-slate-600">QC Passed</span>
-            <CheckCircle2 size={16} />
-          </div>
-          <div className="text-lg font-bold font-mono text-emerald-700">{n(summary.qcPassedQty)}</div>
-          <div className="text-[11px] text-emerald-600/80 mt-0.5 font-medium">Accepted (Grade A/B)</div>
-        </div>
-
-        {/* Card 4: QC Hold Qty */}
-        <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-xs hover:border-orange-300 transition-colors">
-          <div className="flex items-center justify-between text-orange-600 mb-1.5">
-            <span className="text-xs font-semibold text-slate-600">QC Hold</span>
-            <AlertTriangle size={16} />
-          </div>
-          <div className="text-lg font-bold font-mono text-orange-700">{n(summary.qcHoldQty)}</div>
-          <div className="text-[11px] text-slate-500 mt-0.5">In SYS-QC-HOLD</div>
-        </div>
-
-        {/* Card 5: QC Rejected Qty */}
-        <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-xs hover:border-rose-300 transition-colors">
-          <div className="flex items-center justify-between text-rose-600 mb-1.5">
-            <span className="text-xs font-semibold text-slate-600">QC Rejected</span>
-            <XCircle size={16} />
-          </div>
-          <div className="text-lg font-bold font-mono text-rose-700">{n(summary.qcRejectedQty)}</div>
-          <div className="text-[11px] text-rose-600/80 mt-0.5 font-medium">Failed grading</div>
-        </div>
-
-        {/* Card 6: Customer Project Allocated */}
-        <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-xs hover:border-indigo-300 transition-colors">
-          <div className="flex items-center justify-between text-indigo-600 mb-1.5">
-            <span className="text-xs font-semibold text-slate-600">Customer Alloc.</span>
-            <User size={16} />
-          </div>
-          <div className="text-lg font-bold font-mono text-indigo-700">{n(summary.customerAllocatedQty)}</div>
-          <div className="text-[11px] text-slate-500 mt-0.5">Ready for Dispatch</div>
-        </div>
-
-        {/* Card 7: Own Project Allocated */}
-        <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-xs hover:border-purple-300 transition-colors">
-          <div className="flex items-center justify-between text-purple-600 mb-1.5">
-            <span className="text-xs font-semibold text-slate-600">Own Project Alloc.</span>
-            <Building size={16} />
-          </div>
-          <div className="text-lg font-bold font-mono text-purple-700">{n(summary.ownAllocatedQty)}</div>
-          <div className="text-[11px] text-slate-500 mt-0.5">Internal / Stock</div>
-        </div>
-
-        {/* Card 8: Available for Allocation */}
-        <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-xs hover:border-teal-300 transition-colors">
-          <div className="flex items-center justify-between text-teal-600 mb-1.5">
-            <span className="text-xs font-semibold text-slate-600">Available to Alloc.</span>
-            <Layers size={16} />
-          </div>
-          <div className="text-lg font-bold font-mono text-teal-700">{n(summary.availableForAllocation)}</div>
-          <div className="text-[11px] text-teal-600/80 mt-0.5 font-medium">QC passed unreserved</div>
-        </div>
+      <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-8 gap-3.5">
+        <KpiCard index={0} label="Total Inward Qty" value={n(summary.totalInwardQty)} icon={Box} sub="Stage 14 dock received" />
+        <KpiCard index={1} label="QC Pending" value={n(summary.qcPendingQty)} icon={Clock} sub="Awaiting inspection" />
+        <KpiCard index={2} label="QC Passed" value={n(summary.qcPassedQty)} icon={CheckCircle2} sub="Accepted (Grade A/B)" />
+        <KpiCard index={3} label="QC Hold" value={n(summary.qcHoldQty)} icon={AlertTriangle} sub="In SYS-QC-HOLD" />
+        <KpiCard index={4} label="QC Rejected" value={n(summary.qcRejectedQty)} icon={XCircle} sub="Failed grading" />
+        <KpiCard index={5} label="Customer Alloc." value={n(summary.customerAllocatedQty)} icon={User} sub="Ready for Dispatch" />
+        <KpiCard index={6} label="Own Project Alloc." value={n(summary.ownAllocatedQty)} icon={Building} sub="Internal / Stock" />
+        <KpiCard index={7} label="Available to Alloc." value={n(summary.availableForAllocation)} icon={Layers} sub="QC passed unreserved" />
       </div>
 
       {/* 3. MAIN OPERATIONAL CARD & TABBED WORKSPACE */}

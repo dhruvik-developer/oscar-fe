@@ -195,15 +195,22 @@ const ROW_MAPPERS = {
     ...(o.takas ? { takas: o.takas } : {}),
     ...(o.status ? { status: o.status } : {}),
   }),
-  inwards: (r) => ({
-    date: orUndef(r.date),
-    qty: num(r.qty),
-    ...(r.accepted !== undefined && r.accepted !== '' ? { accepted: num(r.accepted) } : {}),
-    rejected: num(r.rejected),
-    challanNo: r.challanNo || '',
-    ...(r.takas ? { takas: r.takas } : {}),
-    ...(r.status ? { status: r.status } : {}),
-  }),
+  inwards: (r) => {
+    const qty = num(r.qty);
+    const rejected = num(r.rejected);
+    const accepted = r.accepted !== undefined && r.accepted !== '' && r.accepted !== null && Number(r.accepted) > 0
+      ? num(r.accepted)
+      : Math.max(0, qty - rejected);
+    return {
+      date: orUndef(r.date),
+      qty,
+      accepted,
+      rejected,
+      challanNo: r.challanNo || '',
+      ...(r.takas ? { takas: r.takas } : {}),
+      ...(r.status ? { status: r.status } : {}),
+    };
+  },
   losses: (l) => ({
     lossReasonId: l.lossReasonId || null,
     qty: num(l.qty),

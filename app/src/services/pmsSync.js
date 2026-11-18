@@ -316,15 +316,7 @@ export async function addDocument(projectId, stageId, payload) {
   if (!isBackendEnabled()) return null;
   let fileId = payload?.fileId;
   if (!fileId) {
-    const fallbackBlob = new Blob(
-      [`%PDF-1.4\n% Proof: ${payload?.fileName || 'design'}\n`],
-      { type: 'application/pdf' }
-    );
-    fileId = await uploadFileToBackend(
-      fallbackBlob,
-      payload?.fileName || 'design.pdf',
-      'pms_document'
-    );
+    throw new Error('A valid fileId is required to attach a document.');
   }
 
   const backendPayload = {

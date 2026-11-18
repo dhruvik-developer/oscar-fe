@@ -154,7 +154,7 @@ const useAppStoreBase = create((set) => ({
     try {
       const [core, balances, settings] = await Promise.all([
         hrmsSync.pullMany(["employees", "leaves", "attendance",
-          "leaveEncashments", "compOffs"]),
+          "leaveEncashments", "compOffs", "departments", "designations", "locations"]),
         hrmsApi.pullLeaveBalances(),
         hrmsApi.pullHrmsSettings(),
       ]);
@@ -193,8 +193,13 @@ const useAppStoreBase = create((set) => ({
   }),
 
   refreshHrms: async (key, stateKey) => {
+    const keyMap = {
+      compOffs: "compOffCredits",
+      leaveEncashments: "encashments",
+    };
     const rows = await hrmsSync.pull(key);
-    if (rows) set({ [stateKey || key]: rows });
+    const targetKey = stateKey || keyMap[key] || key;
+    if (rows) set({ [targetKey]: rows });
     return rows;
   },
 

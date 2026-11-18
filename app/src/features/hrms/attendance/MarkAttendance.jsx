@@ -37,7 +37,7 @@ import {
 } from "lucide-react";
 import { useAppStore } from "../../../stores/appStore";
 import { useAttendanceStore } from "../../../stores/attendanceStore";
-import { hrmsSync } from "../../../services/hrmsSync";
+import { hrmsSync, pullDailyAttendance } from "../../../services/hrmsSync";
 import KpiCard from "../../../components/ui/KpiCard";
 import { api } from "../../../services/api";
 import { Badge } from "../../../components/hrms/Badge";
@@ -480,10 +480,12 @@ function TeamMarkAttendance() {
   const [bulkStatus, setBulkStatus] = useState("Present");
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [rowSavingId, setRowSavingId] = useState(null);
 
   const selectAllRef = useRef(null);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (opts = {}) => {
+    const { preserveSelection = false } = opts;
     setLoading(true);
     try {
       try {
@@ -491,10 +493,13 @@ function TeamMarkAttendance() {
       } catch {
         // fallback quietly to direct pull
       }
-      const data = (await hrmsSync.pull("attendance", { date })) || [];
-      setServerRows(data);
+      const data = await pullDailyAttendance(date);
+      const list = Array.isArray(data?.results) ? data.results : (Array.isArray(data) ? data : []);
+      setServerRows(list);
       setEdits({});
-      setChecked({});
+      if (!preserveSelection) {
+        setChecked({});
+      }
       await useAttendanceStore.getState().refreshAttendance();
     } finally {
       setLoading(false);
@@ -507,44 +512,28 @@ function TeamMarkAttendance() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [todayPunch?.isPunchedIn, todayPunch?.lastPunchIso]);
 
-  // Everyone on the payroll of people, with the day's row where there is one.
+  // Everyone on the workforce roster, showing accurate names and codes directly
   const rows = useMemo(() => {
-    const byEmployee = new Map(serverRows.map((r) => [String(r.employeeId), r]));
-    const peopleRaw = employees?.length
-      ? employees.filter((e) => !["Resigned", "Terminated"].includes(e.status))
-      : serverRows.map((r) => ({ id: r.employeeId, name: r.name, department: r.dept, empId: r.empId }));
-
-    const peopleMap = new Map();
-    peopleRaw.forEach((p) => {
-      const name = (p.name || "").trim().toLowerCase();
-      const id = String(p.id || p.employeeId || "").trim().toLowerCase();
-      const key = id || name;
-      if (key && !peopleMap.has(key) && (!name || !peopleMap.has(name))) {
-        peopleMap.set(key, p);
-        if (name) peopleMap.set(name, p);
-      }
-    });
-    const people = Array.from(new Set(peopleMap.values()));
-
-    return people.map((e) => {
-      const att = byEmployee.get(String(e.id));
+    return serverRows.map((r) => {
+      const empIdStr = String(r.employeeId || r.id);
       const base = {
-        employeeId: String(e.id),
-        name: e.name || att?.name || "Employee",
-        empId: e.empId || e.employeeCode || att?.empId || "",
-        dept: e.department || e.dept || att?.dept || "",
-        avatar: e.avatar || e.photo || e.img || "",
-        checkIn: toHHMM(att?.checkIn),
-        checkOut: toHHMM(att?.checkOut),
-        status: att?.status || "",
-        remark: att?.remark || "",
-        source: att?.source || "",
-        punchCount: (att?.punches || []).length,
-        marked: Boolean(att),
+        employeeId: empIdStr,
+        name: r.name || "Employee",
+        empId: r.employeeCode || r.empId || "",
+        dept: r.department || r.dept || "",
+        avatar: r.avatar || r.photo || "",
+        checkIn: toHHMM(r.checkIn),
+        checkOut: toHHMM(r.checkOut),
+        status: r.status === "Not Marked" ? "" : (r.status || ""),
+        serverStatus: r.status || "",
+        remark: r.remark || "",
+        source: r.source || "",
+        punchCount: (r.punches || []).length,
+        marked: Boolean(r.marked || (r.status && r.status !== "Not Marked" && r.status !== "Not Joined")),
       };
       return { ...base, ...(edits[base.employeeId] || {}) };
     });
-  }, [employees, serverRows, edits]);
+  }, [serverRows, edits]);
 
   const departments = useMemo(() => ["All", ...new Set(rows.map((r) => r.dept).filter(Boolean))], [rows]);
 
@@ -663,6 +652,7 @@ function TeamMarkAttendance() {
 
   async function handleStatusChange(employeeId, newStatus) {
     const r = rows.find((row) => row.employeeId === employeeId);
+    if (!r) return;
     const defaultIn = flexibility?.shiftStart || "09:00";
     const defaultOut = flexibility?.shiftEnd || "18:00";
 
@@ -671,10 +661,15 @@ function TeamMarkAttendance() {
       checkIn: newStatus === "Absent" ? "" : (r?.checkIn || (newStatus === "Present" ? defaultIn : "")),
       checkOut: newStatus === "Absent" ? "" : (r?.checkOut || (newStatus === "Present" ? defaultOut : "")),
     };
-    edit(employeeId, patch);
-    setChecked((p) => ({ ...p, [employeeId]: isAttended(newStatus) }));
+
+    // Instant optimistic update directly into serverRows & edits
+    setServerRows((prev) =>
+      prev.map((row) => (String(row.employeeId || row.id) === String(employeeId) ? { ...row, ...patch } : row))
+    );
+    resetEdit(employeeId);
 
     if (newStatus) {
+      setRowSavingId(employeeId);
       try {
         await api.post("/hrms/attendance/bulk/", {
           date,
@@ -688,18 +683,22 @@ function TeamMarkAttendance() {
             },
           ],
         });
-        resetEdit(employeeId);
-        await useAttendanceStore.getState().refreshAttendance();
-        await load();
+        useAttendanceStore.getState().refreshAttendance();
         showToast?.(`Updated status for ${r?.name || "employee"} to ${newStatus}`);
       } catch (err) {
+        setServerRows((prev) =>
+          prev.map((row) => (String(row.employeeId || row.id) === String(employeeId) ? { ...row, ...r } : row))
+        );
         showToast?.(`Failed to update status — ${err?.payload?.message || err?.message || "try again"}`);
+      } finally {
+        setRowSavingId(null);
       }
     }
   }
 
   async function quickMark(employeeId, newStatus) {
     const current = rows.find((r) => r.employeeId === employeeId);
+    if (!current) return;
     const defaultIn = flexibility?.shiftStart || "09:00";
     const defaultOut = flexibility?.shiftEnd || "18:00";
 
@@ -715,7 +714,14 @@ function TeamMarkAttendance() {
       checkIn: inTime,
       checkOut: outTime,
     };
-    edit(employeeId, patch);
+
+    // 1. Instantly update serverRows so UI updates without flicker or reverting
+    setServerRows((prev) =>
+      prev.map((r) => (String(r.employeeId || r.id) === String(employeeId) ? { ...r, ...patch } : r))
+    );
+    // 2. Clear pending draft edit so it renders the updated server row cleanly
+    resetEdit(employeeId);
+    setRowSavingId(employeeId);
 
     try {
       await api.post("/hrms/attendance/bulk/", {
@@ -730,12 +736,55 @@ function TeamMarkAttendance() {
           },
         ],
       });
-      resetEdit(employeeId);
-      await useAttendanceStore.getState().refreshAttendance();
-      await load();
+      // Refresh attendance store silently in the background
+      useAttendanceStore.getState().refreshAttendance();
       showToast?.(`Marked ${current?.name || "employee"} as ${newStatus}`);
     } catch (err) {
+      // Revert to original row state on failure
+      setServerRows((prev) =>
+        prev.map((r) => (String(r.employeeId || r.id) === String(employeeId) ? { ...r, ...current } : r))
+      );
       showToast?.(`Failed to update attendance — ${err?.payload?.message || err?.message || "try again"}`);
+    } finally {
+      setRowSavingId(null);
+    }
+  }
+
+  async function saveSingleRow(employeeId) {
+    const r = rows.find((row) => row.employeeId === employeeId);
+    if (!r) return;
+
+    if (r.checkIn && r.checkOut && r.checkOut <= r.checkIn) {
+      showToast?.(`Cannot save: Check-out (${r.checkOut}) must be after Check-in (${r.checkIn}) for ${r.name || "employee"}`);
+      return;
+    }
+
+    const payloadStatus = r.status || (r.checkIn ? "Present" : "Absent");
+    setServerRows((prev) =>
+      prev.map((row) => (String(row.employeeId || row.id) === String(employeeId) ? { ...row, status: payloadStatus } : row))
+    );
+    resetEdit(employeeId);
+    setRowSavingId(employeeId);
+
+    try {
+      await api.post("/hrms/attendance/bulk/", {
+        date,
+        records: [
+          {
+            employeeId,
+            checkIn: r.checkIn || null,
+            checkOut: r.checkOut || null,
+            status: payloadStatus,
+            remark: r.remark || null,
+          },
+        ],
+      });
+      useAttendanceStore.getState().refreshAttendance();
+      showToast?.(`Saved attendance for ${r.name || "employee"}`);
+    } catch (err) {
+      showToast?.(`Failed to save attendance — ${err?.payload?.message || err?.message || "try again"}`);
+    } finally {
+      setRowSavingId(null);
     }
   }
 
@@ -1047,6 +1096,34 @@ function TeamMarkAttendance() {
         </div>
       )}
 
+      {/* Unsaved Edits Bar (Displayed when manual edits are made without active bulk selection) */}
+      {dirtyIds.length > 0 && selectedIds.length === 0 && (
+        <div className="bg-amber-50 border border-amber-200/90 rounded-2xl p-3 px-4 shadow-xs flex flex-wrap items-center justify-between gap-3 animate-in fade-in duration-150">
+          <div className="flex items-center gap-2.5">
+            <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse" />
+            <span className="text-xs font-bold text-amber-900">
+              {dirtyIds.length} employee{dirtyIds.length === 1 ? "" : "s"} with unsaved changes
+            </span>
+            <button
+              type="button"
+              onClick={() => setEdits({})}
+              className="text-xs text-amber-700 hover:text-amber-900 underline underline-offset-2 cursor-pointer ml-1"
+            >
+              Discard all
+            </button>
+          </div>
+          <button
+            type="button"
+            onClick={save}
+            disabled={saving}
+            className="h-8 px-4 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold inline-flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors"
+          >
+            {saving ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />}
+            <span>Save All Changes</span>
+          </button>
+        </div>
+      )}
+
       {/* Main Register Table Card */}
       <div className="bg-white border border-bdr rounded-2xl shadow-xs overflow-hidden flex flex-col">
         <div className="overflow-x-auto">
@@ -1242,9 +1319,12 @@ function TeamMarkAttendance() {
                     <td className="py-3 px-3">
                       <div className="relative inline-flex items-center">
                         <select
+                          disabled={rowSavingId === r.employeeId}
                           value={r.status || ""}
                           onChange={(e) => handleStatusChange(r.employeeId, e.target.value)}
                           className={`h-8 pl-3 pr-7 text-xs font-semibold rounded-lg border appearance-none cursor-pointer outline-none transition-all shadow-2xs ${
+                            rowSavingId === r.employeeId ? "opacity-60 cursor-wait" : ""
+                          } ${
                             r.status ? statusStyle.bg : "bg-slate-50 text-slate-500 border-slate-200 hover:border-slate-300"
                           }`}
                         >
@@ -1271,17 +1351,29 @@ function TeamMarkAttendance() {
                     <td className="py-3 pr-4 pl-2 text-right">
                       <div className="inline-flex items-center gap-1.5 justify-end">
                         {dirty && (
-                          <button
-                            type="button"
-                            title="Discard edits for this employee"
-                            onClick={() => resetEdit(r.employeeId)}
-                            className="w-7 h-7 rounded-lg text-amber-700 bg-amber-100/70 hover:bg-amber-200 flex items-center justify-center cursor-pointer transition-colors"
-                          >
-                            <RotateCcw size={13} />
-                          </button>
+                          <>
+                            <button
+                              type="button"
+                              title="Save changes for this employee"
+                              disabled={rowSavingId === r.employeeId}
+                              onClick={() => saveSingleRow(r.employeeId)}
+                              className="w-7 h-7 rounded-lg text-emerald-700 bg-emerald-100 hover:bg-emerald-200 flex items-center justify-center cursor-pointer transition-colors"
+                            >
+                              {rowSavingId === r.employeeId ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />}
+                            </button>
+                            <button
+                              type="button"
+                              title="Discard edits for this employee"
+                              onClick={() => resetEdit(r.employeeId)}
+                              className="w-7 h-7 rounded-lg text-amber-700 bg-amber-100/70 hover:bg-amber-200 flex items-center justify-center cursor-pointer transition-colors"
+                            >
+                              <RotateCcw size={13} />
+                            </button>
+                          </>
                         )}
                         <button
                           type="button"
+                          disabled={rowSavingId === r.employeeId}
                           title={r.status === "Present" ? "Currently marked Present" : "Mark Present"}
                           onClick={() => quickMark(r.employeeId, "Present")}
                           className={`w-7 h-7 rounded-lg border flex items-center justify-center cursor-pointer transition-colors ${
@@ -1294,6 +1386,7 @@ function TeamMarkAttendance() {
                         </button>
                         <button
                           type="button"
+                          disabled={rowSavingId === r.employeeId}
                           title={r.status === "Absent" ? "Currently marked Absent" : "Mark Absent"}
                           onClick={() => quickMark(r.employeeId, "Absent")}
                           className={`w-7 h-7 rounded-lg border flex items-center justify-center cursor-pointer transition-colors ${

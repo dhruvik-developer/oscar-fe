@@ -472,21 +472,17 @@ const useAttendanceStoreBase = create((set, get) => ({
 
   addRequest: async (r) => {
     if (isBackendEnabled()) {
-      try {
-        const payload = {
-          employeeId: isServerId(r.employeeId) ? r.employeeId : undefined,
-          date: r.date,
-          requestedCheckIn: r.requestedCheckIn || r.reqIn,
-          requestedCheckOut: r.requestedCheckOut || r.reqOut,
-          requestedStatus: r.requestedStatus,
-          reason: r.reason,
-        };
-        const res = await api.post("/hrms/attendance/regularizations/", payload);
-        await get().refreshRequests?.();
-        return res;
-      } catch (err) {
-        throw err;
-      }
+      const payload = {
+        employeeId: isServerId(r.employeeId) ? r.employeeId : undefined,
+        date: r.date,
+        requestedCheckIn: r.requestedCheckIn || r.reqIn,
+        requestedCheckOut: r.requestedCheckOut || r.reqOut,
+        requestedStatus: r.requestedStatus,
+        reason: r.reason,
+      };
+      const res = await api.post("/hrms/attendance/regularizations/", payload);
+      await get().refreshRequests?.();
+      return res;
     }
 
     set((s) => {
@@ -614,8 +610,10 @@ const useAttendanceStoreBase = create((set, get) => ({
     });
 
     get().fetchTodayPunch();
-    get().refreshAttendance();
-    get().refreshRequests();
+    get().refreshAttendance();
+
+    get().refreshRequests();
+
   },
 
   saveFlexibility: async (flexibility) => {

@@ -6,8 +6,7 @@ import { DataTable } from "../../../components/hrms/DataTable";
 import { StatusBadge } from "../../../components/hrms/StatusBadge";
 import { Modal } from "../../../components/hrms/Modal";
 import { Button } from "../../../components/hrms/Button";
-import { Avatar } from "../../../components/hrms/Avatar";
-import PageHeader from "../../../components/ui/PageHeader";
+import PageInfoButton from "../../../components/common/PageInfoButton";
 import { hrmsGuides } from "../../../data/hrms/hrmsGuides";
 import {
   CalendarCheck,
@@ -27,8 +26,11 @@ import {
   Layers,
   Sparkles,
   Target,
+  FileText,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import PerformanceReportModal from "./PerformanceReportModal";
+import UserInitials from "../../../components/common/UserInitials";
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -47,6 +49,10 @@ export default function Dashboard() {
     setActiveCycleId,
     getMetrics,
   } = usePerformanceStore();
+
+  const currentUser = useAppStore((s) => s.currentUser);
+  const employeeViewName = simulatedEmployeeName || currentUser?.name || "";
+  const managerViewName = simulatedManagerName || currentUser?.name || "";
 
   const metrics = getMetrics();
   const metricIcons = [CalendarCheck, Clock, CheckCircle2, Star, Activity, AlertTriangle];
@@ -71,6 +77,10 @@ export default function Dashboard() {
   // Table Filter
   const [stageFilter, setStageFilter] = useState("All");
 
+  // Performance Report Modal State
+  const [perfReportOpen, setPerfReportOpen] = useState(false);
+  const [selectedPerfAppraisal, setSelectedPerfAppraisal] = useState(null);
+
   const activeCycle = cycles.find((c) => c.id === activeCycleId) || cycles[0];
 
   // Filtered appraisals based on selected role
@@ -78,11 +88,11 @@ export default function Dashboard() {
     let list = appraisals;
     if (role === "Employee") {
       list = appraisals.filter(
-        (a) => String(a.employee ?? '').toLowerCase() === simulatedEmployeeName.toLowerCase()
+        (a) => String(a.employee ?? '').toLowerCase() === employeeViewName.toLowerCase()
       );
     } else if (role === "Manager") {
       list = appraisals.filter(
-        (a) => String(a.reviewer ?? '').toLowerCase() === simulatedManagerName.toLowerCase()
+        (a) => String(a.reviewer ?? '').toLowerCase() === managerViewName.toLowerCase()
       );
     }
 
@@ -90,7 +100,7 @@ export default function Dashboard() {
       list = list.filter((a) => a.stage === stageFilter);
     }
     return list;
-  }, [appraisals, role, simulatedEmployeeName, simulatedManagerName, stageFilter]);
+  }, [appraisals, role, employeeViewName, managerViewName, stageFilter]);
 
   // Stage distribution counts
   const stageCounts = useMemo(() => {
@@ -107,11 +117,17 @@ export default function Dashboard() {
   // Open Add Cycle Modal
   const handleOpenNewCycle = () => {
     setEditingCycle(null);
+    const now = new Date();
+    const q = Math.floor(now.getMonth() / 3);
+    const qStart = new Date(now.getFullYear(), q * 3, 1);
+    const qEnd = new Date(now.getFullYear(), q * 3 + 3, 0);
+    const isoOf = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    const labelOf = (d) => d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
     setCycleForm({
-      name: `Q${Math.min(4, Math.floor(new Date().getMonth() / 3) + 1)} ${new Date().getFullYear()} Review Cycle`,
-      reviewPeriod: "01 Oct 2024 – 31 Dec 2024",
-      startDate: "2024-10-01",
-      endDate: "2024-12-31",
+      name: `Q${q + 1} ${now.getFullYear()} Review Cycle`,
+      reviewPeriod: `${labelOf(qStart)} – ${labelOf(qEnd)}`,
+      startDate: isoOf(qStart),
+      endDate: isoOf(qEnd),
       reviewFrequency: "Quarterly",
       status: "Active",
       description: "Appraisal cycle for quarterly performance evaluation and calibration.",
@@ -170,7 +186,7 @@ export default function Dashboard() {
       sortable: true,
       render: (r) => (
         <div className="flex items-center gap-2.5">
-          <Avatar name={r.employee} size="sm" />
+          <UserInitials name={r.employee} className="w-7 h-7 text-[10px]" />
           <div>
             <div className="font-medium text-slate-800 text-[13px]">{r.employee}</div>
             <div className="text-[11px] text-slate-500">{r.designation} • {r.department}</div>
@@ -232,12 +248,24 @@ export default function Dashboard() {
       key: "actions",
       header: "Action",
       render: (r) => (
-        <button
-          onClick={() => navigate('/hrms/performance/appraisal')}
-          className="px-2.5 py-1 bg-white hover:bg-slate-50 border border-[#e2e8f0] text-slate-700 rounded-lg text-[11.5px] font-medium transition flex items-center gap-1 shadow-2xs"
-        >
-          Manage <ChevronRight size={13} />
-        </button>
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={() => {
+              setSelectedPerfAppraisal(r);
+              setPerfReportOpen(true);
+            }}
+            className="px-2 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-xl text-[11.5px] font-medium transition flex items-center gap-1"
+            title="Generate Performance Report"
+          >
+            <FileText size={12} /> Report
+          </button>
+          <button
+            onClick={() => navigate('/hrms/performance/appraisal')}
+            className="px-2.5 py-1 bg-white hover:bg-slate-50 border border-[#e2e8f0] text-slate-700 rounded-xl text-[11.5px] font-medium transition flex items-center gap-1 shadow-2xs"
+          >
+            Manage <ChevronRight size={13} />
+          </button>
+        </div>
       ),
     },
   ];
@@ -245,20 +273,37 @@ export default function Dashboard() {
   return (
     <div className="flex flex-col gap-6">
       {/* Header & New Cycle Action */}
-      <PageHeader
-        title="Performance Management"
-        subtitle="Overview of review cycles, appraisal workflows, indicators, and department ratings."
-        guide={hrmsGuides.performanceDashboard}
-        actions={
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <div className="flex items-center gap-2.5">
+            <h1 className="text-[22px] font-bold text-slate-800">Performance Management</h1>
+            <PageInfoButton guide={hrmsGuides.performanceDashboard} />
+          </div>
+          <p className="text-[13px] text-slate-500 mt-0.5">
+            Overview of review cycles, appraisal workflows, indicators, and department ratings.
+          </p>
+        </div>
+        <div className="flex flex-wrap lg:flex-nowrap items-center gap-2.5">
+          <button
+            onClick={() => {
+              setSelectedPerfAppraisal(null);
+              setPerfReportOpen(true);
+            }}
+            className="btn-outline h-9 px-3.5 rounded-xl text-xs font-semibold shadow-2xs flex items-center gap-1.5"
+            title="Generate Official Employee Performance Report"
+          >
+            <FileText size={14} className="text-blue-600" />
+            Performance Report
+          </button>
           <button
             onClick={handleOpenNewCycle}
-            className="bg-primary hover:bg-primary-hover text-white px-4 py-2 rounded-xl text-[13px] font-medium transition shadow-2xs flex items-center gap-1.5 cursor-pointer"
+            className="btn-primary h-9 px-4 rounded-xl text-xs font-semibold shadow-2xs flex items-center gap-1.5"
           >
             <Plus size={15} />
             New Review Cycle
           </button>
-        }
-      />
+        </div>
+      </div>
 
       {/* Role Simulation Toolbar */}
       <div className="bg-white border border-[#e2e8f0] rounded-2xl p-3.5 shadow-2xs flex flex-wrap items-center justify-between gap-3">
@@ -269,7 +314,7 @@ export default function Dashboard() {
           <div>
             <div className="text-[11px] uppercase tracking-wider text-slate-400 font-semibold">Simulated Role Perspective</div>
             <div className="text-[13px] font-medium text-slate-800">
-              Viewing as: <span className="font-bold text-blue-600">{role}</span> {role === "Employee" && `(${simulatedEmployeeName})`}{role === "Manager" && `(${simulatedManagerName})`}
+              Viewing as: <span className="font-bold text-blue-600">{role}</span> {role === "Employee" && `(${employeeViewName})`}{role === "Manager" && `(${managerViewName})`}
             </div>
           </div>
         </div>
@@ -277,7 +322,7 @@ export default function Dashboard() {
         <div className="flex items-center gap-1 bg-[#f8fafc] p-1 rounded-xl border border-[#e2e8f0]">
           <button
             onClick={() => setRole("HR")}
-            className={`px-3 py-1.5 rounded-lg text-[12px] font-medium transition flex items-center gap-1.5 ${
+            className={`h-8 px-3 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 ${
               role === "HR"
                 ? "bg-white text-slate-900 shadow-2xs border border-[#e2e8f0]"
                 : "text-slate-600 hover:text-slate-900"
@@ -288,7 +333,7 @@ export default function Dashboard() {
           </button>
           <button
             onClick={() => setRole("Manager")}
-            className={`px-3 py-1.5 rounded-lg text-[12px] font-medium transition flex items-center gap-1.5 ${
+            className={`h-8 px-3 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 ${
               role === "Manager"
                 ? "bg-white text-slate-900 shadow-2xs border border-[#e2e8f0]"
                 : "text-slate-600 hover:text-slate-900"
@@ -299,7 +344,7 @@ export default function Dashboard() {
           </button>
           <button
             onClick={() => setRole("Employee")}
-            className={`px-3 py-1.5 rounded-lg text-[12px] font-medium transition flex items-center gap-1.5 ${
+            className={`h-8 px-3 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 ${
               role === "Employee"
                 ? "bg-white text-slate-900 shadow-2xs border border-[#e2e8f0]"
                 : "text-slate-600 hover:text-slate-900"
@@ -329,7 +374,7 @@ export default function Dashboard() {
       <div className="bg-white border border-[#e2e8f0] rounded-2xl p-5 shadow-2xs flex flex-col gap-4">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#f1f5f9] pb-3.5">
           <div className="flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">
+            <div className="w-7 h-7 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
               <Calendar size={16} />
             </div>
             <div>
@@ -404,9 +449,9 @@ export default function Dashboard() {
             </h2>
             <p className="text-[12.5px] text-slate-500">
               {role === "Employee"
-                ? `Current evaluation progress for ${simulatedEmployeeName}`
+                ? `Current evaluation progress for ${employeeViewName}`
                 : role === "Manager"
-                ? `Direct reports assigned to reviewer ${simulatedManagerName}`
+                ? `Direct reports assigned to reviewer ${managerViewName}`
                 : "Live 4-stage review progression across all departments"}
             </p>
           </div>
@@ -418,7 +463,7 @@ export default function Dashboard() {
                 onClick={() => setStageFilter(st)}
                 className={`h-8 px-3 rounded-xl text-[12px] font-medium transition ${
                   stageFilter === st
-                    ? "bg-primary text-white shadow-2xs"
+                    ? "bg-[#16233a] text-white shadow-2xs"
                     : "bg-white text-slate-600 border border-[#e2e8f0] hover:bg-slate-50"
                 }`}
               >
@@ -595,7 +640,7 @@ export default function Dashboard() {
               </div>
               <div>
                 <span className="text-[11px] text-slate-400 block">Total Appraisals</span>
-                <span className="font-medium text-slate-800">{viewingCycle.appraisalCount || 24}</span>
+                <span className="font-medium text-slate-800">{viewingCycle.appraisalCount || appraisals.filter((a) => a.cycleId === viewingCycle.id || a.cycle === viewingCycle.name).length}</span>
               </div>
             </div>
 
@@ -608,6 +653,13 @@ export default function Dashboard() {
           </div>
         )}
       </Modal>
+
+      {/* Performance & Appraisal Report Modal */}
+      <PerformanceReportModal
+        isOpen={perfReportOpen}
+        onClose={() => setPerfReportOpen(false)}
+        appraisal={selectedPerfAppraisal}
+      />
     </div>
   );
 }

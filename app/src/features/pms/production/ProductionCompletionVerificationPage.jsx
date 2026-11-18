@@ -184,25 +184,7 @@ export default function ProductionCompletionVerificationPage() {
     }
   };
 
-  const handleGeneratePo = async () => {
-    if (!activePiId) return;
-    setActionError(null);
-    setActionNotice(null);
-    setBusy('po');
-    try {
-      const res = await api.post(`/production/instructions/${activePiId}/generate-po/`);
-      setDetail(res);
-      const msg = res?.finalPoNumber ? `Final Job Work PO ${res.finalPoNumber} created.` : 'Final Job Work PO created.';
-      setActionNotice(msg);
-      showToast(msg, 'success');
-      await loadCompletionData(activePiId);
-    } catch (err) {
-      setActionError(`Generate Final PO failed: ${errorText(err)}`);
-      showToast(`Generate Final PO failed: ${errorText(err)}`, 'error');
-    } finally {
-      setBusy(null);
-    }
-  };
+
 
   const handleVerify = async (e) => {
     e.preventDefault();

@@ -52,10 +52,15 @@ const ICON_STYLE = {
 };
 
 /** The master's options, plus `extra` values (e.g. on saved tasks) it no longer lists. */
-function withExtras(options, extra) {
-  const out = [...options];
-  extra.forEach((value) => {
-    if (value && !out.includes(value)) out.push(value);
+function withExtras(options = [], extra = []) {
+  const set = new Set();
+  const out = [];
+  [...(Array.isArray(options) ? options : []), ...(Array.isArray(extra) ? extra : [])].forEach((value) => {
+    const str = typeof value === 'string' ? value.trim() : (value?.name || String(value || '')).trim();
+    if (str && !set.has(str)) {
+      set.add(str);
+      out.push(str);
+    }
   });
   return out;
 }
@@ -266,7 +271,7 @@ export default function MasterTasksPage() {
     });
     setFormError('');
     setModalOpen(true);
-    setMenuId(null);
+    setMenu(null);
   }
 
   function submitForm(e) {
@@ -323,7 +328,7 @@ export default function MasterTasksPage() {
   function duplicateTask(id) {
     const src = tasks.find((t) => t.id === id);
     if (!src) return;
-    setMenuId(null);
+    setMenu(null);
     const maxOrder = tasks.reduce((m, t) => Math.max(m, t.order || 0), 0);
     const copy = {
       ...src,
@@ -351,7 +356,7 @@ export default function MasterTasksPage() {
     } else {
       reportFailure(new Error(NOT_SIGNED_IN));
     }
-    setMenuId(null);
+    setMenu(null);
   }
 
   function confirmDelete() {
@@ -362,7 +367,7 @@ export default function MasterTasksPage() {
       reportFailure(new Error(NOT_SIGNED_IN));
     }
     setDeleteId(null);
-    setMenuId(null);
+    setMenu(null);
   }
 
   function priorityPill(priority) {

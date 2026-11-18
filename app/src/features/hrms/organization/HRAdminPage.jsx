@@ -560,15 +560,29 @@ export default function HRAdminPage({ defaultTab }) {
   const handleCreateTermination = (e) => {
     e.preventDefault();
     if (!newTermination.employee) return;
+    let targetEmpId = newTermination.employeeId;
+    if (!isServerId(targetEmpId)) {
+      const match = (employees || []).find((x) =>
+        (x?.name && x.name.toLowerCase() === String(newTermination.employee).toLowerCase()) ||
+        (targetEmpId && (String(x?.id) === String(targetEmpId) ||
+          String(x?.empId || '').toLowerCase() === String(targetEmpId).toLowerCase() ||
+          String(x?.employeeCode || '').toLowerCase() === String(targetEmpId).toLowerCase()))
+      );
+      if (match && isServerId(match.id)) targetEmpId = match.id;
+    }
     const created = {
       id: `TRM-${100 + terminations.length + 1}`,
       ...newTermination,
+      employeeId: targetEmpId,
+      lastWorkingDay: newTermination.exitDate || newTermination.lastWorkingDay,
+      terminationDate: newTermination.exitDate || newTermination.terminationDate,
       status: "In Exit Clearance",
       createdAt: new Date().toISOString().split("T")[0],
     };
     setTerminations([created, ...terminations]);
     if (isBackendEnabled()) {
-      hrmsSync.create('terminations', created).then((saved) => {
+      const { id: _tempId, ...terminationPayload } = created;
+      hrmsSync.create('terminations', terminationPayload).then((saved) => {
         if (saved?.id) {
           setTerminations((prev) => prev.map((t) => (t.id === created.id ? saved : t)));
         }
@@ -774,8 +788,8 @@ export default function HRAdminPage({ defaultTab }) {
         if (c.id !== id) return c;
         const next =
           c.status === "Open"
-            ? "Under Investigation"
-            : c.status === "Under Investigation"
+            ? "Under Review"
+            : c.status === "Under Review"
             ? "Resolved"
             : "Open";
         if (isBackendEnabled()) {
@@ -863,20 +877,26 @@ export default function HRAdminPage({ defaultTab }) {
       confirmText: "Remove Holiday"
     });
     if (!confirmed) return;
-    if (true) {
-      setHolidays((prev) => prev.filter((h) => h.id !== id));
-      if (isBackendEnabled()) {
-        hrmsSync.remove('holidays', id).catch(console.warn);
+
+    if (isBackendEnabled()) {
+      try {
+        await hrmsSync.remove('holidays', id);
+      } catch (err) {
+        console.error("Failed to delete holiday from backend:", err);
+        showToast(err?.message || "Failed to remove holiday from backend.");
+        return;
       }
-      const calEvents = useCalendarStore.getState().events;
-      const calMatch = calEvents.find(
-        (e) => e.source_id === id || e.sourceId === id || (e.title || '').toLowerCase() === (name || '').toLowerCase()
-      );
-      if (calMatch?.id) {
-        deleteCalendarEvent?.(calMatch.id);
-      }
-      showToast(`Holiday "${name}" removed`);
     }
+
+    setHolidays((prev) => prev.filter((h) => h.id !== id));
+    const calEvents = useCalendarStore.getState().events;
+    const calMatch = calEvents.find(
+      (e) => e.source_id === id || e.sourceId === id || (e.title || '').toLowerCase() === (name || '').toLowerCase()
+    );
+    if (calMatch?.id) {
+      deleteCalendarEvent?.(calMatch.id);
+    }
+    showToast(`Holiday "${name}" removed`);
   };
 
   // ── Org Settings ───────────────────────────────────────────
@@ -1099,16 +1119,7 @@ export default function HRAdminPage({ defaultTab }) {
             </div>
 
             {/* Contextual Primary Action Button */}
-            {/* Teams action button commented out */}
-            {false && (
-              <button
-                type="button"
-                onClick={handleOpenAddTeam}
-                className="inline-flex items-center gap-2 px-5 py-2.5 bg-navy text-white rounded-xl text-[13.5px] font-medium hover:bg-navy/90 transition shadow-xs cursor-pointer"
-              >
-                <Plus size={16} /> Create Team
-              </button>
-            )}
+            {/* Teams action button removed */}
             {activeTab === "working-days" && (
               <div className="flex items-center gap-2">
                 <button
@@ -1141,16 +1152,7 @@ export default function HRAdminPage({ defaultTab }) {
                 <Plus size={16} /> New Approval Chain
               </button>
             )}
-            {/* Offers action button commented out */}
-            {false && (
-              <button
-                type="button"
-                onClick={() => setIsGenerateOfferModalOpen(true)}
-                className="inline-flex items-center gap-2 px-5 py-2.5 bg-navy text-white rounded-xl text-[13.5px] font-medium hover:bg-navy/90 transition shadow-xs cursor-pointer"
-              >
-                <Plus size={16} /> Generate Offer Letter
-              </button>
-            )}
+            {/* Offers action button removed */}
             {activeTab === "terminations" && (
               <button
                 type="button"
@@ -2042,7 +2044,7 @@ export default function HRAdminPage({ defaultTab }) {
                         className={`px-2.5 py-0.5 rounded-full text-[11px] font-medium border cursor-pointer ${
                           c.status === "Resolved"
                             ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                            : c.status === "Under Investigation"
+                            : (c.status === "Under Review" || c.status === "Under Investigation")
                             ? "bg-purple-50 text-purple-700 border-purple-200"
                             : "bg-amber-50 text-amber-700 border-amber-200"
                         }`}

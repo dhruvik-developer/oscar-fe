@@ -94,7 +94,7 @@ export function Stage12JobWorkOutwardWorkspace({
       const [plansRes, jwoRes, takasRes, empRes] = await Promise.allSettled([
         fetchPlans().catch(() => []),
         fetchJWOs().catch(() => []),
-        api.get('/inventory/lot-takas/', { query: { page_size: 150 } }).catch(() => ({ results: [] })),
+        api.get('/inventory/lot-register/', { query: { page_size: 150 } }).catch(() => ({ results: [] })),
         api.get('/hrms/employees/', { query: { page_size: 100 } }).catch(() => ({ results: [] })),
       ]);
 
@@ -269,7 +269,7 @@ export function Stage12JobWorkOutwardWorkspace({
     }
     setSubmitting(true);
     try {
-      const res = await api.post(`/jobwork/plans/${activePlan.id}/create-jwo/`);
+      const res = await api.post(`/jobwork/process-plans/${activePlan.id}/create-jwo/`);
       toast.success(`Job Work Order ${res.jwoNo || 'generated'} created successfully!`);
       await loadWorkspaceData();
       if (onUpdated) await onUpdated();

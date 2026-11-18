@@ -1,7 +1,6 @@
-import { modal } from '../../../context/ModalContext';
 import { useState, useMemo, useEffect } from "react";
-import { Avatar } from "../../../components/hrms/Avatar";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
+import { Pagination } from "../../../components/ui/Pagination";
 import {
   Plus,
   LayoutGrid,
@@ -27,8 +26,7 @@ import { useAppStore } from "../../../stores/appStore";
 import { Drawer } from "../../../components/hrms/Drawer";
 import { Modal } from "../../../components/hrms/Modal";
 import { Button } from "../../../components/hrms/Button";
-import PageHeader from "../../../components/ui/PageHeader";
-import AppPagination from "../../../components/ui/AppPagination";
+import PageInfoButton from "../../../components/common/PageInfoButton";
 import { hrmsGuides } from "../../../data/hrms/hrmsGuides";
 
 const STAGE_DROP_STYLES = {
@@ -44,6 +42,7 @@ const STAGE_DROP_STYLES = {
 export default function TrainingFunnel({ embedded = false, onBack }) {
   const navigate = useNavigate();
   const showToast = useAppStore((s) => s.showToast);
+  const employees = useAppStore((s) => s.employees || []);
 
   const {
     trainings,
@@ -61,6 +60,12 @@ export default function TrainingFunnel({ embedded = false, onBack }) {
   // Filters
   const [search, setSearch] = useState("");
   const [deptFilter, setDeptFilter] = useState("All");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  useEffect(() => {
+    setPage(1);
+  }, [search, deptFilter]);
 
   // Modal / Drawer state
   const [modalOpen, setModalOpen] = useState(false);
@@ -76,14 +81,14 @@ export default function TrainingFunnel({ embedded = false, onBack }) {
   const [form, setForm] = useState({
     name: "",
     trainer: "Unassigned",
-    department: "Engineering",
+    department: "General",
     type: "Technical",
     stage: "Requested",
-    cost: 25000,
-    participants: 12,
-    start: "18 Oct 2024",
-    end: "19 Oct 2024",
-    location: "Training Hall A",
+    cost: 0,
+    participants: 1,
+    start: "",
+    end: "",
+    location: "",
     description: "",
   });
 
@@ -101,18 +106,6 @@ export default function TrainingFunnel({ embedded = false, onBack }) {
       return true;
     });
   }, [trainings, deptFilter, search]);
-
-  const [listPage, setListPage] = useState(1);
-  const [listPageSize, setListPageSize] = useState(10);
-
-  useEffect(() => {
-    setListPage(1);
-  }, [deptFilter, search, listPageSize]);
-
-  const paginatedTrainings = useMemo(() => {
-    const start = (listPage - 1) * listPageSize;
-    return filteredTrainings.slice(start, start + listPageSize);
-  }, [filteredTrainings, listPage, listPageSize]);
 
   // Overall totals
   const totalCount = filteredTrainings.length;
@@ -175,14 +168,14 @@ export default function TrainingFunnel({ embedded = false, onBack }) {
     setForm({
       name: "",
       trainer: "Unassigned",
-      department: "Engineering",
+      department: "General",
       type: "Technical",
       stage,
-      cost: 25000,
-      participants: 12,
-      start: "18 Oct 2024",
-      end: "19 Oct 2024",
-      location: "Training Hall A",
+      cost: 0,
+      participants: 1,
+      start: "",
+      end: "",
+      location: "",
       description: "",
     });
     setModalOpen(true);
@@ -190,16 +183,21 @@ export default function TrainingFunnel({ embedded = false, onBack }) {
 
   const handleOpenEdit = (item) => {
     setEditingItem(item);
+    const pCount = Array.isArray(item.participants)
+      ? item.participants.length
+      : typeof item.participants === "number"
+      ? item.participants
+      : Number(item.participants) || 1;
     setForm({
-      name: item.name || "",
-      trainer: item.trainer || "Unassigned",
-      department: item.department || "Engineering",
+      name: item.name || item.title || "",
+      trainer: item.trainer || item.trainerName || "Unassigned",
+      department: item.department || "General",
       type: item.type || "Technical",
       stage: item.stage || "Requested",
       cost: item.cost || 0,
-      participants: item.participants || 1,
-      start: item.start || "",
-      end: item.end || "",
+      participants: pCount,
+      start: item.start || item.startDate || "",
+      end: item.end || item.endDate || "",
       location: item.location || "",
       description: item.description || "",
     });
@@ -209,7 +207,12 @@ export default function TrainingFunnel({ embedded = false, onBack }) {
   const handleSave = (e) => {
     e.preventDefault();
     if (!form.name.trim()) {
-      showToast("Training title is required");
+      showToast("Training title is required", "error");
+      return;
+    }
+
+    if (form.start && form.end && form.end < form.start) {
+      showToast("End date cannot precede start date", "error");
       return;
     }
 
@@ -233,41 +236,40 @@ export default function TrainingFunnel({ embedded = false, onBack }) {
 
   const departmentsList = [
     "All",
-    "Engineering",
-    "Product",
-    "Design",
-    "HR",
-    "Finance",
-    "Marketing",
-    "Operations",
+    ...new Set([
+      "General",
+      ...employees.map((e) => e.department).filter(Boolean),
+      ...trainings.map((t) => t.department).filter(Boolean),
+    ]),
   ];
 
   return (
     <div className="flex flex-col gap-5 w-full pb-16">
-      {/* Header */}
+      {/* Top Header */}
       <div className="flex flex-col gap-1">
-        {/* Back button to Training Setup - Commented out */}
-        {/* {!embedded && (
-          <button
-            type="button"
-            onClick={() => (onBack ? onBack() : navigate("/hrms/training"))}
-            className="inline-flex items-center gap-1.5 text-[12.5px] font-medium text-slate-500 hover:text-navy transition w-fit cursor-pointer group mb-1"
-          >
-            <ArrowLeft size={16} className="group-hover:-translate-x-0.5 transition-transform" />
-            <span>Back to Training Setup</span>
-          </button>
-        )} */}
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2.5">
+              <h1 className="text-[24px] font-bold text-slate-900 tracking-tight">Training Funnel</h1>
+              <PageInfoButton guide={hrmsGuides.trainingFunnel} />
+            </div>
+            <div className="text-[13px] text-slate-500 flex items-center gap-1.5 mt-0.5 font-medium">
+              <Link to="/hrms/training" className="hover:text-navy hover:underline">
+                Dashboard
+              </Link>
+              <span>&gt;</span>
+              <span className="text-slate-700">Training Funnel</span>
+            </div>
+          </div>
 
-        <PageHeader
-          title="Training Funnel"
-          guide={hrmsGuides.trainingFunnel}
-          actions={<>
+          {/* Top Right Action Icons */}
+          <div className="flex flex-wrap lg:flex-nowrap items-center gap-2">
             {/* View switcher: Kanban vs List */}
             <div className="flex p-1 bg-white border border-bdr rounded-xl shadow-xs">
               <button
                 type="button"
                 onClick={() => setViewMode("kanban")}
-                className={`p-2 rounded-lg text-slate-700 transition cursor-pointer ${
+                className={`p-2 rounded-xl text-slate-700 transition cursor-pointer ${
                   viewMode === "kanban" ? "bg-slate-800 text-white shadow-xs" : "hover:bg-off"
                 }`}
                 title="Kanban Funnel View"
@@ -277,7 +279,7 @@ export default function TrainingFunnel({ embedded = false, onBack }) {
               <button
                 type="button"
                 onClick={() => setViewMode("list")}
-                className={`p-2 rounded-lg text-slate-700 transition cursor-pointer ${
+                className={`p-2 rounded-xl text-slate-700 transition cursor-pointer ${
                   viewMode === "list" ? "bg-slate-800 text-white shadow-xs" : "hover:bg-off"
                 }`}
                 title="Table / List View"
@@ -290,13 +292,14 @@ export default function TrainingFunnel({ embedded = false, onBack }) {
             <button
               type="button"
               onClick={() => handleOpenAdd("Requested")}
-              className="w-9 h-9 rounded-xl bg-[#1e3a8a] text-white hover:bg-[#1e40af] transition grid place-items-center shadow-xs cursor-pointer"
+              className="h-9 px-4 rounded-xl bg-primary hover:bg-primary-dark text-white text-xs font-semibold transition flex items-center gap-1.5 shadow-2xs active:scale-[0.99] cursor-pointer"
               title="Add / Request Training"
             >
-              <Plus size={18} />
+              <Plus size={16} />
+              <span>Add Training</span>
             </button>
-          </>}
-        />
+          </div>
+        </div>
       </div>
 
       {/* Filter Toolbar */}
@@ -342,25 +345,23 @@ export default function TrainingFunnel({ embedded = false, onBack }) {
           )}
         </div>
 
-        {/* Quick Links to other training modules - Commented out */}
-        {/*
+        {/* Quick Links to other training modules */}
         <div className="flex flex-wrap lg:flex-nowrap items-center gap-2">
           <button
             type="button"
             onClick={() => navigate("/hrms/training/list")}
-            className="text-[12px] text-slate-600 hover:text-navy px-2.5 py-1 rounded-lg hover:bg-off font-medium transition"
+            className="text-[12px] text-slate-600 hover:text-navy px-2.5 py-1 rounded-xl hover:bg-off font-medium transition"
           >
             Programs List &rarr;
           </button>
           <button
             type="button"
             onClick={() => navigate("/hrms/training/trainers")}
-            className="text-[12px] text-slate-600 hover:text-navy px-2.5 py-1 rounded-lg hover:bg-off font-medium transition"
+            className="text-[12px] text-slate-600 hover:text-navy px-2.5 py-1 rounded-xl hover:bg-off font-medium transition"
           >
             Trainers &rarr;
           </button>
         </div>
-        */}
       </div>
 
       {/* Main Funnel Card */}
@@ -488,8 +489,14 @@ export default function TrainingFunnel({ embedded = false, onBack }) {
                             </div>
 
                             {/* Trainer info */}
-                            <div className="flex items-center gap-1.5 text-[10.5px] text-slate-600 mt-0.5 min-w-0">
-                              <Avatar name={item.trainer || "Unassigned"} size="xs" className="!w-4 !h-4 !text-[8px]" />
+                            <div className="flex items-center gap-1 text-[10.5px] text-slate-600 mt-0.5 min-w-0">
+                              {item.avatar ? (
+                                <img src={item.avatar} alt="" className="w-3.5 h-3.5 rounded-full object-cover shrink-0" />
+                              ) : (
+                                <div className="w-3.5 h-3.5 rounded-full bg-slate-200 grid place-items-center text-[7.5px] font-bold text-slate-600 shrink-0">
+                                  {item.trainer ? item.trainer[0] : "U"}
+                                </div>
+                              )}
                               <span className="truncate">{item.trainer || "Unassigned"}</span>
                             </div>
 
@@ -561,13 +568,13 @@ export default function TrainingFunnel({ embedded = false, onBack }) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-bdr/60">
-                {paginatedTrainings.map((t) => {
+                {filteredTrainings.slice((page - 1) * pageSize, page * pageSize).map((t) => {
                   const stageObj =
                     TRAINING_FUNNEL_STAGES.find((s) => s.key === t.stage) ||
                     TRAINING_FUNNEL_STAGES[0];
                   return (
                     <tr key={t.id} className="hover:bg-slate-50/70 transition">
-                      <td className="py-3 px-4 font-bold text-slate-900">{t.name}</td>
+                      <td className="py-3 px-4 font-bold text-slate-900">{t.name || t.title}</td>
                       <td className="py-3 px-4">
                         <span
                           className={`inline-flex px-2.5 py-0.5 rounded-full text-[11px] font-bold ${stageObj.badgeClass}`}
@@ -577,43 +584,39 @@ export default function TrainingFunnel({ embedded = false, onBack }) {
                       </td>
                       <td className="py-3 px-4">
                         <div className="flex items-center gap-2">
-                          <Avatar name={t.trainer || t.name} size="xs" />
-                          <span>{t.trainer}</span>
+                          {t.avatar && <img src={t.avatar} alt="" className="w-6 h-6 rounded-full" />}
+                          <span>{t.trainer || t.trainerName || "Unassigned"}</span>
                         </div>
                       </td>
                       <td className="py-3 px-4 text-slate-600">{t.department}</td>
-                      <td className="py-3 px-4 text-slate-700 font-medium">{t.participants}</td>
+                      <td className="py-3 px-4 text-slate-700 font-medium">
+                        {Array.isArray(t.participants) ? t.participants.length : (t.participants ?? 0)}
+                      </td>
                       <td className="py-3 px-4 font-semibold text-slate-900">
                         ₹ {Number(t.cost || 0).toLocaleString("en-IN")}
                       </td>
                       <td className="py-3 px-4 text-slate-500 text-[12px]">
-                        {t.start} {t.end && t.end !== t.start ? `– ${t.end}` : ""}
+                        {t.start || t.startDate || ""} {t.end && t.end !== t.start ? `– ${t.end}` : ""}
                       </td>
                       <td className="py-3 px-4 text-right">
                         <div className="flex items-center justify-end gap-1.5">
                           <button
                             type="button"
                             onClick={() => handleOpenEdit(t)}
-                            className="p-1 text-slate-500 hover:text-navy rounded-lg hover:bg-off transition"
+                            className="p-1 text-slate-500 hover:text-navy rounded-xl hover:bg-off transition"
                             title="Edit"
                           >
                             <Pencil size={14} />
                           </button>
                           <button
                             type="button"
-                            onClick={async () => {
-                              const confirmed = await modal.deleteConfirm({
-                                title: "Delete Training?",
-                                message: `Are you sure you want to delete training "${t.name}"?`,
-                                itemName: t.name,
-                                confirmText: "Delete Training"
-                              });
-                              if (confirmed) {
+                            onClick={() => {
+                              if (confirm(`Delete training "${t.name}"?`)) {
                                 deleteTraining(t.id);
                                 showToast(`Deleted "${t.name}"`);
                               }
                             }}
-                            className="p-1 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition"
+                            className="p-1 text-slate-400 hover:text-rose-600 rounded-xl hover:bg-rose-50 transition"
                             title="Delete"
                           >
                             <Trash2 size={14} />
@@ -625,14 +628,21 @@ export default function TrainingFunnel({ embedded = false, onBack }) {
                 })}
               </tbody>
             </table>
-            <AppPagination
-              total={filteredTrainings.length}
-              page={listPage}
-              pageSize={listPageSize}
-              onPageChange={setListPage}
-              onPageSizeChange={setListPageSize}
-              pageSizeOptions={[10, 25, 50]}
-            />
+            {filteredTrainings.length > 0 && (
+              <div className="border-t border-bdr bg-off/50 px-4 py-2">
+                <Pagination
+                  total={filteredTrainings.length}
+                  page={page}
+                  pageSize={pageSize}
+                  pageSizeOptions={[10, 20, 50]}
+                  onPageSizeChange={(newSize) => {
+                    setPageSize(newSize);
+                    setPage(1);
+                  }}
+                  onChange={setPage}
+                />
+              </div>
+            )}
           </div>
         )}
 
@@ -646,27 +656,22 @@ export default function TrainingFunnel({ embedded = false, onBack }) {
 
           <button
             type="button"
-            onClick={async () => {
-              const confirmed = await modal.warning({
-                title: "Reset Training Data?",
-                message: "Reset training funnel data to initial realistic defaults? Any custom training records will be replaced.",
-                confirmText: "Reset Defaults"
-              });
-              if (confirmed) {
+            onClick={() => {
+              if (confirm("Discard unsaved local changes and reload training data from the server?")) {
                 resetToDefaults();
-                showToast("Training data reset to defaults");
+                showToast("Training data reloaded");
               }
             }}
             className="text-[11.5px] text-muted hover:text-slate-800 underline decoration-dotted transition"
           >
-            Reset Seed Data
+            Reload Data
           </button>
         </div>
       </div>
 
       {/* Add / Edit Training Modal */}
       {modalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
+        <div className="fixed inset-0 z-50 bg-black/45 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4">
           <div className="bg-white rounded-2xl border border-bdr shadow-2xl w-full max-w-lg overflow-hidden animate-fade-in">
             <div className="flex justify-between items-center gap-2 lg:gap-0 px-4 sm:px-6 py-4 border-b border-bdr bg-slate-50/80">
               <div>
@@ -680,7 +685,7 @@ export default function TrainingFunnel({ embedded = false, onBack }) {
               <button
                 type="button"
                 onClick={() => setModalOpen(false)}
-                className="w-8 h-8 rounded-lg hover:bg-slate-200/60 grid place-items-center text-muted hover:text-slate-800 transition"
+                className="w-8 h-8 rounded-xl hover:bg-slate-200/60 grid place-items-center text-muted hover:text-slate-800 transition"
               >
                 ✕
               </button>
@@ -697,7 +702,7 @@ export default function TrainingFunnel({ embedded = false, onBack }) {
                   placeholder="e.g. Leadership Essentials / Kubernetes Security"
                   value={form.name}
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  className="w-full px-3.5 py-2 rounded-xl border border-bdr text-[13px] bg-off focus:bg-white focus:outline-none focus:border-navy transition"
+                  className="w-full px-3.5 py-2 rounded-xl border border-bdr text-[13px] bg-off focus:bg-white focus:outline-none focus:border-navy cursor-text transition"
                 />
               </div>
 
@@ -791,9 +796,10 @@ export default function TrainingFunnel({ embedded = false, onBack }) {
                   </label>
                   <input
                     type="number"
+                    min={0}
                     value={form.cost}
                     onChange={(e) => setForm({ ...form, cost: Number(e.target.value) })}
-                    className="w-full px-3.5 py-2 rounded-xl border border-bdr text-[13px] bg-off focus:bg-white focus:outline-none focus:border-navy"
+                    className="w-full px-3.5 py-2 rounded-xl border border-bdr text-[13px] bg-off focus:bg-white focus:outline-none focus:border-navy cursor-text"
                   />
                 </div>
 
@@ -803,9 +809,10 @@ export default function TrainingFunnel({ embedded = false, onBack }) {
                   </label>
                   <input
                     type="number"
+                    min={1}
                     value={form.participants}
                     onChange={(e) => setForm({ ...form, participants: Number(e.target.value) })}
-                    className="w-full px-3.5 py-2 rounded-xl border border-bdr text-[13px] bg-off focus:bg-white focus:outline-none focus:border-navy"
+                    className="w-full px-3.5 py-2 rounded-xl border border-bdr text-[13px] bg-off focus:bg-white focus:outline-none focus:border-navy cursor-text"
                   />
                 </div>
               </div>
@@ -816,11 +823,10 @@ export default function TrainingFunnel({ embedded = false, onBack }) {
                     Start Date
                   </label>
                   <input
-                    type="text"
-                    placeholder="e.g. 18 Oct 2024"
+                    type="date"
                     value={form.start}
                     onChange={(e) => setForm({ ...form, start: e.target.value })}
-                    className="w-full px-3.5 py-2 rounded-xl border border-bdr text-[13px] bg-off focus:bg-white focus:outline-none focus:border-navy"
+                    className="w-full px-3.5 py-2 rounded-xl border border-bdr text-[13px] bg-off focus:bg-white focus:outline-none focus:border-navy cursor-pointer transition"
                   />
                 </div>
 
@@ -829,11 +835,10 @@ export default function TrainingFunnel({ embedded = false, onBack }) {
                     End Date
                   </label>
                   <input
-                    type="text"
-                    placeholder="e.g. 19 Oct 2024"
+                    type="date"
                     value={form.end}
                     onChange={(e) => setForm({ ...form, end: e.target.value })}
-                    className="w-full px-3.5 py-2 rounded-xl border border-bdr text-[13px] bg-off focus:bg-white focus:outline-none focus:border-navy"
+                    className="w-full px-3.5 py-2 rounded-xl border border-bdr text-[13px] bg-off focus:bg-white focus:outline-none focus:border-navy cursor-pointer transition"
                   />
                 </div>
               </div>
@@ -847,7 +852,7 @@ export default function TrainingFunnel({ embedded = false, onBack }) {
                   placeholder="e.g. Auditorium B & Zoom"
                   value={form.location}
                   onChange={(e) => setForm({ ...form, location: e.target.value })}
-                  className="w-full px-3.5 py-2 rounded-xl border border-bdr text-[13px] bg-off focus:bg-white focus:outline-none focus:border-navy"
+                  className="w-full px-3.5 py-2 rounded-xl border border-bdr text-[13px] bg-off focus:bg-white focus:outline-none focus:border-navy cursor-text"
                 />
               </div>
 
@@ -860,7 +865,7 @@ export default function TrainingFunnel({ embedded = false, onBack }) {
                   placeholder="Key training outcomes, syllabus modules..."
                   value={form.description}
                   onChange={(e) => setForm({ ...form, description: e.target.value })}
-                  className="w-full px-3.5 py-2 rounded-xl border border-bdr text-[13px] bg-off focus:bg-white focus:outline-none focus:border-navy resize-none"
+                  className="w-full px-3.5 py-2 rounded-xl border border-bdr text-[13px] bg-off focus:bg-white focus:outline-none focus:border-navy resize-none cursor-text"
                 />
               </div>
 
@@ -868,14 +873,8 @@ export default function TrainingFunnel({ embedded = false, onBack }) {
                 {editingItem ? (
                   <button
                     type="button"
-                    onClick={async () => {
-                      const confirmed = await modal.deleteConfirm({
-                        title: "Delete Training?",
-                        message: `Are you sure you want to delete training "${editingItem.name}"?`,
-                        itemName: editingItem.name,
-                        confirmText: "Delete Training"
-                      });
-                      if (confirmed) {
+                    onClick={() => {
+                      if (confirm(`Delete training "${editingItem.name}"?`)) {
                         deleteTraining(editingItem.id);
                         setModalOpen(false);
                         showToast("Training deleted");
@@ -894,13 +893,13 @@ export default function TrainingFunnel({ embedded = false, onBack }) {
                   <button
                     type="button"
                     onClick={() => setModalOpen(false)}
-                    className="px-4 py-2 border border-bdr rounded-xl text-[13px] hover:bg-off font-medium transition"
+                    className="px-4 h-9 bg-card border border-border rounded-xl text-xs font-semibold text-text hover:bg-card-hover transition cursor-pointer"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
-                    className="px-5 py-2 bg-navy text-white rounded-xl text-[13px] font-medium hover:bg-navy/90 transition shadow-xs"
+                    className="px-4 h-9 bg-primary hover:bg-primary-dark text-white rounded-xl text-xs font-semibold shadow-2xs active:scale-[0.99] transition cursor-pointer"
                   >
                     {editingItem ? "Update Training" : "Save to Funnel"}
                   </button>

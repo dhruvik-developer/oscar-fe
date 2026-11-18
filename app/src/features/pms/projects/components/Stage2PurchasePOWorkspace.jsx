@@ -106,7 +106,7 @@ export function Stage2PurchasePOWorkspace({
   const loadMasterData = async () => {
     try {
       const [vendorsRes, itemsRes] = await Promise.allSettled([
-        api.get('/parties/vendors/').catch(() => api.get('/parties/')).catch(() => api.get('/masters/parties/vendors/')),
+        api.get('/parties/'),
         api.get('/inventory/items/').catch(() => api.get('/masters/items/')),
       ]);
 

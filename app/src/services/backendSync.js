@@ -274,6 +274,7 @@ function partyToApi(party) {
     bankName: party.bankName || undefined,
     accountHolderName: party.accountHolderName || undefined,
     openingBalance: party.openingBalance !== undefined ? num(party.openingBalance) : undefined,
+    openingBalanceType: party.openingBalanceType || (party.type === 'Customer' ? 'Advance' : 'Payable'),
     billingAddress: party.billingAddress || undefined,
     shippingAddress: party.shippingAddress || undefined,
     status: party.status || 'Active',
@@ -290,6 +291,7 @@ function partyFromApi(row) {
   return {
     ...row,
     partyType: row.type,
+    openingBalanceType: row.openingBalanceType || row.opening_balance_type || (row.type === 'Customer' ? 'Advance' : 'Payable'),
     contactPerson: row.contact_person || row.contacts?.[0]?.name || '',
     _synced: true,
   };
@@ -314,6 +316,8 @@ function customerFromParty(row) {
     // tax/address record to show the customer without a second request.
     partyType: row.type || 'Customer',
     leadCount: num(row.leadCount),
+    openingBalance: row.opening_balance ?? row.openingBalance,
+    openingBalanceType: row.openingBalanceType || row.opening_balance_type || 'Advance',
     gstTreatment: row.gstTreatment || '',
     billingAddress: row.billingAddress || {},
     shippingAddress: row.shippingAddress || {},

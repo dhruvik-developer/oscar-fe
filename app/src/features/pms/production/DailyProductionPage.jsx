@@ -315,21 +315,16 @@ export default function DailyProductionPage() {
     try {
       if (editing) {
         const payload = {
-          entry_date: formDate,
           entryDate: formDate,
           meters: numQty,
-          reject_meter: numRej,
           rejectMeter: numRej,
-          reprocess_meter: numRep,
           reprocessMeter: numRep,
-          good_meter: modalAccepted,
           goodMeter: modalAccepted,
           remarks: formRemarks,
           status: actionType,
         };
         if (empId) {
           payload.enteredByEmployeeId = empId;
-          payload.entered_by_employee_id = empId;
         }
         const updated = await api.patch(`/production/daily-entries/${editing.id}/`, payload);
         const norm = normalizeEntry(updated);
@@ -337,18 +332,12 @@ export default function DailyProductionPage() {
       } else {
         const payload = {
           instructionId: pi.id,
-          instruction_id: pi.id,
-          entry_date: formDate,
           entryDate: formDate,
           meters: numQty,
-          reject_meter: numRej,
           rejectMeter: numRej,
-          reprocess_meter: numRep,
           reprocessMeter: numRep,
-          good_meter: modalAccepted,
           goodMeter: modalAccepted,
           enteredByEmployeeId: empId,
-          entered_by_employee_id: empId,
           remarks: formRemarks,
           status: actionType,
         };

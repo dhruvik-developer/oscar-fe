@@ -28,7 +28,8 @@ import {
   FileSpreadsheet,
   CheckCircle2,
   Truck,
-  IndianRupee
+  IndianRupee,
+  Receipt
 } from 'lucide-react';
 
 const partiesGuide = {
@@ -47,6 +48,53 @@ const partiesGuide = {
   ],
 };
 
+export const getPartyBalanceMeta = (party) => {
+  if (!party) {
+    return {
+      label: 'Settled',
+      tone: 'text-text-secondary',
+      badgeClass: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border-border',
+      isAdvance: false,
+    };
+  }
+  const isVendor = party.type === 'Vendor' || party.type === 'Transporter' || party.type === 'Processor';
+  const bal = Number(party.balance) || 0;
+  const balType = party.openingBalanceType || party.opening_balance_type || (isVendor ? 'Payable' : 'Advance');
+
+  if (isVendor) {
+    if (balType === 'Advance' || bal < 0) {
+      return {
+        label: 'Advance',
+        isAdvance: true,
+        tone: bal !== 0 ? 'text-emerald-600 dark:text-emerald-400 font-bold' : 'text-text-secondary',
+        badgeClass: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800',
+      };
+    }
+    return {
+      label: 'Payable',
+      isAdvance: false,
+      tone: bal > 0 ? 'text-amber-600 dark:text-amber-400 font-bold' : 'text-text-secondary',
+      badgeClass: 'bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400 border-amber-200 dark:border-amber-800',
+    };
+  }
+
+  // Customer: default for customer opening balance is Advance (deposit) unless explicitly marked Receivable
+  if (balType === 'Receivable') {
+    return {
+      label: 'Receivable',
+      isAdvance: false,
+      tone: bal > 0 ? 'text-rose-600 dark:text-rose-400 font-bold' : 'text-text-secondary',
+      badgeClass: 'bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-400 border-rose-200 dark:border-rose-800',
+    };
+  }
+  return {
+    label: 'Advance',
+    isAdvance: true,
+    tone: bal > 0 ? 'text-emerald-600 dark:text-emerald-400 font-bold' : 'text-text-secondary',
+    badgeClass: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800',
+  };
+};
+
 export default function PartiesPage() {
   const location = useLocation();
   const searchParams = new URLSearchParams(location.search);
@@ -54,7 +102,7 @@ export default function PartiesPage() {
   const isCustomerContext = location.pathname.includes('/crm/customers') || typeParam?.toLowerCase() === 'customer';
   const isVendorContext = location.pathname.includes('/purchase/vendors') || typeParam?.toLowerCase() === 'vendor';
 
-  const { parties = [], addParty, updateParty, formatCurrency } = useERP();
+  const { parties = [], addParty, updateParty, addPaymentIn, addPaymentOut, bankAccounts = [], formatCurrency, showToast } = useERP();
   const [selectedType, setSelectedType] = useState(() => {
     if (typeParam && ['customer', 'vendor', 'both'].includes(typeParam.toLowerCase())) {
       return typeParam.charAt(0).toUpperCase() + typeParam.slice(1).toLowerCase();
@@ -66,38 +114,90 @@ export default function PartiesPage() {
   const [isWizardOpen, setIsWizardOpen] = useState(false);
   const [editingParty, setEditingParty] = useState(null);
   const [viewingParty, setViewingParty] = useState(null);
-  const [balanceModalParty, setBalanceModalParty] = useState(null);
-  const [newOpeningBal, setNewOpeningBal] = useState('');
-  const [balanceUpdating, setBalanceUpdating] = useState(false);
-  const [balanceError, setBalanceError] = useState('');
+  const [advanceModalParty, setAdvanceModalParty] = useState(null);
+  const [addAdvanceAmt, setAddAdvanceAmt] = useState('');
+  const [advanceMode, setAdvanceMode] = useState('Bank Wire Direct');
+  const [selectedBankId, setSelectedBankId] = useState('');
+  const [advanceNote, setAdvanceNote] = useState('');
+  const [advanceUpdating, setAdvanceUpdating] = useState(false);
+  const [advanceError, setAdvanceError] = useState('');
 
-  const handleOpenBalanceModal = (party) => {
-    setBalanceModalParty(party);
-    const currentOpening = party.openingBalance ?? party.opening_balance ?? 0;
-    setNewOpeningBal(currentOpening !== 0 ? String(currentOpening) : '');
-    setBalanceError('');
+  const handleOpenAdvanceModal = (party) => {
+    setAdvanceModalParty(party);
+    setAddAdvanceAmt('');
+    setAdvanceMode('Bank Wire Direct');
+    setSelectedBankId(bankAccounts?.[0]?.id || '');
+    setAdvanceNote('');
+    setAdvanceError('');
   };
 
-  const handleSaveBalance = async (e) => {
+  const handleAddAdvance = async (e) => {
     e.preventDefault();
-    if (!balanceModalParty) return;
-    const parsedVal = newOpeningBal === '' ? 0 : Number(newOpeningBal);
-    if (isNaN(parsedVal)) {
-      setBalanceError('Please enter a valid numeric balance amount.');
+    if (!advanceModalParty) return;
+    const addAmt = Number(addAdvanceAmt);
+    if (isNaN(addAmt) || addAmt <= 0) {
+      setAdvanceError('Please enter a valid advance amount greater than 0.');
       return;
     }
-    setBalanceUpdating(true);
-    setBalanceError('');
+    setAdvanceUpdating(true);
+    setAdvanceError('');
     try {
-      await updateParty(balanceModalParty.id, {
-        openingBalance: parsedVal,
-        opening_balance: parsedVal,
+      const isVendor = advanceModalParty.type === 'Vendor' || advanceModalParty.type === 'Processor';
+      const chosenBank = bankAccounts?.find((b) => b.id === selectedBankId) || bankAccounts?.[0];
+      const today = new Date().toISOString().split('T')[0];
+
+      // 1. Post to Accounts & General Ledger via PaymentIn / PaymentOut
+      if (isVendor) {
+        if (typeof addPaymentOut === 'function') {
+          await addPaymentOut({
+            vendorId: advanceModalParty.id,
+            vendor: advanceModalParty.name,
+            amount: addAmt,
+            date: today,
+            mode: advanceMode,
+            bankAccountId: advanceMode === 'Cash' ? undefined : chosenBank?.id,
+            reference: advanceNote || `ADV-${Date.now().toString().slice(-6)}`,
+            notes: advanceNote ? `Vendor Advance: ${advanceNote}` : 'Vendor Advance',
+          });
+        }
+      } else {
+        if (typeof addPaymentIn === 'function') {
+          await addPaymentIn({
+            customerId: advanceModalParty.id,
+            customer: advanceModalParty.name,
+            amount: addAmt,
+            date: today,
+            mode: advanceMode,
+            bankAccountId: advanceMode === 'Cash' ? undefined : chosenBank?.id,
+            reference: advanceNote || `ADV-${Date.now().toString().slice(-6)}`,
+            notes: advanceNote ? `Customer Advance: ${advanceNote}` : 'Customer Advance',
+          });
+        }
+      }
+
+      // 2. Update party current balance and classification
+      const currentBal = Number(advanceModalParty.balance) || 0;
+      const nextBal = currentBal + addAmt;
+      const meta = getPartyBalanceMeta(advanceModalParty);
+      await updateParty(advanceModalParty.id, {
+        balance: nextBal,
+        openingBalanceType: advanceModalParty.openingBalanceType || meta.label,
+        lastAdvanceAmount: addAmt,
+        lastAdvanceDate: new Date().toISOString(),
+        lastAdvanceNote: advanceNote || undefined,
+        lastAdvanceMode: advanceMode,
       });
-      setBalanceModalParty(null);
+
+      if (typeof showToast === 'function') {
+        showToast(`Recorded ${formatCurrency(addAmt)} advance for ${advanceModalParty.name} and posted to Accounts.`);
+      }
+      setAdvanceModalParty(null);
+      setAddAdvanceAmt('');
+      setAdvanceNote('');
     } catch (err) {
-      setBalanceError(err?.message || 'Failed to update balance.');
+      setAdvanceError(err?.message || 'Failed to record advance.');
     } finally {
-      setBalanceUpdating(false);
+      setAdvanceUpdating(false);
     }
   };
 
@@ -124,12 +224,15 @@ export default function PartiesPage() {
     const vendors = parties.filter((p) => p.type === 'Vendor' || p.type === 'Both').length;
     const both = parties.filter((p) => p.type === 'Both').length;
     const totalReceivable = parties
-      .filter((p) => p.type === 'Customer' || p.type === 'Both')
+      .filter((p) => (p.type === 'Customer' || p.type === 'Both') && p.openingBalanceType === 'Receivable')
+      .reduce((sum, p) => sum + (p.balance > 0 ? p.balance : 0), 0);
+    const totalAdvances = parties
+      .filter((p) => (p.type === 'Customer' || p.type === 'Both') && p.openingBalanceType !== 'Receivable')
       .reduce((sum, p) => sum + (p.balance > 0 ? p.balance : 0), 0);
     const totalPayable = parties
-      .filter((p) => p.type === 'Vendor' || p.type === 'Both')
+      .filter((p) => (p.type === 'Vendor' || p.type === 'Both') && p.openingBalanceType !== 'Advance')
       .reduce((sum, p) => sum + (p.balance > 0 ? p.balance : 0), 0);
-    return { total, customers, vendors, both, totalReceivable, totalPayable };
+    return { total, customers, vendors, both, totalReceivable, totalAdvances, totalPayable };
   }, [parties]);
 
   const handleAddNew = () => {
@@ -264,20 +367,23 @@ export default function PartiesPage() {
       render: (party) => {
         const bal = party.balance || 0;
         const opBal = Number(party.openingBalance ?? party.opening_balance ?? 0);
+        const meta = getPartyBalanceMeta(party);
         const isPositive = bal > 0;
         return (
           <div className="text-right">
-            <div className={`font-semibold font-mono text-xs ${isPositive ? 'text-amber-600 dark:text-amber-400 font-bold' : 'text-text-secondary'}`}>
+            <div className={`font-semibold font-mono text-xs ${isPositive ? meta.tone : 'text-text-secondary'}`}>
               {formatCurrency(bal)}
             </div>
-            <div className="text-[10px] text-muted">
-              {party.type === 'Vendor' ? 'Payable' : 'Receivable'}
-              {opBal !== 0 && (
-                <span className="block text-[9.5px] text-slate-400 dark:text-muted">
-                  Opening: {formatCurrency(opBal)}
-                </span>
-              )}
+            <div className="text-[10px] text-muted flex items-center justify-end gap-1 mt-0.5">
+              <span className={`inline-block px-1.5 py-0.2 rounded text-[9.5px] font-semibold border ${meta.badgeClass}`}>
+                {meta.label}
+              </span>
             </div>
+            {opBal !== 0 && (
+              <span className="block text-[9.5px] text-slate-400 dark:text-muted mt-0.5">
+                Opening: {formatCurrency(opBal)}
+              </span>
+            )}
           </div>
         );
       },
@@ -316,9 +422,9 @@ export default function PartiesPage() {
           </button>
           <button
             type="button"
-            onClick={() => handleOpenBalanceModal(party)}
-            title="Quick Update Balance / Opening Balance"
-            className="w-7 h-7 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/20 flex items-center justify-center transition cursor-pointer shadow-2xs"
+            onClick={() => handleOpenAdvanceModal(party)}
+            title="Add Advance"
+            className="w-7 h-7 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 flex items-center justify-center transition cursor-pointer shadow-2xs"
           >
             <IndianRupee className="w-3.5 h-3.5" />
           </button>
@@ -354,7 +460,7 @@ export default function PartiesPage() {
       />
 
       {/* Modern Colorful Metric Badges Row */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
         <MetricChip
           icon={Users}
           label="Total Active Parties"
@@ -378,6 +484,12 @@ export default function PartiesPage() {
           label="Total Receivables"
           value={formatCurrency(stats.totalReceivable, { noDecimals: true })}
           colorScheme="rose"
+        />
+        <MetricChip
+          icon={CreditCard}
+          label="Customer Advances"
+          value={formatCurrency(stats.totalAdvances, { noDecimals: true })}
+          colorScheme="teal"
         />
       </div>
 
@@ -568,15 +680,25 @@ export default function PartiesPage() {
                   </div>
                   <div>
                     <span className="text-slate-400 block text-[10px] uppercase font-semibold">Opening Balance</span>
-                    <span className="font-mono font-bold text-slate-800">
-                      ₹{Number(viewingParty.openingBalance ?? viewingParty.opening_balance ?? 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                    </span>
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                      <span className="font-mono font-bold text-slate-800">
+                        {formatCurrency(Number(viewingParty.openingBalance ?? viewingParty.opening_balance ?? 0))}
+                      </span>
+                      <span className={`text-[9.5px] px-1.5 py-0.2 rounded font-semibold border ${getPartyBalanceMeta(viewingParty).badgeClass}`}>
+                        {getPartyBalanceMeta(viewingParty).label}
+                      </span>
+                    </div>
                   </div>
                   <div>
                     <span className="text-slate-400 block text-[10px] uppercase font-semibold">Current Balance</span>
-                    <span className="font-mono font-bold text-amber-700">
-                      ₹{(viewingParty.balance || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                    </span>
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                      <span className={`font-mono font-bold ${getPartyBalanceMeta(viewingParty).tone}`}>
+                        {formatCurrency(viewingParty.balance || 0)}
+                      </span>
+                      <span className={`text-[9.5px] px-1.5 py-0.2 rounded font-semibold border ${getPartyBalanceMeta(viewingParty).badgeClass}`}>
+                        {getPartyBalanceMeta(viewingParty).label}
+                      </span>
+                    </div>
                   </div>
                   <div>
                     <span className="text-slate-400 block text-[10px] uppercase font-semibold">Bank Name</span>
@@ -653,11 +775,11 @@ export default function PartiesPage() {
         </div>
       )}
 
-      {/* Quick Update Balance Modal */}
-      {balanceModalParty && (
+      {/* Add Advance / Balance Modal */}
+      {advanceModalParty && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150"
-          onClick={() => setBalanceModalParty(null)}
+          onClick={() => setAdvanceModalParty(null)}
         >
           <div
             className="bg-white dark:bg-card border border-slate-200 dark:border-border text-slate-800 dark:text-text rounded-2xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col"
@@ -665,48 +787,48 @@ export default function PartiesPage() {
           >
             <div className="p-4 sm:p-5 border-b border-slate-100 dark:border-border flex items-center justify-between bg-slate-50/70 dark:bg-soft">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 flex items-center justify-center">
+                <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
                   <IndianRupee size={20} />
                 </div>
                 <div>
                   <h3 className="font-extrabold text-slate-800 dark:text-text text-base">
-                    Update Party Balance
+                    Add Advance
                   </h3>
                   <p className="text-xs text-slate-500 dark:text-muted truncate max-w-[240px]">
-                    {balanceModalParty.name} ({balanceModalParty.code})
+                    {advanceModalParty.name} ({advanceModalParty.code})
                   </p>
                 </div>
               </div>
               <button
                 type="button"
-                onClick={() => setBalanceModalParty(null)}
+                onClick={() => setAdvanceModalParty(null)}
                 className="text-slate-400 hover:text-slate-600 dark:hover:text-text p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-soft transition cursor-pointer"
               >
                 <X size={18} />
               </button>
             </div>
 
-            <form onSubmit={handleSaveBalance} className="p-5 space-y-4 text-xs">
-              {balanceError && (
+            <form onSubmit={handleAddAdvance} className="p-5 space-y-4 text-xs">
+              {advanceError && (
                 <div className="bg-rose-50 border border-rose-200 text-rose-700 rounded-xl p-2.5 text-xs font-semibold">
-                  {balanceError}
+                  {advanceError}
                 </div>
               )}
 
               <div className="grid grid-cols-2 gap-3 text-center">
                 <div className="bg-slate-50 dark:bg-soft p-3 rounded-xl border border-slate-200/80 dark:border-border">
                   <span className="text-[10px] uppercase font-bold text-slate-400 block mb-0.5">Current Balance</span>
-                  <span className="font-mono font-bold text-amber-600 dark:text-amber-400 text-sm block">
-                    {formatCurrency(balanceModalParty.balance || 0)}
+                  <span className={`font-mono font-bold text-sm block ${getPartyBalanceMeta(advanceModalParty).tone}`}>
+                    {formatCurrency(advanceModalParty.balance || 0)}
                   </span>
-                  <span className="text-[9.5px] text-slate-400">
-                    {balanceModalParty.type === 'Vendor' ? 'Payable' : 'Receivable'}
+                  <span className="text-[9.5px] text-slate-400 font-semibold">
+                    {getPartyBalanceMeta(advanceModalParty).label}
                   </span>
                 </div>
                 <div className="bg-slate-50 dark:bg-soft p-3 rounded-xl border border-slate-200/80 dark:border-border">
-                  <span className="text-[10px] uppercase font-bold text-slate-400 block mb-0.5">Current Opening</span>
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block mb-0.5">Opening Balance</span>
                   <span className="font-mono font-bold text-slate-700 dark:text-text text-sm block">
-                    {formatCurrency(Number(balanceModalParty.openingBalance ?? balanceModalParty.opening_balance ?? 0))}
+                    {formatCurrency(Number(advanceModalParty.openingBalance ?? advanceModalParty.opening_balance ?? 0))}
                   </span>
                   <span className="text-[9.5px] text-slate-400">Recorded Opening</span>
                 </div>
@@ -714,7 +836,7 @@ export default function PartiesPage() {
 
               <div>
                 <label className="block font-bold text-slate-800 dark:text-text text-xs mb-1.5">
-                  New Opening Balance (₹) <span className="text-rose-500">*</span>
+                  Advance Amount to Add (₹) <span className="text-rose-500">*</span>
                 </label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
@@ -723,35 +845,92 @@ export default function PartiesPage() {
                   <input
                     type="number"
                     step="0.01"
-                    value={newOpeningBal}
-                    onChange={(e) => setNewOpeningBal(e.target.value)}
+                    min="0.01"
+                    value={addAdvanceAmt}
+                    onChange={(e) => setAddAdvanceAmt(e.target.value)}
                     placeholder="0.00"
                     autoFocus
-                    className="w-full pl-8 pr-3 py-2.5 bg-white dark:bg-soft border border-slate-300 dark:border-border rounded-xl text-base font-mono font-bold text-slate-900 dark:text-text focus:outline-none focus:ring-2 focus:ring-amber-500/30"
+                    required
+                    className="w-full pl-8 pr-3 py-2.5 bg-white dark:bg-soft border border-slate-300 dark:border-border rounded-xl text-base font-mono font-bold text-slate-900 dark:text-text focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
                   />
                 </div>
                 <p className="text-[10px] text-slate-400 mt-1">
-                  Enter opening balance for this party. Current balance and ledger recalculate automatically.
+                  Enter advance amount received to add directly to this party's current balance.
                 </p>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-semibold text-slate-600 dark:text-muted text-[11px] mb-1">
+                    Payment Mode
+                  </label>
+                  <select
+                    value={advanceMode}
+                    onChange={(e) => setAdvanceMode(e.target.value)}
+                    className="w-full p-2 bg-white dark:bg-soft border border-slate-300 dark:border-border rounded-xl text-xs font-semibold text-slate-900 dark:text-text focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
+                  >
+                    <option value="Bank Wire Direct">Bank Wire Direct (NEFT/RTGS)</option>
+                    <option value="UPI / QR">UPI / QR Transfer</option>
+                    <option value="Cash">Cash Deposit</option>
+                    <option value="Cheque / DD">Cheque / Demand Draft</option>
+                  </select>
+                </div>
+                {advanceMode !== 'Cash' && bankAccounts && bankAccounts.length > 0 && (
+                  <div>
+                    <label className="block font-semibold text-slate-600 dark:text-muted text-[11px] mb-1">
+                      Deposit Into Bank Account
+                    </label>
+                    <select
+                      value={selectedBankId || bankAccounts[0]?.id || ''}
+                      onChange={(e) => setSelectedBankId(e.target.value)}
+                      className="w-full p-2 bg-white dark:bg-soft border border-slate-300 dark:border-border rounded-xl text-xs font-semibold text-slate-900 dark:text-text focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
+                    >
+                      {bankAccounts.map((b) => (
+                        <option key={b.id} value={b.id}>
+                          {b.bankName || b.name || b.bank_name || 'Bank Account'} {b.accountNumber ? `(…${String(b.accountNumber).slice(-4)})` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+                <div className={advanceMode === 'Cash' || !bankAccounts?.length ? 'sm:col-span-2' : 'sm:col-span-2'}>
+                  <label className="block font-semibold text-slate-600 dark:text-muted text-[11px] mb-1">
+                    Reference / Note (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={advanceNote}
+                    onChange={(e) => setAdvanceNote(e.target.value)}
+                    placeholder="e.g. Advance deposit for fabric order, UTR #..."
+                    className="w-full p-2 bg-white dark:bg-soft border border-slate-300 dark:border-border rounded-xl text-xs text-slate-900 dark:text-text focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
+                  />
+                </div>
+              </div>
+
+              {/* Accounts Integration Notice */}
+              <div className="p-2.5 rounded-xl bg-blue-50/70 dark:bg-blue-950/20 border border-blue-200/70 dark:border-blue-900/30 flex items-center gap-2 text-[10.5px] text-blue-800 dark:text-blue-300">
+                <Receipt size={14} className="shrink-0 text-blue-600" />
+                <span>
+                  Connected to <strong>Accounts</strong>: Automatically posts a receipt voucher to Day Book, Cash & Bank, and General Ledger.
+                </span>
               </div>
 
               {/* Live Projected Calculation */}
               {(() => {
-                const currentOp = Number(balanceModalParty.openingBalance ?? balanceModalParty.opening_balance ?? 0);
-                const enteredOp = newOpeningBal === '' ? 0 : Number(newOpeningBal);
-                const diff = enteredOp - currentOp;
-                const projected = (Number(balanceModalParty.balance) || 0) + diff;
+                const currentBal = Number(advanceModalParty.balance) || 0;
+                const parsedAdd = addAdvanceAmt === '' ? 0 : Number(addAdvanceAmt);
+                const projected = currentBal + (isNaN(parsedAdd) ? 0 : parsedAdd);
                 return (
-                  <div className="bg-amber-50/60 dark:bg-amber-950/20 border border-amber-200/80 dark:border-amber-900/40 p-3 rounded-xl flex items-center justify-between">
+                  <div className="bg-emerald-50/70 dark:bg-emerald-950/20 border border-emerald-200/80 dark:border-emerald-900/40 p-3 rounded-xl flex items-center justify-between">
                     <div>
-                      <span className="text-[10px] font-bold uppercase text-amber-800 dark:text-amber-300 block">
+                      <span className="text-[10px] font-bold uppercase text-emerald-800 dark:text-emerald-300 block">
                         Projected New Balance
                       </span>
                       <span className="text-[9.5px] text-slate-500">
-                        Based on opening adjustment ({diff >= 0 ? `+${formatCurrency(diff)}` : formatCurrency(diff)})
+                        Current ({formatCurrency(currentBal)}) + Added Advance ({parsedAdd > 0 ? `+${formatCurrency(parsedAdd)}` : formatCurrency(0)})
                       </span>
                     </div>
-                    <span className="font-mono font-extrabold text-amber-700 dark:text-amber-400 text-sm">
+                    <span className="font-mono font-extrabold text-emerald-700 dark:text-emerald-400 text-sm">
                       {formatCurrency(projected)}
                     </span>
                   </div>
@@ -761,18 +940,18 @@ export default function PartiesPage() {
               <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-slate-100 dark:border-border">
                 <button
                   type="button"
-                  onClick={() => setBalanceModalParty(null)}
+                  onClick={() => setAdvanceModalParty(null)}
                   className="px-4 py-2 border border-slate-300 dark:border-border hover:bg-slate-100 dark:hover:bg-soft text-slate-700 dark:text-text rounded-xl font-semibold text-xs transition cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  disabled={balanceUpdating}
+                  disabled={advanceUpdating}
                   className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs transition cursor-pointer shadow-md shadow-emerald-600/20 flex items-center gap-1.5 disabled:opacity-50"
                 >
                   <CheckCircle2 size={15} />
-                  <span>{balanceUpdating ? 'Updating...' : 'Update Balance'}</span>
+                  <span>{advanceUpdating ? 'Adding...' : 'Add Advance'}</span>
                 </button>
               </div>
             </form>

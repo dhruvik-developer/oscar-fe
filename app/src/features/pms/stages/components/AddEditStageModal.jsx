@@ -131,6 +131,7 @@ export function AddEditStageModal({ isOpen, onClose, stage = null }) {
           <input
             id="stage-name"
             type="text"
+            required
             className={fieldClass}
             value={draft.name}
             onChange={(e) => set({ name: e.target.value })}
@@ -162,6 +163,7 @@ export function AddEditStageModal({ isOpen, onClose, stage = null }) {
             </label>
             <select
               id="stage-dept"
+              required
               className={fieldClass}
               value={draft.department}
               onChange={(e) => set({ department: e.target.value })}
@@ -184,6 +186,7 @@ export function AddEditStageModal({ isOpen, onClose, stage = null }) {
             <input
               id="stage-duration"
               type="number"
+              required
               min={1}
               step={1}
               className={fieldClass}

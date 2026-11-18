@@ -104,9 +104,13 @@ export function periodStage(rows = []) {
 
 /** Swap server copies into the list by id. */
 function replaceRows(list, fresh) {
-  const byId = new Map(fresh.filter(Boolean).map((r) => [String(r.id), r]));
+  const byId = new Map();
+  fresh.filter(Boolean).forEach((r) => {
+    if (r.id) byId.set(String(r.id), r);
+    if (r.employeeId) byId.set(String(r.employeeId), r);
+  });
   if (byId.size === 0) return list;
-  return list.map((r) => byId.get(String(r.id)) || r);
+  return list.map((r) => byId.get(String(r.id)) || byId.get(String(r.employeeId)) || r);
 }
 
 /**
@@ -177,6 +181,76 @@ const usePayrollStoreBase = create((set, get) => ({
     return rows;
   },
 
+  syncRoster: (directoryEmployees) => {
+    if (!directoryEmployees || directoryEmployees.length === 0) return;
+    const current = get().employees || [];
+    const deptDays = get().departmentWorkingDays || DEFAULT_DEPARTMENT_WORKING_DAYS;
+    const deptHours = get().departmentWorkingHours || DEFAULT_DEPARTMENT_WORKING_HOURS;
+    const dDays = get().defaultWorkingDays || 24;
+
+    const merged = [...current];
+    directoryEmployees.forEach((emp) => {
+      if (emp.status && !["Active", "On Leave", "Probation"].includes(emp.status)) return;
+      const eId = String(emp.id || "").toLowerCase();
+      const eCode = String(emp.employee_code || emp.employeeCode || emp.empId || "").toLowerCase();
+      const eName = String(emp.name || "").toLowerCase();
+
+      const existsIdx = merged.findIndex((p) => {
+        const pId = String(p.id || "").toLowerCase();
+        const pEmpId = String(p.employeeId || "").toLowerCase();
+        const pCode = String(p.empId || p.employeeCode || "").toLowerCase();
+        const pName = String(p.name || "").toLowerCase();
+        return (
+          (pId && (pId === eId || pEmpId === eId)) ||
+          (pEmpId && pEmpId === eId) ||
+          (pCode && (pCode === eCode || pCode === eId)) ||
+          (pName && pName === eName)
+        );
+      });
+
+      const dept = typeof emp.department === "object" ? emp.department?.name : emp.department;
+      const desig = typeof emp.designation === "object" ? emp.designation?.name : emp.designation;
+      const stdSal = Number(emp.standard_salary || emp.standardSalary || 0);
+      const totalD = getDepartmentDays(deptDays, dept) || dDays;
+      const dailyH = getDepartmentHours(deptHours, dept) || 8;
+      const totalH = totalD * dailyH;
+      const hourlyR = totalH > 0 ? Math.round(stdSal / totalH) : 0;
+
+      if (existsIdx === -1) {
+        merged.push({
+          id: String(emp.id),
+          employeeId: String(emp.id),
+          empId: emp.employee_code || emp.employeeCode || `EMP-${emp.id}`,
+          employeeCode: emp.employee_code || emp.employeeCode || `EMP-${emp.id}`,
+          name: emp.name,
+          email: emp.email,
+          phone: emp.phone,
+          department: dept || "General",
+          role: desig || "Staff Member",
+          designation: desig || "Staff Member",
+          avatar: emp.avatar || emp.avatar_url,
+          standardSalary: stdSal,
+          totalDays: totalD,
+          dailyHours: dailyH,
+          totalHours: totalH,
+          hourlyRate: hourlyR,
+          attendedDays: 0,
+          paidLeaves: 0,
+          unpaidLeaves: 0,
+          absentDays: totalD,
+          advance: 0,
+          additionalEarnings: 0,
+          deductions: 0,
+          status: "In Progress",
+          netPayable: 0,
+          earnedSalary: 0,
+        });
+      }
+    });
+
+    set({ employees: merged });
+  },
+
   /** Switch month (`YYYY-MM`) and load it. */
   setPeriod: (period) => {
     if (!period || period === get().period) return Promise.resolve(get().employees);
@@ -202,21 +276,24 @@ const usePayrollStoreBase = create((set, get) => ({
   },
 
   /** Change additional earnings / deductions / advance; the server recomputes the payslip. */
-  adjust: async (id, { additionalEarnings, deductions, advance } = {}) => {
-    const row = await hrmsSync.update("payroll", id, { additionalEarnings, deductions, advance });
+  adjust: async (id, { standardSalary, additionalEarnings, deductions, advance } = {}) => {
+    const row = await hrmsSync.update("payroll", id, { standardSalary, additionalEarnings, deductions, advance });
     if (row && row.id) set((s) => ({ employees: replaceRows(s.employees, [row]) }));
+    await get().reloadPeriod();
     return row;
   },
 
   approve: async (id) => {
     const row = await approvePayroll(id);
     if (row && row.id) set((s) => ({ employees: replaceRows(s.employees, [row]) }));
+    await get().reloadPeriod();
     return row;
   },
 
   markPaid: async (id, paymentDate = localISODate()) => {
     const row = await markPayrollPaid(id, { paymentDate });
     if (row && row.id) set((s) => ({ employees: replaceRows(s.employees, [row]) }));
+    await get().reloadPeriod();
     return row;
   },
 

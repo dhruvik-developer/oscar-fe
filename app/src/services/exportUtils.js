@@ -1,6 +1,7 @@
-/**
- * Universal CSV and Print Export Utility for Horizon ERP
- */
+import { jsPDF } from 'jspdf';
+import { toPng } from 'html-to-image';
+import { modal } from '../context/ModalContext';
+
 export function exportToCSV(filename, headers, rows) {
     const escapeCell = (cell) => {
         if (cell === null || cell === undefined)
@@ -50,4 +51,49 @@ export function exportObjectsToCSV(filename, data, columnMapping) {
 }
 export function triggerPrint() {
     window.print();
+}
+
+/**
+ * Directly downloads an HTML DOM element as a high-quality A4 PDF without opening the printer dialog.
+ */
+export async function downloadElementAsPdf(element, filename = 'document.pdf') {
+    if (!element) {
+        window.print();
+        return;
+    }
+    try {
+        const dataUrl = await toPng(element, {
+            pixelRatio: 2,
+            backgroundColor: '#ffffff',
+            cacheBust: true,
+            skipFonts: true,
+        });
+        const pdf = new jsPDF({
+            orientation: 'portrait',
+            unit: 'mm',
+            format: 'a4',
+        });
+        const imgProps = pdf.getImageProperties(dataUrl);
+        const pdfWidth = pdf.internal.pageSize.getWidth();
+        const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+        const pageHeight = pdf.internal.pageSize.getHeight();
+        let heightLeft = pdfHeight;
+        let position = 0;
+
+        pdf.addImage(dataUrl, 'PNG', 0, position, pdfWidth, pdfHeight);
+        heightLeft -= pageHeight;
+
+        while (heightLeft > 0) {
+            position = heightLeft - pdfHeight;
+            pdf.addPage();
+            pdf.addImage(dataUrl, 'PNG', 0, position, pdfWidth, pdfHeight);
+            heightLeft -= pageHeight;
+        }
+
+        const safeFilename = filename.toLowerCase().endsWith('.pdf') ? filename : `${filename}.pdf`;
+        pdf.save(safeFilename);
+    } catch (err) {
+        console.error('Failed to generate direct PDF download, falling back to window.print():', err);
+        window.print();
+    }
 }

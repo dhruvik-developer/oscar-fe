@@ -22,7 +22,6 @@ import {
   generateMonthGrid,
   generateWeekDays,
   getQuarterInfo,
-  exportEventsToICS,
   isEventOnDate,
 } from "./calendarUtils";
 
@@ -343,10 +342,7 @@ export function CalendarPage() {
     showToast(target ? `Deleted "${target.title}"` : "Event deleted");
   };
 
-  const handleExport = () => {
-    exportEventsToICS(filteredEvents, `HRMS-Calendar-${MONTH_NAMES[activeMonth]}-${activeYear}`);
-    showToast("Calendar (.ics) downloaded successfully");
-  };
+
 
   const handleResetDefaults = async () => {
     const confirmed = await modal.warning({

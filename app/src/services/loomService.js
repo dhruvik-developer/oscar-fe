@@ -17,7 +17,10 @@ export const loomService = {
 
   // Machines
   getMachines: (params) => api.get(`${BASE}/machines/`, { params }),
-  batchCreateMachines: (data) => api.post(`${BASE}/machines/batch_create/`, data),
+  batchCreateMachines: (data) => {
+    const fid = data.factory_id || data.factory;
+    return api.post(`${BASE}/machines/batch_create/`, { ...data, factory: fid, factory_id: fid });
+  },
   updateMachine: (id, data) => api.patch(`${BASE}/machines/${id}/`, data),
   deleteMachine: (id) => api.delete(`${BASE}/machines/${id}/`),
 
@@ -42,7 +45,10 @@ export const loomService = {
 
   // Daily Production
   getFactoryDayProduction: (factoryId, dateStr) => api.get(`${BASE}/daily-production/factory_day/`, { params: { factory: factoryId, date: dateStr } }),
-  bulkSaveDailyProduction: (data) => api.post(`${BASE}/daily-production/bulk_save/`, data),
+  bulkSaveDailyProduction: (data) => {
+    const fid = data.factory_id || data.factory;
+    return api.post(`${BASE}/daily-production/bulk_save/`, { ...data, factory: fid, factory_id: fid });
+  },
   deleteDailyProduction: (id) => api.delete(`${BASE}/daily-production/${id}/`),
 
   // Yarn Bookings & Deliveries

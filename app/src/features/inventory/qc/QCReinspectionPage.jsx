@@ -17,6 +17,7 @@ import {
   X,
   Loader2,
   AlertTriangle,
+  AlertCircle,
 } from 'lucide-react';
 import { api } from '../../../services/api';
 import { inventoryService } from '../../../services/domainServices';

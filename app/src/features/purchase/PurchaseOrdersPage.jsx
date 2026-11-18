@@ -484,6 +484,10 @@ export const PurchaseOrdersPage = () => {
     };
 
     const handleOpenEditModal = (po) => {
+        if (po?.status === 'Approved' || (!['Draft', 'Pending Approval', 'Issued'].includes(po?.status))) {
+            showToast('Approved purchase orders cannot be edited.', 'warning');
+            return;
+        }
         setEditingPo(po);
         const vend = vendors.find((v) => v.id === po.vendorId || v.name === po.vendor);
         setSelectedVendorId(vend?.id || vendors[0]?.id || '');

@@ -462,18 +462,7 @@ export const NAV = [
       },
       // { label: 'Training', icon: GraduationCap, to: '/hrms/training' }, // Hidden: Training feature commented out
       { label: 'HR Admin', icon: ShieldCheck, to: '/hrms/hr-admin' },
-      {
-        label: 'Asset Setup',
-        icon: Briefcase,
-        defaultOpen: false,
-        navigateOnOpen: true,
-        to: '/hrms/assets',
-        children: [
-          { label: 'Assets', to: '/hrms/assets', dot: true },
-          { label: 'Asset Requests', to: '/hrms/assets?tab=requests' },
-          { label: 'Categories', to: '/hrms/assets?tab=categories' },
-        ],
-      },
+      { label: 'Asset Setup', icon: Briefcase, to: '/hrms/assets' },
       { label: 'Documents', icon: FileText, to: '/hrms/documents' },
       { label: 'Company Policy', icon: ShieldCheck, to: '/hrms/company-policy' },
       { label: 'Calendar', icon: Calendar, to: '/hrms/calendar' },

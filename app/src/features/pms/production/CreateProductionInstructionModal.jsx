@@ -94,7 +94,7 @@ export function CreateProductionInstructionModal({ project, po, defaultQty, onCl
   const label = 'block font-semibold text-slate-700 mb-1';
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-      <form onSubmit={submit} className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl bg-white shadow-2xl border border-slate-200 text-xs">
+      <form onSubmit={submit} className="w-full max-w-[calc(100vw-1.5rem)] sm:max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl bg-white shadow-2xl border border-slate-200 text-xs">
         <div className="flex items-center justify-between p-4 border-b border-slate-100 sticky top-0 bg-white">
           <div className="flex items-center gap-2">
             <FileText size={16} className="text-amber-600" />
@@ -109,7 +109,7 @@ export function CreateProductionInstructionModal({ project, po, defaultQty, onCl
             Order reference: <strong className="text-slate-800">{po?.poNumber || project?.code}</strong> · saved as Draft. The Final Job Work PO is generated only after production is verified.
           </div>
 
-          <fieldset className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          <fieldset className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
             <legend className="col-span-full font-bold text-slate-800 mb-1">Header</legend>
             <label><span className={label}>Date</span><input type="date" value={form.piDate} onChange={set('piDate')} className={field} /></label>
             <label className="sm:col-span-2"><span className="flex items-baseline justify-between"><span className={label}>External Agency</span><MasterSourceLink source="agencies" /></span>
@@ -124,14 +124,14 @@ export function CreateProductionInstructionModal({ project, po, defaultQty, onCl
             <label><span className={label}>Expected Completion</span><input type="date" value={form.expectedCompletionDate} onChange={set('expectedCompletionDate')} className={field} /></label>
           </fieldset>
 
-          <fieldset className="grid grid-cols-3 gap-3">
+          <fieldset className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <legend className="col-span-full font-bold text-slate-800 mb-1">Quantity</legend>
             <label><span className={label}>Order Meter</span><input type="number" min="0" step="0.01" value={form.orderMeter} onChange={set('orderMeter')} className={`${field} font-mono`} /></label>
             <label><span className={label}>Taka / Roll Count</span><input type="number" min="0" value={form.takaCount} onChange={set('takaCount')} className={`${field} font-mono`} /></label>
             <label><span className={label}>Weight (kg)</span><input type="number" min="0" step="0.01" value={form.totalWeight} onChange={set('totalWeight')} className={`${field} font-mono`} /></label>
           </fieldset>
 
-          <fieldset className="grid grid-cols-3 gap-3">
+          <fieldset className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <legend className="col-span-full font-bold text-slate-800 mb-1">Commercial</legend>
             <label><span className={label}>Tentative Rate (₹)</span><input type="number" min="0" step="0.01" value={form.tentativeRate} onChange={set('tentativeRate')} className={`${field} font-mono`} /></label>
             <label><span className={label}>Agreed Rate (₹)</span><input type="number" min="0" step="0.01" value={form.agreedJobRate} onChange={set('agreedJobRate')} className={`${field} font-mono`} /></label>
@@ -143,7 +143,7 @@ export function CreateProductionInstructionModal({ project, po, defaultQty, onCl
             <label className="col-span-full"><span className={label}>Special Terms</span><input value={form.specialTerms} onChange={set('specialTerms')} className={field} /></label>
           </fieldset>
 
-          <fieldset className="grid grid-cols-2 gap-3">
+          <fieldset className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <legend className="col-span-full font-bold text-slate-800 mb-1">Responsibility</legend>
             <label><span className="flex items-baseline justify-between"><span className={label}>Company Production Employee</span><MasterSourceLink source="employees" /></span>
               <select value={form.employeeId} onChange={set('employeeId')} className={field}>

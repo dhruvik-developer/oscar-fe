@@ -5703,6 +5703,37 @@ textarea:focus::placeholder {
   position: relative;
   border-radius: 0.75rem;
   scrollbar-width: thin;
+  -webkit-overflow-scrolling: touch;
+}
+
+.pms-table-container > table {
+  min-width: 720px;
+}
+
+@media (max-width: 640px) {
+  .pms-screen {
+    padding-left: 0.25rem;
+    padding-right: 0.25rem;
+  }
+  .pms-table-container {
+    border-radius: 0.5rem;
+  }
+  .pms-table-container > table {
+    min-width: 640px;
+  }
+}
+
+.pms-table-container td.sticky,
+.pms-table-container th.sticky {
+  position: sticky;
+  left: 0;
+  z-index: 10;
+  background-color: #ffffff;
+}
+
+.dark .pms-table-container td.sticky,
+.dark .pms-table-container th.sticky {
+  background-color: #0f172a;
 }
 
 .pms-table-container::-webkit-scrollbar {

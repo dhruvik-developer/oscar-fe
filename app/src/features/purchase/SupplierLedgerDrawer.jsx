@@ -17,6 +17,8 @@ import {
   ArrowDownLeft,
   AlertCircle,
   ExternalLink,
+  ShieldAlert,
+  CheckCircle2,
 } from 'lucide-react';
 import api from '../../services/api';
 import { numIN, toDDMMYYYY } from '../../utils/formatters';
@@ -35,6 +37,40 @@ export function SupplierLedgerDrawer({
   const [dateTo, setDateTo] = useState('');
   const [ledgerData, setLedgerData] = useState(null);
   const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
+  const [isWriteOffModalOpen, setIsWriteOffModalOpen] = useState(false);
+  const [writeOffAmount, setWriteOffAmount] = useState('');
+  const [writeOffReason, setWriteOffReason] = useState('Uncollectible overdue balance write-off');
+  const [writeOffLoading, setWriteOffLoading] = useState(false);
+  const [writeOffError, setWriteOffError] = useState('');
+  const [writeOffSuccess, setWriteOffSuccess] = useState('');
+
+  const handleConfirmWriteOff = async (e) => {
+    e.preventDefault();
+    if (!writeOffAmount || Number(writeOffAmount) <= 0) {
+      setWriteOffError('Please enter a valid write-off amount.');
+      return;
+    }
+    setWriteOffLoading(true);
+    setWriteOffError('');
+    try {
+      const res = await api.post('/accounting/customer-write-off/', {
+        partyId: supplier.id,
+        amount: writeOffAmount,
+        reason: writeOffReason,
+      });
+      setWriteOffSuccess(res?.message || 'Successfully posted bad debt write-off.');
+      setTimeout(() => {
+        setIsWriteOffModalOpen(false);
+        setWriteOffSuccess('');
+        fetchLedger();
+        if (onRefreshSupplierList) onRefreshSupplierList();
+      }, 1000);
+    } catch (err) {
+      setWriteOffError(err?.message || 'Failed to post bad debt write-off.');
+    } finally {
+      setWriteOffLoading(false);
+    }
+  };
 
   // Pagination for the Statement of Account table inside the drawer
   const [statementPage, setStatementPage] = useState(1);
@@ -277,6 +313,24 @@ export function SupplierLedgerDrawer({
                 <Printer size={13} />
                 <span>Print Statement</span>
               </button>
+              {isCustomer && closingBalance > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setWriteOffAmount(String(Math.abs(closingBalance)));
+                    setWriteOffReason('Uncollectible overdue balance write-off');
+                    setWriteOffError('');
+                    setWriteOffSuccess('');
+                    setIsWriteOffModalOpen(true);
+                  }}
+                  disabled={loading || !ledgerData}
+                  className="px-3.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg font-semibold flex items-center gap-1.5 transition cursor-pointer disabled:opacity-50 shadow-xs"
+                  title="Write off uncollectible customer bad debt (PDF §14, §16)"
+                >
+                  <ShieldAlert size={13} />
+                  <span>Write-Off Bad Debt</span>
+                </button>
+              )}
             </div>
           </div>
 
@@ -781,6 +835,105 @@ export function SupplierLedgerDrawer({
           </div>
         </div>
       </div>
+
+      {/* Customer Bad-Debt Write-Off Modal (PDF §14, §16) */}
+      {isWriteOffModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl border border-slate-200 max-w-md w-full p-6 shadow-2xl text-xs space-y-4 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2 text-rose-700">
+                <ShieldAlert size={18} />
+                <h3 className="font-bold text-sm text-slate-900">Customer Bad-Debt Write-Off</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsWriteOffModalOpen(false)}
+                className="p-1 text-slate-400 hover:text-slate-600 rounded-lg cursor-pointer"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <p className="text-slate-500 leading-relaxed text-[11px]">
+              This will write off uncollectible receivables for <strong className="text-slate-800">{supplier?.name}</strong>.
+              The accounting engine will automatically post <strong className="text-slate-700">Dr Bad Debts Written Off (5800) / Cr Sundry Debtors (1200)</strong>.
+            </p>
+
+            {writeOffError && (
+              <div className="p-3 bg-rose-50 border border-rose-200 rounded-lg text-rose-700 flex items-center gap-2">
+                <AlertCircle size={14} className="shrink-0" />
+                <span>{writeOffError}</span>
+              </div>
+            )}
+
+            {writeOffSuccess && (
+              <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-emerald-800 flex items-center gap-2">
+                <CheckCircle2 size={14} className="shrink-0 text-emerald-600" />
+                <span>{writeOffSuccess}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleConfirmWriteOff} className="space-y-3 pt-1">
+              <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-1">
+                <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Current Receivable Balance</span>
+                <p className="text-base font-extrabold font-mono text-slate-900">
+                  ₹{numIN(Math.abs(closingBalance))} <span className="text-xs text-rose-600 font-bold">Dr</span>
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                  Write-Off Amount (₹) *
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  required
+                  min="0.01"
+                  max={Math.abs(closingBalance)}
+                  value={writeOffAmount}
+                  onChange={(e) => setWriteOffAmount(e.target.value)}
+                  className="w-full px-3 py-2 text-xs font-mono font-bold rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-1 focus:ring-rose-500 shadow-2xs"
+                  placeholder="Enter amount to write off..."
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                  Reason & Justification *
+                </label>
+                <textarea
+                  required
+                  rows={2}
+                  value={writeOffReason}
+                  onChange={(e) => setWriteOffReason(e.target.value)}
+                  className="w-full px-3 py-2 text-xs rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-1 focus:ring-rose-500 shadow-2xs"
+                  placeholder="State reason for writing off this account (e.g. Insolvency, Disputed & uncollectible)..."
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsWriteOffModalOpen(false)}
+                  disabled={writeOffLoading}
+                  className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={writeOffLoading}
+                  className="px-4 py-2 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-lg shadow-xs transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  {writeOffLoading ? <RefreshCw size={12} className="animate-spin" /> : <ShieldAlert size={12} />}
+                  <span>Confirm Write-Off</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Print Statement Modal */}
       <PrintSupplierStatementModal

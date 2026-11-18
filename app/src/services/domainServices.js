@@ -178,6 +178,7 @@ export const salesService = {
   createBroker: (data) => api.post('/masters/brokers/', data),
   approveBrokerCommission: (id) => api.post(`/sales/broker-commissions/${id}/approve/`),
   makeBrokerPayable: (id) => api.post(`/sales/broker-commissions/${id}/make-payable/`),
+  toggleBrokerCommissionHold: (id, data) => api.post(`/sales/broker-commissions/${id}/toggle-hold/`, data),
   payBrokerCommission: (id, data) => api.post(`/sales/broker-commissions/${id}/pay/`, data),
   getBrokerStatement: (query) => api.get('/sales/broker-commissions/statement/', { query }),
   getPartyDiscounts: (query) => api.get('/sales/party-discounts/', { query }),

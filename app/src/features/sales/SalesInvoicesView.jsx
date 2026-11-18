@@ -133,6 +133,7 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
     const [finalizeModalTarget, setFinalizeModalTarget] = useState(null);
     const [finalizeError, setFinalizeError] = useState('');
     const [finalizeErrorCode, setFinalizeErrorCode] = useState('');
+    const [discountApprovalData, setDiscountApprovalData] = useState(null);
     const [finalizingInvoiceId, setFinalizingInvoiceId] = useState(null);
     const [creditExposure, setCreditExposure] = useState(null);
     const [creditOverrideReason, setCreditOverrideReason] = useState('');
@@ -666,6 +667,7 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
             setFinalizeModalTarget(null);
             setCreditExposure(null);
             setFinalizeErrorCode('');
+            setDiscountApprovalData(null);
         } catch (error) {
             const errPayload = error?.payload || {};
             const code = errPayload?.code || errPayload?.payload?.code || error?.code || '';
@@ -674,6 +676,11 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
             setFinalizeErrorCode(code);
             setCreditExposure(
                 code === 'CREDIT_LIMIT_EXCEEDED'
+                    ? (errPayload?.payload || errPayload)
+                    : null
+            );
+            setDiscountApprovalData(
+                code === 'APPROVAL_REQUIRED'
                     ? (errPayload?.payload || errPayload)
                     : null
             );
@@ -1239,6 +1246,28 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
                             <div>
                                 <label className="text-xs font-semibold text-slate-800 block mb-2">Invoice Line Items</label>
                                 <LineItemEditor items={lineItems} onChange={setLineItems} type="sales"/>
+                                {(() => {
+                                    const sub = lineItems.reduce((acc, it) => acc + (Number(it.rate || 0) * Number(it.qty || 0)), 0);
+                                    const disc = lineItems.reduce((acc, it) => {
+                                        const itemSub = Number(it.rate || 0) * Number(it.qty || 0);
+                                        const itemDiscPct = Number(it.discount || it.discountPercent || 0);
+                                        return acc + (Number(it.discountAmount || 0) || (itemSub * (itemDiscPct / 100)));
+                                    }, 0);
+                                    const pct = sub > 0 ? (disc / sub) * 100 : 0;
+                                    if (pct > 1.0) {
+                                        return (
+                                            <div className="mt-2.5 p-2.5 bg-amber-50 border border-amber-300 rounded-xl flex items-center gap-2 text-amber-900 text-xs">
+                                                <ShieldAlert className="w-4 h-4 text-amber-600 flex-shrink-0" />
+                                                <span>
+                                                    <strong>Multi-Tier Discount Notice (§11, §12):</strong> Invoice discount is{' '}
+                                                    <strong>{pct.toFixed(1)}%</strong> (exceeds 1.0% salesperson auto-allow threshold). Finalization will route to{' '}
+                                                    <strong>{pct > 3.0 ? 'Owner / Director' : 'Sales Manager'}</strong> for authorization before posting to ledger.
+                                                </span>
+                                            </div>
+                                        );
+                                    }
+                                    return null;
+                                })()}
                             </div>
 
                             {/* Charges billed on top of the goods */}
@@ -1622,7 +1651,7 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
                             </ul>
                         </div>
 
-                        {finalizeError && (
+                        {finalizeError && finalizeErrorCode !== 'APPROVAL_REQUIRED' && (
                             <div role="alert" className="mb-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-rose-700">
                                 <p>{finalizeError}</p>
                                 {finalizeErrorCode === 'NO_LOCATION' && (
@@ -1639,6 +1668,49 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
                                         Open Warehouse Setup
                                     </button>
                                 )}
+                            </div>
+                        )}
+
+                        {finalizeErrorCode === 'APPROVAL_REQUIRED' && (
+                            <div className="mb-3 rounded-xl border border-amber-300 bg-amber-50 p-3.5 text-slate-800 space-y-2">
+                                <div className="flex items-center gap-2 font-bold text-amber-900 text-xs">
+                                    <ShieldAlert className="w-4 h-4 text-amber-600 flex-shrink-0" />
+                                    <span>Multi-Tier Discount Approval Required (Oscar Letter Pad §11, §12)</span>
+                                </div>
+                                <p className="text-[11px] text-slate-700 leading-relaxed">
+                                    The discount on this invoice exceeds the salesperson auto-allow threshold (1.0%). A formal approval request has been generated and routed to{' '}
+                                    <strong className="text-amber-950 font-semibold">
+                                        {discountApprovalData?.requiredLevel === 'owner' ? 'the Owner / Director' : 'the Sales Manager'}
+                                    </strong>{' '}
+                                    in the Approvals Inbox. This draft is preserved and locked until approved.
+                                </p>
+                                {discountApprovalData?.approvalRequestId && (
+                                    <div className="text-[11px] text-slate-700 bg-white/80 p-2 rounded-lg border border-amber-200">
+                                        <span className="font-semibold text-amber-950">Approval Request ID:</span> {discountApprovalData.approvalRequestId}
+                                    </div>
+                                )}
+                                {discountApprovalData?.reasons && discountApprovalData.reasons.length > 0 && (
+                                    <ul className="list-disc list-inside text-[11px] text-amber-900 font-medium space-y-0.5">
+                                        {discountApprovalData.reasons.map((r, i) => (
+                                            <li key={i}>{r}</li>
+                                        ))}
+                                    </ul>
+                                )}
+                                <div className="pt-2 flex justify-end">
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setFinalizeModalTarget(null);
+                                            setFinalizeError('');
+                                            setFinalizeErrorCode('');
+                                            setDiscountApprovalData(null);
+                                            navigate('/approvals');
+                                        }}
+                                        className="px-3.5 py-1.5 bg-amber-700 hover:bg-amber-800 text-white rounded-lg font-bold text-xs shadow-xs transition-colors cursor-pointer"
+                                    >
+                                        View in Approvals Inbox →
+                                    </button>
+                                </div>
                             </div>
                         )}
 
@@ -1711,6 +1783,8 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
                                     setFinalizeModalTarget(null);
                                     setFinalizeError('');
                                     setCreditExposure(null);
+                                    setFinalizeErrorCode('');
+                                    setDiscountApprovalData(null);
                                 }}
                             >
                                 {finalizingInvoiceId === finalizeModalTarget.id ? 'Finalizing…' : 'Back'}

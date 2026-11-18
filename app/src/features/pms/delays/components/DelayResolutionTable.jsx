@@ -191,17 +191,15 @@ export function DelayResolutionTable({
         </table>
       </div>
 
-      {total > 0 && (
-        <TablePagination
-          totalItems={total}
-          page={page}
-          pageSize={pageSize}
-          onPageChange={setPage}
-          onPageSizeChange={setPageSize}
-          pageSizeOptions={[10, 20, 50]}
-          bordered
-        />
-      )}
+      <TablePagination
+        totalItems={total}
+        page={page}
+        pageSize={pageSize}
+        onPageChange={setPage}
+        onPageSizeChange={(sz) => { setPageSize(sz); setPage(1); }}
+        pageSizeOptions={[10, 20, 50]}
+        bordered
+      />
     </div>
   );
 }

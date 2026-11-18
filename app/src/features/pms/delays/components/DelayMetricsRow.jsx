@@ -12,7 +12,7 @@ export function DelayMetricsRow({ metrics }) {
   const bottleneck = metrics?.bottleneck;
 
   return (
-    <section className="grid gap-3.5 grid-cols-2 lg:grid-cols-4" aria-label="Delay summary metrics">
+    <section className="grid gap-2.5 sm:gap-3.5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4" aria-label="Delay summary metrics">
       <KpiCard
         label="Delayed Projects"
         value={metrics?.delayedProjects ?? 0}

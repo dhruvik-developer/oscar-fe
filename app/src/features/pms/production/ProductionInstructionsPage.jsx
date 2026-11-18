@@ -410,7 +410,7 @@ export default function ProductionInstructionsPage() {
         <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 p-3.5">
           <div className="relative">
             <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search PI No., vendor, fabric..." className="w-56 rounded-lg border border-slate-200 bg-white py-2 pl-9 pr-3 text-[12px] outline-none placeholder:text-slate-400 focus:border-blue-400" />
+            <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search PI No., vendor, fabric..." className="w-full sm:w-56 rounded-lg border border-slate-200 bg-white py-2 pl-9 pr-3 text-[12px] outline-none placeholder:text-slate-400 focus:border-blue-400" />
           </div>
           <select value={vendorFilter} onChange={(e) => setVendorFilter(e.target.value)} className="rounded-lg border border-slate-200 bg-white py-2 px-2 text-[12px] font-medium text-slate-600 outline-none">
             <option value="All">All Agencies</option>
@@ -747,7 +747,7 @@ export default function ProductionInstructionsPage() {
             </div>
 
             {/* Modal Tabs */}
-            <div className="flex border-b border-slate-200 gap-2 mt-3 text-xs">
+            <div className="flex border-b border-slate-200 gap-2 mt-3 text-xs overflow-x-auto no-scrollbar whitespace-nowrap">
               <button
                 type="button"
                 onClick={() => setViewTab('overview')}

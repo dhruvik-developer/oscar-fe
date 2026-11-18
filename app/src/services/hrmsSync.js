@@ -1745,7 +1745,7 @@ export const pullMonthlyAttendance = (employeeId, month) =>
   read('/hrms/attendance/monthly/', { employeeId, month }, 'monthly attendance');
 
 export const pullLeaveBalanceSummary = (employeeId, year) =>
-  read('/hrms/leave/balance-summary/', { employeeId, year }, 'leave balance summary');
+  read('/hrms/leave/balances/summary/', { employeeId, year }, 'leave balance summary');
 
 export async function saveAttendanceDay(date, records) {
   const iso = toISODate(date) || date;

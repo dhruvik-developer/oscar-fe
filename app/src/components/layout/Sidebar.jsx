@@ -1055,6 +1055,7 @@ export default function Sidebar() {
   const sidebarWidth = useAppStore((s) => s.sidebarWidth) ?? 280;
   const brandName = useBrandName('EVENMORE INFOTECH');
   const setSidebarWidth = useAppStore((s) => s.setSidebarWidth);
+  const mobileSidebarOpen = useAppStore((s) => s.mobileSidebarOpen);
   const setMobileSidebarOpen = useAppStore((s) => s.setMobileSidebarOpen);
   const currentUser = useAppStore((s) => s.currentUser);
   const permissions = useAppStore((s) => s.permissions) || [];
@@ -1066,6 +1067,20 @@ export default function Sidebar() {
   const [searchQuery, setSearchQuery] = useState('');
   const profileRef = useRef(null);
   const isDraggingRef = useRef(false);
+
+  useEffect(() => {
+    if (!mobileSidebarOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') setMobileSidebarOpen(false);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.body.style.overflow = prev;
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [mobileSidebarOpen, setMobileSidebarOpen]);
 
   const permittedNav = useMemo(() => {
     return filterNavByPermissions(NAV, currentUser, permissions, hasPermission);

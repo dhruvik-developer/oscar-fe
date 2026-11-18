@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Factory,
@@ -15,6 +15,9 @@ import {
   UserCheck,
   ArrowRight,
   LayoutGrid,
+  FileSpreadsheet,
+  FileText,
+  ChevronDown,
 } from 'lucide-react';
 import PageHeader from '../../../components/ui/PageHeader';
 import KpiCard from '../../../components/ui/KpiCard';
@@ -23,6 +26,7 @@ import { loomService } from '../../../services/loomService';
 import { formatNum } from '../utils/loomCalculations';
 import { useERP } from '../../../context/ERPContext';
 import { ConfirmModal } from '../../../components/ui/ConfirmModal';
+import { exportToCSV, downloadElementAsPdf } from '../../../services/exportUtils';
 
 export default function LoomDashboardPage() {
   const navigate = useNavigate();
@@ -34,6 +38,22 @@ export default function LoomDashboardPage() {
   const [activeTab, setActiveTab] = useState(
     () => localStorage.getItem('oscar_pms_dashboard_tab') || 'looms'
   );
+
+  const [showExportMenu, setShowExportMenu] = useState(false);
+  const [exportingPdf, setExportingPdf] = useState(false);
+  const exportMenuRef = useRef(null);
+  const reportContentRef = useRef(null);
+
+  // Close export dropdown on click outside
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (exportMenuRef.current && !exportMenuRef.current.contains(e.target)) {
+        setShowExportMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const handleTabChange = (tabId) => {
     setActiveTab(tabId);
@@ -74,6 +94,108 @@ export default function LoomDashboardPage() {
     a.href = url;
     a.download = `oscar-loom-pms-export-${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
+  };
+
+  const handleExportExcel = () => {
+    setShowExportMenu(false);
+    if (!dashboardData || !factories.length) {
+      showToast('No dashboard data available to export', 'warning');
+      return;
+    }
+
+    const headers = [
+      'Factory Name',
+      'Looms Running',
+      'Total Looms',
+      'Idle Looms',
+      'Meters on Looms',
+      'Spare Beams (Count)',
+      'Spare Beams (Meters)',
+      'Daily Output (m/d)',
+      'Days on Looms',
+      'Days with Spares',
+      'Prep Needed (<=7d)',
+      'Urgent Looms (<=2d)',
+    ];
+
+    const rows = factories.map((f) => [
+      f.factory_name || '',
+      f.running_machines || 0,
+      f.total_machines || 0,
+      f.idle_machines || 0,
+      f.on_loom_m || 0,
+      f.spares_count || 0,
+      f.spares_m || 0,
+      f.daily_out || 0,
+      f.days_on_loom !== undefined && f.days_on_loom !== null ? Number(f.days_on_loom).toFixed(1) : '0.0',
+      f.days_with_spare !== undefined && f.days_with_spare !== null ? Number(f.days_with_spare).toFixed(1) : '0.0',
+      f.within7_count || 0,
+      f.urgent_machines && f.urgent_machines.length > 0 ? f.urgent_machines.join(', ') : 'All covered',
+    ]);
+
+    // Append Yarn Cover Details if available
+    const hasYarn = factories.some((f) => (f.yarn_cover || []).length > 0);
+    if (hasYarn) {
+      rows.push([]);
+      rows.push(['--- YARN WEFT COVER STATUS ---']);
+      rows.push(['Factory', 'Yarn Quality', 'Balance (kg)', 'Daily Weft (kg/d)', 'Cover Days', 'Pending (kg)']);
+      factories.forEach((f) => {
+        (f.yarn_cover || []).forEach((y) => {
+          rows.push([
+            f.factory_name || '',
+            y.yarn_name || '',
+            y.bal || 0,
+            y.daily > 0 ? Number(y.daily).toFixed(1) : 'warp',
+            y.days !== null && y.days !== undefined ? Number(y.days).toFixed(1) : 'N/A',
+            y.pending || 0,
+          ]);
+        });
+      });
+    }
+
+    // Append Active Programs if available
+    if (programs.length > 0) {
+      rows.push([]);
+      rows.push(['--- ACTIVE PROGRAMS PROGRESS ---']);
+      rows.push(['Program Name', 'Factory', 'Done Meters', 'Target Meters', 'Loom Eff %', 'At Factory (m)']);
+      programs.forEach((p) => {
+        const s = p.stats || {};
+        rows.push([
+          p.name || '',
+          p.factory_name || '',
+          s.meters || 0,
+          p.target || 0,
+          s.eff_pct !== undefined ? Number(s.eff_pct).toFixed(1) : '0.0',
+          s.at_factory || 0,
+        ]);
+      });
+    }
+
+    exportToCSV(`Loom_Manufacturing_Command_Center`, headers, rows);
+    showToast('Excel (.csv) sheet downloaded successfully', 'success');
+  };
+
+  const handleExportPdf = async () => {
+    setShowExportMenu(false);
+    if (!reportContentRef.current) {
+      window.print();
+      return;
+    }
+    setExportingPdf(true);
+    showToast('Generating PDF document...', 'info');
+    try {
+      await downloadElementAsPdf(
+        reportContentRef.current,
+        `Loom_Manufacturing_Command_Center_${new Date().toISOString().slice(0, 10)}.pdf`
+      );
+      showToast('PDF downloaded successfully', 'success');
+    } catch (err) {
+      console.error('PDF export error:', err);
+      showToast('Failed to export PDF, opening print preview', 'warning');
+      window.print();
+    } finally {
+      setExportingPdf(false);
+    }
   };
 
   const factories = dashboardData?.factories || [];
@@ -133,13 +255,66 @@ export default function LoomDashboardPage() {
               </select>
             </div>
 
-            <button
-              type="button"
-              onClick={handleExportJson}
-              className="pms-btn-secondary"
-            >
-              <Download size={14} className="mr-1" /> Export
-            </button>
+            {/* Export Dropdown (Excel / PDF / JSON) */}
+            <div className="relative" ref={exportMenuRef}>
+              <button
+                type="button"
+                onClick={() => setShowExportMenu(!showExportMenu)}
+                className="pms-btn-secondary inline-flex items-center gap-1.5"
+                aria-expanded={showExportMenu}
+                title="Export report in Excel, PDF, or JSON format"
+              >
+                <Download size={14} className={exportingPdf ? 'animate-bounce text-blue-500' : ''} />
+                <span>Export</span>
+                <ChevronDown size={12} className={`text-slate-400 transition-transform duration-200 ${showExportMenu ? 'rotate-180' : ''}`} />
+              </button>
+
+              {showExportMenu && (
+                <div className="absolute right-0 mt-1.5 w-52 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-lg py-1.5 z-50 text-xs animate-in fade-in zoom-in-95 duration-100">
+                  <button
+                    type="button"
+                    onClick={handleExportExcel}
+                    className="w-full text-left px-3 py-2 flex items-center gap-2.5 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                  >
+                    <FileSpreadsheet size={15} className="text-emerald-600 dark:text-emerald-400 shrink-0" />
+                    <div>
+                      <div className="font-semibold text-slate-800 dark:text-slate-100">Export to Excel</div>
+                      <div className="text-[10px] text-slate-400">Spreadsheet (.csv)</div>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleExportPdf}
+                    disabled={exportingPdf}
+                    className="w-full text-left px-3 py-2 flex items-center gap-2.5 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                  >
+                    <FileText size={15} className="text-rose-600 dark:text-rose-400 shrink-0" />
+                    <div>
+                      <div className="font-semibold text-slate-800 dark:text-slate-100">Export to PDF</div>
+                      <div className="text-[10px] text-slate-400">Printable A4 report (.pdf)</div>
+                    </div>
+                  </button>
+
+                  <div className="my-1 border-t border-slate-100 dark:border-slate-800" />
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowExportMenu(false);
+                      handleExportJson();
+                    }}
+                    className="w-full text-left px-3 py-2 flex items-center gap-2.5 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                  >
+                    <Download size={14} className="text-slate-400 shrink-0" />
+                    <div>
+                      <div className="font-medium text-slate-700 dark:text-slate-300">Raw Data (JSON)</div>
+                      <div className="text-[10px] text-slate-400">Full schema backup (.json)</div>
+                    </div>
+                  </button>
+                </div>
+              )}
+            </div>
             <button
               type="button"
               onClick={() => setResetConfirmOpen(true)}
@@ -159,8 +334,10 @@ export default function LoomDashboardPage() {
         }
       />
 
-      {/* KPI Cards Strip - Responsive 5 cols on lg, 2 cols on mobile */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
+      {/* Dashboard Report Printable / Capturable Section */}
+      <div ref={reportContentRef} className="space-y-6">
+        {/* KPI Cards Strip - Responsive 5 cols on lg, 2 cols on mobile */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
         <KpiCard
           title="Looms Running"
           value={`${runningLooms} / ${totalLooms}`}
@@ -451,6 +628,7 @@ export default function LoomDashboardPage() {
         )}
       </div>
       )}
+      </div>
 
       <ConfirmModal
         isOpen={resetConfirmOpen}

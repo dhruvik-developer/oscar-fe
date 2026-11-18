@@ -418,14 +418,16 @@ export default function DailyLoomEntryPage() {
                       )}
                     </td>
                     <td className="py-1.5 px-3 text-center">
-                      {r.done && r.prod_id && (
+                      {r.done && r.prod_id ? (
                         <button
                           onClick={() => setDeleteEntryConfirmId(r.prod_id)}
-                          className="text-red-500 hover:text-red-700 p-1 rounded transition-colors"
+                          className="text-red-500 hover:text-red-700 p-1 rounded transition-colors inline-flex items-center justify-center"
                           title="Delete filed row"
                         >
                           <Trash2 size={13} />
                         </button>
+                      ) : (
+                        <span className="text-slate-300 dark:text-slate-600 font-mono text-xs">—</span>
                       )}
                     </td>
                   </tr>

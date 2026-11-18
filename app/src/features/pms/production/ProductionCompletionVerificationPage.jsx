@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
-  ArrowLeft, Printer, MoreHorizontal, Eye, ListChecks,
+  ArrowLeft, Printer, Plus, Eye, ListChecks,
   ClipboardList, Package, XCircle, CheckCircle2, AlertTriangle,
   IndianRupee, Check, X, FileText, LayoutGrid,
 } from 'lucide-react';
@@ -381,24 +381,14 @@ export default function ProductionCompletionVerificationPage() {
             >
               <Printer size={13} /> Print
             </button>
-            <div className="relative">
-              <button
-                onClick={() => setMenuOpen((v) => !v)}
-                className="rounded-lg border border-[#e2eaf5] px-2.5 py-1.5 text-slate-600 hover:bg-slate-50"
-                title="More"
-              >
-                <MoreHorizontal size={14} />
-              </button>
-              {menuOpen && (
-                <>
-                  <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
-                  <div className="absolute right-0 z-20 w-44 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-xl text-[12px]">
-                    <button onClick={() => { setMenuOpen(false); navigate(`/pms/daily-production?pi=${encodeURIComponent(activePiId || '')}`); }} className="block w-full px-3 py-2 text-left font-medium text-slate-700 hover:bg-slate-50">Add daily entry</button>
-                    <button onClick={() => { setMenuOpen(false); handlePrint(); }} className="block w-full px-3 py-2 text-left font-medium text-slate-700 hover:bg-slate-50">Print summary</button>
-                  </div>
-                </>
-              )}
-            </div>
+            <button
+              type="button"
+              onClick={() => navigate(`/pms/daily-production?pi=${encodeURIComponent(activePiId || '')}`)}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-[#e2eaf5] px-3 py-1.5 text-[12px] font-bold text-slate-600 hover:bg-slate-50 transition-colors"
+              title="Add daily production entry"
+            >
+              <Plus size={13} /> Add Daily Entry
+            </button>
           </div>
         </div>
 

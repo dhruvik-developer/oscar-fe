@@ -94,11 +94,7 @@ export default function GenerateFinalJobWorkPOModal({
 
   // Remarks & Attachments
   const [remarks, setRemarks] = useState('Final PO generated for verified accepted quantity.');
-  const [attachments, setAttachments] = useState([
-    { name: 'Production_Summary.pdf', size: '1.2 MB' },
-    { name: 'QC_Report.pdf', size: '850 KB' },
-    { name: 'Rate_Approval.pdf', size: '600 KB' },
-  ]);
+  const [attachments, setAttachments] = useState([]);
 
   // Amount Summary
   const [otherCharges, setOtherCharges] = useState(0);
@@ -271,8 +267,26 @@ export default function GenerateFinalJobWorkPOModal({
     const newItems = files.map((f) => ({
       name: f.name,
       size: `${(f.size / (1024 * 1024)).toFixed(1)} MB`,
+      file: f,
+      url: URL.createObjectURL(f),
     }));
     setAttachments((prev) => [...prev, ...newItems]);
+  };
+
+  const handleDownloadAttachment = (file) => {
+    if (file.url) {
+      const a = document.createElement('a');
+      a.href = file.url;
+      a.download = file.name;
+      a.click();
+    } else if (file.file) {
+      const url = URL.createObjectURL(file.file);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = file.name;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
   };
 
   const handleDeleteAttachment = (index) => {
@@ -940,13 +954,18 @@ export default function GenerateFinalJobWorkPOModal({
                           <span className="text-slate-400 shrink-0 text-[10px]">{file.size}</span>
                         </div>
                         <div className="flex items-center gap-1.5 shrink-0 ml-2">
-                          <button type="button" className="text-slate-400 hover:text-blue-600" title="Download">
+                          <button
+                            type="button"
+                            onClick={() => handleDownloadAttachment(file)}
+                            className="text-slate-400 hover:text-blue-600 p-0.5 rounded cursor-pointer"
+                            title="Download"
+                          >
                             <Download size={13} />
                           </button>
                           <button
                             type="button"
                             onClick={() => handleDeleteAttachment(idx)}
-                            className="text-slate-400 hover:text-rose-600"
+                            className="text-slate-400 hover:text-rose-600 p-0.5 rounded cursor-pointer"
                             title="Delete"
                           >
                             <Trash2 size={13} />
@@ -954,6 +973,9 @@ export default function GenerateFinalJobWorkPOModal({
                         </div>
                       </div>
                     ))}
+                    {attachments.length === 0 && (
+                      <p className="text-[11px] text-slate-400 italic text-center py-1">No attachments added</p>
+                    )}
                   </div>
                 </div>
               </div>

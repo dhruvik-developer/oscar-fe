@@ -88,111 +88,112 @@ export default function DelayDashboardPage() {
 
       <DelayMetricsRow metrics={metrics} />
 
-      {/* Filter bar */}
-      <section className="rounded-xl border border-[#dce5f4] bg-white p-4 shadow-2xs space-y-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="relative flex-1 min-w-[200px]">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-            <input
-              type="search"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search project, stage, owner or reason…"
-              aria-label="Search delays"
-              className="w-full text-xs rounded-lg border border-[#dce5f4] bg-white pl-9 pr-3 py-2 text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400"
-            />
-          </div>
-
-          <select
-            className={selectClass}
-            value={filters.projectId}
-            onChange={(e) => update({ projectId: e.target.value })}
-            aria-label="Filter by project"
-          >
-            <option value="all">All projects</option>
-            {options.projects.map((p) => (
-              <option key={p.id} value={p.id}>{p.code || p.id} — {p.label}</option>
-            ))}
-          </select>
-
-          <select
-            className={selectClass}
-            value={filters.department}
-            onChange={(e) => update({ department: e.target.value })}
-            aria-label="Filter by department"
-          >
-            <option value="all">All departments</option>
-            {options.departments.map((d) => <option key={d} value={d}>{d}</option>)}
-          </select>
-
-          <select
-            className={selectClass}
-            value={filters.stageName}
-            onChange={(e) => update({ stageName: e.target.value })}
-            aria-label="Filter by stage"
-          >
-            <option value="all">All stages</option>
-            {options.stageNames.map((s) => <option key={s} value={s}>{s}</option>)}
-          </select>
-
-          <select
-            className={selectClass}
-            value={filters.category}
-            onChange={(e) => update({ category: e.target.value })}
-            aria-label="Filter by root cause"
-          >
-            <option value="all">All root causes</option>
-            {DELAY_REASON_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
-          </select>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-[11px] font-semibold text-slate-500">Due between</span>
-          <input
-            type="date"
-            className={selectClass}
-            value={filters.dateFrom}
-            onChange={(e) => update({ dateFrom: e.target.value })}
-            aria-label="Due from date"
-          />
-          <span className="text-xs text-slate-400">and</span>
-          <input
-            type="date"
-            className={selectClass}
-            value={filters.dateTo}
-            onChange={(e) => update({ dateTo: e.target.value })}
-            aria-label="Due to date"
-          />
-
-          <span className="inline-flex items-center gap-1.5 text-[11px] text-slate-500 ml-auto">
-            <Gauge size={12} className="text-slate-300" />
-            At-risk trigger: {settings.atRiskThresholdPct}% elapsed with under 50% done
-          </span>
-        </div>
-
-        <div className="flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 lg:gap-0 pt-1 border-t border-slate-100">
-          <span className="inline-flex items-center gap-1.5 text-[11px] text-slate-500">
-            <SlidersHorizontal size={12} className="text-slate-300" />
-            Showing <strong className="text-slate-700">{visible.length}</strong> of {allRows.length}{' '}
-            delayed {allRows.length === 1 ? 'stage' : 'stages'}
-          </span>
-          {isFiltered && (
-            <button
-              type="button"
-              onClick={reset}
-              className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-500 hover:text-rose-600"
-            >
-              <X size={12} /> Clear filters
-            </button>
-          )}
-        </div>
-      </section>
-
+      {/* Unified Table Card with Integrated Filter Header */}
       <DelayResolutionTable
         rows={visible}
         onLog={(row) => setModal({ row, mode: 'log' })}
         onUpdatePlan={(row) => setModal({ row, mode: 'plan' })}
         onResolve={(row) => setModal({ row, mode: 'resolve' })}
+        headerContent={
+          <div className="p-4 space-y-3 bg-white border-b border-slate-100">
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="relative flex-1 min-w-[200px]">
+                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                <input
+                  type="search"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search project, stage, owner or reason…"
+                  aria-label="Search delays"
+                  className="w-full text-xs rounded-lg border border-[#dce5f4] bg-white pl-9 pr-3 py-2 text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400"
+                />
+              </div>
+
+              <select
+                className={selectClass}
+                value={filters.projectId}
+                onChange={(e) => update({ projectId: e.target.value })}
+                aria-label="Filter by project"
+              >
+                <option value="all">All projects</option>
+                {options.projects.map((p) => (
+                  <option key={p.id} value={p.id}>{p.code || p.id} — {p.label}</option>
+                ))}
+              </select>
+
+              <select
+                className={selectClass}
+                value={filters.department}
+                onChange={(e) => update({ department: e.target.value })}
+                aria-label="Filter by department"
+              >
+                <option value="all">All departments</option>
+                {options.departments.map((d) => <option key={d} value={d}>{d}</option>)}
+              </select>
+
+              <select
+                className={selectClass}
+                value={filters.stageName}
+                onChange={(e) => update({ stageName: e.target.value })}
+                aria-label="Filter by stage"
+              >
+                <option value="all">All stages</option>
+                {options.stageNames.map((s) => <option key={s} value={s}>{s}</option>)}
+              </select>
+
+              <select
+                className={selectClass}
+                value={filters.category}
+                onChange={(e) => update({ category: e.target.value })}
+                aria-label="Filter by root cause"
+              >
+                <option value="all">All root causes</option>
+                {DELAY_REASON_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-[11px] font-semibold text-slate-500">Due between</span>
+              <input
+                type="date"
+                className={selectClass}
+                value={filters.dateFrom}
+                onChange={(e) => update({ dateFrom: e.target.value })}
+                aria-label="Due from date"
+              />
+              <span className="text-xs text-slate-400">and</span>
+              <input
+                type="date"
+                className={selectClass}
+                value={filters.dateTo}
+                onChange={(e) => update({ dateTo: e.target.value })}
+                aria-label="Due to date"
+              />
+
+              <span className="inline-flex items-center gap-1.5 text-[11px] text-slate-500 ml-auto">
+                <Gauge size={12} className="text-slate-300" />
+                At-risk trigger: {settings.atRiskThresholdPct}% elapsed with under 50% done
+              </span>
+            </div>
+
+            <div className="flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 lg:gap-0 pt-1 border-t border-slate-100">
+              <span className="inline-flex items-center gap-1.5 text-[11px] text-slate-500">
+                <SlidersHorizontal size={12} className="text-slate-300" />
+                Showing <strong className="text-slate-700">{visible.length}</strong> of {allRows.length}{' '}
+                delayed {allRows.length === 1 ? 'stage' : 'stages'}
+              </span>
+              {isFiltered && (
+                <button
+                  type="button"
+                  onClick={reset}
+                  className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-500 hover:text-rose-600 cursor-pointer"
+                >
+                  <X size={12} /> Clear filters
+                </button>
+              )}
+            </div>
+          </div>
+        }
       />
 
       <LogDelayModal

@@ -320,6 +320,9 @@ export default function GenerateFinalJobWorkPOModal({
         fabric: fabric,
         uom: uom,
         agreedJobRate: agreedJobRate,
+        rate: agreedJobRate,
+        billableQty: totalBillableQty || acceptedQty,
+        acceptedQty: totalBillableQty || acceptedQty,
         gstPct: gstPct,
         items: items.map((it) => ({
           description: it.description,

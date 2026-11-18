@@ -24,12 +24,13 @@ const DEFAULT_TIMEOUT_MS = Number(import.meta.env.VITE_API_TIMEOUT_MS) || 15000;
 const inflightGets = new Map();
 
 export class ApiError extends Error {
-  constructor(message, { status = 0, endpoint = '', payload = null } = {}) {
+  constructor(message, { status = 0, endpoint = '', payload = null, retryAfter = null } = {}) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
     this.endpoint = endpoint;
     this.payload = payload;
+    this.retryAfter = retryAfter;
   }
 }
 
@@ -285,7 +286,11 @@ export async function apiClient(
         if (typeof message !== 'string') message = `Request failed with status ${response.status}`;
         if (message.length > 300) message = `${message.slice(0, 297)}…`;
 
-        throw new ApiError(message, { status: response.status, endpoint: normalizedEp, payload: result });
+        const retryHeader = response.headers?.get('Retry-After') || response.headers?.get('retry-after');
+        const parsedRetry = retryHeader ? parseInt(retryHeader, 10) : (result?.retry_after ? parseInt(result.retry_after, 10) : null);
+        const retryAfter = Number.isFinite(parsedRetry) ? parsedRetry : null;
+
+        throw new ApiError(message, { status: response.status, endpoint: normalizedEp, payload: result, retryAfter });
       } catch (err) {
         const retryable =
           err?.name === 'AbortError' ||

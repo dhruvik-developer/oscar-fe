@@ -5224,7 +5224,7 @@ function LeadTasksTab({ lead, onCountsChange, onActivity }) {
 
       {isModalOpen && !editingId && (
 
-        <div className="fixed inset-0 z-[70] flex items-start justify-center p-2 sm:p-4 bg-slate-950/50 overflow-y-auto" onClick={() => setIsModalOpen(false)}>
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-2 sm:p-4 bg-slate-950/50 overflow-y-auto" onClick={() => setIsModalOpen(false)}>
 
           <div className="bg-[#f1f5f9] rounded-xl shadow-2xl w-full max-w-5xl my-6 overflow-hidden border border-slate-200" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label={editingId ? 'Edit lead task' : 'Create lead task'}>
 

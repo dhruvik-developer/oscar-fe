@@ -761,7 +761,7 @@ export default function BrokerCommissionPage() {
             <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
             <input
               type="text"
-              placeholder={activeTab === 'leads' ? 'Search by lead #, party, broker, fabric...' : 'Search commissions...'}
+              placeholder={activeTab === 'leads' ? 'Search by lead, party, broker, fabric...' : 'Search commissions...'}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="w-full h-9 pl-9 pr-3 text-xs bg-card border border-border rounded-lg text-text placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-primary"
@@ -842,7 +842,7 @@ export default function BrokerCommissionPage() {
             <table className="w-full text-left border-collapse">
               <thead className="table-head-std sticky top-0 z-10 shadow-xs">
                 <tr className="table-head-row-std border-b border-border bg-table-head text-text-secondary font-semibold text-xs h-11">
-                  <th className="th-std h-11 px-3 align-middle text-xs font-semibold whitespace-nowrap">Lead # & Date</th>
+                  <th className="th-std h-11 px-3 align-middle text-xs font-semibold whitespace-nowrap">Lead & Date</th>
                   <th className="th-std h-11 px-3 align-middle text-xs font-semibold whitespace-nowrap">Broker</th>
                   <th className="th-std h-11 px-3 align-middle text-xs font-semibold whitespace-nowrap">Customer / Party</th>
                   <th className="th-std h-11 px-3 align-middle text-xs font-semibold whitespace-nowrap">Fabric & Volume</th>
@@ -958,8 +958,8 @@ export default function BrokerCommissionPage() {
             <table className="w-full text-left border-collapse">
               <thead className="table-head-std sticky top-0 z-10 shadow-xs">
                 <tr className="table-head-row-std border-b border-border bg-table-head text-text-secondary font-semibold text-xs h-11">
-                  <th className="th-std h-11 px-3 align-middle text-xs font-semibold whitespace-nowrap">Commission # & Date</th>
-                  <th className="th-std h-11 px-3 align-middle text-xs font-semibold whitespace-nowrap">Invoice #</th>
+                  <th className="th-std h-11 px-3 align-middle text-xs font-semibold whitespace-nowrap">Commission & Date</th>
+                  <th className="th-std h-11 px-3 align-middle text-xs font-semibold whitespace-nowrap">Invoice</th>
                   <th className="th-std h-11 px-3 align-middle text-xs font-semibold whitespace-nowrap">Broker Name</th>
                   <th className="th-std h-11 px-3 align-middle text-xs font-semibold whitespace-nowrap">Customer Party</th>
                   <th className="th-std h-11 px-3 align-middle text-xs font-semibold whitespace-nowrap text-center">Basis & Rate</th>
@@ -1147,7 +1147,7 @@ export default function BrokerCommissionPage() {
                   <table className="w-full text-left border-collapse">
                     <thead className="table-head-std sticky top-0 z-10 shadow-xs">
                       <tr className="table-head-row-std border-b border-border bg-table-head text-text-secondary font-semibold text-xs h-11">
-                        <th className="th-std h-11 px-3 align-middle text-xs font-semibold whitespace-nowrap">Doc # & Date</th>
+                        <th className="th-std h-11 px-3 align-middle text-xs font-semibold whitespace-nowrap">Doc & Date</th>
                         <th className="th-std h-11 px-3 align-middle text-xs font-semibold whitespace-nowrap">Party Name</th>
                         <th className="th-std h-11 px-3 align-middle text-xs font-semibold whitespace-nowrap">Commission Basis</th>
                         <th className="th-std h-11 px-3 align-middle text-xs font-semibold whitespace-nowrap text-right">Invoiced Amount</th>

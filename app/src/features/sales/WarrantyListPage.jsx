@@ -103,7 +103,7 @@ export const WarrantyListPage = () => {
     const columns = [
         {
             key: 'cardNumber',
-            header: 'Warranty Card #',
+            header: 'Warranty Card',
             width: '14%',
             render: (w) => (
                 <button

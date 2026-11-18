@@ -420,7 +420,7 @@ export function SupplierPaymentInlineSlide({ po, instruction, onClose, onPayment
             <table className="w-full text-left text-xs">
               <thead className="bg-slate-50 font-bold text-slate-600 border-b border-slate-200 uppercase text-[10px]">
                 <tr>
-                  <th className="py-2 px-3">Voucher #</th>
+                  <th className="py-2 px-3">Voucher</th>
                   <th className="py-2 px-3">Date</th>
                   <th className="py-2 px-3">Mode</th>
                   <th className="py-2 px-3">Reference / UTR</th>

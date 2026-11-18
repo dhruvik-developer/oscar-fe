@@ -28,7 +28,7 @@ export const ServiceUsagePage = () => {
     const columns = [
         {
             key: 'ticketNumber',
-            header: 'Service Ticket #',
+            header: 'Service Ticket',
             width: '16%',
             render: (s) => (<span className="font-mono font-bold text-text-secondary flex items-center gap-1.5">
           <Wrench size={13} className="text-primary"/> {s.ticketNumber}

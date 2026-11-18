@@ -353,7 +353,7 @@ export const SalesOrdersPage = () => {
     const columns = [
         {
             key: 'orderNumber',
-            header: 'Sales Order #',
+            header: 'Sales Order',
             width: '14%',
             render: (o) => {
                 const linkedPms = pmsProjects.find((p) => p.crmOrderId === o.orderNumber);

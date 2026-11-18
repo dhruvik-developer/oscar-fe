@@ -617,8 +617,8 @@ export function LotTakaInlineSlide({ po, onClose, onLotSaved, onSwitchToGrn, onN
               <table className="w-full text-left text-xs">
                 <thead className="bg-slate-50 font-bold text-slate-600 border-b border-slate-200 uppercase text-[10px] sticky top-0 z-10">
                   <tr>
-                    <th className="py-2 px-3 w-10 text-center">#</th>
-                    <th className="py-2 px-3 w-20">Roll #</th>
+                    <th className="py-2 px-3 w-10 text-center">Sr. No.</th>
+                    <th className="py-2 px-3 w-20">Roll No.</th>
                     <th className="py-2 px-3 w-36">Meters (Qty) * <span className="text-purple-600 font-extrabold normal-case">(Default: 90m)</span></th>
                     <th className="py-2 px-3 w-24">Weight (kg)</th>
                     <th className="py-2 px-3 w-24">Width (&quot;)</th>
@@ -827,8 +827,8 @@ export function LotTakaInlineSlide({ po, onClose, onLotSaved, onSwitchToGrn, onN
                 <thead className="bg-slate-50 font-bold text-slate-500 uppercase text-[10px] border-b border-slate-200 sticky top-0 z-10">
                   <tr>
                     <SortableTh sort={existingSort} sortKey="takaId" className="py-2 px-3">Barcode / Taka ID</SortableTh>
-                    <SortableTh sort={existingSort} sortKey="lotNo" className="py-2 px-3">Lot #</SortableTh>
-                    <SortableTh sort={existingSort} sortKey="takaRoll" className="py-2 px-3">Roll #</SortableTh>
+                    <SortableTh sort={existingSort} sortKey="lotNo" className="py-2 px-3">Lot No.</SortableTh>
+                    <SortableTh sort={existingSort} sortKey="takaRoll" className="py-2 px-3">Roll No.</SortableTh>
                     <SortableTh sort={existingSort} sortKey="length" className="py-2 px-3">Length (m)</SortableTh>
                     <SortableTh sort={existingSort} sortKey="qcStatus" className="py-2 px-3">QC Status</SortableTh>
                     <SortableTh sort={existingSort} sortKey="location" className="py-2 px-3">Location</SortableTh>

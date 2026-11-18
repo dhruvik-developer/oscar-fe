@@ -489,7 +489,7 @@ export const VendorBillsPage = () => {
             <table className="w-full min-w-[720px] text-left text-xs text-slate-600">
               <thead className="bg-slate-50 uppercase font-semibold text-slate-500 tracking-wider border-b border-slate-200">
                 <tr>
-                  <th className="py-2.5 px-3 w-10">#</th>
+                  <th className="py-2.5 px-3 w-10">Sr. No.</th>
                   <th className="py-2.5 px-3">Bill No.</th>
                   <th className="py-2.5 px-3">Bill Date</th>
                   <th className="py-2.5 px-3">Vendor</th>
@@ -598,7 +598,7 @@ export const VendorBillsPage = () => {
                               type="text"
                               value={poSearch}
                               onChange={(e) => setPoSearch(e.target.value)}
-                              placeholder="Search PO #, vendor, or fabric..."
+                              placeholder="Search PO, vendor, or fabric..."
                               className="w-full bg-transparent text-xs text-slate-800 outline-none"
                               autoFocus
                             />
@@ -1028,7 +1028,7 @@ export const VendorBillsPage = () => {
                   <table className="w-full text-xs text-slate-600">
                     <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase tracking-wider">
                       <tr>
-                        <th className="py-2 px-2 w-8">#</th>
+                        <th className="py-2 px-2 w-8">Sr. No.</th>
                         <th className="py-2 px-2 text-left">Batch / Item</th>
                         <th className="py-2 px-2 text-right">Qty</th>
                         <th className="py-2 px-2 text-right">Rate</th>

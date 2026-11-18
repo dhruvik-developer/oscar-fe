@@ -307,7 +307,7 @@ export const SalesReturnsPage = () => {
     const columns = [
         {
             key: 'returnNumber',
-            header: 'Credit Note #',
+            header: 'Credit Note',
             width: '16%',
             render: (r) => (
               <button
@@ -421,7 +421,7 @@ export const SalesReturnsPage = () => {
                 columns={columns}
                 data={salesReturns}
                 keyExtractor={(r) => r.id}
-                searchPlaceholder="Search return #, customer, invoice, or reason..."
+                searchPlaceholder="Search return, customer, invoice, or reason..."
                 searchFilter={(r, term) =>
                     String(r.returnNumber ?? '').toLowerCase().includes(term) ||
                     String(r.customer ?? r.partyName ?? '').toLowerCase().includes(term) ||

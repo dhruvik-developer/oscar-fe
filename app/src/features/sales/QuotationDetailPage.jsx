@@ -376,7 +376,7 @@ export default function QuotationDetailPage() {
             <table className="w-full text-left text-xs">
               <thead>
                 <tr className="text-[11px] font-bold text-slate-500 border-b border-slate-100">
-                  <th className="py-1.5 pr-2 w-7">#</th>
+                  <th className="py-1.5 pr-2 w-7">Sr. No.</th>
                   <th className="py-1.5 pr-2">Fabric / Item</th>
                   <th className="py-1.5 pr-2">Quality</th>
                   <th className="py-1.5 pr-2">Colour</th>

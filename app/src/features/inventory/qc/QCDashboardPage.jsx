@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { modal } from '../../../context/ModalContext';
 import { Link, useSearchParams } from 'react-router-dom';
 import {
@@ -32,6 +32,7 @@ import { inventoryService } from '../../../services/domainServices';
 import { useERP } from '../../../context/ERPContext';
 import QCPageHeader from './QCPageHeader';
 import KpiCard from '../../../components/ui/KpiCard';
+import TablePagination from '../../../components/ui/TablePagination';
 
 export default function QCDashboardPage({ defaultTab = 'All' }) {
   const { purchaseBills = [], vendors = [], items = [], formatCurrency } = useERP();
@@ -51,7 +52,7 @@ export default function QCDashboardPage({ defaultTab = 'All' }) {
   const [dateTo, setDateTo] = useState(() => new Date().toISOString().split('T')[0]);
   const [sourceTypeFilter, setSourceTypeFilter] = useState('All');
 
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const queryTab = searchParams.get('tab');
   // Table Controls
   const [activeTab, setActiveTab] = useState(queryTab || defaultTab);
@@ -61,6 +62,41 @@ export default function QCDashboardPage({ defaultTab = 'All' }) {
     if (t) setActiveTab(t);
   }, [searchParams]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [page, setPage] = useState(1);
+
+  // Table Ref and smooth scrolling handler for View All
+  const tableRef = useRef(null);
+  const [highlightTable, setHighlightTable] = useState(false);
+
+  const scrollToTable = useCallback((tabName) => {
+    if (tabName) {
+      setActiveTab(tabName);
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        next.set('tab', tabName);
+        return next;
+      });
+    }
+    setPage(1);
+    setHighlightTable(true);
+    setTimeout(() => {
+      if (tableRef.current) {
+        tableRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }, 60);
+    setTimeout(() => {
+      setHighlightTable(false);
+    }, 2200);
+  }, [setSearchParams]);
+
+  const handleViewAllPending = () => {
+    scrollToTable('Pending');
+  };
+
+  const handleViewAllHold = () => {
+    scrollToTable('On Hold');
+  };
+  const [pageSize, setPageSize] = useState(10);
   const [qualityTopN, setQualityTopN] = useState('Top 5');
   const [selectedRecord, setSelectedRecord] = useState(null);
 
@@ -185,6 +221,17 @@ export default function QCDashboardPage({ defaultTab = 'All' }) {
       return true;
     });
   }, [allRecords, activeTab, searchQuery]);
+
+  // Reset pagination on filter or tab change
+  useEffect(() => {
+    setPage(1);
+  }, [activeTab, searchQuery, supplierFilter, sourceTypeFilter, dateFrom, dateTo]);
+
+  // Paginated records for table view
+  const paginatedRecords = useMemo(() => {
+    const start = (page - 1) * pageSize;
+    return filteredRecords.slice(start, start + pageSize);
+  }, [filteredRecords, page, pageSize]);
 
   // Metrics Data Extraction
   const cards = dashboardData?.summaryCards || {
@@ -371,14 +418,7 @@ export default function QCDashboardPage({ defaultTab = 'All' }) {
               Apply
             </button>
 
-            {/* Quick Intake Button */}
-            <Link
-              to="/purchase/receipts"
-              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-lg shadow-xs transition flex items-center gap-1"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>Intake GRN</span>
-            </Link>
+
           </div>
         }
       />
@@ -533,10 +573,21 @@ export default function QCDashboardPage({ defaultTab = 'All' }) {
 
         {/* Card B: QC Trend (Last 6 Months Stacked Bar Chart) */}
         <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-2xs flex flex-col justify-between">
-          <h3 className="text-xs font-bold text-slate-900 tracking-tight mb-2">QC Trend (Last 6 Months)</h3>
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-xs font-bold text-slate-900 tracking-tight">QC Trend (Last 6 Months)</h3>
+            {(() => {
+              const maxVal = Math.max(...trendData.map((x) => (x.good || 0) + (x.hold || 0) + (x.reprocess || 0) + (x.rejected || 0)), 0);
+              return maxVal > 0 ? (
+                <span className="text-[10px] text-slate-400 font-medium">
+                  Peak: {Number(maxVal).toLocaleString('en-IN')} m
+                </span>
+              ) : null;
+            })()}
+          </div>
           
-          <div className="h-32 flex flex-col justify-end relative pt-2">
-            <div className="absolute inset-0 flex flex-col justify-between pointer-events-none text-[9px] text-slate-400 pr-1">
+          <div className="h-32 flex flex-col justify-between relative pt-1">
+            {/* Background grid lines aligned to 88px plot height */}
+            <div className="absolute inset-x-0 top-1 h-[88px] flex flex-col justify-between pointer-events-none text-[9px] text-slate-400 pr-1">
               <div className="border-b border-dashed border-slate-100 flex justify-between"><span>Max</span></div>
               <div className="border-b border-dashed border-slate-100 flex justify-between"><span>75%</span></div>
               <div className="border-b border-dashed border-slate-100 flex justify-between"><span>50%</span></div>
@@ -545,37 +596,65 @@ export default function QCDashboardPage({ defaultTab = 'All' }) {
             </div>
 
             {/* Stacked Columns */}
-            <div className="relative z-10 grid grid-cols-6 gap-2 h-24 pl-5 pr-1 items-end">
-              {trendData.map((m, idx) => {
-                const totalM = m.good + m.hold + m.reprocess + m.rejected;
-                const maxInTrend = Math.max(...trendData.map((x) => x.good + x.hold + x.reprocess + x.rejected), 1);
-                const heightPct = totalM > 0 ? Math.min(100, Math.max(15, (totalM / maxInTrend) * 100)) : 4;
-                const goodSegment = totalM ? (m.good / totalM) * 100 : 0;
-                const holdSegment = totalM ? (m.hold / totalM) * 100 : 0;
-                const repSegment = totalM ? (m.reprocess / totalM) * 100 : 0;
-                const rejSegment = totalM ? (m.rejected / totalM) * 100 : 0;
-
-                return (
-                  <div key={m.month || idx} className="flex flex-col items-center gap-1">
-                    <div
-                      className="w-3.5 flex flex-col-reverse rounded-t overflow-hidden bg-slate-100"
-                      style={{ height: `${heightPct}%` }}
-                    >
-                      {totalM > 0 ? (
-                        <>
-                          <div style={{ height: `${goodSegment}%` }} className="bg-[#10b981]" />
-                          <div style={{ height: `${holdSegment}%` }} className="bg-[#f59e0b]" />
-                          <div style={{ height: `${repSegment}%` }} className="bg-[#8b5cf6]" />
-                          <div style={{ height: `${rejSegment}%` }} className="bg-[#ef4444]" />
-                        </>
-                      ) : (
-                        <div className="w-full h-1 bg-slate-200" />
-                      )}
-                    </div>
-                    <span className="text-[10px] text-slate-500">{m.month}</span>
-                  </div>
+            <div className="relative z-10 grid grid-cols-6 gap-2 h-full pl-6 pr-1">
+              {(() => {
+                const maxInTrend = Math.max(
+                  ...trendData.map((x) => (x.good || 0) + (x.hold || 0) + (x.reprocess || 0) + (x.rejected || 0)),
+                  1
                 );
-              })}
+                return trendData.map((m, idx) => {
+                  const totalM = (m.good || 0) + (m.hold || 0) + (m.reprocess || 0) + (m.rejected || 0);
+                  const barHeightPx = totalM > 0
+                    ? Math.max(6, Math.round((totalM / maxInTrend) * 88))
+                    : 2;
+
+                  return (
+                    <div key={m.month || idx} className="flex flex-col items-center h-full justify-between">
+                      {/* Bar track area (sits on the 0 baseline) */}
+                      <div className="h-[88px] w-full flex items-end justify-center pb-0.5">
+                        <div
+                          className="w-4 flex flex-col-reverse rounded-t overflow-hidden bg-slate-100 shadow-2xs transition-all duration-300 hover:brightness-105 cursor-pointer"
+                          style={{ height: `${barHeightPx}px` }}
+                          title={`${m.month}: Total ${Number(totalM).toLocaleString('en-IN')} m\n• Good: ${Number(m.good || 0).toLocaleString('en-IN')} m\n• Hold: ${Number(m.hold || 0).toLocaleString('en-IN')} m\n• Reprocess: ${Number(m.reprocess || 0).toLocaleString('en-IN')} m\n• Rejected: ${Number(m.rejected || 0).toLocaleString('en-IN')} m`}
+                        >
+                          {totalM > 0 ? (
+                            <>
+                              {m.good > 0 && (
+                                <div
+                                  style={{ flex: m.good }}
+                                  className="w-full bg-[#10b981] min-h-[2px]"
+                                />
+                              )}
+                              {m.hold > 0 && (
+                                <div
+                                  style={{ flex: m.hold }}
+                                  className="w-full bg-[#f59e0b] min-h-[2px]"
+                                />
+                              )}
+                              {m.reprocess > 0 && (
+                                <div
+                                  style={{ flex: m.reprocess }}
+                                  className="w-full bg-[#8b5cf6] min-h-[2px]"
+                                />
+                              )}
+                              {m.rejected > 0 && (
+                                <div
+                                  style={{ flex: m.rejected }}
+                                  className="w-full bg-[#ef4444] min-h-[2px]"
+                                />
+                              )}
+                            </>
+                          ) : (
+                            <div className="w-full h-0.5 bg-slate-200" />
+                          )}
+                        </div>
+                      </div>
+                      {/* Month label sitting below the 0 line */}
+                      <span className="text-[10px] font-medium text-slate-500 h-5 flex items-center">{m.month}</span>
+                    </div>
+                  );
+                });
+              })()}
             </div>
           </div>
 
@@ -759,8 +838,9 @@ export default function QCDashboardPage({ defaultTab = 'All' }) {
             <h3 className="text-xs font-bold text-slate-900 tracking-tight">Pending Inspections</h3>
             <button
               type="button"
-              onClick={() => setActiveTab('Pending')}
-              className="text-[11px] font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-0.5 cursor-pointer"
+              onClick={handleViewAllPending}
+              className="text-[11px] font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-0.5 cursor-pointer hover:underline transition-colors"
+              title="View all pending inspections in table below"
             >
               View All <ArrowRight className="w-3 h-3" />
             </button>
@@ -806,8 +886,9 @@ export default function QCDashboardPage({ defaultTab = 'All' }) {
             <h3 className="text-xs font-bold text-slate-900 tracking-tight">On Hold Review</h3>
             <button
               type="button"
-              onClick={() => setActiveTab('On Hold')}
-              className="text-[11px] font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-0.5 cursor-pointer"
+              onClick={handleViewAllHold}
+              className="text-[11px] font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-0.5 cursor-pointer hover:underline transition-colors"
+              title="View all on-hold inspections in table below"
             >
               View All <ArrowRight className="w-3 h-3" />
             </button>
@@ -843,7 +924,13 @@ export default function QCDashboardPage({ defaultTab = 'All' }) {
       </div>
 
       {/* ── Bottom Section: Latest QC Inspections ─────────────────── */}
-      <div className="bg-white border border-slate-200 rounded-xl shadow-2xs overflow-hidden">
+      <div
+        ref={tableRef}
+        id="latest-qc-inspections"
+        className={`scroll-mt-6 bg-white border rounded-xl shadow-2xs overflow-hidden transition-all duration-500 ${
+          highlightTable ? 'border-blue-400 ring-4 ring-blue-100 shadow-md' : 'border-slate-200'
+        }`}
+      >
         {/* Table Header with Tabs and Search */}
         <div className="p-4 border-b border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-3">
           <div>
@@ -861,10 +948,17 @@ export default function QCDashboardPage({ defaultTab = 'All' }) {
                 <button
                   key={t.key}
                   type="button"
-                  onClick={() => setActiveTab(t.key)}
+                  onClick={() => {
+                    setActiveTab(t.key);
+                    setSearchParams((prev) => {
+                      const next = new URLSearchParams(prev);
+                      next.set('tab', t.key);
+                      return next;
+                    });
+                  }}
                   className={`px-3 py-1 text-xs font-semibold rounded-lg transition cursor-pointer ${
                     activeTab === t.key
-                      ? 'bg-blue-50 text-blue-600 border border-blue-200'
+                      ? 'bg-blue-50 text-blue-600 border border-blue-200 shadow-2xs'
                       : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'
                   }`}
                 >
@@ -896,6 +990,26 @@ export default function QCDashboardPage({ defaultTab = 'All' }) {
               )}
             </div>
 
+            {activeTab === 'Pending' && (
+              <Link
+                to="/inventory/qc/advanced?step=pending"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 rounded-lg text-xs font-semibold transition cursor-pointer"
+                title="Open full dedicated QC pending inspections queue"
+              >
+                <span>Inspection Queue</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
+            )}
+            {activeTab === 'On Hold' && (
+              <Link
+                to="/inventory/qc/advanced?step=decide"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-700 rounded-lg text-xs font-semibold transition cursor-pointer"
+                title="Open full QC disposition & hold review workbench"
+              >
+                <span>Disposition Workbench</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
+            )}
             <button
               type="button"
               onClick={handleExportCSV}
@@ -932,8 +1046,8 @@ export default function QCDashboardPage({ defaultTab = 'All' }) {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-slate-700">
-              {filteredRecords.length > 0 ? (
-                filteredRecords.map((r, idx) => (
+              {paginatedRecords.length > 0 ? (
+                paginatedRecords.map((r, idx) => (
                   <tr key={r.id || idx} className="hover:bg-slate-50/80 transition-colors">
                     <td className="py-2 px-3 font-semibold text-blue-600">{r.id}</td>
                     <td className="py-2 px-3 text-slate-500">{r.date}</td>
@@ -1017,6 +1131,20 @@ export default function QCDashboardPage({ defaultTab = 'All' }) {
             </tbody>
           </table>
         </div>
+
+        {/* Standard Table Pagination Footer */}
+        {filteredRecords.length > 0 && (
+          <TablePagination
+            page={page}
+            pageSize={pageSize}
+            totalItems={filteredRecords.length}
+            onPageChange={setPage}
+            onPageSizeChange={(newSize) => {
+              setPageSize(newSize);
+              setPage(1);
+            }}
+          />
+        )}
       </div>
 
       {/* ── Inspection Detail & Disposition Modal ────────────────── */}

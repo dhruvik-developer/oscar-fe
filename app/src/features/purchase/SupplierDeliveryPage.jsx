@@ -524,7 +524,7 @@ export default function SupplierDeliveryPage() {
                   <table className="w-full text-left text-xs border-collapse">
                     <thead className="bg-slate-50 text-[10.5px] font-bold text-slate-500 uppercase border-b border-slate-200">
                       <tr>
-                        <th className="py-2.5 px-3 w-10">#</th>
+                        <th className="py-2.5 px-3 w-10">Sr. No.</th>
                         <th className="py-2.5 px-3">Fabric Quality / Description</th>
                         <th className="py-2.5 px-3 text-right">Ordered Qty</th>
                         <th className="py-2.5 px-3 text-right">Agreed Rate</th>
@@ -777,7 +777,7 @@ export default function SupplierDeliveryPage() {
                     <table className="w-full text-left text-xs border-collapse">
                       <thead className="bg-slate-50 text-[10.5px] font-bold text-slate-600 uppercase border-b border-slate-200">
                         <tr>
-                          <th className="py-2.5 px-3 w-10">#</th>
+                          <th className="py-2.5 px-3 w-10">Sr. No.</th>
                           <th className="py-2.5 px-3">Fabric Quality / Description</th>
                           <th className="py-2.5 px-3 text-right">Contracted Qty</th>
                           <th className="py-2.5 px-3 text-right">Rate</th>
@@ -916,7 +916,7 @@ export default function SupplierDeliveryPage() {
                 <table className="w-full text-left text-xs border-collapse">
                   <thead>
                     <tr className="bg-slate-50 border-b border-slate-200 text-[10.5px] font-bold text-slate-500 uppercase tracking-wider">
-                      <th className="py-3 px-3">Delivery #</th>
+                      <th className="py-3 px-3">Delivery</th>
                       <th className="py-3 px-3">Challan No & Date</th>
                       <th className="py-3 px-3">Dispatch Date</th>
                       <th className="py-3 px-3 text-right">Dispatched Qty</th>
@@ -1012,7 +1012,7 @@ export default function SupplierDeliveryPage() {
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search Delivery #, PO #, Challan #..."
+                placeholder="Search Delivery, PO, Challan..."
                 className="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-xl text-xs bg-slate-50 focus:bg-white focus:outline-none"
               />
             </div>
@@ -1057,7 +1057,7 @@ export default function SupplierDeliveryPage() {
                 <table className="w-full text-left text-xs border-collapse">
                   <thead>
                     <tr className="bg-slate-50 border-b border-slate-200 text-[10.5px] font-bold text-slate-500 uppercase tracking-wider">
-                      <th className="py-3 px-4">Delivery #</th>
+                      <th className="py-3 px-4">Delivery</th>
                       <th className="py-3 px-4">Purchase Order</th>
                       <th className="py-3 px-4">Supplier & Fabric</th>
                       <th className="py-3 px-4 text-right">Dispatched Qty</th>

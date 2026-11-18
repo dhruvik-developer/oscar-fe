@@ -859,10 +859,10 @@ export const GoodsReceiptPage = () => {
                 <table className="w-full text-left text-xs">
                   <thead className="table-head-std">
                     <tr className="table-head-row-std">
-                      <th>GRN #</th>
+                      <th>GRN</th>
                       <th>Receipt Date</th>
                       <th>Supplier</th>
-                      <th>Supplier Challan #</th>
+                      <th>Supplier Challan</th>
                       <th>PO Number</th>
                       <th className="text-right">Lines</th>
                       <th className="text-center">QC Status</th>
@@ -1207,7 +1207,7 @@ export const GoodsReceiptPage = () => {
                       {/* Dedicated Batch & Costing Row (Ek batch kitne me padi) */}
                       <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end p-2.5 bg-blue-50/40 rounded-xl border border-blue-200/70 shadow-2xs">
                         <div className="sm:col-span-4">
-                          <label className="block text-[11px] font-semibold text-slate-700 mb-1">Batch / Lot #</label>
+                          <label className="block text-[11px] font-semibold text-slate-700 mb-1">Batch / Lot No.</label>
                           <input
                             type="text"
                             value={line.batchNumber}

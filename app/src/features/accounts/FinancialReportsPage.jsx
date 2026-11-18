@@ -588,7 +588,7 @@ export function FinancialReportsPage() {
                   <table className="w-full text-left text-xs border-collapse">
                     <thead className="bg-slate-50 text-slate-600 uppercase text-[10.5px] border-b border-slate-200">
                       <tr>
-                        <SortableTh sort={ageingSort} sortKey="documentNumber" className="py-2.5 px-3">Document #</SortableTh>
+                        <SortableTh sort={ageingSort} sortKey="documentNumber" className="py-2.5 px-3">Document</SortableTh>
                         <SortableTh sort={ageingSort} sortKey="partyName" className="py-2.5 px-3">Party Name</SortableTh>
                         <SortableTh sort={ageingSort} sortKey="date" className="py-2.5 px-3">Doc Date</SortableTh>
                         <SortableTh sort={ageingSort} sortKey="dueDate" className="py-2.5 px-3">Due Date</SortableTh>

@@ -194,7 +194,7 @@ export function PoDetailsModal({
               <table className="w-full text-left border-collapse text-[11.5px]">
                 <thead>
                   <tr className="bg-slate-50/60 text-slate-500 font-semibold border-b border-slate-100 text-[10px] uppercase tracking-wider">
-                    <th className="px-3.5 py-2">#</th>
+                    <th className="px-3.5 py-2">Sr. No.</th>
                     <th className="px-3.5 py-2">Fabric / Item</th>
                     <th className="px-3.5 py-2 text-right">Ordered Qty</th>
                     <th className="px-3.5 py-2 text-right">Rate (₹)</th>

@@ -106,7 +106,7 @@ export default function ProductionInstructionsPage() {
     // Fetch live progress
     setPiProgressLoading(true);
     api.get(`/production/instructions/${pi.id}/progress/`)
-      .then((res) => setPiProgress(res?.data || res))
+      .then((res) => setPiProgress(res))
       .catch(() => setPiProgress(null))
       .finally(() => setPiProgressLoading(false));
   };
@@ -121,9 +121,9 @@ export default function ProductionInstructionsPage() {
         invoiceQty: parseFloat(matchQty) || 0,
         invoiceRate: parseFloat(matchRate) || 0,
       });
-      setMatchResult(res?.data || res);
+      setMatchResult(res);
     } catch (err) {
-      setMatchError(err?.response?.data?.message || err?.message || 'Failed to verify three-way match.');
+      setMatchError(err?.payload?.field_errors ? JSON.stringify(err.payload.field_errors) : (err?.payload?.message || err?.payload?.detail || err?.message || 'Failed to verify three-way match.'));
     } finally {
       setMatchLoading(false);
     }

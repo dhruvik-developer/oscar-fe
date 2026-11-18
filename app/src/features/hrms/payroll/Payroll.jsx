@@ -74,11 +74,18 @@ function slipMonth(p) {
  * earned and net figures are the server's.
  */
 function withAliases(p) {
-  const std = Number(p.standardSalary) || 0;
-  const earned = Number(p.earnedSalary) || 0;
+  const std = Math.max(0, Number(p.standardSalary) || 0);
+  const earned = Math.max(0, Number(p.earnedSalary) || 0);
+  const addEarnings = Math.max(0, Number(p.additionalEarnings) || 0);
+  const deds = Math.max(0, Number(p.deductions) || 0);
+  const adv = Math.max(0, Number(p.advance) || 0);
+  const rawNet = p.netPayable !== undefined && p.netPayable !== null
+    ? Number(p.netPayable)
+    : (earned + addEarnings - deds - adv);
+  const net = Math.max(0, isNaN(rawNet) ? 0 : rawNet);
   return {
     ...p,
-    remainingPayable: Number(p.netPayable) || 0,
+    remainingPayable: net,
     payableDays: (Number(p.attendedDays) || 0) + (Number(p.paidLeaves) || 0),
     earnedProgress: std > 0 ? Math.max(0, Math.min(100, Math.round((earned / std) * 100))) : 100,
   };
@@ -382,9 +389,11 @@ function printPayslip(p) {
 export default function Payroll() {
   const showToast = useAppStore((s) => s.showToast);
   const currentUser = useAppStore((s) => s.currentUser);
+  const directoryEmployees = useAppStore((s) => s.employees || []);
 
   const {
     employees: payrollEmployees,
+    syncRoster,
     structures,
     period,
     loading,
@@ -407,6 +416,13 @@ export default function Payroll() {
   // Primary 4 views: 'overall' | 'department' | 'employee' | 'own'
   const [activeTab, setActiveTab] = useState("overall");
 
+  // Sync directory employees into payroll roster so all active staff appear
+  useEffect(() => {
+    if (directoryEmployees && directoryEmployees.length > 0) {
+      syncRoster?.(directoryEmployees);
+    }
+  }, [directoryEmployees, syncRoster]);
+
   // Coming back to the screen: re-read the month (the first visit is loaded by the store itself).
   useEffect(() => {
     if (usePayrollStore.getState().loaded) usePayrollStore.getState().reloadPeriod();
@@ -427,7 +443,7 @@ export default function Payroll() {
   const [selectedPayslip, setSelectedPayslip] = useState(null);
   const [showGenerateModal, setShowGenerateModal] = useState(false);
   const [showAddStructureModal, setShowAddStructureModal] = useState(false);
-  const [newStructure, setNewStructure] = useState({ name: "", department: "", employees: "" });
+  const [newStructure, setNewStructure] = useState({ name: "", basicPct: 50, hraPct: 20 });
 
   // Bulk approve / pay confirmation: { kind: 'approve' | 'pay', ids, scope }
   const [confirmBulk, setConfirmBulk] = useState(null);
@@ -439,6 +455,7 @@ export default function Payroll() {
 
   // Adjustment modal (earnings / deductions / advance only)
   const [editingId, setEditingId] = useState(null);
+  const [editStandardSalary, setEditStandardSalary] = useState(0);
   const [editAdvance, setEditAdvance] = useState(0);
   const [editEarnings, setEditEarnings] = useState(0);
   const [editDeductions, setEditDeductions] = useState(0);
@@ -712,16 +729,19 @@ export default function Payroll() {
     if (!newStructure.name) return;
     addStructure({
       name: newStructure.name,
-      department: newStructure.department || undefined,
-      employees: Number(newStructure.employees) || undefined,
+      basic_pct: Number(newStructure.basicPct) || 50,
+      hra_pct: Number(newStructure.hraPct) || 20,
+      basicPct: Number(newStructure.basicPct) || 50,
+      hraPct: Number(newStructure.hraPct) || 20,
     });
-    setNewStructure({ name: "", department: "", employees: "" });
+    setNewStructure({ name: "", basicPct: 50, hraPct: 20 });
     setShowAddStructureModal(false);
     showToast("New salary structure added");
   };
 
   const openEditModal = (emp) => {
     setEditingId(emp.id);
+    setEditStandardSalary(Number(emp.standardSalary) || 0);
     setEditAdvance(Number(emp.advance) || 0);
     setEditEarnings(Number(emp.additionalEarnings) || 0);
     setEditDeductions(Number(emp.deductions) || 0);
@@ -732,11 +752,14 @@ export default function Payroll() {
     if (!editingEmployee || savingEdit) return;
     setSavingEdit(true);
     try {
-      await adjust(editingEmployee.id, {
+      const targetId = editingEmployee.id || editingEmployee.employeeId;
+      await adjust(targetId, {
+        standardSalary: Math.max(0, Number(editStandardSalary) || 0),
         additionalEarnings: Math.max(0, Number(editEarnings) || 0),
         deductions: Math.max(0, Number(editDeductions) || 0),
         advance: Math.max(0, Number(editAdvance) || 0),
       });
+      await reloadPeriod?.();
       showToast(`Adjustments saved for ${editingEmployee.name} — payslip recomputed`);
       setEditingId(null);
     } catch (err) {
@@ -2057,11 +2080,21 @@ export default function Payroll() {
       {editingEmployee && (() => {
         const editable =
           editingEmployee.status === "In Progress" || editingEmployee.status === "Ready for Review" || !editingEmployee.status;
-        const previewNet =
-          (Number(editingEmployee.earnedSalary) || 0) +
-          (Number(editEarnings) || 0) -
-          (Number(editDeductions) || 0) -
-          (Number(editAdvance) || 0);
+
+        const curStd = Math.max(0, Number(editStandardSalary) || 0);
+        const totalD = Math.max(1, Number(editingEmployee.totalDays) || 24);
+        const attDays = Number(editingEmployee.attendedDays) || 0;
+        const pLeaves = Number(editingEmployee.paidLeaves) || 0;
+        const absentDays = Math.max(0, totalD - attDays - pLeaves);
+        const perDaySalary = totalD > 0 ? curStd / totalD : 0;
+        const attendanceDeduction = Math.round(perDaySalary * absentDays);
+        const earnedSalary = Math.max(0, curStd - attendanceDeduction);
+
+        const curEarnings = Math.max(0, Number(editEarnings) || 0);
+        const curDeductions = Math.max(0, Number(editDeductions) || 0);
+        const curAdvance = Math.max(0, Number(editAdvance) || 0);
+
+        const previewNet = Math.max(0, earnedSalary + curEarnings - curDeductions - curAdvance);
         return (
         <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
           <form
@@ -2084,9 +2117,16 @@ export default function Payroll() {
 
             {/* Attendance (read-only, from the attendance register) */}
             <div className="bg-slate-50/80 p-3.5 rounded-xl border border-slate-200/80 space-y-2.5">
-              <div className="flex justify-between items-center text-[12.5px]">
-                <span className="text-slate-600 font-medium">Standard Monthly Salary:</span>
-                <span className="font-bold text-slate-900 text-[13.5px]">{formatINR(editingEmployee.standardSalary)}</span>
+              <div className="flex justify-between items-center text-[12.5px] gap-3">
+                <span className="text-slate-600 font-medium shrink-0">Standard Monthly Salary:</span>
+                <input
+                  type="number"
+                  min="0"
+                  disabled={!editable}
+                  value={editStandardSalary}
+                  onChange={(e) => setEditStandardSalary(e.target.value)}
+                  className="w-36 h-8 px-2.5 bg-white border border-slate-300 rounded-lg text-right font-bold text-[13px] text-slate-900 focus:outline-none focus:border-navy"
+                />
               </div>
 
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-slate-200/60 text-center">
@@ -2106,21 +2146,21 @@ export default function Payroll() {
               <div className="bg-white p-2.5 rounded-lg border border-slate-200 text-[11.5px] space-y-1">
                 <div className="flex justify-between text-slate-600">
                   <span>Per-day rate:</span>
-                  <span className="font-mono font-medium">{formatINR(editingEmployee.perDaySalary)}/day</span>
+                  <span className="font-mono font-medium">{formatINR(perDaySalary)}/day</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-600">Days deducted:</span>
-                  <span className={`font-semibold ${editingEmployee.absentDays > 0 ? "text-rose-600" : "text-emerald-600"}`}>
-                    {fmtDays(editingEmployee.absentDays)} {editingEmployee.absentDays > 0 ? "day(s)" : "(full pay)"}
+                  <span className={`font-semibold ${absentDays > 0 ? "text-rose-600" : "text-emerald-600"}`}>
+                    {fmtDays(absentDays)} {absentDays > 0 ? "day(s)" : "(full pay)"}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-700 font-medium">Attendance deduction:</span>
-                  <span className="font-bold text-rose-700">-{formatINR(editingEmployee.attendanceDeduction)}</span>
+                  <span className="font-bold text-rose-700">-{formatINR(attendanceDeduction)}</span>
                 </div>
                 <div className="flex justify-between pt-1 border-t border-slate-100 font-semibold text-blue-900">
                   <span>Earned Salary:</span>
-                  <span>{formatINR(editingEmployee.earnedSalary)}</span>
+                  <span>{formatINR(earnedSalary)}</span>
                 </div>
               </div>
 
@@ -2209,7 +2249,7 @@ export default function Payroll() {
                   </span>
                 </div>
                 <div className="text-[11px] text-slate-500 pt-1 border-t border-emerald-200/60 leading-tight">
-                  Earned ({formatINR(editingEmployee.earnedSalary)}) + Earnings ({formatINR(editEarnings)}) − Deductions ({formatINR(editDeductions)}) − Advance ({formatINR(editAdvance)}). The server recomputes on save.
+                  Earned ({formatINR(earnedSalary)}) + Earnings ({formatINR(curEarnings)}) − Deductions ({formatINR(curDeductions)}) − Advance ({formatINR(curAdvance)}). Net payable: {formatINR(previewNet)}. The server recomputes on save.
                 </div>
               </div>
             </div>

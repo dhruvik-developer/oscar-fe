@@ -43,7 +43,7 @@ export default function ProjectsPage() {
           Dashboard
         </span>
         <ChevronRight size={12} className="text-slate-400" />
-        <span className="hover:text-slate-800 cursor-pointer" onClick={() => navigate('/pms/dashboard')}>
+        <span className="hover:text-slate-800 cursor-pointer" onClick={() => navigate('/pms')}>
           PMS
         </span>
         <ChevronRight size={12} className="text-slate-400" />

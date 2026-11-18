@@ -135,10 +135,15 @@ export default function BrandingSettingsCard({ isAdmin }) {
                 <button
                   type="button"
                   disabled={!isAdmin}
-                  onClick={() => { setLogo(''); setDetectedColor(''); }}
+                  onClick={() => {
+                    setLogo('');
+                    setDetectedColor('');
+                    setBranding({ ...(branding || {}), logo: '' });
+                    showToast?.('Logo removed successfully');
+                  }}
                   className="px-3 py-1.5 text-xs font-medium text-rose-600 hover:bg-rose-50 rounded-lg flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                 >
-                  <Trash2 size={13} /> Remove
+                  <Trash2 size={13} /> Remove Logo
                 </button>
               )}
               <p className="text-[11px] text-slate-400">PNG, JPG, WebP or SVG · max 2 MB</p>

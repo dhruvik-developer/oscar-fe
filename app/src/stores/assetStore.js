@@ -120,6 +120,56 @@ const useAssetStoreBase = create((set, get) => ({
     return rows;
   },
 
+  addCategory: async (categoryName) => {
+    const name = (typeof categoryName === "string" ? categoryName : categoryName?.name || "").trim();
+    if (!name) return null;
+    requireBackend();
+    const created = await hrmsSync.create("assetCategories", { name });
+    const row = ensureRow(created, "category");
+    set((s) => ({ categories: upsert(s.categories, row) }));
+    return row;
+  },
+
+  deleteCategory: async (id) => {
+    requireBackend();
+    await hrmsSync.remove("assetCategories", id);
+    set((s) => ({ categories: s.categories.filter((c) => c.id !== id) }));
+  },
+
+  seedStandardCategories: async () => {
+    const standards = [
+      "Laptop",
+      "Desktop / Workstation",
+      "Monitor",
+      "Mobile Phone",
+      "Tablet",
+      "Audio & Peripherals",
+      "Office Furniture",
+      "Networking",
+    ];
+    const existing = new Set((get().categories || []).map((c) => (c.name || "").toLowerCase()));
+    const toAdd = standards.filter((s) => !existing.has(s.toLowerCase()));
+    if (toAdd.length === 0) return get().categories;
+
+    requireBackend();
+    const added = [];
+    for (const name of toAdd) {
+      try {
+        const row = await hrmsSync.create("assetCategories", { name });
+        if (row && row.id) added.push(row);
+      } catch (err) {
+        console.warn("Failed to seed category " + name + ":", err);
+      }
+    }
+    const refreshed = await hrmsSync.pull("assetCategories");
+    if (refreshed) {
+      set({ categories: refreshed });
+      return refreshed;
+    }
+    set((s) => ({ categories: [...s.categories, ...added] }));
+    return get().categories;
+  },
+
   /** Empty on sign-out so the next user sees nothing of the previous one. */
   clear: () => set({ assets: [], requests: [], categories: [], loaded: false, loading: false }),
 

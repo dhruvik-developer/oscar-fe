@@ -67,8 +67,26 @@ const useTrainingStoreBase = create((set, get) => ({
       pullTracked("trainings"),
       pullTracked("trainers"),
     ]);
+    const cleanTrainings = (rows[0] || []).map((t) => {
+      const pCount = Array.isArray(t.participants)
+        ? t.participants.length
+        : typeof t.participants === "number"
+        ? t.participants
+        : Number(t.participants) || 0;
+      return {
+        ...t,
+        name: t.name || t.title || "Untitled Training",
+        title: t.title || t.name || "Untitled Training",
+        trainer: t.trainer || t.trainerName || "Unassigned",
+        trainerName: t.trainerName || t.trainer || "Unassigned",
+        start: t.start || t.startDate || "",
+        end: t.end || t.endDate || t.start || t.startDate || "",
+        participants: pCount,
+        participantsList: Array.isArray(t.participants) ? t.participants : (t.participantsList || []),
+      };
+    });
     set((s) => ({
-      trainings: rows[0] || s.trainings,
+      trainings: cleanTrainings.length > 0 ? cleanTrainings : s.trainings,
       trainers: rows[1] || s.trainers,
     }));
     return rows;
@@ -88,8 +106,8 @@ const useTrainingStoreBase = create((set, get) => ({
       status: item.stage || "Requested",
       cost: Number(item.cost) || 0,
       participants: Number(item.participants) || 1,
-      start: item.start || "18 Oct 2024",
-      end: item.end || item.start || "19 Oct 2024",
+      start: item.start || "",
+      end: item.end || item.start || "",
       department: item.department || "General",
       type: item.type || "Technical",
       trainer: item.trainer || "Unassigned",
@@ -117,10 +135,10 @@ const useTrainingStoreBase = create((set, get) => ({
           type: "Training",
           category: "Training Program",
           time: created.time || "10:00 AM - 01:00 PM",
-          location: created.mode === "Online" ? "Zoom Webinar" : "Training Room 2",
+          location: created.location || (created.mode === "Online" ? "Online" : ""),
           dept: created.department || "All Staff",
           organizer: created.trainer || "L&D Lead",
-          description: `${created.type} workshop. Enrolled: ${created.participants || 12} participants.`,
+          description: `${created.type} workshop. Enrolled: ${created.participants || 0} participants.`,
         });
       } catch (err) {
         console.error("Calendar sync error:", err);
@@ -150,10 +168,10 @@ const useTrainingStoreBase = create((set, get) => ({
                 type: "Training",
                 category: "Training Program",
                 time: next.time || "10:00 AM - 01:00 PM",
-                location: next.mode === "Online" ? "Zoom Webinar" : "Training Room 2",
+                location: next.location || (next.mode === "Online" ? "Online" : ""),
                 dept: next.department || "All Staff",
                 organizer: next.trainer || "L&D Lead",
-                description: `${next.type} workshop. Enrolled: ${next.participants || 12} participants.`,
+                description: `${next.type} workshop. Enrolled: ${next.participants || 0} participants.`,
               });
             } catch {}
           }
@@ -233,13 +251,8 @@ const useTrainingStoreBase = create((set, get) => ({
     });
   },
 
-  resetToDefaults: () => {
-    try {
-      
-      
-    } catch {}
-    set({ trainings: [], trainers: [] });
-  },
+  /** Discard local edits and re-read trainings and trainers from the server. */
+  resetToDefaults: () => get().hydrate(),
 }));
 
 // Hydrated the first time a screen reads it, not at boot — services/lazyModules.

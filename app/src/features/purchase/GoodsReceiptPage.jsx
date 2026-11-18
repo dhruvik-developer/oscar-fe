@@ -1279,14 +1279,16 @@ export const GoodsReceiptPage = () => {
                           <span className="text-slate-500 font-medium">Variance vs PO:</span>
                           {shortage > 0 ? (
                             <span className="text-amber-600 font-semibold flex items-center gap-1">
-                              ⚠️ Shortage: {numIN(shortage)} m ({Math.round((shortage / line.orderedQty) * 100)}%)
+                              <AlertTriangle size={12} /> Shortage: {numIN(shortage)} m ({Math.round((shortage / line.orderedQty) * 100)}%)
                             </span>
                           ) : excess > 0 ? (
                             <span className="text-blue-600 font-semibold flex items-center gap-1">
-                              ℹ️ Excess: +{numIN(excess)} m ({Math.round((excess / line.orderedQty) * 100)}%)
+                              Excess: +{numIN(excess)} m ({Math.round((excess / line.orderedQty) * 100)}%)
                             </span>
                           ) : (
-                            <span className="text-emerald-600 font-semibold">✓ Exact match with PO</span>
+                            <span className="text-emerald-600 font-semibold flex items-center gap-1">
+                              <CheckCircle2 size={12} /> Exact match with PO
+                            </span>
                           )}
                         </div>
                       )}

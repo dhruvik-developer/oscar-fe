@@ -10,7 +10,7 @@ const TABS = [
 ];
 
 const DEFAULT_SETTINGS = {
-  atRiskThresholdPct: 20,
+  atRiskThresholdPct: 70,
   requireClientApprovalOnDesign: false,
   requireQaCertificate: false,
   defaultDepartmentCapacity: 20,

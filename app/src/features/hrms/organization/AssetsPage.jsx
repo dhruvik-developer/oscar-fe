@@ -21,6 +21,7 @@ import {
   Cpu,
   Headphones,
   Armchair,
+  Tag,
   Box,
   Plus,
   Search,
@@ -265,10 +266,14 @@ export function AssetsPage() {
     approveRequest,
     rejectRequest,
     fulfillRequest,
+    addCategory,
+    deleteCategory,
+    seedStandardCategories,
   } = useAssetStore();
 
-  // Tab State: 'inventory' | 'requests' (driven directly by URL search params, single source of truth)
-  const activeTab = searchParams.get("tab") === "requests" ? "requests" : "inventory";
+  // Tab State: 'inventory' | 'requests' | 'categories' (driven directly by URL search params)
+  const tabFromUrl = searchParams.get("tab");
+  const activeTab = tabFromUrl === "requests" ? "requests" : tabFromUrl === "categories" ? "categories" : "inventory";
 
   const handleTabChange = (newTab) => {
     setSearchParams(
@@ -276,6 +281,8 @@ export function AssetsPage() {
         const next = new URLSearchParams(prev);
         if (newTab === "requests") {
           next.set("tab", "requests");
+        } else if (newTab === "categories") {
+          next.set("tab", "categories");
         } else {
           next.delete("tab");
         }
@@ -283,6 +290,55 @@ export function AssetsPage() {
       },
       { replace: true }
     );
+  };
+
+  // Modals state & handlers (Categories)
+  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState("");
+  const [isAddingCategory, setIsAddingCategory] = useState(false);
+  const [categorySearch, setCategorySearch] = useState("");
+
+  const handleSaveCategory = async (e) => {
+    if (e && e.preventDefault) e.preventDefault();
+    const trimmed = newCategoryName.trim();
+    if (!trimmed) return;
+    setIsAddingCategory(true);
+    try {
+      await addCategory(trimmed);
+      setNewCategoryName("");
+      showToast(`Category "${trimmed}" created successfully`);
+    } catch (err) {
+      showToast(`Failed to create category — ${describeError(err)}`);
+    } finally {
+      setIsAddingCategory(false);
+    }
+  };
+
+  const handleSeedCategories = async () => {
+    setIsAddingCategory(true);
+    try {
+      await seedStandardCategories();
+      showToast("Standard categories loaded successfully");
+    } catch (err) {
+      showToast(`Failed to load standard categories — ${describeError(err)}`);
+    } finally {
+      setIsAddingCategory(false);
+    }
+  };
+
+  const handleDeleteCategory = async (catId, catName) => {
+    const inUse = assets.some((a) => (a.category || "").toLowerCase() === (catName || "").toLowerCase());
+    if (inUse) {
+      if (!window.confirm(`Category "${catName}" is assigned to one or more assets. Delete anyway?`)) {
+        return;
+      }
+    }
+    try {
+      await deleteCategory(catId);
+      showToast(`Category "${catName}" deleted`);
+    } catch (err) {
+      showToast(`Failed to delete category — ${describeError(err)}`);
+    }
   };
 
   // In-flight action key, e.g. `${id}:approve` — disables the buttons it covers.
@@ -783,6 +839,20 @@ export function AssetsPage() {
             >
               <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
             </button>
+            <button
+              type="button"
+              onClick={() => setIsCategoryModalOpen(true)}
+              className="px-3.5 h-10 bg-white border border-bdr hover:bg-off text-slate-700 rounded-xl text-xs font-semibold shadow-2xs transition flex items-center gap-1.5 cursor-pointer"
+              title="Manage Asset Categories"
+            >
+              <Tag size={15} className="text-slate-500" />
+              <span>Categories</span>
+              {categories.length > 0 && (
+                <span className="px-1.5 py-0.2 rounded-full bg-slate-100 text-slate-600 text-[10.5px] font-bold">
+                  {categories.length}
+                </span>
+              )}
+            </button>
             {activeTab === "inventory" ? (
               <button
                 type="button"
@@ -844,6 +914,23 @@ export function AssetsPage() {
             {reqPending > 0 ? `${reqPending} Pending` : reqTotal}
           </span>
           {activeTab === "requests" && (
+            <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-navy rounded-t" />
+          )}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => handleTabChange("categories")}
+          className={`pb-3 px-3 text-[14px] font-semibold transition-colors relative flex items-center gap-2 shrink-0 lg:shrink cursor-pointer ${
+            activeTab === "categories" ? "text-navy" : "text-muted hover:text-slate-700"
+          }`}
+        >
+          <Tag size={16} />
+          <span>Asset Categories</span>
+          <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
+            {categories.length}
+          </span>
+          {activeTab === "categories" && (
             <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-navy rounded-t" />
           )}
         </button>
@@ -1425,6 +1512,172 @@ export function AssetsPage() {
             />
           </div>
         </>
+      )}
+
+      {/* CATEGORIES TAB VIEW */}
+      {activeTab === "categories" && (
+        <div className="flex flex-col gap-5">
+          {/* Category Stats */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+            <div className="bg-white border border-bdr rounded-2xl p-4 shadow-2xs">
+              <div className="text-[12px] text-muted font-medium">Total Categories</div>
+              <div className="text-2xl font-bold text-slate-900 mt-1">{categories.length}</div>
+              <div className="text-[11.5px] text-muted mt-1">Configured equipment types</div>
+            </div>
+            <div className="bg-white border border-bdr rounded-2xl p-4 shadow-2xs">
+              <div className="text-[12px] text-muted font-medium">Categories In Use</div>
+              <div className="text-2xl font-bold text-emerald-600 mt-1">
+                {categories.filter((cat) => assets.some((a) => (a.category || "").toLowerCase() === (cat.name || "").toLowerCase())).length}
+              </div>
+              <div className="text-[11.5px] text-muted mt-1">Assigned to registered assets</div>
+            </div>
+            <div className="bg-white border border-bdr rounded-2xl p-4 shadow-2xs">
+              <div className="text-[12px] text-muted font-medium">Total Registered Units</div>
+              <div className="text-2xl font-bold text-blue-600 mt-1">{assets.length}</div>
+              <div className="text-[11.5px] text-muted mt-1">Units tracked across all categories</div>
+            </div>
+          </div>
+
+          {/* Category Management Card */}
+          <div className="bg-white border border-bdr rounded-2xl p-5 shadow-2xs flex flex-col gap-5">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-bdr pb-4">
+              <div>
+                <h2 className="text-[16px] font-bold text-slate-900">Manage Asset Categories</h2>
+                <p className="text-[12.5px] text-muted mt-0.5">
+                  Organize and classify company equipment (e.g. Laptop, Monitor, Mobile, Workstation).
+                </p>
+              </div>
+              {categories.length < 3 && (
+                <button
+                  type="button"
+                  onClick={handleSeedCategories}
+                  disabled={isAddingCategory}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-[12.5px] font-semibold transition cursor-pointer flex items-center gap-1.5 shadow-2xs"
+                >
+                  <Plus size={14} />
+                  Load Standard Categories
+                </button>
+              )}
+            </div>
+
+            {/* Add Category Form & Search Filter */}
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <form onSubmit={handleSaveCategory} className="flex items-center gap-2 w-full sm:w-auto">
+                <input
+                  type="text"
+                  placeholder="e.g. Smartphone, Workstation, Tablet..."
+                  value={newCategoryName}
+                  onChange={(e) => setNewCategoryName(e.target.value)}
+                  className="px-3.5 py-2 rounded-xl border border-bdr text-[13px] bg-off focus:bg-white focus:outline-none focus:border-navy w-full sm:w-72"
+                />
+                <button
+                  type="submit"
+                  disabled={!newCategoryName.trim() || isAddingCategory}
+                  className="px-4 py-2 bg-navy text-white rounded-xl text-[12.5px] font-semibold hover:bg-navy/90 disabled:opacity-50 transition cursor-pointer shrink-0"
+                >
+                  {isAddingCategory ? "Adding..." : "Add Category"}
+                </button>
+              </form>
+
+              <div className="relative w-full sm:w-64">
+                <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
+                <input
+                  type="text"
+                  placeholder="Search categories..."
+                  value={categorySearch}
+                  onChange={(e) => setCategorySearch(e.target.value)}
+                  className="w-full pl-9 pr-3.5 py-2 rounded-xl border border-bdr text-[13px] bg-off focus:bg-white focus:outline-none focus:border-navy"
+                />
+              </div>
+            </div>
+
+            {/* Categories Table */}
+            <div className="border border-bdr rounded-xl overflow-hidden overflow-x-auto">
+              <table className="w-full text-left text-[13px]">
+                <thead className="bg-off border-b border-bdr text-[11px] font-semibold uppercase tracking-wider text-muted">
+                  <tr>
+                    <th className="py-3 px-4">Category Name</th>
+                    <th className="py-3 px-4 text-center">Assets Count</th>
+                    <th className="py-3 px-4 text-center">Available Stock</th>
+                    <th className="py-3 px-4 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-bdr/60">
+                  {categories.length === 0 ? (
+                    <tr>
+                      <td colSpan={4} className="py-12 text-center text-muted">
+                        <div className="flex flex-col items-center justify-center gap-2">
+                          <Tag size={32} className="text-slate-300" />
+                          <p className="text-[13.5px] font-medium text-slate-700">No asset categories configured yet</p>
+                          <p className="text-[12px] text-muted max-w-sm">
+                            Create categories using the form above, or click &quot;Load Standard Categories&quot; to initialize with defaults.
+                          </p>
+                          <button
+                            type="button"
+                            onClick={handleSeedCategories}
+                            disabled={isAddingCategory}
+                            className="mt-2 px-4 py-2 bg-navy text-white rounded-xl text-[12px] font-semibold hover:bg-navy/90 transition cursor-pointer"
+                          >
+                            Load Standard Categories
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : (
+                    categories
+                      .filter((c) => !categorySearch || (c.name || "").toLowerCase().includes(categorySearch.toLowerCase()))
+                      .map((cat) => {
+                        const totalUnits = assets.filter(
+                          (a) => (a.category || "").toLowerCase() === (cat.name || "").toLowerCase()
+                        ).length;
+                        const availUnits = assets.filter(
+                          (a) => (a.category || "").toLowerCase() === (cat.name || "").toLowerCase() && a.status === "Available"
+                        ).length;
+                        return (
+                          <tr key={cat.id || cat.name} className="hover:bg-off/50 transition-colors">
+                            <td className="py-3.5 px-4 font-medium text-slate-800">
+                              <div className="flex items-center gap-2.5">
+                                <span className="p-2 rounded-lg bg-slate-100 text-slate-600">
+                                  {getCategoryIcon(cat.name)}
+                                </span>
+                                <span className="font-semibold text-slate-900">{cat.name}</span>
+                              </div>
+                            </td>
+                            <td className="py-3.5 px-4 text-center">
+                              <span className="px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[12px] font-bold">
+                                {totalUnits} {totalUnits === 1 ? "unit" : "units"}
+                              </span>
+                            </td>
+                            <td className="py-3.5 px-4 text-center">
+                              <span
+                                className={`px-2.5 py-0.5 rounded-full text-[12px] font-bold ${
+                                  availUnits > 0
+                                    ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                    : "bg-slate-100 text-slate-500"
+                                }`}
+                              >
+                                {availUnits} in stock
+                              </span>
+                            </td>
+                            <td className="py-3.5 px-4 text-right">
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteCategory(cat.id, cat.name)}
+                                className="p-1.5 rounded-lg text-muted hover:text-red-600 hover:bg-red-50 transition cursor-pointer"
+                                title="Delete Category"
+                              >
+                                <Trash2 size={15} />
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* MODAL 1: ADD ASSET */}
@@ -2320,6 +2573,114 @@ export function AssetsPage() {
             </button>
           </div>
         </form>
+      </Modal>
+
+      {/* MODAL 10: MANAGE ASSET CATEGORIES */}
+      <Modal
+        isOpen={isCategoryModalOpen}
+        onClose={() => setIsCategoryModalOpen(false)}
+        title="Asset Categories"
+        size="md"
+      >
+        <div className="flex flex-col gap-4">
+          <p className="text-[12.5px] text-muted">
+            Organize and classify company equipment (e.g. Laptop, Monitor, Mobile, Workstation).
+          </p>
+
+          {/* Add Category Form */}
+          <form onSubmit={handleSaveCategory} className="flex items-center gap-2">
+            <input
+              type="text"
+              placeholder="e.g. Smartphone, Workstation, Tablet..."
+              value={newCategoryName}
+              onChange={(e) => setNewCategoryName(e.target.value)}
+              className="flex-1 px-3.5 py-2 rounded-xl border border-bdr text-[13px] bg-off focus:bg-white focus:outline-none focus:border-navy"
+            />
+            <button
+              type="submit"
+              disabled={!newCategoryName.trim() || isAddingCategory}
+              className="px-4 py-2 bg-navy text-white rounded-xl text-[12.5px] font-semibold hover:bg-navy/90 disabled:opacity-50 transition cursor-pointer shrink-0"
+            >
+              {isAddingCategory ? "Adding..." : "Add Category"}
+            </button>
+          </form>
+
+          {/* Quick starter button if few or none */}
+          {categories.length < 3 && (
+            <div className="p-3 bg-blue-50/70 border border-blue-200/80 rounded-xl flex items-center justify-between gap-3">
+              <div className="text-[12px] text-blue-900">
+                <span className="font-semibold">Quick Setup:</span> Load standard asset categories with one click.
+              </div>
+              <button
+                type="button"
+                onClick={handleSeedCategories}
+                disabled={isAddingCategory}
+                className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[11.5px] font-semibold transition cursor-pointer shrink-0"
+              >
+                Load Standards
+              </button>
+            </div>
+          )}
+
+          {/* Category List */}
+          <div className="border border-bdr rounded-xl overflow-hidden max-h-[280px] overflow-y-auto">
+            {categories.length === 0 ? (
+              <div className="py-8 text-center text-muted text-[13px]">
+                No categories created yet. Type a category name above or click &quot;Load Standards&quot;.
+              </div>
+            ) : (
+              <table className="w-full text-left text-[12.5px]">
+                <thead className="bg-off border-b border-bdr text-[11px] font-semibold uppercase text-muted">
+                  <tr>
+                    <th className="py-2.5 px-3.5">Category Name</th>
+                    <th className="py-2.5 px-3.5 text-center">Assets Count</th>
+                    <th className="py-2.5 px-3.5 text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-bdr/50">
+                  {categories.map((cat) => {
+                    const count = assets.filter(
+                      (a) => (a.category || "").toLowerCase() === (cat.name || "").toLowerCase()
+                    ).length;
+                    return (
+                      <tr key={cat.id || cat.name} className="hover:bg-off/40 transition-colors">
+                        <td className="py-2.5 px-3.5 font-medium text-slate-800 flex items-center gap-2">
+                          {getCategoryIcon(cat.name)}
+                          <span>{cat.name}</span>
+                        </td>
+                        <td className="py-2.5 px-3.5 text-center text-muted font-semibold">
+                          <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[11px]">
+                            {count}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3.5 text-right">
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteCategory(cat.id, cat.name)}
+                            className="p-1 rounded-lg text-muted hover:text-red-600 hover:bg-red-50 transition cursor-pointer"
+                            title="Delete Category"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
+          </div>
+
+          <div className="flex justify-end pt-2 border-t border-bdr">
+            <button
+              type="button"
+              onClick={() => setIsCategoryModalOpen(false)}
+              className="px-4 py-2 border border-bdr rounded-xl text-[13px] hover:bg-off font-medium cursor-pointer"
+            >
+              Close
+            </button>
+          </div>
+        </div>
       </Modal>
     </div>
   );

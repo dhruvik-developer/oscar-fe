@@ -11,11 +11,14 @@ import {
   Clock,
   AlertCircle,
   LayoutGrid,
+  Building2,
+  ExternalLink,
 } from 'lucide-react';
 import PageHeader from '../../../components/ui/PageHeader';
 import { Button } from '../../../components/ui/Button';
 import TablePagination from '../../../components/ui/TablePagination';
 import { loomService } from '../../../services/loomService';
+import { partiesService } from '../../../services/domainServices';
 import { formatNum, preventNegativeInput } from '../utils/loomCalculations';
 import { useERP } from '../../../context/ERPContext';
 import { ConfirmModal } from '../../../components/ui/ConfirmModal';
@@ -26,6 +29,7 @@ export default function YarnManagementPage() {
   const [deleteBookingConfirmId, setDeleteBookingConfirmId] = useState(null);
   const [yarns, setYarns] = useState([]);
   const [factories, setFactories] = useState([]);
+  const [parties, setParties] = useState([]);
   const [bookings, setBookings] = useState([]);
   const [deliveries, setDeliveries] = useState([]);
   const [stockOverview, setStockOverview] = useState([]);
@@ -40,6 +44,7 @@ export default function YarnManagementPage() {
 
   // Step 1: Book Yarn Form
   const [bkSupplier, setBkSupplier] = useState('');
+  const [bkSupplierParty, setBkSupplierParty] = useState('');
   const [bkYarn, setBkYarn] = useState('');
   const [bkKgs, setBkKgs] = useState('');
   const [bkRate, setBkRate] = useState('');
@@ -56,18 +61,21 @@ export default function YarnManagementPage() {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const [yRes, fRes, bRes] = await Promise.all([
+      const [yRes, fRes, bRes, pRes] = await Promise.all([
         loomService.getYarns(),
         loomService.getFactories(),
         loomService.getYarnBookings(),
+        partiesService.getParties({ type: 'Vendor' }).catch(() => partiesService.getParties().catch(() => [])),
       ]);
       const yList = Array.isArray(yRes) ? yRes : yRes?.results || [];
       const fList = Array.isArray(fRes) ? fRes : fRes?.results || [];
       const bList = Array.isArray(bRes) ? bRes : bRes?.results || [];
+      const pList = Array.isArray(pRes) ? pRes : pRes?.results || [];
 
       setYarns(yList);
       setFactories(fList);
       setBookings(bList);
+      setParties(pList);
 
       if (yList.length && !bkYarn) setBkYarn(yList[0].id);
       if (bList.length && !schBooking) setSchBooking(bList[0].id);
@@ -115,6 +123,7 @@ export default function YarnManagementPage() {
     try {
       await loomService.createYarnBooking({
         supplier: bkSupplier,
+        supplier_party: bkSupplierParty || null,
         yarn: bkYarn,
         kgs: Number(bkKgs),
         rate: Number(bkRate),
@@ -123,6 +132,7 @@ export default function YarnManagementPage() {
       });
       showToast('Yarn booking created successfully', 'success');
       setBkSupplier('');
+      setBkSupplierParty('');
       setBkKgs('');
       setBkRate('');
       setBkNote('');
@@ -317,16 +327,52 @@ export default function YarnManagementPage() {
             </h3>
           </div>
           <form onSubmit={handleAddBooking} className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-end">
-            <div>
-              <label className="pms-label">Supplier</label>
-              <input
-                type="text"
-                placeholder="e.g. Indospun Yarn"
-                value={bkSupplier}
-                onChange={(e) => setBkSupplier(e.target.value)}
-                className="pms-input w-full"
-                required
-              />
+            <div className="sm:col-span-2">
+              <div className="flex items-center justify-between mb-1">
+                <label className="pms-label mb-0">Supplier / Vendor</label>
+                {parties.length > 0 && (
+                  <span className="text-[10px] text-blue-600 dark:text-blue-400 font-medium flex items-center gap-1">
+                    <Building2 size={11} /> Connected to Parties Master ({parties.length})
+                  </span>
+                )}
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <select
+                  value={bkSupplierParty}
+                  onChange={(e) => {
+                    const pid = e.target.value;
+                    setBkSupplierParty(pid);
+                    if (pid) {
+                      const p = parties.find((x) => x.id === pid);
+                      if (p) setBkSupplier(p.name);
+                    }
+                  }}
+                  className="pms-select w-full cursor-pointer text-xs"
+                >
+                  <option value="">— Pick from Parties Master —</option>
+                  {parties.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name} {p.gstin ? `(${p.gstin})` : p.city ? `(${p.city})` : ''}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  type="text"
+                  placeholder="Or enter custom supplier name"
+                  value={bkSupplier}
+                  onChange={(e) => {
+                    setBkSupplier(e.target.value);
+                    if (bkSupplierParty) {
+                      const matched = parties.find((x) => x.id === bkSupplierParty);
+                      if (matched && matched.name !== e.target.value) {
+                        setBkSupplierParty('');
+                      }
+                    }
+                  }}
+                  className="pms-input w-full text-xs"
+                  required
+                />
+              </div>
             </div>
             <div>
               <label className="pms-label">Yarn</label>
@@ -603,7 +649,20 @@ export default function YarnManagementPage() {
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
               {paginatedBookings.map((b) => (
                 <tr key={b.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50">
-                  <td className="py-2 px-2.5 sm:py-2.5 sm:px-3 font-bold text-slate-800 dark:text-slate-200">{b.supplier}</td>
+                  <td className="py-2 px-2.5 sm:py-2.5 sm:px-3">
+                    <div className="flex flex-col">
+                      <span className="font-bold text-slate-800 dark:text-slate-200">{b.supplier}</span>
+                      {b.supplier_party_details ? (
+                        <span className="text-[10px] text-blue-600 dark:text-blue-400 font-mono flex items-center gap-1 mt-0.5">
+                          <Building2 size={10} className="shrink-0" />
+                          <span>Parties Master</span>
+                          {b.supplier_party_details.gstin && (
+                            <span className="text-slate-400 font-normal">({b.supplier_party_details.gstin})</span>
+                          )}
+                        </span>
+                      ) : null}
+                    </div>
+                  </td>
                   <td className="py-2 px-2.5 sm:py-2.5 sm:px-3 font-medium text-slate-700 dark:text-slate-300">{b.yarn_name}</td>
                   <td className="py-2 px-2.5 sm:py-2.5 sm:px-3 text-slate-500">{b.date}</td>
                   <td className="py-2 px-2.5 sm:py-2.5 sm:px-3 text-right font-mono font-medium">{formatNum(b.kgs)}</td>

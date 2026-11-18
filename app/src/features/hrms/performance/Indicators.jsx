@@ -7,25 +7,71 @@ import { StatusBadge } from "../../../components/hrms/StatusBadge";
 import { Modal } from "../../../components/hrms/Modal";
 import { Drawer } from "../../../components/hrms/Drawer";
 import { Button } from "../../../components/hrms/Button";
-import { Eye, Pencil, Trash2, Star, Target, Sliders, Layers } from "lucide-react";
-import PageHeader from "../../../components/ui/PageHeader";
+import { SearchableSelect } from "../../../components/hrms/SearchableSelect";
+import { Eye, Pencil, Trash2, Star, Target, Sliders, Layers, ChevronDown } from "lucide-react";
+import PageInfoButton from "../../../components/common/PageInfoButton";
 import { hrmsGuides } from "../../../data/hrms/hrmsGuides";
-import MasterSourceLink from "../../../components/common/MasterSourceLink";
+import { hrmsSync } from "../../../services/hrmsSync";
+
+const DEFAULT_BRANCHES = [
+  "Headquarters",
+  "Main Branch",
+  "Plant 1",
+  "Regional Office",
+];
+
+const DEFAULT_DEPARTMENTS = [
+  "Accounts & Finance",
+  "Engineering",
+  "General",
+  "Human Resources",
+  "Management & Administration",
+  "Marketing",
+  "Operations",
+  "Production & Fabrication",
+  "Quality Assurance",
+  "Sales",
+];
+
+const DEFAULT_DESIGNATIONS = [
+  "Accounts Executive",
+  "Accounts Manager",
+  "Assembly Technician",
+  "Fabrication Technician",
+  "General Manager",
+  "HR Executive",
+  "HR Manager",
+  "Operations Manager",
+  "Production Supervisor",
+  "Quality Inspector",
+  "Software Engineer",
+];
 
 export default function Indicators() {
   const showToast = useAppStore((s) => s.showToast);
   const employees = useAppStore((s) => s.employees) || [];
-  const storeDepartments = useAppStore((s) => s.departments) || [];
-  const storeLocations = useAppStore((s) => s.locations) || [];
-  const storeDesignations = useAppStore((s) => s.designations) || [];
+  const currentUser = useAppStore((s) => s.currentUser);
 
-  const { indicators, addIndicator, updateIndicator, deleteIndicator, hydrate } = usePerformanceStore();
+  const { indicators = [], addIndicator, updateIndicator, deleteIndicator } = usePerformanceStore();
+
+  const [departmentsList, setDepartmentsList] = useState([]);
+  const [designationsList, setDesignationsList] = useState([]);
+  const [locationsList, setLocationsList] = useState([]);
 
   useEffect(() => {
-    hydrate?.();
-  }, [hydrate]);
+    hrmsSync.pull("departments").then((deps) => {
+      if (Array.isArray(deps)) setDepartmentsList(deps);
+    }).catch(() => {});
+    hrmsSync.pull("designations").then((desigs) => {
+      if (Array.isArray(desigs)) setDesignationsList(desigs);
+    }).catch(() => {});
+    hrmsSync.pull("locations").then((locs) => {
+      if (Array.isArray(locs)) setLocationsList(locs);
+    }).catch(() => {});
+  }, []);
 
   const [search, setSearch] = useState("");
+  const [empFilter, setEmpFilter] = useState("All");
   const [branch, setBranch] = useState("All");
   const [dept, setDept] = useState("All");
   const [desig, setDesig] = useState("All");
@@ -39,11 +85,11 @@ export default function Indicators() {
 
   const [form, setForm] = useState({
     name: "",
-    branch: "New York",
-    department: "Engineering",
-    designation: "Senior Engineer",
-    assignedEmployee: "All Engineers",
-    target: "≥ 95%",
+    branch: "",
+    department: "",
+    designation: "",
+    assignedEmployee: "All in Designation",
+    target: "",
     measurementType: "Percentage",
     weight: 15,
     description: "",
@@ -54,6 +100,7 @@ export default function Indicators() {
   const filtered = useMemo(() => {
     return indicators.filter((r) => {
       if (search && !`${r.name} ${r.department} ${r.designation} ${r.target || ""} ${r.assignedEmployee || ""}`.toLowerCase().includes(search.toLowerCase())) return false;
+      if (empFilter !== "All" && r.assignedEmployee !== empFilter && r.assignedEmployee !== "All in Designation" && r.assignedEmployee !== "All in Role") return false;
       if (branch !== "All" && r.branch !== branch) return false;
       if (dept !== "All" && r.department !== dept) return false;
       if (desig !== "All" && r.designation !== desig) return false;
@@ -64,7 +111,7 @@ export default function Indicators() {
       }
       return true;
     });
-  }, [indicators, search, branch, dept, desig, status, rating]);
+  }, [indicators, search, empFilter, branch, dept, desig, status, rating]);
 
   function validate(f) {
     const e = {};
@@ -83,11 +130,11 @@ export default function Indicators() {
   function openAdd() {
     setForm({
       name: "",
-      branch: "New York",
-      department: "Engineering",
-      designation: "Senior Engineer",
-      assignedEmployee: "All Engineers",
-      target: "≥ 95%",
+      branch: "",
+      department: "",
+      designation: "",
+      assignedEmployee: "All in Designation",
+      target: "",
       measurementType: "Percentage",
       weight: 15,
       description: "",
@@ -120,30 +167,22 @@ export default function Indicators() {
       setErrors(e);
       return;
     }
-    const payload = {
-      ...form,
-      weight: Number(form.weight),
-      rating: form.rating ? Number(form.rating) : 4.0,
-      addedBy: "Ayesha Khan",
-    };
     if (editRow) {
-      updateIndicator(editRow.id, payload)
-        .then(() => {
-          showToast("Indicator updated successfully.");
-          setEditRow(null);
-        })
-        .catch((err) => {
-          showToast(err?.message || "Failed to update indicator", "error");
-        });
+      updateIndicator(editRow.id, {
+        ...form,
+        weight: Number(form.weight),
+      });
+      showToast("Indicator updated successfully.");
+      setEditRow(null);
     } else {
-      addIndicator(payload)
-        .then(() => {
-          showToast("Indicator created successfully.");
-          setAddOpen(false);
-        })
-        .catch((err) => {
-          showToast(err?.message || "Failed to create indicator", "error");
-        });
+      addIndicator({
+        ...form,
+        weight: Number(form.weight),
+        rating: 4.0,
+        addedBy: currentUser?.name || "",
+      });
+      showToast("Indicator created successfully.");
+      setAddOpen(false);
     }
   }
 
@@ -215,21 +254,21 @@ export default function Indicators() {
           <button
             aria-label={`View ${r.name}`}
             onClick={() => setViewRow(r)}
-            className="w-7 h-7 rounded-lg hover:bg-slate-100 text-slate-600 grid place-items-center transition"
+            className="w-7 h-7 rounded-xl hover:bg-slate-100 text-slate-600 grid place-items-center transition"
           >
             <Eye size={14} />
           </button>
           <button
             aria-label={`Edit ${r.name}`}
             onClick={() => openEdit(r)}
-            className="w-7 h-7 rounded-lg hover:bg-slate-100 text-slate-600 grid place-items-center transition"
+            className="w-7 h-7 rounded-xl hover:bg-slate-100 text-slate-600 grid place-items-center transition"
           >
             <Pencil size={14} />
           </button>
           <button
             aria-label={`Delete ${r.name}`}
             onClick={() => setDeleteRow(r)}
-            className="w-7 h-7 rounded-lg hover:bg-red-50 text-red-600 grid place-items-center transition"
+            className="w-7 h-7 rounded-xl hover:bg-red-50 text-red-600 grid place-items-center transition"
           >
             <Trash2 size={14} />
           </button>
@@ -238,35 +277,63 @@ export default function Indicators() {
     },
   ];
 
-  const branchOpts = useMemo(() => {
-    const names = new Set(["New York", "London", "Dubai"]);
-    storeLocations.forEach((l) => { if (l?.name) names.add(l.name); });
-    indicators.forEach((i) => { if (i?.branch) names.add(i.branch); if (i?.location) names.add(i.location); });
-    return [
-      { value: "All", label: "All Branches" },
-      ...Array.from(names).map((name) => ({ value: name, label: name })),
-    ];
-  }, [storeLocations, indicators]);
+  const uniqueEmployeeNames = useMemo(() => {
+    return [...new Set(employees.map((e) => (e.name || "").trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+  }, [employees]);
 
-  const deptOpts = useMemo(() => {
-    const names = new Set(["Engineering", "Design", "Marketing", "HR", "Finance", "Operations"]);
-    storeDepartments.forEach((d) => { if (d?.name) names.add(d.name); });
-    indicators.forEach((i) => { if (i?.department) names.add(i.department); });
-    return [
-      { value: "All", label: "All Departments" },
-      ...Array.from(names).map((name) => ({ value: name, label: name })),
-    ];
-  }, [storeDepartments, indicators]);
+  const empOpts = [
+    { value: "All", label: "All Employees" },
+    ...uniqueEmployeeNames.map((name) => ({ value: name, label: name })),
+  ];
 
-  const desigOpts = useMemo(() => {
-    const names = new Set(["Senior Engineer", "Tech Lead", "Product Designer", "DevOps Engineer", "Analyst", "HR Manager"]);
-    storeDesignations.forEach((d) => { if (d?.name) names.add(d.name); });
-    indicators.forEach((i) => { if (i?.designation) names.add(i.designation); });
+  const allBranches = useMemo(() => {
     return [
-      { value: "All", label: "All Designations" },
-      ...Array.from(names).map((name) => ({ value: name, label: name })),
-    ];
-  }, [storeDesignations, indicators]);
+      ...new Set([
+        ...DEFAULT_BRANCHES,
+        ...locationsList.map((l) => l.name || l.title).filter(Boolean),
+        ...employees.map((e) => e.location).filter(Boolean),
+        ...indicators.map((r) => r.branch).filter(Boolean),
+        form.branch,
+      ].filter(Boolean)),
+    ].sort((a, b) => a.localeCompare(b));
+  }, [locationsList, employees, indicators, form.branch]);
+
+  const allDepartments = useMemo(() => {
+    return [
+      ...new Set([
+        ...DEFAULT_DEPARTMENTS,
+        ...departmentsList.map((d) => d.name || d.title).filter(Boolean),
+        ...employees.map((e) => e.department).filter(Boolean),
+        ...indicators.map((r) => r.department).filter(Boolean),
+        form.department,
+      ].filter(Boolean)),
+    ].sort((a, b) => a.localeCompare(b));
+  }, [departmentsList, employees, indicators, form.department]);
+
+  const allDesignations = useMemo(() => {
+    return [
+      ...new Set([
+        ...DEFAULT_DESIGNATIONS,
+        ...designationsList.map((d) => d.name || d.title).filter(Boolean),
+        ...employees.map((e) => e.designation || e.role).filter(Boolean),
+        ...indicators.map((r) => r.designation).filter(Boolean),
+        form.designation,
+      ].filter(Boolean)),
+    ].sort((a, b) => a.localeCompare(b));
+  }, [designationsList, employees, indicators, form.designation]);
+
+  const branchOpts = [
+    { value: "All", label: "All Branches" },
+    ...allBranches.map((v) => ({ value: v, label: v })),
+  ];
+  const deptOpts = [
+    { value: "All", label: "All Departments" },
+    ...allDepartments.map((v) => ({ value: v, label: v })),
+  ];
+  const desigOpts = [
+    { value: "All", label: "All Designations" },
+    ...allDesignations.map((v) => ({ value: v, label: v })),
+  ];
   const ratingOpts = [
     { value: "All", label: "All Ratings" },
     { value: "4", label: "4★ & up" },
@@ -279,149 +346,238 @@ export default function Indicators() {
     { value: "Draft", label: "Draft" },
   ];
 
-  function renderFormFields() {
+  const assignedEmployeeOpts = useMemo(() => {
+    let list = employees;
+    if (form.department) {
+      const match = list.filter((e) => (e.department || "").toLowerCase() === form.department.toLowerCase());
+      if (match.length > 0) list = match;
+    }
+    if (form.designation) {
+      const match = list.filter((e) => (e.designation || e.role || "").toLowerCase() === form.designation.toLowerCase());
+      if (match.length > 0) list = match;
+    }
+    const names = [...new Set(list.map((e) => (e.name || "").trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+    if (form.assignedEmployee && form.assignedEmployee !== "All in Designation" && !names.includes(form.assignedEmployee)) {
+      names.unshift(form.assignedEmployee);
+    }
+    return [
+      { value: "All in Designation", label: "All in Designation" },
+      ...names.map((name) => ({ value: name, label: name })),
+    ];
+  }, [employees, form.department, form.designation, form.assignedEmployee]);
+
+  function FormFields() {
     return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <label className="sm:col-span-2 flex flex-col gap-1">
-          <span className="text-[11px] font-medium text-slate-500">Indicator Name *</span>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-5 gap-y-4">
+        {/* Indicator Name */}
+        <label className="sm:col-span-2 flex flex-col gap-1.5">
+          <span className="text-[12px] font-semibold text-slate-700 flex items-center gap-0.5">
+            Indicator Name <span className="text-red-500 font-bold">*</span>
+          </span>
           <input
             value={form.name}
-            onChange={(e) => setForm({ ...form, name: e.target.value })}
+            onChange={(e) => {
+              setForm({ ...form, name: e.target.value });
+              if (errors.name) setErrors((err) => ({ ...err, name: "" }));
+            }}
             placeholder="e.g. Code Review Thoroughness & Discipline"
-            className={`h-9 px-3 bg-white border rounded-xl text-[13px] ${
-              errors.name ? "border-red-500" : "border-[#e2e8f0]"
+            className={`w-full h-10 px-3.5 bg-slate-50/70 border rounded-xl text-[13px] text-slate-800 placeholder:text-slate-400 focus:outline-none focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition shadow-2xs ${
+              errors.name ? "border-red-500" : "border-slate-200"
             }`}
           />
-          {errors.name && <span className="text-[11px] text-red-500">{errors.name}</span>}
+          {errors.name && <span className="text-[11px] text-red-500 font-medium">{errors.name}</span>}
         </label>
 
-        <label className="flex flex-col gap-1">
-          <span className="text-[11px] font-medium text-slate-500">Branch *</span>
-          <select
-            value={form.branch}
-            onChange={(e) => setForm({ ...form, branch: e.target.value })}
-            className="h-9 px-3 bg-white border border-[#e2e8f0] rounded-xl text-[13px]"
-          >
-            {branchOpts.slice(1).map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label className="flex flex-col gap-1">
-          <span className="text-[11px] font-medium text-slate-500">Department *</span>
-          <select
-            value={form.department}
-            onChange={(e) => setForm({ ...form, department: e.target.value })}
-            className="h-9 px-3 bg-white border border-[#e2e8f0] rounded-xl text-[13px]"
-          >
-            {deptOpts.slice(1).map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label className="flex flex-col gap-1">
-          <span className="text-[11px] font-medium text-slate-500">Designation *</span>
-          <select
-            value={form.designation}
-            onChange={(e) => setForm({ ...form, designation: e.target.value })}
-            className="h-9 px-3 bg-white border border-[#e2e8f0] rounded-xl text-[13px]"
-          >
-            {desigOpts.slice(1).map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label className="flex flex-col gap-1">
-          <span className="flex items-center justify-between">
-            <span className="text-[11px] font-medium text-slate-500">Employee Assignment</span>
-            <MasterSourceLink source="employees" />
+        {/* Branch */}
+        <label className="flex flex-col gap-1.5">
+          <span className="text-[12px] font-semibold text-slate-700 flex items-center gap-0.5">
+            Branch <span className="text-red-500 font-bold">*</span>
           </span>
-          <select
-            value={form.assignedEmployee}
-            onChange={(e) => setForm({ ...form, assignedEmployee: e.target.value })}
-            className="h-9 px-3 bg-white border border-[#e2e8f0] rounded-xl text-[13px]"
-          >
-            <option value="All in Designation">All in Designation</option>
-            {employees.map((e) => (
-              <option key={e.id || e.name} value={e.name}>
-                {e.name}
-              </option>
-            ))}
-          </select>
+          <div className="relative">
+            <select
+              value={form.branch}
+              onChange={(e) => {
+                setForm({ ...form, branch: e.target.value });
+                if (errors.branch) setErrors((err) => ({ ...err, branch: "" }));
+              }}
+              className={`w-full h-10 pl-3.5 pr-10 bg-slate-50/70 border rounded-xl text-[13px] appearance-none cursor-pointer focus:outline-none focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition shadow-2xs ${
+                errors.branch ? "border-red-500" : "border-slate-200"
+              } ${!form.branch ? "text-slate-400" : "text-slate-800 font-medium"}`}
+            >
+              <option value="">Select branch</option>
+              {allBranches.map((b) => (
+                <option key={b} value={b} className="text-slate-800">
+                  {b}
+                </option>
+              ))}
+            </select>
+            <ChevronDown size={15} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+          </div>
+          {errors.branch && <span className="text-[11px] text-red-500 font-medium">{errors.branch}</span>}
         </label>
 
-        <label className="flex flex-col gap-1">
-          <span className="text-[11px] font-medium text-slate-500">Target Benchmark *</span>
+        {/* Department */}
+        <label className="flex flex-col gap-1.5">
+          <span className="text-[12px] font-semibold text-slate-700 flex items-center gap-0.5">
+            Department <span className="text-red-500 font-bold">*</span>
+          </span>
+          <div className="relative">
+            <select
+              value={form.department}
+              onChange={(e) => {
+                setForm({ ...form, department: e.target.value });
+                if (errors.department) setErrors((err) => ({ ...err, department: "" }));
+              }}
+              className={`w-full h-10 pl-3.5 pr-10 bg-slate-50/70 border rounded-xl text-[13px] appearance-none cursor-pointer focus:outline-none focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition shadow-2xs ${
+                errors.department ? "border-red-500" : "border-slate-200"
+              } ${!form.department ? "text-slate-400" : "text-slate-800 font-medium"}`}
+            >
+              <option value="">Select department</option>
+              {allDepartments.map((d) => (
+                <option key={d} value={d} className="text-slate-800">
+                  {d}
+                </option>
+              ))}
+            </select>
+            <ChevronDown size={15} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+          </div>
+          {errors.department && <span className="text-[11px] text-red-500 font-medium">{errors.department}</span>}
+        </label>
+
+        {/* Designation */}
+        <label className="flex flex-col gap-1.5">
+          <span className="text-[12px] font-semibold text-slate-700 flex items-center gap-0.5">
+            Designation <span className="text-red-500 font-bold">*</span>
+          </span>
+          <div className="relative">
+            <select
+              value={form.designation}
+              onChange={(e) => {
+                setForm({ ...form, designation: e.target.value });
+                if (errors.designation) setErrors((err) => ({ ...err, designation: "" }));
+              }}
+              className={`w-full h-10 pl-3.5 pr-10 bg-slate-50/70 border rounded-xl text-[13px] appearance-none cursor-pointer focus:outline-none focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition shadow-2xs ${
+                errors.designation ? "border-red-500" : "border-slate-200"
+              } ${!form.designation ? "text-slate-400" : "text-slate-800 font-medium"}`}
+            >
+              <option value="">Select designation</option>
+              {allDesignations.map((d) => (
+                <option key={d} value={d} className="text-slate-800">
+                  {d}
+                </option>
+              ))}
+            </select>
+            <ChevronDown size={15} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+          </div>
+          {errors.designation && <span className="text-[11px] text-red-500 font-medium">{errors.designation}</span>}
+        </label>
+
+        {/* Employee Assignment */}
+        <label className="flex flex-col gap-1.5">
+          <span className="text-[12px] font-semibold text-slate-700">Employee Assignment</span>
+          <div className="relative">
+            <select
+              value={form.assignedEmployee}
+              onChange={(e) => setForm({ ...form, assignedEmployee: e.target.value })}
+              className="w-full h-10 pl-3.5 pr-10 bg-slate-50/70 border border-slate-200 rounded-xl text-[13px] text-slate-800 font-medium appearance-none cursor-pointer focus:outline-none focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition shadow-2xs"
+            >
+              {assignedEmployeeOpts.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+            <ChevronDown size={15} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+          </div>
+        </label>
+
+        {/* Target Benchmark */}
+        <label className="flex flex-col gap-1.5">
+          <span className="text-[12px] font-semibold text-slate-700 flex items-center gap-0.5">
+            Target Benchmark <span className="text-red-500 font-bold">*</span>
+          </span>
           <input
             value={form.target}
-            onChange={(e) => setForm({ ...form, target: e.target.value })}
+            onChange={(e) => {
+              setForm({ ...form, target: e.target.value });
+              if (errors.target) setErrors((err) => ({ ...err, target: "" }));
+            }}
             placeholder="e.g. ≥ 95% on-time"
-            className={`h-9 px-3 bg-white border rounded-xl text-[13px] ${
-              errors.target ? "border-red-500" : "border-[#e2e8f0]"
+            className={`w-full h-10 px-3.5 bg-slate-50/70 border rounded-xl text-[13px] text-slate-800 placeholder:text-slate-400 focus:outline-none focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition shadow-2xs ${
+              errors.target ? "border-red-500" : "border-slate-200"
             }`}
           />
-          {errors.target && <span className="text-[11px] text-red-500">{errors.target}</span>}
+          {errors.target && <span className="text-[11px] text-red-500 font-medium">{errors.target}</span>}
         </label>
 
-        <label className="flex flex-col gap-1">
-          <span className="text-[11px] font-medium text-slate-500">Measurement Type</span>
-          <select
-            value={form.measurementType}
-            onChange={(e) => setForm({ ...form, measurementType: e.target.value })}
-            className="h-9 px-3 bg-white border border-[#e2e8f0] rounded-xl text-[13px]"
-          >
-            <option>Percentage</option>
-            <option>Rating Score</option>
-            <option>Numeric Score</option>
-            <option>Milestone / SLA</option>
-          </select>
+        {/* Measurement Type */}
+        <label className="flex flex-col gap-1.5">
+          <span className="text-[12px] font-semibold text-slate-700">Measurement Type</span>
+          <div className="relative">
+            <select
+              value={form.measurementType}
+              onChange={(e) => setForm({ ...form, measurementType: e.target.value })}
+              className="w-full h-10 pl-3.5 pr-10 bg-slate-50/70 border border-slate-200 rounded-xl text-[13px] text-slate-800 font-medium appearance-none cursor-pointer focus:outline-none focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition shadow-2xs"
+            >
+              <option>Percentage</option>
+              <option>Rating Score</option>
+              <option>Numeric Score</option>
+              <option>Milestone / SLA</option>
+            </select>
+            <ChevronDown size={15} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+          </div>
         </label>
 
-        <label className="flex flex-col gap-1">
-          <span className="text-[11px] font-medium text-slate-500">Weightage (%) *</span>
-          <input
-            type="number"
-            min={1}
-            max={100}
-            value={form.weight}
-            onChange={(e) => setForm({ ...form, weight: Number(e.target.value) })}
-            className={`h-9 px-3 bg-white border rounded-xl text-[13px] ${
-              errors.weight ? "border-red-500" : "border-[#e2e8f0]"
-            }`}
-          />
-          {errors.weight && <span className="text-[11px] text-red-500">{errors.weight}</span>}
+        {/* Weightage (%) */}
+        <label className="flex flex-col gap-1.5">
+          <span className="text-[12px] font-semibold text-slate-700 flex items-center gap-0.5">
+            Weightage (%) <span className="text-red-500 font-bold">*</span>
+          </span>
+          <div className="relative flex items-center">
+            <input
+              type="number"
+              min={1}
+              max={100}
+              value={form.weight}
+              onChange={(e) => {
+                setForm({ ...form, weight: Number(e.target.value) });
+                if (errors.weight) setErrors((err) => ({ ...err, weight: "" }));
+              }}
+              className={`w-full h-10 pl-3.5 pr-8 bg-slate-50/70 border rounded-xl text-[13px] text-slate-800 placeholder:text-slate-400 focus:outline-none focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition shadow-2xs ${
+                errors.weight ? "border-red-500" : "border-slate-200"
+              }`}
+            />
+            <span className="absolute right-3.5 text-xs font-semibold text-slate-400 pointer-events-none">%</span>
+          </div>
+          {errors.weight && <span className="text-[11px] text-red-500 font-medium">{errors.weight}</span>}
         </label>
 
-        <label className="flex flex-col gap-1">
-          <span className="text-[11px] font-medium text-slate-500">Status</span>
-          <select
-            value={form.status}
-            onChange={(e) => setForm({ ...form, status: e.target.value })}
-            className="h-9 px-3 bg-white border border-[#e2e8f0] rounded-xl text-[13px]"
-          >
-            <option>Active</option>
-            <option>Inactive</option>
-            <option>Draft</option>
-          </select>
+        {/* Status */}
+        <label className="flex flex-col gap-1.5">
+          <span className="text-[12px] font-semibold text-slate-700">Status</span>
+          <div className="relative">
+            <select
+              value={form.status}
+              onChange={(e) => setForm({ ...form, status: e.target.value })}
+              className="w-full h-10 pl-3.5 pr-10 bg-slate-50/70 border border-slate-200 rounded-xl text-[13px] text-slate-800 font-medium appearance-none cursor-pointer focus:outline-none focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition shadow-2xs"
+            >
+              <option>Active</option>
+              <option>Inactive</option>
+              <option>Draft</option>
+            </select>
+            <ChevronDown size={15} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+          </div>
         </label>
 
-        <label className="sm:col-span-2 flex flex-col gap-1">
-          <span className="text-[11px] font-medium text-slate-500">Evaluation Criteria & Guidance</span>
+        {/* Evaluation Criteria & Guidance */}
+        <label className="sm:col-span-2 flex flex-col gap-1.5">
+          <span className="text-[12px] font-semibold text-slate-700">Evaluation Criteria & Guidance</span>
           <textarea
             rows={3}
             value={form.description}
             onChange={(e) => setForm({ ...form, description: e.target.value })}
             placeholder="Specific expectations, behaviors, and rubric for measuring this indicator..."
-            className="p-3 bg-white border border-[#e2e8f0] rounded-xl text-[13px]"
+            className="w-full p-3.5 bg-slate-50/70 border border-slate-200 rounded-xl text-[13px] text-slate-800 placeholder:text-slate-400 focus:outline-none focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition shadow-2xs resize-y"
           />
         </label>
       </div>
@@ -431,18 +587,25 @@ export default function Indicators() {
   return (
     <div className="flex flex-col gap-5">
       {/* Header */}
-      <PageHeader
-        title="Performance Indicators"
-        subtitle="Technical and organizational indicators with benchmarks, measurement types, and weightages."
-        guide={hrmsGuides.indicators}
-        actions={<Button onClick={openAdd}>+ Add Indicator</Button>}
-      />
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <div className="flex items-center gap-2.5">
+            <h1 className="text-[22px] font-bold text-slate-800">Performance Indicators</h1>
+            <PageInfoButton guide={hrmsGuides.indicators} />
+          </div>
+          <p className="text-[13px] text-slate-500 mt-0.5">
+            Technical and organizational indicators with benchmarks, measurement types, and weightages.
+          </p>
+        </div>
+        <Button onClick={openAdd}>+ Add Indicator</Button>
+      </div>
 
       {/* Filter Bar */}
       <FilterBar
         search={search}
         onSearch={setSearch}
         selects={[
+          { label: "Employee", value: empFilter, onChange: setEmpFilter, options: empOpts },
           { label: "Branch", value: branch, onChange: setBranch, options: branchOpts },
           { label: "Department", value: dept, onChange: setDept, options: deptOpts },
           { label: "Designation", value: desig, onChange: setDesig, options: desigOpts },
@@ -451,6 +614,7 @@ export default function Indicators() {
         ]}
         onClear={() => {
           setSearch("");
+          setEmpFilter("All");
           setBranch("All");
           setDept("All");
           setDesig("All");
@@ -473,6 +637,7 @@ export default function Indicators() {
         isOpen={addOpen}
         onClose={() => setAddOpen(false)}
         title="Add Performance Indicator"
+        size="lg"
         footer={
           <>
             <Button variant="secondary" onClick={() => setAddOpen(false)}>
@@ -482,7 +647,7 @@ export default function Indicators() {
           </>
         }
       >
-        {renderFormFields()}
+        {FormFields()}
       </Modal>
 
       {/* Edit Modal */}
@@ -490,6 +655,7 @@ export default function Indicators() {
         isOpen={!!editRow}
         onClose={() => setEditRow(null)}
         title="Edit Performance Indicator"
+        size="lg"
         footer={
           <>
             <Button variant="secondary" onClick={() => setEditRow(null)}>
@@ -499,7 +665,7 @@ export default function Indicators() {
           </>
         }
       >
-        {renderFormFields()}
+        {FormFields()}
       </Modal>
 
       {/* View Drawer */}
@@ -534,7 +700,7 @@ export default function Indicators() {
                 <span className="text-slate-400 text-[11px] block">Current Rating</span>
                 <span className="font-bold text-slate-900 flex items-center gap-1">
                   <Star size={12} className="text-amber-500 fill-amber-400" />
-                  {(Number(viewRow.rating) || 4.0).toFixed(1)} / 5.0
+                  {viewRow.rating.toFixed(1)} / 5.0
                 </span>
               </div>
               <div>
@@ -557,7 +723,7 @@ export default function Indicators() {
             </div>
 
             <div className="text-[11px] text-slate-400 pt-2 border-t border-[#e2e8f0]">
-              <span>Added by: {viewRow.addedBy || "Ayesha Khan"} • Created: {viewRow.createdAt}</span>
+              <span>Added by: {viewRow.addedBy || "—"} • Created: {viewRow.createdAt}</span>
             </div>
           </div>
         )}
@@ -576,12 +742,9 @@ export default function Indicators() {
             <Button
               variant="danger"
               onClick={() => {
-                if (deleteRow) {
-                  deleteIndicator(deleteRow.id)
-                    .then(() => showToast("Indicator deleted successfully."))
-                    .catch((err) => showToast(err?.message || "Failed to delete indicator", "error"));
-                }
+                if (deleteRow) deleteIndicator(deleteRow.id);
                 setDeleteRow(null);
+                showToast("Indicator deleted successfully.");
               }}
             >
               Delete Indicator

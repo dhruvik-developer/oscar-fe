@@ -33,7 +33,7 @@ const usePolicyStoreBase = create((set, get) => ({
           .filter((p) => isServerId(p.id))
           .map((p) => fetchPolicyAcknowledgements(p.id).catch(() => []));
         const ackResults = await Promise.all(ackPromises);
-        acks = ackResults.flat().filter(Boolean);
+        acks = ackResults.flatMap((res) => (Array.isArray(res) ? res : res?.results || [])).filter(Boolean);
       } catch (err) {
         console.warn("[HRMS] Failed to hydrate policy acknowledgements:", err?.message || err);
       }

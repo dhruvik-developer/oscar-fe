@@ -131,6 +131,12 @@ export default function LoginPage() {
     setCurrentUser(user);
     setPermissions(permissions);
 
+    try {
+      Object.keys(sessionStorage).forEach((k) => {
+        if (k.startsWith('oscar_nav_open_')) sessionStorage.removeItem(k);
+      });
+    } catch {}
+
     showToast?.(`Signed in successfully as ${user?.name || email}`);
     const targetRoute = (returnTo && returnTo !== '/dashboard')
       ? returnTo

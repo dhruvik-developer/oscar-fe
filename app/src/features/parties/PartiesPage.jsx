@@ -542,12 +542,16 @@ export default function PartiesPage() {
         data={filteredParties}
         keyExtractor={(p) => p.id}
         searchPlaceholder="Filter by name, code, GSTIN, or phone..."
-        searchFilter={(p, term) =>
-          String(p.name ?? '').toLowerCase().includes(term) ||
-          String(p.code ?? '').toLowerCase().includes(term) ||
-          (p.gstin && String(p.gstin ?? '').toLowerCase().includes(term)) ||
-          (p.phone && p.phone.includes(term))
-        }
+        searchFilter={(p, rawTerm) => {
+          const term = String(rawTerm ?? '').trim().toLowerCase();
+          if (!term) return true;
+          return (
+            String(p.name ?? '').toLowerCase().includes(term) ||
+            String(p.code ?? '').toLowerCase().includes(term) ||
+            (p.gstin && String(p.gstin ?? '').toLowerCase().includes(term)) ||
+            (p.phone && p.phone.includes(term))
+          );
+        }}
       />
 
       {/* 6-Step Party Wizard Modal */}

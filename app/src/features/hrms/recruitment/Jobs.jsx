@@ -18,6 +18,7 @@ import {
   ArrowLeft,
   Plus,
   Briefcase,
+  FileText,
   X,
   ChevronDown,
   Building2,

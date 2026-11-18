@@ -667,6 +667,8 @@ const router = createBrowserRouter([
       { path: 'hrms/asset', element: <Page component={AssetsPage} /> },
       { path: 'hrms/asset-setup', element: <Page component={AssetsPage} /> },
       { path: 'hrms/asset-requests', element: <Page component={AssetsPage} /> },
+      { path: 'hrms/asset-categories', element: <Page component={AssetsPage} /> },
+      { path: 'hrms/assets/categories', element: <Page component={AssetsPage} /> },
       { path: 'hrms/documents', element: <Page component={DocumentsPage} /> },
       { path: 'hrms/company-policy', element: <Page component={CompanyPolicy} /> },
       { path: 'hrms/company-policy/policies', element: <Page component={() => <CompanyPolicy forcedSection="policies" />} /> },

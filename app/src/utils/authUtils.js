@@ -187,6 +187,11 @@ export function clearStoredAuth({ reason = null } = {}) {
       sessionStorage.removeItem(key);
     });
     localStorage.removeItem(SAVED_USER_KEY);
+    try {
+      Object.keys(sessionStorage).forEach((k) => {
+        if (k.startsWith('oscar_nav_open_')) sessionStorage.removeItem(k);
+      });
+    } catch {}
     if (reason) sessionStorage.setItem(AUTH_END_REASON_KEY, reason);
     else sessionStorage.removeItem(AUTH_END_REASON_KEY);
 

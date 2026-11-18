@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, useLocation } from "react-router-dom";
 import { useAppStore } from "../../../stores/appStore";
 import { useAssetStore } from "../../../stores/assetStore";
 import { describeError, isServerId } from "../../../services/hrmsSync";
@@ -272,8 +272,15 @@ export function AssetsPage() {
   } = useAssetStore();
 
   // Tab State: 'inventory' | 'requests' | 'categories' (driven directly by URL search params)
+  const location = useLocation();
   const tabFromUrl = searchParams.get("tab");
-  const activeTab = tabFromUrl === "requests" ? "requests" : tabFromUrl === "categories" ? "categories" : "inventory";
+  const isCategoriesPath = location.pathname.includes("categories") || location.pathname.includes("category");
+  const isRequestsPath = location.pathname.includes("requests") || location.pathname.includes("request");
+  const activeTab = (tabFromUrl === "requests" || isRequestsPath)
+    ? "requests"
+    : (tabFromUrl === "categories" || isCategoriesPath)
+    ? "categories"
+    : "inventory";
 
   const handleTabChange = (newTab) => {
     setSearchParams(

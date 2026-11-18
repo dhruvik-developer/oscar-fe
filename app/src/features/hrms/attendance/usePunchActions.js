@@ -13,13 +13,29 @@ import { useCallback, useState } from 'react';
 import { useAttendanceStore } from '../../../stores/attendanceStore';
 import { useAppStore } from '../../../stores/appStore';
 
-/** Leaving before the shift ends, or with under 8h worked, asks for a reason. */
+/** Leaving before completing required working hours (e.g. 8h) asks for a reason. */
 export function isEarlyDeparture(todayPunch, now = new Date()) {
-  const [endH, endM] = String(todayPunch?.shiftEnd || '18:30').split(':').map((v) => parseInt(v, 10) || 0);
-  const shiftEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), endH, endM, 0);
-  const earlyMins = Math.floor((shiftEnd.getTime() - now.getTime()) / 60000);
+  const fullDayHours = Number(todayPunch?.fullDayHours || 8);
   const workingHours = Number(todayPunch?.workingHours || 0);
-  return earlyMins > 0 || (workingHours > 0 && workingHours < 8);
+
+  // If employee completed the required full day hours (e.g. 8 hours), not an early exit
+  if (workingHours >= fullDayHours) {
+    return false;
+  }
+
+  // Dynamic flexible exit based on punch-in time + working hours requirement + breaks
+  if (todayPunch?.firstPunchIso || todayPunch?.firstIn) {
+    const punchInDate = new Date(todayPunch.firstPunchIso || todayPunch.firstIn);
+    if (!Number.isNaN(punchInDate.getTime())) {
+      const breakMins = Number(todayPunch?.totalBreakMinutes || 0);
+      const expectedExitMs = punchInDate.getTime() + (fullDayHours * 60 + breakMins) * 60000;
+      return now.getTime() < expectedExitMs;
+    }
+  }
+
+  const [endH, endM] = String(todayPunch?.shiftEnd || '18:00').split(':').map((v) => parseInt(v, 10) || 0);
+  const shiftEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), endH, endM, 0);
+  return now.getTime() < shiftEnd.getTime();
 }
 
 export function usePunchActions() {

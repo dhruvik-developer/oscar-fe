@@ -1,11 +1,20 @@
-function addMinutesToClock(baseTime = "09:30", minutes = 10) {
+function addMinutesToClock(baseTime = "09:00", minutes = 30) {
   const match = String(baseTime).match(/(\d{1,2}):(\d{2})/);
   const h = match ? parseInt(match[1], 10) : 9;
-  const m = match ? parseInt(match[2], 10) : 30;
+  const m = match ? parseInt(match[2], 10) : 0;
   const total = (h * 60 + m + Number(minutes)) % 1440;
   const newH = String(Math.floor(total / 60)).padStart(2, "0");
   const newM = String(total % 60).padStart(2, "0");
   return `${newH}:${newM}`;
+}
+
+function getMinutesDiff(startClock = "09:00", endClock = "09:30") {
+  const m1 = String(startClock).match(/(\d{1,2}):(\d{2})/);
+  const m2 = String(endClock).match(/(\d{1,2}):(\d{2})/);
+  if (!m1 || !m2) return 0;
+  const t1 = parseInt(m1[1], 10) * 60 + parseInt(m1[2], 10);
+  const t2 = parseInt(m2[1], 10) * 60 + parseInt(m2[2], 10);
+  return Math.max(0, t2 - t1);
 }
 
 import { useState, useEffect } from "react";
@@ -96,11 +105,13 @@ export default function Flexibility() {
     if (preset === "Strict (9-5 Corporate)") {
       setForm({
         ...form,
+        shiftStart: "09:00",
+        shiftEnd: "17:05",
         gracePeriod: "5 minutes",
-        lateAfter: addMinutesToClock("09:00", 5),
+        lateAfter: "09:05",
         halfDayThreshold: "4 hours",
         minimumWorkingHours: "8 hours",
-        flexibleWorkingHours: "09:00 - 18:00 (Fixed)",
+        flexibleWorkingHours: "09:00 - 17:05 (Fixed)",
         earlyClockOutRequiresApproval: true,
         overtimeStartsAfter: "8 hours",
         overtimeRequiresApproval: true,
@@ -109,22 +120,26 @@ export default function Flexibility() {
     } else if (preset === "Flexible Hybrid") {
       setForm({
         ...form,
-        gracePeriod: "30 minutes",
-        lateAfter: addMinutesToClock(start, 30),
+        shiftStart: "08:30",
+        shiftEnd: "19:00",
+        gracePeriod: "60 minutes",
+        lateAfter: "09:30",
         halfDayThreshold: "4 hours",
         minimumWorkingHours: "8 hours",
-        flexibleWorkingHours: "08:00 - 20:00 (Core 10-4)",
+        flexibleWorkingHours: "08:30 - 19:00 (Core 10-4)",
         earlyClockOutRequiresApproval: false,
         overtimeStartsAfter: "9 hours",
         overtimeRequiresApproval: true,
       });
       showToast("Applied Flexible Hybrid preset");
     } else {
-      // Standard
+      // Standard: 9:00 - 9:30 flexible punch in, 8 hours working
       setForm({
         ...form,
-        gracePeriod: "10 minutes",
-        lateAfter: addMinutesToClock(start, 10),
+        shiftStart: "09:00",
+        shiftEnd: "18:00",
+        gracePeriod: "30 minutes",
+        lateAfter: "09:30",
         halfDayThreshold: "4 hours",
         minimumWorkingHours: "8 hours",
         flexibleWorkingHours: "09:00 - 18:00 (Flexible)",
@@ -132,7 +147,7 @@ export default function Flexibility() {
         overtimeStartsAfter: "8 hours",
         overtimeRequiresApproval: true,
       });
-      showToast("Applied Standard preset");
+      showToast("Applied Standard preset (9:00–9:30 flexible punch-in)");
     }
   }
 
@@ -180,30 +195,25 @@ export default function Flexibility() {
       )}
 
       {loaded && (
-        <div className="bg-white border border-[#e2e8f0] rounded-xl px-4 py-3 text-[12.5px] text-slate-600 flex flex-wrap items-center gap-x-4 gap-y-1">
+        <div className="bg-white border border-[#e2e8f0] rounded-xl px-4 py-3 text-[12.5px] text-slate-600 flex flex-wrap items-center gap-x-4 gap-y-1.5">
           <span className="font-semibold text-slate-800 flex items-center gap-1.5">
             <Calendar size={14} className="text-[#1e3a8a]" /> Effective rules:
           </span>
           <span>
-            Shift <b>{flexibility.shiftStart || "—"}–{flexibility.shiftEnd || "—"}</b>
+            Shift <b>{flexibility.shiftStart || "09:00"}–{flexibility.shiftEnd || "18:00"}</b>
+          </span>
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-800 font-medium border border-emerald-100">
+            Flexible In: <b>{flexibility.shiftStart || "09:00"}–{flexibility.lateAfter || "09:30"}</b> (Not late)
+          </span>
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-blue-50 text-blue-800 font-medium border border-blue-100">
+            Flexible Exit: <b>{flexibility.flexiblePunchOutStart || "17:00"}–{flexibility.flexiblePunchOutEnd || "17:30"}</b> (8h completed)
           </span>
           <span>
-            Late after <b>{flexibility.lateAfter || "—"}</b>
-            {flexibility.graceMinutes != null ? ` (${flexibility.graceMinutes} min grace)` : ""}
+            Half day below <b>{flexibility.halfDayThresholdHours ?? "4"}h</b>
           </span>
           <span>
-            Half day below <b>{flexibility.halfDayThresholdHours ?? "—"}h</b>
+            Full day <b>{flexibility.fullDayHours ?? 8}h</b>
           </span>
-          {flexibility.fullDayHours != null && (
-            <span>
-              Full day <b>{flexibility.fullDayHours}h</b>
-            </span>
-          )}
-          {flexibility.overtimeAfterHours != null && (
-            <span>
-              Overtime after <b>{flexibility.overtimeAfterHours}h</b>
-            </span>
-          )}
         </div>
       )}
 
@@ -244,7 +254,7 @@ export default function Flexibility() {
 
       {/* ── 2-Column Responsive Form Layout ── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        {/* ── Card 1: Late Arrival & Grace Period ── */}
+        {/* ── Card 1: Late Arrival & Flexible Punch-In Rules ── */}
         <div className="bg-white border border-[#e2e8f0] rounded-2xl p-4 sm:p-6 shadow-xs flex flex-col justify-between hover:border-slate-300 transition">
           <div>
             <div className="flex items-center gap-3 pb-4 mb-5 border-b border-[#f1f5f9]">
@@ -252,25 +262,68 @@ export default function Flexibility() {
                 <Clock size={20} />
               </div>
               <div>
-                <h3 className="font-bold text-[15.5px] text-slate-900">Late Arrival Rules</h3>
-                <p className="text-[12px] text-slate-500">Tolerances for morning clock-in before marking late</p>
+                <h3 className="font-bold text-[15.5px] text-slate-900">Late Arrival &amp; Flexible Punch-In</h3>
+                <p className="text-[12px] text-slate-500">Tolerances and flexible time window for morning clock-in</p>
               </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {/* Grace Period */}
+              {/* Shift Start Time */}
               <div>
+                <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+                  Shift Start Time
+                </label>
+                <input
+                  type="time"
+                  disabled={!canEdit}
+                  value={form.shiftStart || "09:00"}
+                  onChange={(e) => {
+                    const startVal = e.target.value;
+                    const mins = parseInt(form.gracePeriod, 10) || 30;
+                    setForm({ ...form, shiftStart: startVal, lateAfter: addMinutesToClock(startVal, mins) });
+                  }}
+                  className="w-full h-10 px-3.5 bg-white border border-[#cbd5e1] rounded-xl text-[13px] text-slate-800 disabled:bg-[#f8fafc] focus:outline-none focus:border-[#1e3a8a]"
+                />
+                <span className="block text-[11px] text-slate-400 mt-1">
+                  Base start time for daily schedule.
+                </span>
+              </div>
+
+              {/* Late After / Flexible In Cutoff */}
+              <div>
+                <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+                  Flexible Punch-In Cutoff (Mark Late After)
+                </label>
+                <input
+                  type="time"
+                  disabled={!canEdit}
+                  value={form.lateAfter || "09:30"}
+                  onChange={(e) => {
+                    const lateVal = e.target.value;
+                    const startVal = form.shiftStart || "09:00";
+                    const diff = getMinutesDiff(startVal, lateVal);
+                    setForm({ ...form, lateAfter: lateVal, gracePeriod: `${diff} minutes` });
+                  }}
+                  className="w-full h-10 px-3.5 bg-white border border-[#cbd5e1] rounded-xl text-[13px] text-slate-800 disabled:bg-[#f8fafc] focus:outline-none focus:border-[#1e3a8a]"
+                />
+                <span className="block text-[11px] text-slate-400 mt-1">
+                  Punches after this trigger &apos;Late&apos; flag.
+                </span>
+              </div>
+
+              {/* Grace Period Window */}
+              <div className="sm:col-span-2">
                 <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
                   Grace Period Window
                 </label>
                 <div className="relative">
                   <select
                     disabled={!canEdit}
-                    value={form.gracePeriod || "10 minutes"}
+                    value={form.gracePeriod || "30 minutes"}
                     onChange={(e) => {
                       const graceVal = e.target.value;
                       const mins = parseInt(graceVal, 10) || 0;
-                      const start = flexibility?.shiftStart || "09:30";
+                      const start = form.shiftStart || "09:00";
                       const newLate = addMinutesToClock(start, mins);
                       setForm({ ...form, gracePeriod: graceVal, lateAfter: newLate });
                     }}
@@ -278,31 +331,20 @@ export default function Flexibility() {
                   >
                     <option value="0 minutes">None (0 min strict)</option>
                     <option value="5 minutes">5 minutes</option>
-                    <option value="10 minutes">10 minutes (Recommended)</option>
+                    <option value="10 minutes">10 minutes</option>
                     <option value="15 minutes">15 minutes</option>
-                    <option value="30 minutes">30 minutes</option>
+                    <option value="20 minutes">20 minutes</option>
+                    <option value="30 minutes">30 minutes (Standard 9:00–9:30)</option>
+                    <option value="45 minutes">45 minutes</option>
+                    <option value="60 minutes">60 minutes (1 hour flexible)</option>
                   </select>
                 </div>
-                <span className="block text-[11px] text-slate-400 mt-1">
-                  Buffer time after official shift start.
-                </span>
-              </div>
-
-              {/* Late After */}
-              <div>
-                <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
-                  Mark Late After
-                </label>
-                <input
-                  type="time"
-                  disabled={!canEdit}
-                  value={form.lateAfter || "09:10"}
-                  onChange={(e) => setForm({ ...form, lateAfter: e.target.value })}
-                  className="w-full h-10 px-3.5 bg-white border border-[#cbd5e1] rounded-xl text-[13px] text-slate-800 disabled:bg-[#f8fafc] focus:outline-none focus:border-[#1e3a8a]"
-                />
-                <span className="block text-[11px] text-slate-400 mt-1">
-                  Punches after this trigger &apos;Late&apos; flag.
-                </span>
+                <div className="mt-2.5 p-2.5 bg-emerald-50/70 border border-emerald-200 rounded-xl text-[12px] text-emerald-800 flex items-start gap-2">
+                  <Check size={15} className="text-emerald-600 shrink-0 mt-0.5" />
+                  <span>
+                    Employees punching in between <b>{form.shiftStart || "09:00"}</b> and <b>{form.lateAfter || "09:30"}</b> are within the flexible time window and considered <b>Present</b> (not marked Late).
+                  </span>
+                </div>
               </div>
 
               {/* Half-Day Threshold */}
@@ -338,8 +380,8 @@ export default function Flexibility() {
                 <LogOut size={20} />
               </div>
               <div>
-                <h3 className="font-bold text-[15.5px] text-slate-900">Early Departure Gate</h3>
-                <p className="text-[12px] text-slate-500">Approvals and penalties when clocking out ahead of schedule</p>
+                <h3 className="font-bold text-[15.5px] text-slate-900">Early Departure &amp; Exit Rules</h3>
+                <p className="text-[12px] text-slate-500">Punch-out validation and flexible departure gates</p>
               </div>
             </div>
 
@@ -350,7 +392,7 @@ export default function Flexibility() {
                     Require Manager Approval for Early Clock-Out
                   </div>
                   <div className="text-[12px] text-slate-500 mt-0.5">
-                    Creates an automated pending item in <b>Attendance &gt; Requests</b> for manager sign-off.
+                    Triggered only when leaving before completing required working hours ({form.minimumWorkingHours || "8 hours"}).
                   </div>
                 </div>
                 <label className="relative inline-flex items-center cursor-pointer shrink-0 mt-0.5">
@@ -367,10 +409,10 @@ export default function Flexibility() {
                 </label>
               </div>
 
-              <div className="p-3.5 bg-blue-50/60 border border-blue-100 rounded-xl text-[12px] text-blue-900 flex items-start gap-2.5">
+              <div className="p-3.5 bg-blue-50/70 border border-blue-100 rounded-xl text-[12px] text-blue-900 flex items-start gap-2.5">
                 <Info size={16} className="text-blue-600 shrink-0 mt-0.5" />
                 <span>
-                  Employees who depart before the shift end time ({flexibility?.shiftEnd || "18:30"}) will be prompted to supply a reason and request manager clearance.
+                  <b>Exit Punch-Out Flexibility:</b> When an employee completes their <b>{form.minimumWorkingHours || "8 hours"}</b> (e.g. punch in at <b>09:30 AM</b> and punch out at <b>05:30 PM</b> with no breaks), the working hours are considered a full 8 hours and <b>not penalized</b> as early clock-out.
                 </span>
               </div>
             </div>
@@ -426,6 +468,11 @@ export default function Flexibility() {
                 <span className="block text-[11px] text-slate-400 mt-1">
                   Permitted punch window for employees.
                 </span>
+              </div>
+
+              <div className="sm:col-span-2 p-3 bg-slate-50 border border-[#e2e8f0] rounded-xl text-[12px] text-slate-600">
+                <span className="font-semibold text-slate-700">Dynamic Exit Window: </span>
+                {addMinutesToClock(form.shiftStart || "09:00", (parseFloat(form.minimumWorkingHours) || 8) * 60)} – {addMinutesToClock(form.lateAfter || "09:30", (parseFloat(form.minimumWorkingHours) || 8) * 60)} (e.g. punch in at 09:30 completes 8h at 17:30)
               </div>
             </div>
           </div>
@@ -500,7 +547,7 @@ export default function Flexibility() {
               Active Policy Status: Enforced across all departments
             </div>
             <div className="text-[12px] text-slate-500">
-              Grace window: <b>{form.gracePeriod || "10 min"}</b> • Late threshold: <b>{form.lateAfter || "09:10"}</b> • Min hours: <b>{form.minimumWorkingHours || "8 hrs"}</b>
+              Flexible In: <b>{form.shiftStart || "09:00"}–{form.lateAfter || "09:30"}</b> (Not late) • Min hours: <b>{form.minimumWorkingHours || "8 hrs"}</b> • Flexible Exit: <b>{addMinutesToClock(form.shiftStart || "09:00", (parseFloat(form.minimumWorkingHours) || 8) * 60)}–{addMinutesToClock(form.lateAfter || "09:30", (parseFloat(form.minimumWorkingHours) || 8) * 60)}</b>
             </div>
           </div>
         </div>

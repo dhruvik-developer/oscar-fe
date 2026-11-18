@@ -303,25 +303,59 @@ export default function LoomMastersPage() {
     try {
       await loomService.deleteMachine(id);
       showToast('Machine deleted', 'success');
+      setFactories((prev) =>
+        prev.map((f) =>
+          f.id === selectedFactoryId
+            ? {
+                ...f,
+                machines: (f.machines || []).filter((m) => m.id !== id),
+                machines_count: Math.max(0, (f.machines_count || 1) - 1),
+              }
+            : f
+        )
+      );
       loadData();
     } catch (err) {
-      showToast('Failed to delete machine', 'error');
+      if (err?.status === 404 || err?.response?.status === 404) {
+        showToast('Machine already removed', 'info');
+        setFactories((prev) =>
+          prev.map((f) =>
+            f.id === selectedFactoryId
+              ? {
+                  ...f,
+                  machines: (f.machines || []).filter((m) => m.id !== id),
+                  machines_count: Math.max(0, (f.machines_count || 1) - 1),
+                }
+              : f
+          )
+        );
+        loadData();
+        return;
+      }
+      showToast(err?.payload?.detail || err?.message || 'Failed to delete machine', 'error');
     }
   };
 
   // Coordinator actions
   const handleAddCoord = async (e) => {
     e.preventDefault();
-    if (!cForm.name) {
-      showToast('Coordinator name is required', 'warning');
+    if (!cForm.employee) {
+      showToast('Please select an employee/user from the list', 'warning');
+      return;
+    }
+    const emp = masterEmployees.find((m) => String(m.id) === String(cForm.employee));
+    const empName = emp ? (emp.full_name || `${emp.first_name || ''} ${emp.last_name || ''}`.trim() || emp.name) : cForm.name;
+    if (!empName) {
+      showToast('Selected employee has no name', 'warning');
       return;
     }
     try {
       await loomService.createCoordinator({
-        ...cForm,
-        employee: cForm.employee || null,
+        name: empName,
+        phone: emp?.phone || emp?.mobile || cForm.phone || null,
+        employee: cForm.employee,
       });
-      showToast('Loom coordinator added', 'success');
+      showToast('Loom coordinator added from employee roster', 'success');
       setCForm({ name: '', phone: '', employee: '' });
       loadData();
     } catch (err) {
@@ -802,7 +836,10 @@ export default function LoomMastersPage() {
               </h3>
               <form onSubmit={handleAddFactory} className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-end">
                 <div>
-                  <label className="pms-label">Factory Name</label>
+                  <label className="pms-label flex items-center justify-between">
+                    <span>Factory Name</span>
+                    <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">Auto-syncs to Parties (Vendors)</span>
+                  </label>
                   <input
                     type="text"
                     placeholder="e.g. Royal King Texo"
@@ -820,7 +857,7 @@ export default function LoomMastersPage() {
                     className="pms-select w-full cursor-pointer"
                   >
                     <option value="in_house">In-House Shed (Self-Owned)</option>
-                    <option value="job_work">Contract Job-Worker (Outside Shed)</option>
+                    <option value="job_work">Contract Job-Worker (Outside Shed / Vendor)</option>
                   </select>
                 </div>
                 {fForm.factory_type === 'in_house' ? (
@@ -843,15 +880,23 @@ export default function LoomMastersPage() {
                 ) : (
                   <div>
                     <label className="pms-label flex items-center justify-between">
-                      <span>Job-Worker Party</span>
+                      <span>Job-Worker / Vendor Party</span>
                       <span className="text-[10px] text-blue-600 dark:text-blue-400 font-normal">Parties Master</span>
                     </label>
                     <select
                       value={fForm.job_worker_party}
-                      onChange={(e) => setFForm({ ...fForm, job_worker_party: e.target.value })}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        const p = masterJobWorkers.find((x) => String(x.id) === String(val));
+                        setFForm((prev) => ({
+                          ...prev,
+                          job_worker_party: val,
+                          name: p ? p.name : prev.name,
+                        }));
+                      }}
                       className="pms-select w-full cursor-pointer"
                     >
-                      <option value="">-- Select Vendor / Job-Worker --</option>
+                      <option value="">-- Select Vendor / Job-Worker from Parties --</option>
                       {masterJobWorkers.map((p) => (
                         <option key={p.id} value={p.id}>{p.name} {p.gstin ? `(${p.gstin})` : ''}</option>
                       ))}
@@ -1016,10 +1061,13 @@ export default function LoomMastersPage() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5 sm:gap-4">
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 sm:p-5 shadow-2xs">
             <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 tracking-tight mb-3">Add Factory Coordinator</h3>
-            <form onSubmit={handleAddCoord} className="space-y-3">
+            <p className="text-xs text-slate-500 mb-3.5">
+              Coordinators must be selected from the company employee & staff roster.
+            </p>
+            <form onSubmit={handleAddCoord} className="space-y-3.5">
               <div>
                 <label className="pms-label flex items-center justify-between">
-                  <span>Link HRMS Employee (Optional)</span>
+                  <span>Select Employee / User</span>
                   <span className="text-[10px] text-blue-600 dark:text-blue-400 font-normal">HRMS Roster</span>
                 </label>
                 <select
@@ -1027,16 +1075,16 @@ export default function LoomMastersPage() {
                   onChange={(e) => {
                     const empId = e.target.value;
                     const emp = masterEmployees.find((m) => String(m.id) === String(empId));
-                    setCForm((prev) => ({
-                      ...prev,
+                    setCForm({
                       employee: empId,
-                      name: emp ? (emp.full_name || `${emp.first_name || ''} ${emp.last_name || ''}`.trim() || emp.name) : prev.name,
-                      phone: emp?.phone || emp?.mobile || prev.phone,
-                    }));
+                      name: emp ? (emp.full_name || `${emp.first_name || ''} ${emp.last_name || ''}`.trim() || emp.name) : '',
+                      phone: emp?.phone || emp?.mobile || '',
+                    });
                   }}
                   className="pms-select w-full cursor-pointer"
+                  required
                 >
-                  <option value="">-- Manual / External Coordinator --</option>
+                  <option value="">-- Choose from User / Employee List --</option>
                   {masterEmployees.map((emp) => (
                     <option key={emp.id} value={emp.id}>
                       {emp.employee_code || emp.code ? `[${emp.employee_code || emp.code}] ` : ''}
@@ -1046,29 +1094,28 @@ export default function LoomMastersPage() {
                   ))}
                 </select>
               </div>
-              <div>
-                <label className="pms-label">Coordinator Name</label>
-                <input
-                  type="text"
-                  placeholder="e.g. Mayur"
-                  value={cForm.name}
-                  onChange={(e) => setCForm({ ...cForm, name: e.target.value })}
-                  className="pms-input w-full"
-                  required
-                />
-              </div>
-              <div>
-                <label className="pms-label">Phone Number</label>
-                <input
-                  type="text"
-                  placeholder="Optional phone"
-                  value={cForm.phone}
-                  onChange={(e) => setCForm({ ...cForm, phone: e.target.value })}
-                  className="pms-input w-full"
-                />
-              </div>
-              <button type="submit" className="pms-btn-emerald w-full">
-                <Plus size={16} /> Add Coordinator
+
+              {cForm.employee && (
+                <div className="p-3 rounded-lg border border-emerald-200 dark:border-emerald-800/60 bg-emerald-50/60 dark:bg-emerald-950/30 text-xs space-y-1.5 animate-fadeIn">
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-500 text-[11px]">Selected Staff:</span>
+                    <span className="font-bold text-emerald-800 dark:text-emerald-200">{cForm.name}</span>
+                  </div>
+                  {cForm.phone && (
+                    <div className="flex items-center justify-between text-[11px] text-slate-600 dark:text-slate-400">
+                      <span>Contact:</span>
+                      <span className="font-mono">{cForm.phone}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={!cForm.employee}
+                className="pms-btn-emerald w-full disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Plus size={16} /> Add as Coordinator
               </button>
             </form>
           </div>

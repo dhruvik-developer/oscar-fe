@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import {
   FileText, Plus, Search, Filter, Printer, CheckCircle2,
-  Clock, DollarSign, Package, AlertTriangle, Eye, RefreshCw, ShoppingCart,
+  Clock, DollarSign, Package, AlertTriangle, Eye, RefreshCw, ShoppingCart, Pencil,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import PageHeader from '../../components/ui/PageHeader';
@@ -40,6 +40,7 @@ export default function FinalJobWorkPOsPage() {
   const [loading, setLoading] = useState(true);
   const [orders, setOrders] = useState([]);
   const [showGenerateModal, setShowGenerateModal] = useState(false);
+  const [selectedEditPo, setSelectedEditPo] = useState(null);
   const [printPoTarget, setPrintPoTarget] = useState(null);
 
   const [search, setSearch] = useState('');
@@ -294,6 +295,18 @@ export default function FinalJobWorkPOsPage() {
                       >
                         <Printer size={12} /> Print
                       </button>
+                      {po.status !== 'Approved' && (
+                        <button
+                          onClick={() => {
+                            setSelectedEditPo(po);
+                            setShowGenerateModal(true);
+                          }}
+                          className="inline-flex items-center gap-1 rounded border border-amber-200 bg-amber-50 px-2 py-1 text-[11px] font-bold text-amber-700 hover:bg-amber-100"
+                          title="Edit Final Job Work PO"
+                        >
+                          <Pencil size={12} /> Edit
+                        </button>
+                      )}
                       <button
                         onClick={() => navigate('/purchase/orders')}
                         className="inline-flex items-center gap-1 rounded border border-blue-200 bg-blue-50 px-2 py-1 text-[11px] font-bold text-blue-600 hover:bg-blue-100"
@@ -331,13 +344,22 @@ export default function FinalJobWorkPOsPage() {
         </div>
       </div>
 
-      {/* Generate Final Job Work PO Slide / Modal */}
+      {/* Generate / Edit Final Job Work PO Slide / Modal */}
       <GenerateFinalJobWorkPOModal
         isOpen={showGenerateModal}
-        onClose={() => setShowGenerateModal(false)}
+        onClose={() => {
+          setShowGenerateModal(false);
+          setSelectedEditPo(null);
+        }}
+        initialPoId={selectedEditPo?.id || null}
+        isEditMode={Boolean(selectedEditPo)}
+        isApproved={selectedEditPo?.status === 'Approved'}
         onSuccess={() => {
           loadJobWorkOrders();
-          if (showToast) showToast('Job Work PO generated and added to list!', 'success');
+          if (showToast) {
+            showToast(selectedEditPo ? 'Job Work PO updated successfully!' : 'Job Work PO generated and added to list!', 'success');
+          }
+          setSelectedEditPo(null);
         }}
       />
 

@@ -384,12 +384,17 @@ export default function HRAdminPage({ defaultTab }) {
 
   const [isHolidayModalOpen, setIsHolidayModalOpen] = useState(false);
   const [editingHoliday, setEditingHoliday] = useState(null);
-  const [newHoliday, setNewHoliday] = useState({
-    name: "",
-    date: "2024-11-01",
-    day: "Friday",
-    type: "National Gazetted",
-    appliesTo: "All Locations",
+  const [newHoliday, setNewHoliday] = useState(() => {
+    const today = new Date();
+    const dateStr = today.toISOString().slice(0, 10);
+    const dayName = today.toLocaleDateString("en-US", { weekday: "long" });
+    return {
+      name: "",
+      date: dateStr,
+      day: dayName,
+      type: "National Gazetted",
+      appliesTo: "All Locations",
+    };
   });
 
   // Org Settings State
@@ -804,7 +809,16 @@ export default function HRAdminPage({ defaultTab }) {
   // ── Holiday Handlers ───────────────────────────────────────
   const handleOpenAddHoliday = () => {
     setEditingHoliday(null);
-    setNewHoliday({ name: "", date: "2024-11-01", day: "Friday", type: "National Gazetted", appliesTo: "All Locations" });
+    const today = new Date();
+    const dateStr = today.toISOString().slice(0, 10);
+    const dayName = today.toLocaleDateString("en-US", { weekday: "long" });
+    setNewHoliday({
+      name: "",
+      date: dateStr,
+      day: dayName,
+      type: "National Gazetted",
+      appliesTo: "All Locations",
+    });
     setIsHolidayModalOpen(true);
   };
 
@@ -992,7 +1006,7 @@ export default function HRAdminPage({ defaultTab }) {
     },
     {
       id: "holidays",
-      label: "Holidays (2024)",
+      label: `Holidays (${new Date().getFullYear()})`,
       count: holidays.length,
       subtext: "Gazetted & opt",
       icon: Calendar,
@@ -2086,7 +2100,7 @@ export default function HRAdminPage({ defaultTab }) {
           <div className="p-4 border-b border-bdr flex flex-wrap items-center justify-between gap-3 bg-off/50">
             <div>
               <span className="text-[13px] font-semibold text-slate-800">
-                Annual Enterprise Holiday Schedule (2024–2025)
+                Annual Enterprise Holiday Schedule ({new Date().getFullYear()})
               </span>
               <p className="text-[11.5px] text-muted">Synchronized across Personal Calendar &amp; Attendance modules</p>
             </div>
@@ -2126,15 +2140,26 @@ export default function HRAdminPage({ defaultTab }) {
                     </td>
                     <td className="py-4 px-5 text-slate-800">{h.appliesTo}</td>
                     <td className="py-4 px-5">
-                      <span
-                        className={`px-2.5 py-0.5 rounded-full text-[11px] font-medium border ${
-                          h.status === "Upcoming"
-                            ? "bg-purple-50 text-purple-700 border-purple-200"
-                            : "bg-slate-100 text-slate-600 border-slate-200"
-                        }`}
-                      >
-                        {h.status}
-                      </span>
+                      {(() => {
+                        const todayStr = new Date().toISOString().slice(0, 10);
+                        let holDate = h.date;
+                        if (holDate && /^\d{2}-\d{2}-\d{4}$/.test(holDate)) {
+                          holDate = holDate.split("-").reverse().join("-");
+                        }
+                        const isUpcoming = holDate ? holDate >= todayStr : h.status === "Upcoming";
+                        const displayStatus = isUpcoming ? "Upcoming" : "Past";
+                        return (
+                          <span
+                            className={`px-2.5 py-0.5 rounded-full text-[11px] font-medium border ${
+                              isUpcoming
+                                ? "bg-purple-50 text-purple-700 border-purple-200"
+                                : "bg-slate-100 text-slate-600 border-slate-200"
+                            }`}
+                          >
+                            {displayStatus}
+                          </span>
+                        );
+                      })()}
                     </td>
                     <td className="py-4 px-5 text-right">
                       <div className="flex items-center justify-end gap-1.5">
@@ -3325,7 +3350,17 @@ export default function HRAdminPage({ defaultTab }) {
                   <input
                     type="date"
                     value={newHoliday.date}
-                    onChange={(e) => setNewHoliday({ ...newHoliday, date: e.target.value })}
+                    onChange={(e) => {
+                      const dateVal = e.target.value;
+                      let dayName = newHoliday.day;
+                      if (dateVal) {
+                        const parsed = new Date(dateVal + "T00:00:00");
+                        if (!isNaN(parsed.getTime())) {
+                          dayName = parsed.toLocaleDateString("en-US", { weekday: "long" });
+                        }
+                      }
+                      setNewHoliday({ ...newHoliday, date: dateVal, day: dayName });
+                    }}
                     className="w-full px-3.5 py-2 rounded-xl border border-bdr text-[13px] bg-off focus:bg-white focus:outline-none focus:border-navy"
                   />
                 </div>

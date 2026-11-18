@@ -23,6 +23,9 @@ export default function GenerateFinalJobWorkPOModal({
   isOpen,
   onClose,
   initialInstructionId = null,
+  initialPoId = null,
+  isEditMode = false,
+  isApproved = false,
   onSuccess,
 }) {
   const { vendors = [], showToast } = useERP();
@@ -31,6 +34,8 @@ export default function GenerateFinalJobWorkPOModal({
   const [submitting, setSubmitting] = useState(false);
   const [instructions, setInstructions] = useState([]);
   const [selectedPiId, setSelectedPiId] = useState(initialInstructionId || '');
+  const [existingPoId, setExistingPoId] = useState(initialPoId || null);
+  const [isPoApprovedState, setIsPoApprovedState] = useState(isApproved || false);
   const [employees, setEmployees] = useState([]);
 
   // Resizable & Fullscreen state
@@ -104,15 +109,21 @@ export default function GenerateFinalJobWorkPOModal({
   useEffect(() => {
     if (!isOpen) return;
 
-    // Load next PO number
-    api.get('/purchase/orders/next-jwpo-number/')
-      .then((res) => {
-        if (res?.nextPoNumber) setFinalPoNo(res.nextPoNumber);
-      })
-      .catch(() => {
-        const year = new Date().getFullYear();
-        setFinalPoNo(`JWPO-${year}-0001`);
-      });
+    if (initialInstructionId) setSelectedPiId(String(initialInstructionId));
+    if (initialPoId) setExistingPoId(initialPoId);
+    setIsPoApprovedState(Boolean(isApproved));
+
+    // Load next PO number only if not editing
+    if (!isEditMode && !initialPoId) {
+      api.get('/purchase/orders/next-jwpo-number/')
+        .then((res) => {
+          if (res?.nextPoNumber) setFinalPoNo(res.nextPoNumber);
+        })
+        .catch(() => {
+          const year = new Date().getFullYear();
+          setFinalPoNo(`JWPO-${year}-0001`);
+        });
+    }
 
     // Load instructions list
     api.get('/production/instructions/', { query: { page_size: 200 } })
@@ -133,7 +144,7 @@ export default function GenerateFinalJobWorkPOModal({
         setEmployees(list);
       })
       .catch(() => {});
-  }, [isOpen, initialInstructionId]);
+  }, [isOpen, initialInstructionId, initialPoId, isEditMode, isApproved]);
 
   // When selected PI changes, load full completion details
   useEffect(() => {
@@ -141,7 +152,7 @@ export default function GenerateFinalJobWorkPOModal({
 
     setLoading(true);
     api.get(`/production/instructions/${selectedPiId}/completion/`)
-      .then((data) => {
+      .then(async (data) => {
         if (!data) return;
 
         setProcessType(data.processType || 'Processing');
@@ -193,7 +204,7 @@ export default function GenerateFinalJobWorkPOModal({
         const descLines = ['Processing Job Work', data.fabric || 'Chiffon Grey Fabric'];
         if (data.greyLotNo) descLines.push(data.greyLotNo);
 
-        setItems([
+        let poItems = [
           {
             id: 'item-1',
             description: descLines.join('\n'),
@@ -205,7 +216,75 @@ export default function GenerateFinalJobWorkPOModal({
             gstAmount: gstAmt,
             totalAmount: totalAmt,
           },
-        ]);
+        ];
+
+        // Check if instruction already has a Final PO
+        const linkedPoNumber = data.finalPoNumber;
+        const linkedPoId = data.finalPoId || initialPoId;
+        const poApproved = isApproved || data.status === 'PO Created' || data.finalPoStatus === 'Approved';
+
+        if (linkedPoNumber) {
+          setFinalPoNo(linkedPoNumber);
+        }
+        if (linkedPoId) {
+          setExistingPoId(linkedPoId);
+        }
+        setIsPoApprovedState(Boolean(poApproved));
+
+        // If existing PO ID exists, fetch full PO details to populate form for editing
+        if (linkedPoId) {
+          try {
+            const poData = await api.get(`/purchase/orders/${linkedPoId}/`);
+            if (poData) {
+              if (poData.status === 'Approved') {
+                setIsPoApprovedState(true);
+              }
+              if (poData.poNumber) {
+                setFinalPoNo(poData.poNumber);
+              }
+              if (poData.docDate || poData.date) {
+                setPoDate(String(poData.docDate || poData.date).slice(0, 10));
+              }
+              if (poData.notes || poData.remarks) {
+                setRemarks(poData.notes || poData.remarks);
+              }
+              if (poData.otherCharges !== undefined && poData.otherCharges !== null) {
+                setOtherCharges(Number(poData.otherCharges) || 0);
+              }
+              if (poData.partyId || poData.vendorId) {
+                setVendorId(String(poData.partyId || poData.vendorId));
+              }
+              if (poData.salespersonId || poData.salesperson_fk) {
+                setAssignedEmployeeId(String(poData.salespersonId || poData.salesperson_fk));
+              }
+              const lines = poData.lineItems || poData.items || [];
+              if (lines.length > 0) {
+                poItems = lines.map((it, idx) => {
+                  const bQty = Number(it.qty) || 0;
+                  const r = Number(it.rate) || 0;
+                  const g = Number(it.taxPct ?? it.tax_pct ?? gstPct);
+                  const basic = bQty * r;
+                  const gstVal = (basic * g) / 100;
+                  return {
+                    id: it.id || `item-${idx + 1}`,
+                    description: it.description || descLines.join('\n'),
+                    uom: it.uom || data.rateUom || 'Meter',
+                    billableQty: bQty,
+                    rate: r,
+                    basicAmount: basic,
+                    gstPct: g,
+                    gstAmount: gstVal,
+                    totalAmount: basic + gstVal,
+                  };
+                });
+              }
+            }
+          } catch (e) {
+            console.error('Failed to load existing PO details:', e);
+          }
+        }
+
+        setItems(poItems);
       })
       .catch((err) => {
         console.error('Failed to load PI completion:', err);
@@ -213,7 +292,7 @@ export default function GenerateFinalJobWorkPOModal({
       .finally(() => {
         setLoading(false);
       });
-  }, [selectedPiId, vendors]);
+  }, [selectedPiId, vendors, initialPoId, isApproved, gstPct]);
 
   // Recalculate item amounts when billableQty, rate, or gstPct changes
   const handleItemChange = (index, field, value) => {
@@ -314,6 +393,10 @@ export default function GenerateFinalJobWorkPOModal({
   // Form Submission
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (isPoApprovedState) {
+      if (showToast) showToast('Approved purchase orders cannot be edited.', 'warning');
+      return;
+    }
     if (!vendorId) {
       if (showToast) showToast('Please select an Agency / Vendor.', 'error');
       return;
@@ -360,19 +443,20 @@ export default function GenerateFinalJobWorkPOModal({
         res = await api.post('/purchase/orders/generate-final-job-work/', payload);
       }
 
+      const isUpdating = Boolean(existingPoId || isEditMode);
       if (showToast) {
         showToast(
           res?.finalPoNumber || finalPoNo
-            ? `Final Job Work PO ${res?.finalPoNumber || finalPoNo} created successfully!`
-            : 'Final Job Work PO created successfully!',
+            ? `Final Job Work PO ${res?.finalPoNumber || finalPoNo} ${isUpdating ? 'updated' : 'created'} successfully!`
+            : `Final Job Work PO ${isUpdating ? 'updated' : 'created'} successfully!`,
           'success'
         );
       }
       if (onSuccess) onSuccess(res);
       onClose();
     } catch (err) {
-      console.error('Failed to generate final PO:', err);
-      const msg = err?.response?.data?.detail || err?.message || 'Failed to generate Final Job Work PO.';
+      console.error('Failed to save final PO:', err);
+      const msg = err?.response?.data?.detail || err?.message || 'Failed to save Final Job Work PO.';
       if (showToast) showToast(msg, 'error');
       else await modal.error(msg, 'Final Job Work PO Error');
     } finally {
@@ -412,9 +496,31 @@ export default function GenerateFinalJobWorkPOModal({
               <FileSpreadsheet size={22} />
             </div>
             <div>
-              <h2 className="text-[17px] font-extrabold text-[#17294e] tracking-tight">Generate Final Job Work PO</h2>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h2 className="text-[17px] font-extrabold text-[#17294e] tracking-tight">
+                  {isPoApprovedState
+                    ? `View Final Job Work PO (${finalPoNo})`
+                    : (existingPoId || isEditMode)
+                    ? `Edit Final Job Work PO (${finalPoNo})`
+                    : 'Generate Final Job Work PO'}
+                </h2>
+                {isPoApprovedState && (
+                  <span className="rounded-full bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-[10.5px] font-bold text-emerald-700">
+                    Approved (Locked)
+                  </span>
+                )}
+                {!isPoApprovedState && (existingPoId || isEditMode) && (
+                  <span className="rounded-full bg-blue-50 border border-blue-200 px-2 py-0.5 text-[10.5px] font-bold text-blue-700">
+                    Pending Approval (Editable)
+                  </span>
+                )}
+              </div>
               <p className="text-[12px] font-medium text-slate-400">
-                Create final Job Work Purchase Order based on completed production and verified quantity.
+                {isPoApprovedState
+                  ? 'This Final Job Work PO has been approved and cannot be edited.'
+                  : (existingPoId || isEditMode)
+                  ? 'Update final Job Work Purchase Order details, quantities, rates, and terms.'
+                  : 'Create final Job Work Purchase Order based on completed production and verified quantity.'}
               </p>
             </div>
           </div>
@@ -441,6 +547,15 @@ export default function GenerateFinalJobWorkPOModal({
         {/* Modal Body */}
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-6 bg-slate-50/50">
           
+          {isPoApprovedState && (
+            <div className="flex items-center gap-2.5 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-[12px] font-semibold text-amber-900 shadow-xs">
+              <AlertTriangle size={18} className="text-amber-600 shrink-0" />
+              <span>
+                <strong>PO Approved (Locked):</strong> This Final Job Work Purchase Order has already been approved and cannot be edited. It is displayed in view-only mode.
+              </span>
+            </div>
+          )}
+
           {loading && (
             <div className="flex items-center justify-center py-6 gap-2 text-[13px] font-semibold text-blue-600 bg-blue-50/60 rounded-xl border border-blue-100">
               <Loader2 size={18} className="animate-spin" /> Loading production and verification details...
@@ -807,13 +922,15 @@ export default function GenerateFinalJobWorkPOModal({
                 <Boxes size={16} className="text-blue-600" />
                 <h3 className="text-[13px] font-bold text-[#17294e]">Final PO Item Details</h3>
               </div>
-              <button
-                type="button"
-                onClick={handleAddItem}
-                className="inline-flex items-center gap-1 rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1 text-[11px] font-bold text-blue-600 hover:bg-blue-100 transition-colors"
-              >
-                <Plus size={13} /> Add Item
-              </button>
+              {!isPoApprovedState && (
+                <button
+                  type="button"
+                  onClick={handleAddItem}
+                  className="inline-flex items-center gap-1 rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1 text-[11px] font-bold text-blue-600 hover:bg-blue-100 transition-colors"
+                >
+                  <Plus size={13} /> Add Item
+                </button>
+              )}
             </div>
 
             <div className="overflow-x-auto">
@@ -840,15 +957,17 @@ export default function GenerateFinalJobWorkPOModal({
                         <textarea
                           rows={3}
                           value={row.description}
+                          disabled={isPoApprovedState}
                           onChange={(e) => handleItemChange(idx, 'description', e.target.value)}
-                          className="w-full rounded border border-slate-200 p-1.5 text-[11.5px] text-slate-700 outline-none focus:border-blue-500 resize-none font-medium"
+                          className="w-full rounded border border-slate-200 p-1.5 text-[11.5px] text-slate-700 outline-none focus:border-blue-500 resize-none font-medium disabled:bg-slate-50 disabled:text-slate-600"
                         />
                       </td>
                       <td className="px-3 py-2.5">
                         <select
                           value={row.uom}
+                          disabled={isPoApprovedState}
                           onChange={(e) => handleItemChange(idx, 'uom', e.target.value)}
-                          className="rounded border border-slate-200 bg-white px-2 py-1 text-[11.5px] outline-none"
+                          className="rounded border border-slate-200 bg-white px-2 py-1 text-[11.5px] outline-none disabled:bg-slate-50 disabled:text-slate-600"
                         >
                           <option value="Meter">Meter</option>
                           <option value="Kg">Kg</option>
@@ -860,8 +979,9 @@ export default function GenerateFinalJobWorkPOModal({
                           type="number"
                           step="any"
                           value={row.billableQty}
+                          disabled={isPoApprovedState}
                           onChange={(e) => handleItemChange(idx, 'billableQty', e.target.value)}
-                          className="w-24 rounded border border-slate-200 px-2 py-1 text-[12px] font-bold text-slate-800 outline-none focus:border-blue-500"
+                          className="w-24 rounded border border-slate-200 px-2 py-1 text-[12px] font-bold text-slate-800 outline-none focus:border-blue-500 disabled:bg-slate-50 disabled:text-slate-600"
                         />
                       </td>
                       <td className="px-3 py-2.5">
@@ -869,8 +989,9 @@ export default function GenerateFinalJobWorkPOModal({
                           type="number"
                           step="0.01"
                           value={row.rate}
+                          disabled={isPoApprovedState}
                           onChange={(e) => handleItemChange(idx, 'rate', e.target.value)}
-                          className="w-20 rounded border border-slate-200 px-2 py-1 text-[12px] font-bold text-slate-800 outline-none focus:border-blue-500"
+                          className="w-20 rounded border border-slate-200 px-2 py-1 text-[12px] font-bold text-slate-800 outline-none focus:border-blue-500 disabled:bg-slate-50 disabled:text-slate-600"
                         />
                       </td>
                       <td className="px-3 py-2.5 text-right font-semibold text-slate-800">
@@ -879,8 +1000,9 @@ export default function GenerateFinalJobWorkPOModal({
                       <td className="px-3 py-2.5">
                         <select
                           value={row.gstPct}
+                          disabled={isPoApprovedState}
                           onChange={(e) => handleItemChange(idx, 'gstPct', e.target.value)}
-                          className="rounded border border-slate-200 bg-white px-2 py-1 text-[11.5px] font-semibold outline-none"
+                          className="rounded border border-slate-200 bg-white px-2 py-1 text-[11.5px] font-semibold outline-none disabled:bg-slate-50 disabled:text-slate-600"
                         >
                           <option value={0}>0%</option>
                           <option value={5}>5%</option>
@@ -895,14 +1017,16 @@ export default function GenerateFinalJobWorkPOModal({
                         {fmtINR(row.totalAmount).replace('₹ ', '')}
                       </td>
                       <td className="px-2 py-2.5 text-center">
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteItem(idx)}
-                          className="text-slate-400 hover:text-rose-600 transition-colors"
-                          title="Delete Item"
-                        >
-                          <Trash2 size={15} />
-                        </button>
+                        {!isPoApprovedState && (
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteItem(idx)}
+                            className="text-slate-400 hover:text-rose-600 transition-colors"
+                            title="Delete Item"
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -1035,31 +1159,43 @@ export default function GenerateFinalJobWorkPOModal({
             </button>
 
             <div className="flex items-center gap-4">
-              <label className="flex items-center gap-2 cursor-pointer select-none text-[12px] font-semibold text-slate-700">
-                <input
-                  type="checkbox"
-                  checked={sendToApproval}
-                  onChange={(e) => setSendToApproval(e.target.checked)}
-                  className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-4 w-4"
-                />
-                Send to Approval
-              </label>
+              {!isPoApprovedState && (
+                <label className="flex items-center gap-2 cursor-pointer select-none text-[12px] font-semibold text-slate-700">
+                  <input
+                    type="checkbox"
+                    checked={sendToApproval}
+                    onChange={(e) => setSendToApproval(e.target.checked)}
+                    className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-4 w-4"
+                  />
+                  Send to Approval
+                </label>
+              )}
 
-              <button
-                type="submit"
-                disabled={submitting}
-                className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-[12.5px] font-bold text-white hover:bg-blue-700 disabled:opacity-50 shadow-sm transition-all"
-              >
-                {submitting ? (
-                  <>
-                    <Loader2 size={16} className="animate-spin" /> Generating Final PO...
-                  </>
-                ) : (
-                  <>
-                    <FileText size={16} /> Generate Final PO
-                  </>
-                )}
-              </button>
+              {isPoApprovedState ? (
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-[12.5px] font-bold text-slate-700 hover:bg-slate-50 transition-all shadow-xs"
+                >
+                  Close (Approved PO)
+                </button>
+              ) : (
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-[12.5px] font-bold text-white hover:bg-blue-700 disabled:opacity-50 shadow-sm transition-all"
+                >
+                  {submitting ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" /> {(existingPoId || isEditMode) ? 'Updating Final PO...' : 'Generating Final PO...'}
+                    </>
+                  ) : (
+                    <>
+                      <FileText size={16} /> {(existingPoId || isEditMode) ? 'Update Final Job Work PO' : 'Generate Final PO'}
+                    </>
+                  )}
+                </button>
+              )}
             </div>
           </div>
 

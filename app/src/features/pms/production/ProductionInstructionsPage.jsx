@@ -801,7 +801,7 @@ export default function ProductionInstructionsPage() {
                     ['Expected Start', viewingPi.startDate ? formatDateDDMMYYYY(viewingPi.startDate) : '—'],
                     ['Grey Lot', viewingPi.greyLotNo || '—'],
                     ['Final PO', viewingPi.finalPoNumber || '—'],
-                    ['Remarks', formatRemarks(viewingPi.remarks)],
+                    ['Remarks', viewingPi.remarks || '—'],
                   ].map(([k, v]) => (
                     <div key={k}>
                       <dt className="text-[10px] font-bold uppercase tracking-wide text-slate-400">{k}</dt>

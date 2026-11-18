@@ -220,7 +220,7 @@ export const NAV = [
     label: 'PMS (Loom & Manufacturing)',
     icon: Factory,
     permission: 'menu_pms',
-    defaultOpen: true,
+    defaultOpen: false,
     children: [
       { label: 'Command Center', icon: BarChart3, to: '/pms' },
       { label: 'Machines & Beams', icon: Factory, to: '/pms/looms' },
@@ -461,7 +461,18 @@ export const NAV = [
       },
       // { label: 'Training', icon: GraduationCap, to: '/hrms/training' }, // Hidden: Training feature commented out
       { label: 'HR Admin', icon: ShieldCheck, to: '/hrms/hr-admin' },
-      { label: 'Asset Setup', icon: Briefcase, to: '/hrms/assets' },
+      {
+        label: 'Asset Setup',
+        icon: Briefcase,
+        defaultOpen: false,
+        navigateOnOpen: true,
+        to: '/hrms/assets',
+        children: [
+          { label: 'Assets', to: '/hrms/assets', dot: true },
+          { label: 'Asset Requests', to: '/hrms/assets?tab=requests' },
+          { label: 'Categories', to: '/hrms/assets?tab=categories' },
+        ],
+      },
       { label: 'Documents', icon: FileText, to: '/hrms/documents' },
       { label: 'Company Policy', icon: ShieldCheck, to: '/hrms/company-policy' },
       { label: 'Calendar', icon: Calendar, to: '/hrms/calendar' },
@@ -867,22 +878,6 @@ function ModuleToggle({ enabled, onToggle, label }) {
 function ExpandableRow({ item, depth = 0, badges = {} }) {
   const location = useLocation();
   const navigate = useNavigate();
-  const [open, setOpen] = useState(Boolean(item.defaultOpen || item.forceOpen));
-
-  useEffect(() => {
-    if (item.forceOpen) {
-      setOpen(true);
-    }
-  }, [item.forceOpen]);
-  const Icon = item.icon;
-  const recruitmentEnabled = useAppStore((s) => s.recruitmentEnabled ?? true);
-  const setRecruitmentEnabled = useAppStore((s) => s.setRecruitmentEnabled);
-  const trainingEnabled = useAppStore((s) => s.trainingEnabled ?? true);
-  const setTrainingEnabled = useAppStore((s) => s.setTrainingEnabled);
-
-  const isModuleRow = item.label === 'Recruitment' || item.label === 'Training';
-  const moduleEnabled = item.label === 'Recruitment' ? recruitmentEnabled : trainingEnabled;
-  const setModuleEnabled = item.label === 'Recruitment' ? setRecruitmentEnabled : setTrainingEnabled;
 
   // Auto-open if a child route is active. Query links match on their path.
   const onPath = (to) => {
@@ -893,23 +888,61 @@ function ExpandableRow({ item, depth = 0, badges = {} }) {
     (c) => onPath(c.to) || c.children?.some((sub) => onPath(sub.to))
   );
 
+  const storageKey = `oscar_nav_open_${item.label}`;
+
+  const [open, setOpen] = useState(() => {
+    if (item.forceOpen) return true;
+    if (isChildActive) return true;
+    try {
+      const saved = sessionStorage.getItem(storageKey);
+      if (saved !== null) return saved === 'true';
+    } catch {}
+    return Boolean(item.defaultOpen);
+  });
+
+  const updateOpenState = (nextVal) => {
+    setOpen((prev) => {
+      const resolved = typeof nextVal === 'function' ? nextVal(prev) : nextVal;
+      try {
+        sessionStorage.setItem(storageKey, String(resolved));
+      } catch {}
+      return resolved;
+    });
+  };
+
+  useEffect(() => {
+    if (item.forceOpen) {
+      updateOpenState(true);
+    }
+  }, [item.forceOpen]);
+
+  useEffect(() => {
+    if (isChildActive) {
+      updateOpenState(true);
+    }
+  }, [isChildActive]);
+
+  const Icon = item.icon;
+  const recruitmentEnabled = useAppStore((s) => s.recruitmentEnabled ?? true);
+  const setRecruitmentEnabled = useAppStore((s) => s.setRecruitmentEnabled);
+  const trainingEnabled = useAppStore((s) => s.trainingEnabled ?? true);
+  const setTrainingEnabled = useAppStore((s) => s.setTrainingEnabled);
+
+  const isModuleRow = item.label === 'Recruitment' || item.label === 'Training';
+  const moduleEnabled = item.label === 'Recruitment' ? recruitmentEnabled : trainingEnabled;
+  const setModuleEnabled = item.label === 'Recruitment' ? setRecruitmentEnabled : setTrainingEnabled;
+
   // Groups flagged `navigateOnOpen` open their default page, so the highlight
   // follows the click. Inside the group already, a click only collapses/expands.
   const toggleGroup = () => {
     const target = item.navigateOnOpen && !isChildActive ? defaultChildPath(item) : null;
     if (target) {
-      setOpen(true);
+      updateOpenState(true);
       navigate(target);
       return;
     }
-    setOpen((v) => !v);
+    updateOpenState((v) => !v);
   };
-
-  useEffect(() => {
-    if (isChildActive) {
-      setOpen(true);
-    }
-  }, [isChildActive]);
 
   const isActive = item.to && (location.pathname === item.to || location.pathname.startsWith(item.to + '/'));
 
@@ -968,7 +1001,7 @@ function ExpandableRow({ item, depth = 0, badges = {} }) {
           <button
             type="button"
             onClick={() => {
-              setOpen((v) => !v);
+              updateOpenState((v) => !v);
             }}
             className="flex items-center gap-2 flex-1 min-w-0 bg-transparent border-0 p-0 text-left cursor-pointer"
           >

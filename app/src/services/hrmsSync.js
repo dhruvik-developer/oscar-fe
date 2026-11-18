@@ -226,16 +226,28 @@ export const HRMS_RESOURCES = {
     toApi: (l) => compact({
       name: l.name?.trim() || undefined,
       type: l.type || undefined,
-      address: l.address ?? undefined,
+      address: typeof l.address === 'string' ? l.address : (l.address ?? undefined),
       timezone: l.timezone ?? undefined,
     }),
-    fromApi: (row) => ({
-      ...row,
-      name: row.name || '',
-      address: row.address || '',
-      employees: row.employees ?? 0,
-      _synced: true,
-    }),
+    fromApi: (row) => {
+      let addrStr = '';
+      if (typeof row.address === 'string') {
+        addrStr = row.address;
+      } else if (row.address && typeof row.address === 'object') {
+        const parts = [row.address.line, row.address.line1, row.address.line2, row.address.city, row.address.state, row.address.pincode, row.address.country].filter(Boolean);
+        addrStr = parts.length > 0 ? parts.join(', ') : Object.values(row.address).filter((v) => typeof v === 'string' && v.trim()).join(', ');
+      }
+      return {
+        ...row,
+        name: row.name || '',
+        type: row.type || 'Branch',
+        address: addrStr,
+        timezone: row.timezone || 'Asia/Kolkata',
+        count: row.employeeCount ?? row.employees ?? 0,
+        employees: row.employeeCount ?? row.employees ?? 0,
+        _synced: true,
+      };
+    },
   },
   teams: {
     path: '/hrms/teams/',

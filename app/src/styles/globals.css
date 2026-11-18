@@ -1609,6 +1609,29 @@ img { display: block; max-width: 100%; }
    on touch screens (no hover) they stay visible and the time moves to the meta line. */
 .notif-panel {
   max-height: min(640px, calc(100dvh - 88px));
+  box-shadow: 0 20px 45px -10px rgba(15, 23, 42, 0.22), 0 0 0 1px var(--border);
+}
+.notif-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.35) transparent;
+}
+.notif-scroll::-webkit-scrollbar {
+  width: 5px;
+}
+.notif-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.notif-scroll::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.3);
+  border-radius: 999px;
+}
+.notif-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.55);
+}
+.notif-scroll::-webkit-scrollbar-button {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
 }
 .notif-row-actions { display: none; }
 .notif-row-meta-time { display: none; }
@@ -2619,9 +2642,8 @@ table:not(.printable-document table):not(.no-standard-header table) thead .stick
   position: fixed;
   inset: 0;
   z-index: 100;
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
+  display: grid;
+  place-items: center;
   overflow-y: auto;
   padding: 20px;
   background: rgba(15, 23, 42, 0.56);

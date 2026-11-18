@@ -630,9 +630,9 @@ export function GoodsReceiptInlineSlide({ po, delivery, onClose, onReceiptSaved,
             <table className="w-full text-left text-xs bg-white rounded-lg border border-emerald-200 overflow-hidden">
               <thead className="bg-emerald-100/60 text-emerald-900 font-semibold text-[10.5px] uppercase">
                 <tr>
-                  <th className="px-3 py-2">GRN #</th>
+                  <th className="px-3 py-2">GRN</th>
                   <th className="px-3 py-2">Date</th>
-                  <th className="px-3 py-2">Challan #</th>
+                  <th className="px-3 py-2">Challan</th>
                   <th className="px-3 py-2 text-right">Lines</th>
                   <th className="px-3 py-2 text-center">QC Status</th>
                 </tr>

@@ -484,7 +484,7 @@ export default function ContractDetailPage() {
                   <table className="w-full min-w-[640px] text-xs">
                     <thead>
                       <tr className="bg-slate-50 text-left text-slate-500">
-                        <th className="px-3 py-2.5 font-semibold w-10">#</th>
+                        <th className="px-3 py-2.5 font-semibold w-10">Sr. No.</th>
                         <th className="px-3 py-2.5 font-semibold">File Name</th>
                         <th className="px-3 py-2.5 font-semibold">Type</th>
                         <th className="px-3 py-2.5 font-semibold">Uploaded By</th>

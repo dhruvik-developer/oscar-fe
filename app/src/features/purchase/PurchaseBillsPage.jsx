@@ -190,7 +190,7 @@ export const PurchaseBillsPage = () => {
     const columns = [
         {
             key: 'billNumber',
-            header: 'Vendor Bill #',
+            header: 'Vendor Bill',
             width: '13%',
             render: (b) => (
               <button
@@ -382,7 +382,7 @@ export const PurchaseBillsPage = () => {
         <StatCard index={3} label="Active Bills" value={`${purchaseBills.length} Bills`} icon={FileText} subtext={`${unpaidBillsCount} awaiting payment`} />
       </div>
 
-      <DataTable title="Accounts Payable Bills" columns={columns} data={purchaseBills} keyExtractor={(b) => b.id} searchPlaceholder="Search bill #, PO, or vendor..." searchFilter={(b, term) => String(b.billNumber ?? '').toLowerCase().includes(term) ||
+      <DataTable title="Accounts Payable Bills" columns={columns} data={purchaseBills} keyExtractor={(b) => b.id} searchPlaceholder="Search bill, PO, or vendor..." searchFilter={(b, term) => String(b.billNumber ?? '').toLowerCase().includes(term) ||
             (b.poRef || b.linkedPo || '').toLowerCase().includes(term) ||
             String(b.vendor ?? '').toLowerCase().includes(term)}/>
 
@@ -622,7 +622,7 @@ export const PurchaseBillsPage = () => {
                   <span className="font-bold text-slate-800">{showPayModal.vendor}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-500">Bill #:</span>
+                  <span className="text-slate-500">Bill:</span>
                   <span className="font-mono font-bold text-slate-800">{showPayModal.billNumber}</span>
                 </div>
                 <div className="flex justify-between text-amber-700 font-semibold border-t border-slate-200 pt-1">

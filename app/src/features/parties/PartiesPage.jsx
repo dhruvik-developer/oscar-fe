@@ -4,7 +4,7 @@ import { useERP } from '../../context/ERPContext';
 import { DataTable } from '../../components/ui/DataTable';
 import { StatusBadge } from '../../components/ui/StatusBadge';
 import { Button } from '../../components/ui/Button';
-import { MetricChip } from '../../components/ui/StatCard';
+import KpiCard from '../../components/ui/KpiCard';
 import PartyWizardModal from '../../components/common/PartyWizardModal';
 import { PageHeader } from '../../components/common/PageHeader';
 import { EntityHeroCard } from '../../components/common/EntityHeroCard';
@@ -459,37 +459,45 @@ export default function PartiesPage() {
         }
       />
 
-      {/* Modern Colorful Metric Badges Row */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-        <MetricChip
+      {/* Universal KPI Cards Row */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
+        <KpiCard
+          index={0}
           icon={Users}
           label="Total Active Parties"
           value={stats.total}
-          colorScheme="blue"
+          sub="All registered entities"
+          onClick={() => setSelectedType('All')}
         />
-        <MetricChip
+        <KpiCard
+          index={1}
           icon={UserCheck}
           label="Customers Registered"
           value={stats.customers}
-          colorScheme="emerald"
+          sub={`${stats.customers} active buyers`}
+          onClick={() => setSelectedType('Customer')}
         />
-        <MetricChip
-          icon={TrendingDown}
+        <KpiCard
+          index={2}
+          icon={Building2}
           label="Vendor Accounts"
           value={stats.vendors}
-          colorScheme="amber"
+          sub={`${stats.vendors} active suppliers`}
+          onClick={() => setSelectedType('Vendor')}
         />
-        <MetricChip
+        <KpiCard
+          index={4}
           icon={TrendingUp}
           label="Total Receivables"
           value={formatCurrency(stats.totalReceivable, { noDecimals: true })}
-          colorScheme="rose"
+          sub="Outstanding customer dues"
         />
-        <MetricChip
+        <KpiCard
+          index={5}
           icon={CreditCard}
           label="Customer Advances"
           value={formatCurrency(stats.totalAdvances, { noDecimals: true })}
-          colorScheme="teal"
+          sub="Prepaid customer credit"
         />
       </div>
 

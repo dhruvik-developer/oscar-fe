@@ -409,7 +409,7 @@ export const BillMatchingPage = () => {
                       <table className="w-full min-w-[980px] text-left text-xs text-slate-600">
                         <thead className="bg-slate-50 font-semibold text-slate-500 tracking-wide border-b border-slate-200">
                           <tr>
-                            <th className="py-2.5 px-2 text-center w-8">#</th>
+                            <th className="py-2.5 px-2 text-center w-8">Sr. No.</th>
                             <SortableTh sort={lineSort} sortKey="fabric" className="py-2.5 px-2">Fabric</SortableTh>
                             <SortableTh sort={lineSort} sortKey="poQty" className="py-2.5 px-2 text-right" align="right">{matching?.isAgencyMatch ? 'Final JW Qty' : 'PO Qty (M)'}</SortableTh>
                             <SortableTh sort={lineSort} sortKey="grnQty" className="py-2.5 px-2 text-right" align="right">{matching?.isAgencyMatch ? 'Orig PO Qty' : 'GRN Qty (M)'}</SortableTh>

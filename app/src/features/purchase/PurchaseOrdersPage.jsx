@@ -1439,7 +1439,7 @@ export const PurchaseOrdersPage = () => {
           <div className="flex flex-wrap items-center gap-2">
             <div className="relative">
               <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search PO #, vendor or fabric..." className="w-56 rounded-lg border border-slate-200 bg-white py-2 pl-9 pr-3 text-[12px] outline-none placeholder:text-slate-400 focus:border-blue-400" />
+              <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search PO, vendor or fabric..." className="w-56 rounded-lg border border-slate-200 bg-white py-2 pl-9 pr-3 text-[12px] outline-none placeholder:text-slate-400 focus:border-blue-400" />
             </div>
             <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="rounded-lg border border-slate-200 bg-white py-2 px-2 text-[12px] font-medium text-slate-600 outline-none">
               <option value="All">All Status</option>
@@ -1987,7 +1987,7 @@ export const PurchaseOrdersPage = () => {
                   <table className="w-full min-w-[720px] text-left text-[12px]">
                     <thead className="table-head-std">
                       <tr className="table-head-row-std">
-                        <th className="w-10 text-center">#</th>
+                        <th className="w-10 text-center">Sr. No.</th>
                         <th>
                           <div className="flex items-center justify-between gap-2">
                             <span>Fabric *</span>

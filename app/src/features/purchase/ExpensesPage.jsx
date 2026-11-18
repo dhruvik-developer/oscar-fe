@@ -102,7 +102,7 @@ export const ExpensesPage = () => {
     const columns = [
         {
             key: 'expenseNumber',
-            header: 'Expense Voucher #',
+            header: 'Expense Voucher',
             width: '15%',
             render: (e) => (
               <span className="font-mono font-bold text-text flex items-center gap-1.5 whitespace-nowrap">
@@ -175,7 +175,7 @@ export const ExpensesPage = () => {
         <StatCard index={3} label="Active Cost Centers" value={`${categoriesCount} Categories`} icon={Tag} />
       </div>
 
-      <DataTable title="Operational Overheads & Disbursed Vouchers" columns={columns} data={expenses} keyExtractor={(e) => e.id} searchPlaceholder="Search payee, voucher #, or category..." searchFilter={(e, term) => String(e.expenseNumber ?? '').toLowerCase().includes(term) ||
+      <DataTable title="Operational Overheads & Disbursed Vouchers" columns={columns} data={expenses} keyExtractor={(e) => e.id} searchPlaceholder="Search payee, voucher, or category..." searchFilter={(e, term) => String(e.expenseNumber ?? '').toLowerCase().includes(term) ||
             String(e.payee ?? '').toLowerCase().includes(term) ||
             String(e.category ?? '').toLowerCase().includes(term)}/>
 

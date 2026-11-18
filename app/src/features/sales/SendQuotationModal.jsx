@@ -439,7 +439,7 @@ export default function SendQuotationModal({
                 <table className="w-full text-left text-[11px] mt-2">
                   <thead>
                     <tr className="text-slate-500 border-b border-slate-100">
-                      <th className="py-1 pr-1 w-6">#</th>
+                      <th className="py-1 pr-1 w-6">Sr. No.</th>
                       <th className="py-1 pr-1">Fabric / Item</th>
                       <th className="py-1 pr-1 text-right">Qty</th>
                       <th className="py-1 pr-1 text-right">Rate</th>

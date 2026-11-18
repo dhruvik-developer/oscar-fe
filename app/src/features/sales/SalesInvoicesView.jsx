@@ -915,7 +915,7 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
                     <table className="w-full text-left border-collapse text-xs">
                         <thead className="table-head-std">
                             <tr className="table-head-row-std">
-                                <th>Invoice #</th>
+                                <th>Invoice</th>
                                 <th>Customer</th>
                                 <th>Linked SO</th>
                                 <th>Invoice Date</th>
@@ -1794,7 +1794,7 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
                                     <span className="font-bold text-slate-800">{showPaymentModal.customer}</span>
                                 </div>
                                 <div className="flex justify-between">
-                                    <span className="text-slate-500">Invoice #:</span>
+                                    <span className="text-slate-500">Invoice:</span>
                                     <span className="font-mono font-bold text-slate-800">{showPaymentModal.invoiceNumber}</span>
                                 </div>
                                 <div className="flex justify-between">

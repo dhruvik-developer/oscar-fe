@@ -407,7 +407,7 @@ export function SupplierDeliveryInlineSlide({ po, onClose, onDeliverySaved, onNe
             <table className="w-full text-left text-xs border-collapse">
               <thead className="bg-slate-50 text-[10px] font-bold text-slate-500 uppercase border-b border-slate-200">
                 <tr>
-                  <th className="py-2 px-2.5 w-8">#</th>
+                  <th className="py-2 px-2.5 w-8">Sr. No.</th>
                   <th className="py-2 px-2.5">Fabric Quality / Description</th>
                   <th className="py-2 px-2.5 text-right">Ordered Qty</th>
                   <th className="py-2 px-2.5 text-right">Rate</th>
@@ -729,7 +729,7 @@ export function SupplierDeliveryInlineSlide({ po, onClose, onDeliverySaved, onNe
             <table className="w-full text-left text-xs border-collapse">
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-200 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-                  <th className="py-2.5 px-3">Delivery #</th>
+                  <th className="py-2.5 px-3">Delivery</th>
                   <th className="py-2.5 px-3">Challan No & Date</th>
                   <th className="py-2.5 px-3">Dispatch Date</th>
                   <th className="py-2.5 px-3 text-right">Dispatched Qty</th>

@@ -367,7 +367,7 @@ export default function JobWorkInwardPage() {
       </div>
 
       {showForm && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 p-2 sm:p-4 overflow-y-auto" onClick={() => setShowForm(false)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-2 sm:p-4 overflow-y-auto" onClick={() => setShowForm(false)}>
           <div className="w-full max-w-2xl rounded-2xl bg-white shadow-2xl my-4" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between border-b border-slate-100 px-5 py-3.5">
               <h3 className="text-[15px] font-extrabold text-[#17294e]">Create Inward Receipt</h3>

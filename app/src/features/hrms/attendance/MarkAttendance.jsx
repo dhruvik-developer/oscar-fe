@@ -485,8 +485,8 @@ function TeamMarkAttendance() {
   const selectAllRef = useRef(null);
 
   const load = useCallback(async (opts = {}) => {
-    const { preserveSelection = false } = opts;
-    setLoading(true);
+    const { preserveSelection = false, silent = false } = opts;
+    if (!silent) setLoading(true);
     try {
       try {
         await api.post("/hrms/attendance/sync-punches/", { date });
@@ -502,13 +502,13 @@ function TeamMarkAttendance() {
       }
       await useAttendanceStore.getState().refreshAttendance();
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [date]);
 
   useEffect(() => { load(); }, [load]);
   useEffect(() => {
-    if (date === todayISO()) load();
+    if (date === todayISO()) load({ silent: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [todayPunch?.isPunchedIn, todayPunch?.lastPunchIso]);
 

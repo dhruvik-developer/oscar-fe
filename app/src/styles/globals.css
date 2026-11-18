@@ -5641,10 +5641,36 @@ textarea:focus::placeholder {
 }
 
 /* ──── PMS Loom & Production Section Styling ──────────────────────────────────────────────────────────────── */
+/* ──── PMS Typography Scaled (+1 to +2 points) ──── */
 .pms-screen {
   width: 100%;
   max-width: 100%;
   min-width: 0;
+  font-size: 0.875rem;
+}
+
+.pms-screen .text-\[10px\] {
+  font-size: 0.75rem !important; /* 12px */
+}
+
+.pms-screen .text-\[11px\] {
+  font-size: 0.8125rem !important; /* 13px */
+}
+
+.pms-screen .text-xs {
+  font-size: 0.84375rem !important; /* 13.5px */
+}
+
+.pms-screen .text-sm {
+  font-size: 0.9375rem !important; /* 15px */
+}
+
+.pms-screen table th {
+  font-size: 0.8125rem !important; /* 13px */
+}
+
+.pms-screen table td {
+  font-size: 0.875rem !important; /* 14px */
 }
 
 .pms-table-container {
@@ -5684,7 +5710,7 @@ textarea:focus::placeholder {
 .pms-input, .pms-select {
   height: 38px;
   padding: 0.5rem 0.85rem;
-  font-size: 0.8125rem;
+  font-size: 0.875rem;
   font-weight: 500;
   border-radius: 0.75rem !important; /* rounded-xl (12px) matching Project standard */
   border: 1px solid var(--border, #dce5f4);
@@ -5813,7 +5839,7 @@ textarea:focus::placeholder {
 
 .pms-label {
   display: block;
-  font-size: 0.75rem;
+  font-size: 0.8125rem;
   font-weight: 600;
   color: #475569;
   margin-bottom: 0.375rem;

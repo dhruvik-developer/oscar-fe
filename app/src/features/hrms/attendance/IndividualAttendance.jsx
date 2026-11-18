@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { ChevronRight, ChevronLeft, X, CheckCircle2, XCircle, Clock, Clock3, Calendar, Home } from "lucide-react";
 import KpiCard from "../../../components/ui/KpiCard";
 import { useAppStore } from "../../../stores/appStore";
@@ -166,6 +166,8 @@ export default function IndividualAttendance() {
     return Array.from(map.values()).sort((a, b) => (a.name || "").localeCompare(b.name || ""));
   }, [storeEmployees]);
 
+  const userHasManuallyChangedRef = useRef(false);
+
   const findUserEmployeeId = useCallback(() => {
     if (!employeesList.length) return "";
     const matched = employeesList.find((e) => {
@@ -183,11 +185,11 @@ export default function IndividualAttendance() {
       if (matchId) return true;
       return false;
     });
-    return matched ? matched.id : employeesList[0].id;
+    return matched ? matched.id : "";
   }, [employeesList, currentUser, todayPunch?.employee]);
 
   const now = new Date();
-  const [selectedEmpId, setSelectedEmpId] = useState(() => findUserEmployeeId());
+  const [selectedEmpId, setSelectedEmpId] = useState(() => findUserEmployeeId() || employeesList[0]?.id || "");
   const [selectedMonth, setSelectedMonth] = useState(MONTHS[now.getMonth()]);
   const [selectedYear, setSelectedYear] = useState(String(now.getFullYear()));
   const [viewMode, setViewMode] = useState("Table");
@@ -196,9 +198,11 @@ export default function IndividualAttendance() {
   // Automatically select the logged-in user's employee when employees or currentUser resolves
   useEffect(() => {
     if (employeesList.length > 0) {
-      if (!selectedEmpId || !employeesList.some((e) => e.id === selectedEmpId)) {
-        const defaultId = findUserEmployeeId();
-        if (defaultId) setSelectedEmpId(defaultId);
+      const defaultId = findUserEmployeeId();
+      if (defaultId && !userHasManuallyChangedRef.current) {
+        setSelectedEmpId(defaultId);
+      } else if (!selectedEmpId || !employeesList.some((e) => e.id === selectedEmpId)) {
+        setSelectedEmpId(defaultId || employeesList[0].id);
       }
     }
   }, [employeesList, selectedEmpId, findUserEmployeeId]);
@@ -917,7 +921,7 @@ export default function IndividualAttendance() {
         <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
           <select
             value={currentEmp.id}
-            onChange={(e) => setSelectedEmpId(e.target.value)}
+            onChange={(e) => { userHasManuallyChangedRef.current = true; setSelectedEmpId(e.target.value); }}
             className="ind-select ind-select-emp"
           >
             {employeesList.length === 0 && <option value="">No employees</option>}

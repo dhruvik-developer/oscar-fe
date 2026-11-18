@@ -339,7 +339,7 @@ export default function DailyLoomEntryPage() {
                         type="number"
                         min="0"
                         placeholder="0"
-                        value={r.meters}
+                        value={r.meters ?? ''}
                         onChange={(e) => handleRowChange(r.machine_id, 'meters', e.target.value)}
                         onKeyDown={preventNegativeInput}
                         className="w-20 sm:w-24 px-2 py-1 text-xs font-mono font-bold rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-right focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
@@ -365,7 +365,7 @@ export default function DailyLoomEntryPage() {
                         type="number"
                         min="0"
                         placeholder="0"
-                        value={r.damage}
+                        value={r.damage ?? ''}
                         onChange={(e) => handleRowChange(r.machine_id, 'damage', e.target.value)}
                         onKeyDown={preventNegativeInput}
                         className="w-14 px-1.5 py-1 text-xs font-mono rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-right outline-none"
@@ -377,7 +377,7 @@ export default function DailyLoomEntryPage() {
                           <input
                             type="number"
                             min="0"
-                            value={r.rpm}
+                            value={r.rpm ?? ''}
                             onChange={(e) => handleRowChange(r.machine_id, 'rpm', e.target.value)}
                             onKeyDown={preventNegativeInput}
                             className="w-16 px-1.5 py-1 text-xs font-mono rounded border border-slate-200 dark:border-slate-700 text-right outline-none"
@@ -388,7 +388,7 @@ export default function DailyLoomEntryPage() {
                             type="number"
                             min="0"
                             max="24"
-                            value={r.hours}
+                            value={r.hours ?? ''}
                             onChange={(e) => handleRowChange(r.machine_id, 'hours', e.target.value)}
                             onKeyDown={preventNegativeInput}
                             className="w-14 px-1.5 py-1 text-xs font-mono rounded border border-slate-200 dark:border-slate-700 text-right outline-none"
@@ -398,7 +398,7 @@ export default function DailyLoomEntryPage() {
                           <input
                             type="number"
                             min="0"
-                            value={r.stop}
+                            value={r.stop ?? ''}
                             onChange={(e) => handleRowChange(r.machine_id, 'stop', e.target.value)}
                             onKeyDown={preventNegativeInput}
                             className="w-14 px-1.5 py-1 text-xs font-mono rounded border border-slate-200 dark:border-slate-700 text-right outline-none"
@@ -418,14 +418,16 @@ export default function DailyLoomEntryPage() {
                       )}
                     </td>
                     <td className="py-1.5 px-3 text-center">
-                      {r.done && r.prod_id && (
+                      {r.done && r.prod_id ? (
                         <button
                           onClick={() => setDeleteEntryConfirmId(r.prod_id)}
-                          className="text-red-500 hover:text-red-700 p-1 rounded transition-colors"
+                          className="text-red-500 hover:text-red-700 p-1 rounded transition-colors inline-flex items-center justify-center"
                           title="Delete filed row"
                         >
                           <Trash2 size={13} />
                         </button>
+                      ) : (
+                        <span className="text-slate-300 dark:text-slate-600 font-mono text-xs">—</span>
                       )}
                     </td>
                   </tr>

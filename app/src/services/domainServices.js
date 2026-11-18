@@ -168,7 +168,7 @@ export const salesService = {
   recordPaymentIn: (data) => api.post('/sales/payments/', data),
   getReturns: (query) => api.get('/sales/returns/', { query }),
   createSalesReturn: (data) => api.post('/sales/returns/', data),
-  getCustomerLedger: (customerId) => api.get(`/sales/customers/${customerId}/ledger/`),
+  getCustomerLedger: (customerId) => api.get(`/parties/${customerId}/ledger/`),
   getInvoiceOutstanding: (invoiceId) => api.get(`/sales/invoices/${invoiceId}/outstanding/`),
   // Commercials & Brokerage (Phase 3)
   getBrokerCommissions: (query) => api.get('/sales/broker-commissions/', { query }),

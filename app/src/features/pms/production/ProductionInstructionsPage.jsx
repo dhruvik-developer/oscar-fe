@@ -40,7 +40,23 @@ function normalizeInstruction(item) {
     assignedEmployee: item.employeeName || '',
     employeeId: item.employeeId ? String(item.employeeId) : '',
     status: item.status || '',
-    remarks: item.notes || '',
+    remarks: (() => {
+      const vr = item.verificationRemarks || item.verification_remarks;
+      if (vr) return vr;
+      if (item.notes && typeof item.notes === 'string') {
+        const trimmed = item.notes.trim();
+        if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+          try {
+            const parsed = JSON.parse(trimmed);
+            return parsed.remarks || parsed.originalNotes || parsed.note || '';
+          } catch (e) {
+            return '';
+          }
+        }
+        return item.notes;
+      }
+      return item.notes || '';
+    })(),
     agreedJobRate: numOrNull(item.agreedJobRate),
   };
 }
@@ -83,6 +99,34 @@ export default function ProductionInstructionsPage() {
   const [assignedEmployeeId, setAssignedEmployeeId] = useState('');
   const [remarks, setRemarks] = useState('');
   const [openMenuId, setOpenMenuId] = useState(null);
+  const [menuPos, setMenuPos] = useState({ top: 0, right: 0, openUp: false });
+
+  // Close floating action menu on window / table scroll
+  useEffect(() => {
+    const handleScroll = () => {
+      if (openMenuId) setOpenMenuId(null);
+    };
+    window.addEventListener('scroll', handleScroll, true);
+    return () => window.removeEventListener('scroll', handleScroll, true);
+  }, [openMenuId]);
+
+  const handleToggleMenu = (e, piId) => {
+    if (openMenuId === piId) {
+      setOpenMenuId(null);
+      return;
+    }
+    const rect = e.currentTarget.getBoundingClientRect();
+    const menuHeight = 250;
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const openUp = spaceBelow < menuHeight && rect.top > menuHeight;
+
+    setMenuPos({
+      top: openUp ? rect.top - 6 : rect.bottom + 6,
+      right: Math.max(12, window.innerWidth - rect.right),
+      openUp,
+    });
+    setOpenMenuId(piId);
+  };
 
   // View / Edit state
   const [viewingPi, setViewingPi] = useState(null);
@@ -386,7 +430,7 @@ export default function ProductionInstructionsPage() {
             <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="text-[12px] text-slate-600 outline-none" title="End date to" />
           </div>
         </div>
-        <div className="pms-table-container">
+        <div className="pms-table-container min-h-[220px]">
           <table className="w-full min-w-[1280px] border-collapse text-left text-[12px] pms-sticky-header">
             <thead>
               <tr className="border-b border-slate-100 text-[10.5px] font-bold uppercase tracking-wide text-slate-400">
@@ -435,27 +479,86 @@ export default function ProductionInstructionsPage() {
                         </button>
                       )}
                       <div className="relative">
-                        <button onClick={() => setOpenMenuId(openMenuId === pi.id ? null : pi.id)} className="p-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100 transition-colors" title="More actions">
+                        <button
+                          type="button"
+                          onClick={(e) => handleToggleMenu(e, pi.id)}
+                          className="p-2 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                          title="More actions"
+                          aria-expanded={openMenuId === pi.id}
+                        >
                           <span className="text-[14px] font-bold leading-none tracking-widest">...</span>
                         </button>
                         {openMenuId === pi.id && (
                           <>
-                            <div className="fixed inset-0 z-10" onClick={() => setOpenMenuId(null)} />
-                            <div className="absolute right-0 z-20 w-48 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-xl">
-                              <button onClick={() => { setOpenMenuId(null); handleOpenViewingPi(pi); }} className="block w-full px-3 py-2 text-left text-[12px] font-medium text-slate-700 hover:bg-slate-50">View details</button>
+                            <div className="fixed inset-0 z-40 bg-transparent" onClick={() => setOpenMenuId(null)} />
+                            <div
+                              style={{
+                                position: 'fixed',
+                                ...(menuPos.openUp
+                                  ? { bottom: `${window.innerHeight - menuPos.top}px` }
+                                  : { top: `${menuPos.top}px` }),
+                                right: `${menuPos.right}px`,
+                              }}
+                              className="z-50 w-52 overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 py-1.5 shadow-2xl animate-in fade-in zoom-in-95 duration-100"
+                            >
+                              <button
+                                type="button"
+                                onClick={() => { setOpenMenuId(null); handleOpenViewingPi(pi); }}
+                                className="block w-full px-3.5 py-2 text-left text-[12px] font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700/60 transition-colors"
+                              >
+                                View details
+                              </button>
                               {canEditInstruction(pi.status) && (
-                                <button onClick={() => openEdit(pi)} className="block w-full px-3 py-2 text-left text-[12px] font-medium text-slate-700 hover:bg-slate-50">Edit</button>
+                                <button
+                                  type="button"
+                                  onClick={() => openEdit(pi)}
+                                  className="block w-full px-3.5 py-2 text-left text-[12px] font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700/60 transition-colors"
+                                >
+                                  Edit
+                                </button>
                               )}
                               {canApprove(pi.status) && (
-                                <button disabled={busyId === pi.id} onClick={() => runAction(pi, 'approve', 'Approve')} className="block w-full px-3 py-2 text-left text-[12px] font-medium text-sky-700 hover:bg-sky-50 disabled:opacity-50">Approve</button>
+                                <button
+                                  type="button"
+                                  disabled={busyId === pi.id}
+                                  onClick={() => runAction(pi, 'approve', 'Approve')}
+                                  className="block w-full px-3.5 py-2 text-left text-[12px] font-medium text-sky-700 dark:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-950/40 transition-colors disabled:opacity-50"
+                                >
+                                  Approve
+                                </button>
                               )}
                               {canStart(pi.status) && (
-                                <button disabled={busyId === pi.id} onClick={() => runAction(pi, 'start', 'Start')} className="block w-full px-3 py-2 text-left text-[12px] font-medium text-blue-700 hover:bg-blue-50 disabled:opacity-50">Start production</button>
+                                <button
+                                  type="button"
+                                  disabled={busyId === pi.id}
+                                  onClick={() => runAction(pi, 'start', 'Start')}
+                                  className="block w-full px-3.5 py-2 text-left text-[12px] font-medium text-blue-700 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 transition-colors disabled:opacity-50"
+                                >
+                                  Start production
+                                </button>
                               )}
-                              <button onClick={() => { setOpenMenuId(null); navigate(`/pms/daily-production?pi=${encodeURIComponent(pi.id)}`); }} className="block w-full px-3 py-2 text-left text-[12px] font-medium text-slate-700 hover:bg-slate-50">Daily production</button>
-                              <button onClick={() => { setOpenMenuId(null); navigate(`/pms/production-completion?pi=${encodeURIComponent(pi.id)}`); }} className="block w-full px-3 py-2 text-left text-[12px] font-medium text-slate-700 hover:bg-slate-50">Open completion</button>
+                              <button
+                                type="button"
+                                onClick={() => { setOpenMenuId(null); navigate(`/pms/daily-production?pi=${encodeURIComponent(pi.id)}`); }}
+                                className="block w-full px-3.5 py-2 text-left text-[12px] font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700/60 transition-colors"
+                              >
+                                Daily production
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => { setOpenMenuId(null); navigate(`/pms/production-completion?pi=${encodeURIComponent(pi.id)}`); }}
+                                className="block w-full px-3.5 py-2 text-left text-[12px] font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700/60 transition-colors"
+                              >
+                                Open completion
+                              </button>
                               {pi.status === 'Draft' && (
-                                <button onClick={() => { setOpenMenuId(null); setDeleteConfirmPi(pi); }} className="block w-full px-3 py-2 text-left text-[12px] font-semibold text-rose-600 hover:bg-rose-50">Delete</button>
+                                <button
+                                  type="button"
+                                  onClick={() => { setOpenMenuId(null); setDeleteConfirmPi(pi); }}
+                                  className="block w-full px-3.5 py-2 text-left text-[12px] font-semibold text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors"
+                                >
+                                  Delete
+                                </button>
                               )}
                             </div>
                           </>

@@ -10,8 +10,6 @@ export default function RestoreLeadModal({
   onConfirm,
   isLoading = false,
 }) {
-  if (!isOpen) return null;
-
   const isBulk = Boolean(leads && leads.length > 0 && !lead);
   const targetLeads = isBulk ? leads : (lead ? [lead] : []);
 
@@ -21,6 +19,8 @@ export default function RestoreLeadModal({
 
   const [selectedStageId, setSelectedStageId] = useState(defaultStageId);
   const [dealStage, setDealStage] = useState('Draft');
+
+  if (!isOpen) return null;
 
   const handleSubmit = (e) => {
     e.preventDefault();

@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { ChevronRight, ChevronLeft, X, CheckCircle2, XCircle, Clock, Clock3, Calendar, Home } from "lucide-react";
 import KpiCard from "../../../components/ui/KpiCard";
 import { useAppStore } from "../../../stores/appStore";

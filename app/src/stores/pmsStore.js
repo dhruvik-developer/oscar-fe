@@ -256,11 +256,9 @@ export function computeNavBadges(projects = [], currentUserId = null, now = Date
   let pmsDelayedCount = 0;
   let pmsMyTasksPending = 0;
 
+  pmsDelayedCount = computeDelayWatchlist(projects, now).length;
+
   for (const p of projects) {
-    const hasDelayedOrOverdueStage = (p.stages ?? []).some(
-      (stage) => stage.delayDetails?.isDelayed || stage.status === "Delayed" || isStageOverdue(stage, now)
-    );
-    if (p.status === "Delayed" || hasDelayedOrOverdueStage) pmsDelayedCount += 1;
     if (p.status !== "Completed" && p.status !== "Draft") pmsActiveCount += 1;
 
     for (const stage of p.stages ?? []) {

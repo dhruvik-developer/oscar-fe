@@ -1,11 +1,14 @@
 import { useEffect } from 'react';
-import { Outlet, useLocation } from 'react-router-dom';
+import { Outlet, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import { LogOut } from 'lucide-react';
 import Sidebar from './Sidebar';
 import Topbar from './Topbar';
 import { CommandPalette } from '../common/CommandPalette';
 import { useAppStore } from '../../stores/appStore';
 import { useProofApprovalSync } from '../../features/pms/approval/useProofApprovalSync';
 import { useModuleHydration } from '../../hooks/useModuleHydration';
+import { logout } from '../../services/authService';
+import { isLoomAdminOrManager } from '../../features/pms/loom/DailyLoomEntryPage';
 
 // ERP-only UI scope: graph.json global-shell guidance applied purely as a
 // CSS class. CRM/HRMS routes never receive `erp-scope`, so their UI is
@@ -27,7 +30,21 @@ export default function MainLayout() {
   const mobileSidebarOpen = useAppStore((s) => s.mobileSidebarOpen);
   const setMobileSidebarOpen = useAppStore((s) => s.setMobileSidebarOpen);
   const { pathname } = useLocation();
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const currentUser = useAppStore((s) => s.currentUser);
   const isErpRoute = ERP_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+
+  const isStandaloneQuery = searchParams.get('standalone') === '1' || searchParams.get('direct') === '1';
+  const isEmployeeOnLoomDaily = pathname === '/pms/loom-daily' && currentUser && !isLoomAdminOrManager(currentUser);
+  const showStandaloneOnly = IS_EMBEDDED || isStandaloneQuery || isEmployeeOnLoomDaily;
+
+  const handleSignOut = async () => {
+    try {
+      await logout();
+    } catch {}
+    navigate('/login');
+  };
 
   // Fill the module stores from the API for this session.
   useModuleHydration();
@@ -120,10 +137,73 @@ export default function MainLayout() {
     return () => window.clearTimeout(timer);
   }, [clearToast, toast]);
 
-  if (IS_EMBEDDED) {
+  if (showStandaloneOnly) {
     return (
-      <div className="min-h-screen bg-slate-50">
-        <main className={`content${isErpRoute ? ' erp-scope' : ''}`}>
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col">
+        {/* Minimal Kiosk / Focused Header Bar - No system navigation */}
+        <header className="h-14 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-3.5 sm:px-6 flex items-center justify-between shadow-2xs sticky top-0 z-30">
+          <div className="flex items-center gap-2.5 sm:gap-3">
+            <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white font-black text-sm shadow-xs">
+              E
+            </div>
+            <div>
+              <span className="text-xs font-bold text-slate-900 dark:text-slate-100 block tracking-tight">
+                EVENMORE INFOTECH
+              </span>
+              <span className="text-[10px] text-slate-400 font-medium block -mt-0.5">
+                Daily Loom Production Portal
+              </span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 sm:gap-3">
+            {currentUser && (
+              <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-800 px-2 sm:px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 text-xs">
+                <div className="w-5 h-5 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 flex items-center justify-center font-bold text-[10px]">
+                  {currentUser.initials || currentUser.name?.[0] || 'U'}
+                </div>
+                <div className="text-left hidden sm:block">
+                  <span className="font-bold text-slate-800 dark:text-slate-200 block text-[11px] leading-tight">
+                    {currentUser.name}
+                  </span>
+                  <span className="text-[9px] text-slate-400 block leading-tight">
+                    {currentUser.role?.name || (typeof currentUser.role === 'string' ? currentUser.role : 'Production Staff')}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* If Admin/GM, button to switch to Full System */}
+            {currentUser && isLoomAdminOrManager(currentUser) && (
+              <button
+                type="button"
+                onClick={() => {
+                  const url = new URL(window.location.href);
+                  url.searchParams.delete('standalone');
+                  url.searchParams.delete('direct');
+                  window.location.href = url.pathname + url.search;
+                }}
+                className="text-[11px] font-semibold text-blue-600 hover:text-blue-700 dark:text-blue-400 px-2.5 py-1.5 rounded-lg border border-blue-200 dark:border-blue-800 hover:bg-blue-50 dark:hover:bg-blue-950/40 transition-colors hidden sm:inline-flex"
+                title="Open inside full ERP navigation shell"
+              >
+                Open Full System
+              </button>
+            )}
+
+            {/* Sign Out Button */}
+            <button
+              type="button"
+              onClick={handleSignOut}
+              className="text-xs font-semibold text-rose-600 hover:text-rose-700 dark:text-rose-400 px-2.5 py-1.5 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-lg transition-colors flex items-center gap-1.5 border border-rose-200 dark:border-rose-900/40"
+              title="Sign Out"
+            >
+              <LogOut size={13} />
+              <span className="hidden sm:inline">Sign Out</span>
+            </button>
+          </div>
+        </header>
+
+        <main className={`flex-1 p-3 sm:p-6 max-w-7xl w-full mx-auto content${isErpRoute ? ' erp-scope' : ''}`}>
           <Outlet />
         </main>
         {toast && <div className="toast">{toast.msg}</div>}

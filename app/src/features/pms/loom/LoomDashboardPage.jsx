@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Factory,
@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import PageHeader from '../../../components/ui/PageHeader';
 import KpiCard from '../../../components/ui/KpiCard';
+import TablePagination from '../../../components/ui/TablePagination';
 import { Button } from '../../../components/ui/Button';
 import { loomService } from '../../../services/loomService';
 import { formatNum } from '../utils/loomCalculations';
@@ -43,6 +44,14 @@ export default function LoomDashboardPage() {
   const [exportingPdf, setExportingPdf] = useState(false);
   const exportMenuRef = useRef(null);
   const reportContentRef = useRef(null);
+
+  // Pagination states for dashboard tables
+  const [factoryPage, setFactoryPage] = useState(1);
+  const [factoryPageSize, setFactoryPageSize] = useState(5);
+  const [yarnPage, setYarnPage] = useState(1);
+  const [yarnPageSize, setYarnPageSize] = useState(5);
+  const [programsPage, setProgramsPage] = useState(1);
+  const [programsPageSize, setProgramsPageSize] = useState(5);
 
   // Close export dropdown on click outside
   useEffect(() => {
@@ -200,6 +209,25 @@ export default function LoomDashboardPage() {
 
   const factories = dashboardData?.factories || [];
   const programs = dashboardData?.programs || [];
+  const yarnItems = useMemo(
+    () => factories.flatMap((f) => (f.yarn_cover || []).map((x) => ({ ...x, factory_name: f.factory_name, factory_id: f.factory_id }))),
+    [factories]
+  );
+
+  const paginatedFactories = useMemo(() => {
+    const start = (factoryPage - 1) * factoryPageSize;
+    return factories.slice(start, start + factoryPageSize);
+  }, [factories, factoryPage, factoryPageSize]);
+
+  const paginatedYarnItems = useMemo(() => {
+    const start = (yarnPage - 1) * yarnPageSize;
+    return yarnItems.slice(start, start + yarnPageSize);
+  }, [yarnItems, yarnPage, yarnPageSize]);
+
+  const paginatedPrograms = useMemo(() => {
+    const start = (programsPage - 1) * programsPageSize;
+    return programs.slice(start, start + programsPageSize);
+  }, [programs, programsPage, programsPageSize]);
 
   // Aggregated totals
   const totalLooms = factories.reduce((acc, f) => acc + (f.total_machines || 0), 0);
@@ -434,7 +462,7 @@ export default function LoomDashboardPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-              {factories.map((f) => {
+              {paginatedFactories.map((f) => {
                 const isUrgent = f.urgent_machines && f.urgent_machines.length > 0;
                 return (
                   <tr key={f.factory_id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/50 transition-colors">
@@ -486,9 +514,25 @@ export default function LoomDashboardPage() {
                   </tr>
                 );
               })}
+              {paginatedFactories.length === 0 && (
+                <tr>
+                  <td colSpan={9} className="py-8 text-center text-slate-400">
+                    No factories configured.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
+        <TablePagination
+          page={factoryPage}
+          pageSize={factoryPageSize}
+          totalItems={factories.length}
+          onPageChange={setFactoryPage}
+          onPageSizeChange={(sz) => { setFactoryPageSize(sz); setFactoryPage(1); }}
+          pageSizeOptions={[5, 10, 20, 50]}
+          bordered
+        />
       </div>
       )}
 
@@ -522,41 +566,57 @@ export default function LoomDashboardPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {factories.flatMap((f) =>
-                  (f.yarn_cover || []).map((x) => (
-                    <tr key={`${f.factory_id}-${x.yarn_id}`} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50">
-                      <td className="py-2 px-2.5 font-semibold text-slate-800 dark:text-slate-200">{f.factory_name}</td>
-                      <td className="py-2 px-2.5 font-medium text-slate-700 dark:text-slate-300">{x.yarn_name}</td>
-                      <td className="py-2 px-2.5 text-right font-mono font-semibold">
-                        <span className={x.bal < 0 ? 'text-rose-600 font-bold' : ''}>{formatNum(x.bal)}</span>
-                      </td>
-                      <td className="py-2 px-2.5 text-right font-mono text-slate-500">
-                        {x.daily > 0 ? formatNum(x.daily, 1) : <span className="text-slate-400">warp</span>}
-                      </td>
-                      <td className="py-2 px-2.5 text-right font-bold">
-                        {x.days === null ? (
-                          <span className="text-slate-400">—</span>
-                        ) : x.days <= 5 ? (
-                          <span className="px-1.5 py-0.5 rounded text-[10px] bg-rose-100 text-rose-800 dark:bg-rose-950/40 dark:text-rose-300 font-bold">
-                            {formatNum(x.days, 1)} d
-                          </span>
-                        ) : x.days <= 10 ? (
-                          <span className="px-1.5 py-0.5 rounded text-[10px] bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300 font-bold">
-                            {formatNum(x.days, 1)} d
-                          </span>
-                        ) : (
-                          <span className="text-emerald-600 font-semibold">{formatNum(x.days, 1)} d</span>
-                        )}
-                      </td>
-                      <td className="py-2 px-2.5 text-right font-mono text-blue-600 font-medium">
-                        {formatNum(x.pending)}
-                      </td>
-                    </tr>
-                  ))
+                {paginatedYarnItems.map((x) => (
+                  <tr key={`${x.factory_id}-${x.yarn_id}`} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50">
+                    <td className="py-2 px-2.5 font-semibold text-slate-800 dark:text-slate-200">{x.factory_name}</td>
+                    <td className="py-2 px-2.5 font-medium text-slate-700 dark:text-slate-300">{x.yarn_name}</td>
+                    <td className="py-2 px-2.5 text-right font-mono font-semibold">
+                      <span className={x.bal < 0 ? 'text-rose-600 font-bold' : ''}>{formatNum(x.bal)}</span>
+                    </td>
+                    <td className="py-2 px-2.5 text-right font-mono text-slate-500">
+                      {x.daily > 0 ? formatNum(x.daily, 1) : <span className="text-slate-400">warp</span>}
+                    </td>
+                    <td className="py-2 px-2.5 text-right font-bold">
+                      {x.days === null ? (
+                        <span className="text-slate-400">—</span>
+                      ) : x.days <= 5 ? (
+                        <span className="px-1.5 py-0.5 rounded text-[10px] bg-rose-100 text-rose-800 dark:bg-rose-950/40 dark:text-rose-300 font-bold">
+                          {formatNum(x.days, 1)} d
+                        </span>
+                      ) : x.days <= 10 ? (
+                        <span className="px-1.5 py-0.5 rounded text-[10px] bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300 font-bold">
+                          {formatNum(x.days, 1)} d
+                        </span>
+                      ) : (
+                        <span className="text-emerald-600 font-semibold">{formatNum(x.days, 1)} d</span>
+                      )}
+                    </td>
+                    <td className="py-2 px-2.5 text-right font-mono text-blue-600 font-medium">
+                      {formatNum(x.pending)}
+                    </td>
+                  </tr>
+                ))}
+                {paginatedYarnItems.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="py-6 text-center text-slate-400">
+                      No yarn inventory data.
+                    </td>
+                  </tr>
                 )}
               </tbody>
             </table>
           </div>
+          {yarnItems.length > 0 && (
+            <TablePagination
+              page={yarnPage}
+              pageSize={yarnPageSize}
+              totalItems={yarnItems.length}
+              onPageChange={setYarnPage}
+              onPageSizeChange={(sz) => { setYarnPageSize(sz); setYarnPage(1); }}
+              pageSizeOptions={[5, 10, 20]}
+              bordered
+            />
+          )}
         </div>
         )}
 
@@ -586,7 +646,7 @@ export default function LoomDashboardPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {programs.map((p) => {
+                {paginatedPrograms.map((p) => {
                   const s = p.stats || {};
                   const onTrack = (s.meters || 0) >= (s.expected || 0);
                   return (
@@ -624,6 +684,17 @@ export default function LoomDashboardPage() {
               </tbody>
             </table>
           </div>
+          {programs.length > 0 && (
+            <TablePagination
+              page={programsPage}
+              pageSize={programsPageSize}
+              totalItems={programs.length}
+              onPageChange={setProgramsPage}
+              onPageSizeChange={(sz) => { setProgramsPageSize(sz); setProgramsPage(1); }}
+              pageSizeOptions={[5, 10, 20]}
+              bordered
+            />
+          )}
         </div>
         )}
       </div>

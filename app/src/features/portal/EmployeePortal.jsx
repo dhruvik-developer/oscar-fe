@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { modal } from '../../context/ModalContext';
 import { Link } from 'react-router-dom';
 import KpiCard from '../../components/ui/KpiCard';
+import AppPagination from '../../components/ui/AppPagination';
 import {
   UserCheck,
   Calendar,
@@ -155,6 +156,8 @@ export default function EmployeePortal() {
   const [activeTab, setActiveTab] = useState('ALL'); // 'ALL' | 'POLICIES' | 'LEAVE' | 'HALFDAY' | 'EARLY' | 'REGULARIZATION' | 'WFH' | 'ASSET'
   const [statusFilter, setStatusFilter] = useState('ALL'); // 'ALL' | 'Pending' | 'Approved' | 'Rejected'
   const [searchQuery, setSearchQuery] = useState('');
+  const [requestPage, setRequestPage] = useState(1);
+  const [requestPageSize, setRequestPageSize] = useState(10);
 
   // Policy Portal filters & modal states
   const [policyScopeFilter, setPolicyScopeFilter] = useState('DEPARTMENT'); // 'DEPARTMENT' | 'ALL'
@@ -783,6 +786,17 @@ export default function EmployeePortal() {
       return true;
     });
   }, [unifiedRequests, activeTab, statusFilter, searchQuery]);
+
+  // Reset page when activeTab, filters, or page size change
+  useEffect(() => {
+    setRequestPage(1);
+  }, [activeTab, statusFilter, searchQuery, requestPageSize]);
+
+  // Paginated slice for current page
+  const paginatedRequests = useMemo(() => {
+    const start = (requestPage - 1) * requestPageSize;
+    return filteredRequests.slice(start, start + requestPageSize);
+  }, [filteredRequests, requestPage, requestPageSize]);
 
   // Request stats
   const stats = useMemo(() => {
@@ -2439,7 +2453,7 @@ export default function EmployeePortal() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-bdr/60">
-                {filteredRequests.map((req) => (
+                {paginatedRequests.map((req) => (
                   <tr key={`${req.requestType}-${req.id}`} className="hover:bg-slate-50/70 transition-colors">
                     <td className="py-3 px-5">
                       <div className="flex items-center gap-2 font-semibold text-slate-800">
@@ -2505,6 +2519,17 @@ export default function EmployeePortal() {
             </table>
           )}
         </div>
+
+        {activeTab !== 'CAREER' && activeTab !== 'DOCUMENTS' && activeTab !== 'POLICIES' && filteredRequests.length > 0 && (
+          <AppPagination
+            total={filteredRequests.length}
+            page={requestPage}
+            pageSize={requestPageSize}
+            onPageChange={setRequestPage}
+            onPageSizeChange={setRequestPageSize}
+            pageSizeOptions={[10, 25, 50, 100]}
+          />
+        )}
       </div>
 
       {/* ── MODAL 1: Request Leave (Full Day) ── */}

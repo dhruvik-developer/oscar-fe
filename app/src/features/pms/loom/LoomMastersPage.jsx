@@ -84,7 +84,7 @@ export default function LoomMastersPage() {
     pick_charge: 0.15,
   });
   const [yForm, setYForm] = useState({ name: '', denier: '', kg_per_bag: 25, rate: 0, note: '' });
-  const [fForm, setFForm] = useState({ name: '', coord: '', factory_type: 'in_house', warehouse: '', job_worker_party: '' });
+  const [fForm, setFForm] = useState({ name: '', coord: '', factory_type: 'in_house', warehouse: '', job_worker_party: '', assigned_employee: '' });
   const [mForm, setMForm] = useState({ from_no: 1, to_no: 18, reed: 84 });
   const [cForm, setCForm] = useState({ name: '', phone: '', employee: '' });
 
@@ -248,6 +248,7 @@ export default function LoomMastersPage() {
         coord: fForm.coord || null,
         warehouse: fForm.factory_type === 'in_house' ? (fForm.warehouse || null) : null,
         job_worker_party: fForm.factory_type === 'job_work' ? (fForm.job_worker_party || null) : null,
+        assigned_employees: fForm.assigned_employee ? [fForm.assigned_employee] : [],
       });
       showToast('Factory unit registered', 'success');
       setFForm({ name: '', coord: '', factory_type: 'in_house', warehouse: '', job_worker_party: '' });
@@ -916,6 +917,22 @@ export default function LoomMastersPage() {
                     ))}
                   </select>
                 </div>
+                <div>
+                  <label className="pms-label">Assign Field Staff / Employee</label>
+                  <select
+                    value={fForm.assigned_employee}
+                    onChange={(e) => setFForm({ ...fForm, assigned_employee: e.target.value })}
+                    className="pms-select w-full cursor-pointer"
+                  >
+                    <option value="">-- Assign Employee (Daily Entry) --</option>
+                    {masterEmployees.map((emp) => (
+                      <option key={emp.id} value={emp.id}>
+                        {emp.employee_code || emp.code ? `[${emp.employee_code || emp.code}] ` : ''}
+                        {emp.full_name || `${emp.first_name || ''} ${emp.last_name || ''}`.trim() || emp.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
                 <div className="col-span-full flex justify-end pt-1">
                   <button type="submit" className="pms-btn-emerald">
                     <Plus size={16} /> Add Factory
@@ -1000,6 +1017,11 @@ export default function LoomMastersPage() {
                     {selectedFactory.coord_name && (
                       <span className="text-slate-500 dark:text-slate-400">
                         Coordinator: <b className="text-slate-700 dark:text-slate-300">{selectedFactory.coord_name}</b>
+                      </span>
+                    )}
+                    {selectedFactory.assigned_employee_names && selectedFactory.assigned_employee_names.length > 0 && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                        <Users size={11} /> Staff: {selectedFactory.assigned_employee_names.join(', ')}
                       </span>
                     )}
                   </div>

@@ -97,7 +97,7 @@ export const QuotationsPage = () => {
     };
     const columns = [
         {
-            header: 'Quote #',
+            header: 'Quote',
             accessor: 'quoteNumber',
             width: '18%',
             render: (q) => (

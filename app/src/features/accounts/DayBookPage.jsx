@@ -337,7 +337,7 @@ export default function DayBookPage() {
                 <table className="w-full text-left text-xs">
                   <thead className="bg-slate-50 text-slate-500 border-b border-slate-200">
                     <tr>
-                      <SortableTh sort={salesSort} sortKey="voucherNumber" className={thClass}>Invoice #</SortableTh>
+                      <SortableTh sort={salesSort} sortKey="voucherNumber" className={thClass}>Invoice</SortableTh>
                       <SortableTh sort={salesSort} sortKey="partyName" className={thClass}>Customer</SortableTh>
                       <SortableTh sort={salesSort} sortKey="taxable" className={`${thClass} text-right`} align="right">Taxable Value</SortableTh>
                       <SortableTh sort={salesSort} sortKey="tax" className={`${thClass} text-right`} align="right">GST Tax</SortableTh>
@@ -374,7 +374,7 @@ export default function DayBookPage() {
                 <table className="w-full text-left text-xs">
                   <thead className="bg-slate-50 text-slate-500 border-b border-slate-200">
                     <tr>
-                      <SortableTh sort={collectionSort} sortKey="voucherNumber" className={thClass}>Receipt #</SortableTh>
+                      <SortableTh sort={collectionSort} sortKey="voucherNumber" className={thClass}>Receipt</SortableTh>
                       <SortableTh sort={collectionSort} sortKey="partyName" className={thClass}>Customer</SortableTh>
                       <SortableTh sort={collectionSort} sortKey="mode" className={thClass}>Mode</SortableTh>
                       <SortableTh sort={collectionSort} sortKey="bank" className={thClass}>Deposited Bank</SortableTh>
@@ -405,7 +405,7 @@ export default function DayBookPage() {
                 <table className="w-full text-left text-xs">
                   <thead className="bg-slate-50 text-slate-500 border-b border-slate-200">
                     <tr>
-                      <SortableTh sort={purchaseSort} sortKey="voucherNumber" className={thClass}>Bill #</SortableTh>
+                      <SortableTh sort={purchaseSort} sortKey="voucherNumber" className={thClass}>Bill</SortableTh>
                       <SortableTh sort={purchaseSort} sortKey="partyName" className={thClass}>Vendor</SortableTh>
                       <SortableTh sort={purchaseSort} sortKey="taxable" className={`${thClass} text-right`} align="right">Taxable Value</SortableTh>
                       <SortableTh sort={purchaseSort} sortKey="amount" className={`${thClass} text-right`} align="right">Total Bill Amount</SortableTh>
@@ -440,7 +440,7 @@ export default function DayBookPage() {
                 <table className="w-full text-left text-xs">
                   <thead className="bg-slate-50 text-slate-500 border-b border-slate-200">
                     <tr>
-                      <SortableTh sort={disbursementSort} sortKey="voucherNumber" className={thClass}>Payment #</SortableTh>
+                      <SortableTh sort={disbursementSort} sortKey="voucherNumber" className={thClass}>Payment</SortableTh>
                       <SortableTh sort={disbursementSort} sortKey="partyName" className={thClass}>Vendor / Beneficiary</SortableTh>
                       <SortableTh sort={disbursementSort} sortKey="mode" className={thClass}>Mode</SortableTh>
                       <SortableTh sort={disbursementSort} sortKey="bank" className={thClass}>Bank Account</SortableTh>
@@ -471,7 +471,7 @@ export default function DayBookPage() {
                 <table className="w-full text-left text-xs">
                   <thead className="bg-slate-50 text-slate-500 border-b border-slate-200">
                     <tr>
-                      <SortableTh sort={tripSort} sortKey="voucherNumber" className={thClass}>Trip #</SortableTh>
+                      <SortableTh sort={tripSort} sortKey="voucherNumber" className={thClass}>Trip</SortableTh>
                       <SortableTh sort={tripSort} sortKey="vehicleNumber" className={thClass}>Vehicle Number</SortableTh>
                       <SortableTh sort={tripSort} sortKey="paidBy" className={thClass}>Freight Paid By</SortableTh>
                       <SortableTh sort={tripSort} sortKey="amount" className={`${thClass} text-right`} align="right">Total Charges</SortableTh>

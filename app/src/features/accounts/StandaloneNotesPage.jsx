@@ -323,7 +323,7 @@ export default function StandaloneNotesPage({ embedded = false }) {
             <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
             <input
               type="text"
-              placeholder="Search note #, party, against doc #..."
+              placeholder="Search note, party, against doc..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="w-full pl-9 pr-3 py-2 border border-[#dce5f4] rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
@@ -371,7 +371,7 @@ export default function StandaloneNotesPage({ embedded = false }) {
           <table className="w-full text-left text-xs border-collapse">
             <thead>
               <tr className="bg-slate-50 border-b border-[#dce5f4] text-slate-600 font-semibold uppercase tracking-wider text-[11px]">
-                <SortableTh sort={noteSort} sortKey="noteNumber" className="py-3 px-4">Note #</SortableTh>
+                <SortableTh sort={noteSort} sortKey="noteNumber" className="py-3 px-4">Note</SortableTh>
                 <SortableTh sort={noteSort} sortKey="type" className="py-3 px-4">Type</SortableTh>
                 <SortableTh sort={noteSort} sortKey="date" className="py-3 px-4">Date</SortableTh>
                 <SortableTh sort={noteSort} sortKey="party" className="py-3 px-4">Party</SortableTh>

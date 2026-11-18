@@ -987,7 +987,7 @@ export default function QuotationComposerPage({ embedded = null } = {}) {
               <table className="w-full text-left text-xs border-collapse min-w-[1240px]">
                 <thead>
                   <tr className="text-[11px] font-bold text-slate-500 border-b border-slate-200">
-                    <th className="py-2 pr-2 w-8">#</th>
+                    <th className="py-2 pr-2 w-8">Sr. No.</th>
                     <th className="py-2 pr-2 min-w-[140px]">
                       <div className="flex items-center justify-between gap-2">
                         <span>Fabric / Item</span>

@@ -429,7 +429,7 @@ export function SupplierLedgerDrawer({
                         <tr className="border-b border-slate-200 bg-slate-50 text-[10px] uppercase font-bold text-slate-500 tracking-wider">
                           <th className="py-2.5 px-4">Date</th>
                           <th className="py-2.5 px-3">Voucher Type</th>
-                          <th className="py-2.5 px-3">Document #</th>
+                          <th className="py-2.5 px-3">Document</th>
                           <th className="py-2.5 px-3">Narration / Particulars</th>
                           <th className="py-2.5 px-3 text-right">Debit (₹)</th>
                           <th className="py-2.5 px-3 text-right">Credit (₹)</th>
@@ -558,7 +558,7 @@ export function SupplierLedgerDrawer({
                   <table className="w-full border-collapse text-left text-xs">
                     <thead>
                       <tr className="border-b border-slate-200 bg-slate-50 text-[10px] uppercase font-bold text-slate-500 tracking-wider">
-                        <th className="py-2.5 px-4">{isCustomer ? 'Invoice #' : 'Bill Number'}</th>
+                        <th className="py-2.5 px-4">{isCustomer ? 'Invoice' : 'Bill Number'}</th>
                         <th className="py-2.5 px-3">Date</th>
                         <th className="py-2.5 px-3 text-right">Amount (₹)</th>
                         <th className="py-2.5 px-3 text-right">Paid Amount (₹)</th>
@@ -644,7 +644,7 @@ export function SupplierLedgerDrawer({
                   <table className="w-full border-collapse text-left text-xs">
                     <thead>
                       <tr className="border-b border-slate-200 bg-slate-50 text-[10px] uppercase font-bold text-slate-500 tracking-wider">
-                        <th className="py-2.5 px-4">{isCustomer ? 'Receipt #' : 'Payment #'}</th>
+                        <th className="py-2.5 px-4">{isCustomer ? 'Receipt' : 'Payment'}</th>
                         <th className="py-2.5 px-3">Date</th>
                         <th className="py-2.5 px-3">Mode</th>
                         <th className="py-2.5 px-3 text-right">Amount (₹)</th>

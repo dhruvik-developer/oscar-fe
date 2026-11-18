@@ -383,7 +383,7 @@ export const ProformaInvoicesPage = () => {
   const columns = [
     {
       key: 'proformaNumber',
-      header: 'Proforma #',
+      header: 'Proforma',
       width: '12%',
       render: (pi) => (
         <button
@@ -1113,7 +1113,7 @@ export const ProformaInvoicesPage = () => {
                 <table className="w-full min-w-[640px] lg:min-w-0 text-xs text-left">
                   <thead className="bg-slate-100 border-b border-slate-200 font-bold text-slate-700 text-[11px]">
                     <tr>
-                      <th className="p-2.5 w-8 text-center">#</th>
+                      <th className="p-2.5 w-8 text-center">Sr. No.</th>
                       <th className="p-2.5">Product & Machine Deliverables</th>
                       <th className="p-2.5 text-center w-16">Qty</th>
                       <th className="p-2.5 text-right w-24">Unit Rate</th>

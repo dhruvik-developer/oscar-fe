@@ -332,7 +332,7 @@ export const DeliveryChallansPage = () => {
     const columns = [
         {
             key: 'challanNumber',
-            header: 'Challan / Waybill #',
+            header: 'Challan / Waybill',
             width: '14%',
             render: (c) => (
               <button
@@ -464,7 +464,7 @@ export const DeliveryChallansPage = () => {
             Issue Delivery Challan
           </Button>}/>
 
-      <DataTable title="Active Dispatch Consignments" columns={columns} data={visibleDeliveryChallans} keyExtractor={(c) => c.id} searchPlaceholder="Search challan #, sales order, or carrier..." searchFilter={(c, term) => String(c.challanNumber ?? '').toLowerCase().includes(term) ||
+      <DataTable title="Active Dispatch Consignments" columns={columns} data={visibleDeliveryChallans} keyExtractor={(c) => c.id} searchPlaceholder="Search challan, sales order, or carrier..." searchFilter={(c, term) => String(c.challanNumber ?? '').toLowerCase().includes(term) ||
             (c.salesOrderNumber && String(c.salesOrderNumber ?? '').toLowerCase().includes(term)) ||
             String(c.customer ?? '').toLowerCase().includes(term) ||
             (c.transporter && String(c.transporter ?? '').toLowerCase().includes(term))}/>
@@ -509,7 +509,7 @@ export const DeliveryChallansPage = () => {
                 </div>
                 <div>
                   <div className="flex items-center justify-between mb-1">
-                    <label className="font-semibold text-slate-700 block">Vehicle / Truck Plate #</label>
+                    <label className="font-semibold text-slate-700 block">Vehicle / Truck Plate No.</label>
                     <MasterSourceLink source="vehicles" />
                   </div>
                   <input type="text" value={vehicleNo} onChange={(e) => setVehicleNo(e.target.value)} className="w-full p-2 border border-slate-300 rounded bg-white text-slate-800" placeholder="e.g. MH-12-AB-9041"/>
@@ -768,7 +768,7 @@ export const DeliveryChallansPage = () => {
                   <p className="font-semibold text-slate-800">{selectedChallan.transporter || '—'}</p>
                 </div>
                 <div>
-                  <span className="text-[10px] text-slate-400 font-semibold uppercase">Vehicle / Reg #</span>
+                  <span className="text-[10px] text-slate-400 font-semibold uppercase">Vehicle / Reg No.</span>
                   <p className="font-mono font-semibold text-slate-800">{selectedChallan.vehicleNo || '—'}</p>
                 </div>
                 <div>
@@ -933,7 +933,7 @@ export const DeliveryChallansPage = () => {
                   <table className="w-full min-w-[640px] lg:min-w-0 text-left text-xs text-slate-600">
                     <thead className="bg-slate-50 uppercase font-semibold text-slate-500 tracking-wider border-b border-slate-200">
                       <tr>
-                        <th className="py-2.5 px-3 w-12 text-center">#</th>
+                        <th className="py-2.5 px-3 w-12 text-center">Sr. No.</th>
                         <th className="py-2.5 px-3">Item Description</th>
                         <th className="py-2.5 px-3 w-32">SKU / Code</th>
                         <th className="py-2.5 px-3 w-28 text-center">Dispatched Qty</th>

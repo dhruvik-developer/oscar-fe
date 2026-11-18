@@ -39,6 +39,8 @@ import {
   Factory,
   UserPlus,
   UserX,
+  UserCog,
+  Handshake,
   GraduationCap,
   TrendingUp,
   Hourglass,
@@ -185,11 +187,11 @@ export const NAV = [
         icon: Target,
         defaultOpen: true,
         children: [
-          { label: 'Leads', icon: Users, to: '/crm/leads', dot: true },
-          { label: 'Lost Leads', icon: UserX, to: '/crm/leads/lost' },
-          { label: 'Lead Create Form', icon: FilePlus2, to: '/crm/leads/forms' },
-          { label: 'Lead Tasks Master', icon: ClipboardList, to: '/crm/leads/tasks-master' },
-          { label: 'Lead Stage Tasks', icon: Layers, to: '/crm/leads/stage-tasks' },
+          { label: 'Leads', to: '/crm/leads' },
+          { label: 'Lost Leads', to: '/crm/leads/lost' },
+          { label: 'Lead Create Form', to: '/crm/leads/forms' },
+          { label: 'Lead Tasks Master', to: '/crm/leads/tasks-master' },
+          { label: 'Lead Stage Tasks', to: '/crm/leads/stage-tasks' },
         ],
       },
       {
@@ -337,7 +339,6 @@ export const NAV = [
         ],
       },
       { label: 'Batch Registry', icon: QrCode, to: '/inventory/batches' },
-      { label: 'Batch Profitability', icon: TrendingUp, to: '/inventory/batch-profitability' },
       { label: 'Stock Position', icon: BarChart3, to: '/inventory/stock-position' },
       {
         label: 'QC (Quality Control)', icon: CircleCheck, to: '/inventory/qc/dashboard',
@@ -461,7 +462,18 @@ export const NAV = [
       },
       // { label: 'Training', icon: GraduationCap, to: '/hrms/training' }, // Hidden: Training feature commented out
       { label: 'HR Admin', icon: ShieldCheck, to: '/hrms/hr-admin' },
-      { label: 'Asset Setup', icon: Briefcase, to: '/hrms/assets' },
+      {
+        label: 'Asset Setup',
+        icon: Briefcase,
+        defaultOpen: false,
+        navigateOnOpen: true,
+        to: '/hrms/assets',
+        children: [
+          { label: 'Assets', to: '/hrms/assets', dot: true },
+          { label: 'Asset Requests', to: '/hrms/assets?tab=requests' },
+          { label: 'Categories', to: '/hrms/assets?tab=categories' },
+        ],
+      },
       { label: 'Documents', icon: FileText, to: '/hrms/documents' },
       { label: 'Company Policy', icon: ShieldCheck, to: '/hrms/company-policy' },
       { label: 'Calendar', icon: Calendar, to: '/hrms/calendar' },
@@ -497,9 +509,9 @@ export const NAV = [
     icon: Shield,
     children: [
       { label: 'My Approvals', icon: ShieldCheck, to: '/administration/approvals' },
-      { label: 'Users', to: '/administration/users' },
-      { label: 'Roles', to: '/administration/roles' },
-      { label: 'Clients', to: '/administration/clients' },
+      { label: 'Users', icon: Users, to: '/administration/users' },
+      { label: 'Roles', icon: UserCog, to: '/administration/roles' },
+      { label: 'Clients', icon: Handshake, to: '/administration/clients' },
     ],
   },
 

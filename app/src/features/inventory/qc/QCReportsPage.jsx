@@ -53,6 +53,7 @@ export default function QCReportsPage() {
   const [selectedRow, setSelectedRow] = useState(null);
   const [showExportModal, setShowExportModal] = useState(false);
   const [exportFormat, setExportFormat] = useState('csv');
+  const [exportingPdf, setExportingPdf] = useState(false);
 
   // Backend state
   const [summaryKPIs, setSummaryKPIs] = useState({
@@ -151,10 +152,298 @@ export default function QCReportsPage() {
     });
   }, [reportsData, activeTab, searchQuery]);
 
-  // CSV Export
+  // PDF Export Generation
+  const handleExportPDF = async () => {
+    if (!filteredData || filteredData.length === 0) {
+      modal.info('No records available in this report to export.', 'Export PDF');
+      return;
+    }
+
+    setExportingPdf(true);
+    try {
+      const { jsPDF } = await import('jspdf');
+      const doc = new jsPDF({
+        orientation: 'landscape',
+        unit: 'pt',
+        format: 'a4',
+      });
+
+      const pageWidth = 841.89;
+      const pageHeight = 595.28;
+      const margin = 36;
+      const printableWidth = pageWidth - margin * 2; // 769.89 pt
+
+      const currentTabObj = tabs.find((t) => t.id === activeTab);
+      const reportTitle = currentTabObj?.label || 'QC Report';
+
+      // Define columns for each of the 6 reports
+      const columnConfigs = {
+        supplierRejection: [
+          { header: 'Supplier / Mill', width: 130, align: 'left', get: (r) => r.supplier || '—' },
+          { header: 'Grade', width: 50, align: 'center', get: (r) => r.grade ? `Grade ${r.grade}` : '—' },
+          { header: 'Receipts', width: 55, align: 'right', get: (r) => String(r.receiptsCount ?? 0) },
+          { header: 'Received (m)', width: 75, align: 'right', get: (r) => fmtQty(r.receivedQty) },
+          { header: 'Inspected (m)', width: 75, align: 'right', get: (r) => fmtQty(r.inspectedQty) },
+          { header: 'Good (m)', width: 75, align: 'right', get: (r) => fmtQty(r.goodQty) },
+          { header: 'Hold (m)', width: 70, align: 'right', get: (r) => fmtQty(r.holdQty) },
+          { header: 'Rejected (m)', width: 70, align: 'right', get: (r) => fmtQty(r.rejectedQty) },
+          { header: 'Rejection %', width: 80, align: 'right', get: (r) => fmtPct(r.rejectionPct, '0%') },
+          { header: 'Pass %', width: 90, align: 'right', get: (r) => fmtPct(r.passPct, '0%') },
+        ],
+        fabricDefects: [
+          { header: 'Fabric Quality', width: 140, align: 'left', get: (r) => r.quality || '—' },
+          { header: 'Item Code', width: 75, align: 'left', get: (r) => r.itemCode || '—' },
+          { header: 'Lots', width: 55, align: 'right', get: (r) => String(r.lotsCount ?? 0) },
+          { header: 'Inspected (m)', width: 80, align: 'right', get: (r) => fmtQty(r.inspectedQty) },
+          { header: 'Good Qty (m)', width: 80, align: 'right', get: (r) => fmtQty(r.goodQty) },
+          { header: 'Defective (m)', width: 80, align: 'right', get: (r) => fmtQty(r.defectiveQty) },
+          { header: 'Defect %', width: 75, align: 'right', get: (r) => fmtPct(r.defectPct, '0%') },
+          { header: 'Pass %', width: 75, align: 'right', get: (r) => fmtPct(r.passPct, '0%') },
+          { header: 'Primary Defect', width: 110, align: 'left', get: (r) => r.primaryDefect || 'None' },
+        ],
+        holdPending: [
+          { header: 'Ref / Inward No', width: 85, align: 'left', get: (r) => r.refNo || '—' },
+          { header: 'Source', width: 60, align: 'center', get: (r) => r.sourceType || '—' },
+          { header: 'Date', width: 65, align: 'center', get: (r) => r.date || '—' },
+          { header: 'Supplier / Mill', width: 110, align: 'left', get: (r) => r.supplier || '—' },
+          { header: 'Fabric Quality', width: 100, align: 'left', get: (r) => r.itemName || r.quality || '—' },
+          { header: 'Lot No', width: 65, align: 'left', get: (r) => r.lotNo || '—' },
+          { header: 'Pending (m)', width: 70, align: 'right', get: (r) => fmtQty(r.qty) },
+          { header: 'Days', width: 45, align: 'center', get: (r) => `${r.daysPending ?? 0}d` },
+          { header: 'Aging Bucket', width: 60, align: 'center', get: (r) => r.agingBucket || '—' },
+          { header: 'Status', width: 50, align: 'center', get: (r) => r.status || '—' },
+          { header: 'Reason / Notes', width: 60, align: 'left', get: (r) => r.remarks || '—' },
+        ],
+        reprocessRecovery: [
+          { header: 'Reprocess No', width: 80, align: 'left', get: (r) => r.rpNo || '—' },
+          { header: 'Source Ref', width: 75, align: 'left', get: (r) => r.sourceRef || '—' },
+          { header: 'Processor', width: 110, align: 'left', get: (r) => r.vendor || '—' },
+          { header: 'Fabric Item', width: 95, align: 'left', get: (r) => r.fabricItem || '—' },
+          { header: 'Sent (m)', width: 65, align: 'right', get: (r) => fmtQty(r.sentQty) },
+          { header: 'Recv (m)', width: 70, align: 'right', get: (r) => r.receivedQty != null ? fmtQty(r.receivedQty) : 'Pending' },
+          { header: 'Recovery %', width: 65, align: 'right', get: (r) => fmtPct(r.recoveryPct, '—') },
+          { header: 'Loss (m)', width: 65, align: 'right', get: (r) => r.lossQty != null ? fmtQty(r.lossQty) : '—' },
+          { header: 'Status', width: 55, align: 'center', get: (r) => r.status || '—' },
+          { header: 'Good (m)', width: 60, align: 'right', get: (r) => r.goodQty != null ? fmtQty(r.goodQty) : '—' },
+          { header: 'Reason', width: 80, align: 'left', get: (r) => r.reason || '—' },
+        ],
+        inspectorPerformance: [
+          { header: 'Inspector Name', width: 150, align: 'left', get: (r) => r.inspector || '—' },
+          { header: 'Total Inspections', width: 90, align: 'right', get: (r) => String(r.inspectionsCount ?? 0) },
+          { header: 'Inspected (m)', width: 95, align: 'right', get: (r) => fmtQty(r.inspectedQty) },
+          { header: 'Approved Lots', width: 80, align: 'right', get: (r) => String(r.approvedCount ?? 0) },
+          { header: 'Held Lots', width: 75, align: 'right', get: (r) => String(r.holdCount ?? 0) },
+          { header: 'Rejected Lots', width: 80, align: 'right', get: (r) => String(r.rejectedCount ?? 0) },
+          { header: 'Pass Rate %', width: 90, align: 'right', get: (r) => fmtPct(r.passPct, '0%') },
+          { header: 'Rating', width: 110, align: 'center', get: () => 'Consistent' },
+        ],
+        dateWiseSummary: [
+          { header: 'Date', width: 80, align: 'left', get: (r) => r.date || '—' },
+          { header: 'Receipts', width: 70, align: 'right', get: (r) => String(r.receiptsCount ?? 0) },
+          { header: 'Received (m)', width: 85, align: 'right', get: (r) => fmtQty(r.receivedQty) },
+          { header: 'Inspected (m)', width: 85, align: 'right', get: (r) => fmtQty(r.inspectedQty) },
+          { header: 'Good Fabric (m)', width: 85, align: 'right', get: (r) => fmtQty(r.goodQty) },
+          { header: 'Hold (m)', width: 80, align: 'right', get: (r) => fmtQty(r.holdQty) },
+          { header: 'Rejected (m)', width: 80, align: 'right', get: (r) => fmtQty(r.rejectedQty) },
+          { header: 'Pass Rate %', width: 95, align: 'right', get: (r) => fmtPct(r.passPct, '0%') },
+          { header: 'Rejection Rate %', width: 90, align: 'right', get: (r) => fmtPct(r.rejectionPct, '0%') },
+        ],
+      };
+
+      const columns = columnConfigs[activeTab] || [
+        { header: 'Item', width: printableWidth, align: 'left', get: (r) => JSON.stringify(r) }
+      ];
+
+      // Draw header on each page
+      const drawReportHeader = (isFirstPage) => {
+        if (isFirstPage) {
+          // Dark Header Banner
+          doc.setFillColor(30, 41, 59); // slate-800
+          doc.rect(margin, margin, printableWidth, 34, 'F');
+
+          doc.setFontSize(12);
+          doc.setFont('helvetica', 'bold');
+          doc.setTextColor(255, 255, 255);
+          doc.text('OSCAR TEXTILE ERP  |  QUALITY ASSURANCE & COMPLIANCE', margin + 12, margin + 21);
+
+          doc.setFontSize(8);
+          doc.setFont('helvetica', 'normal');
+          doc.setTextColor(203, 213, 225);
+          doc.text('AUDIT-CERTIFIED QC REPORT', margin + printableWidth - 145, margin + 21);
+
+          // Report Title & Meta
+          doc.setFontSize(14);
+          doc.setFont('helvetica', 'bold');
+          doc.setTextColor(15, 23, 42); // slate-900
+          doc.text(reportTitle, margin, margin + 56);
+
+          doc.setFontSize(8.5);
+          doc.setFont('helvetica', 'normal');
+          doc.setTextColor(100, 116, 139); // slate-500
+          const dateRangeLabel = dateRange === '30' ? 'Last 30 Days' : dateRange === '90' ? 'Last 90 Days' : dateRange === 'custom' ? `${customFrom || '—'} to ${customTo || '—'}` : 'All Time';
+          const metaText = `Time Period: ${dateRangeLabel}  |  Supplier: ${selectedSupplier}  |  Quality: ${selectedQuality}  |  Rows: ${filteredData.length}`;
+          doc.text(metaText, margin, margin + 70);
+
+          const nowStr = new Date().toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' });
+          doc.text(`Generated: ${nowStr}`, margin + printableWidth - 170, margin + 70);
+
+          // Summary KPI Strip
+          doc.setFillColor(248, 250, 252); // slate-50
+          doc.setDrawColor(226, 232, 240); // slate-200
+          doc.roundedRect(margin, margin + 80, printableWidth, 30, 3, 3, 'FD');
+
+          const kpis = [
+            { label: 'Receipts', value: String(summaryKPIs?.totalReceipts || 0) },
+            { label: 'Total Received', value: `${fmtQty(summaryKPIs?.totalReceived, '0')} m` },
+            { label: 'Inspected', value: `${fmtQty(summaryKPIs?.totalInspected, '0')} m` },
+            { label: 'Pass Rate', value: fmtPct(summaryKPIs?.passRate, '0%') },
+            { label: 'Rejection Rate', value: fmtPct(summaryKPIs?.rejectionRate, '0%') },
+            { label: 'Hold / Pending', value: `${fmtQty(summaryKPIs?.pendingHoldQty, '0')} m` },
+            { label: 'Recovery Rate', value: fmtPct(summaryKPIs?.reprocessRecovery, '0%') },
+          ];
+
+          const kpiColWidth = printableWidth / kpis.length;
+          kpis.forEach((k, idx) => {
+            const kx = margin + idx * kpiColWidth;
+            doc.setFontSize(7);
+            doc.setFont('helvetica', 'normal');
+            doc.setTextColor(100, 116, 139);
+            doc.text(k.label, kx + 8, margin + 92);
+
+            doc.setFontSize(9);
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(15, 23, 42);
+            doc.text(k.value, kx + 8, margin + 104);
+          });
+
+          return margin + 120; // Table start Y on page 1
+        } else {
+          doc.setFontSize(9);
+          doc.setFont('helvetica', 'bold');
+          doc.setTextColor(100, 116, 139);
+          doc.text(`${reportTitle} (continued)`, margin, margin + 14);
+          doc.setDrawColor(226, 232, 240);
+          doc.line(margin, margin + 20, margin + printableWidth, margin + 20);
+          return margin + 26; // Table start Y on page 2+
+        }
+      };
+
+      // Draw table headers
+      const drawTableHeaders = (startY) => {
+        doc.setFillColor(241, 245, 249); // slate-100
+        doc.setDrawColor(203, 213, 225); // slate-300
+        doc.rect(margin, startY, printableWidth, 20, 'FD');
+
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(51, 65, 85); // slate-700
+
+        let currentX = margin;
+        columns.forEach((col) => {
+          let textX = currentX + 6;
+          if (col.align === 'right') {
+            textX = currentX + col.width - 6;
+          } else if (col.align === 'center') {
+            textX = currentX + col.width / 2;
+          }
+          doc.text(col.header, textX, startY + 13, { align: col.align });
+          currentX += col.width;
+        });
+
+        return startY + 20;
+      };
+
+      let currentY = drawReportHeader(true);
+      currentY = drawTableHeaders(currentY);
+
+      // Render data rows
+      const rowHeight = 16;
+      const maxY = pageHeight - margin - 22; // 537 pt
+
+      filteredData.forEach((row, rowIdx) => {
+        if (currentY + rowHeight > maxY) {
+          doc.addPage();
+          currentY = drawReportHeader(false);
+          currentY = drawTableHeaders(currentY);
+        }
+
+        // Alternating row background
+        if (rowIdx % 2 === 0) {
+          doc.setFillColor(255, 255, 255);
+        } else {
+          doc.setFillColor(248, 250, 252);
+        }
+        doc.setDrawColor(241, 245, 249);
+        doc.rect(margin, currentY, printableWidth, rowHeight, 'FD');
+
+        doc.setFontSize(7.5);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(51, 65, 85);
+
+        let currentX = margin;
+        columns.forEach((col) => {
+          const rawVal = col.get(row);
+          let text = String(rawVal != null ? rawVal : '—');
+
+          const maxTextWidth = col.width - 12;
+          if (doc.getTextWidth(text) > maxTextWidth) {
+            while (text.length > 3 && doc.getTextWidth(text + '...') > maxTextWidth) {
+              text = text.slice(0, -1);
+            }
+            text += '...';
+          }
+
+          let textX = currentX + 6;
+          if (col.align === 'right') {
+            textX = currentX + col.width - 6;
+          } else if (col.align === 'center') {
+            textX = currentX + col.width / 2;
+          }
+
+          doc.text(text, textX, currentY + 11, { align: col.align });
+          currentX += col.width;
+        });
+
+        currentY += rowHeight;
+      });
+
+      // Bottom footer on every page
+      const totalPages = doc.getNumberOfPages();
+      for (let p = 1; p <= totalPages; p++) {
+        doc.setPage(p);
+        doc.setFontSize(7.5);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(148, 163, 184);
+
+        doc.setDrawColor(226, 232, 240);
+        doc.line(margin, pageHeight - margin + 6, margin + printableWidth, pageHeight - margin + 6);
+
+        doc.text('CONFIDENTIAL - FOR INTERNAL QUALITY CONTROL USE ONLY', margin, pageHeight - margin + 17);
+        doc.text('Generated via OSCAR ERP Quality Control Management System', margin + printableWidth / 2, pageHeight - margin + 17, { align: 'center' });
+        doc.text(`Page ${p} of ${totalPages}`, margin + printableWidth, pageHeight - margin + 17, { align: 'right' });
+      }
+
+      const dateStamp = new Date().toISOString().split('T')[0];
+      const filename = `QC_Report_${activeTab}_${dateStamp}.pdf`;
+      doc.save(filename);
+      setShowExportModal(false);
+    } catch (err) {
+      console.error('Failed to generate PDF report:', err);
+      modal.error('Could not generate PDF report: ' + (err.message || 'Unknown error'), 'PDF Export Failed');
+    } finally {
+      setExportingPdf(false);
+    }
+  };
+
+  // Export Dispatcher (CSV / Excel / PDF)
   const handleExport = () => {
     if (!filteredData || filteredData.length === 0) {
-      modal.info('No records available in this report to export.', 'Export CSV');
+      modal.info('No records available in this report to export.', 'Export Report');
+      return;
+    }
+
+    if (exportFormat === 'pdf') {
+      handleExportPDF();
       return;
     }
 
@@ -175,7 +464,7 @@ export default function QCReportsPage() {
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `QC_Report_${activeTab}_${new Date().toISOString().split('T')[0]}.csv`);
+    link.setAttribute('download', `QC_Report_${activeTab}_${new Date().toISOString().split('T')[0]}.${exportFormat === 'xlsx' ? 'xlsx' : 'csv'}`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -745,10 +1034,14 @@ export default function QCReportsPage() {
           <div className="bg-white rounded-xl border border-slate-200 shadow-xl max-w-sm w-full p-5 space-y-4">
             <div className="flex items-center justify-between pb-2 border-b border-slate-100">
               <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
-                <FileSpreadsheet className="w-4 h-4 text-blue-600" />
+                {exportFormat === 'pdf' ? (
+                  <FileText className="w-4 h-4 text-rose-600" />
+                ) : (
+                  <FileSpreadsheet className="w-4 h-4 text-blue-600" />
+                )}
                 Export {tabs.find((t) => t.id === activeTab)?.label}
               </h3>
-              <button onClick={() => setShowExportModal(false)} className="text-slate-400 hover:text-slate-600">
+              <button onClick={() => !exportingPdf && setShowExportModal(false)} className="text-slate-400 hover:text-slate-600 cursor-pointer">
                 <X className="w-4 h-4" />
               </button>
             </div>
@@ -758,28 +1051,45 @@ export default function QCReportsPage() {
                 <select
                   value={exportFormat}
                   onChange={(e) => setExportFormat(e.target.value)}
-                  className="w-full border border-slate-300 rounded-lg p-2 text-xs bg-slate-50 focus:outline-none"
+                  className="w-full border border-slate-300 rounded-lg p-2 text-xs bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
                 >
                   <option value="csv">CSV (Comma-separated values)</option>
                   <option value="xlsx">Excel (.csv format)</option>
+                  <option value="pdf">PDF Document (.pdf format)</option>
                 </select>
               </div>
               <p className="text-slate-500 text-[11px]">
-                Downloads the currently filtered {filteredData.length} report rows with all columns and calculations.
+                {exportFormat === 'pdf'
+                  ? `Generates an audit-certified A4 landscape PDF report with summary KPIs and all ${filteredData.length} records.`
+                  : `Downloads the currently filtered ${filteredData.length} report rows with all columns and calculations.`}
               </p>
             </div>
             <div className="flex gap-2 pt-2">
               <button
+                type="button"
                 onClick={() => setShowExportModal(false)}
-                className="flex-1 py-2 bg-slate-100 text-slate-700 text-xs font-semibold rounded-lg hover:bg-slate-200 transition"
+                disabled={exportingPdf}
+                className="flex-1 py-2 bg-slate-100 text-slate-700 text-xs font-semibold rounded-lg hover:bg-slate-200 transition disabled:opacity-50 cursor-pointer"
               >
                 Cancel
               </button>
               <button
+                type="button"
                 onClick={handleExport}
-                className="flex-1 py-2 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 transition"
+                disabled={exportingPdf}
+                className="flex-1 py-2 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 transition flex items-center justify-center gap-1.5 disabled:opacity-50 cursor-pointer shadow-xs"
               >
-                Download
+                {exportingPdf ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Generating PDF...</span>
+                  </>
+                ) : (
+                  <>
+                    <Download className="w-3.5 h-3.5" />
+                    <span>Download</span>
+                  </>
+                )}
               </button>
             </div>
           </div>

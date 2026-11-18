@@ -908,7 +908,7 @@ export const ItemsMasterPage = () => {
                   />
                 </th>
                 <th className="text-center w-14">Sr. No.</th>
-                <SortableTh sort={itemSort} sortKey="sku">SKU / Model #</SortableTh>
+                <SortableTh sort={itemSort} sortKey="sku">SKU / Model</SortableTh>
                 <SortableTh sort={itemSort} sortKey="quality">Fabric Quality</SortableTh>
                 <SortableTh sort={itemSort} sortKey="design">Design</SortableTh>
                 <SortableTh sort={itemSort} sortKey="colour">Shade / Colour</SortableTh>

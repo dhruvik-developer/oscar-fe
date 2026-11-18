@@ -798,7 +798,7 @@ export function FinalJobWorkPoInlineSlide({
           <table className="w-full min-w-[700px] text-left text-xs">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200 text-[10.5px] font-bold uppercase tracking-wider text-slate-500">
-                <th className="px-3 py-2.5 w-12 text-center">#</th>
+                <th className="px-3 py-2.5 w-12 text-center">Sr. No.</th>
                 <th className="px-3 py-2.5">Fabric</th>
                 <th className="px-3 py-2.5">HSN</th>
                 <th className="px-3 py-2.5">UOM</th>
@@ -1099,7 +1099,7 @@ export function FinalJobWorkPoInlineSlide({
                   <table className="w-full text-left text-xs">
                     <thead>
                       <tr className="bg-slate-100 border-b border-slate-200 text-[10px] font-bold uppercase text-slate-600">
-                        <th className="px-3 py-2 text-center w-10">#</th>
+                        <th className="px-3 py-2 text-center w-10">Sr. No.</th>
                         <th className="px-3 py-2">Fabric Quality</th>
                         <th className="px-3 py-2">HSN</th>
                         <th className="px-3 py-2 text-center">UOM</th>

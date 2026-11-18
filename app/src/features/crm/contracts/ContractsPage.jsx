@@ -285,8 +285,8 @@ export default function ContractsPage() {
             <table className="w-full min-w-[1080px] text-xs">
               <thead>
                 <tr className="bg-slate-50 text-left text-slate-500">
-                  <th className="px-3 py-3 font-semibold w-8">#</th>
-                  <th className="px-3 py-3 font-semibold">Contract #</th>
+                  <th className="px-3 py-3 font-semibold w-8">Sr. No.</th>
+                  <th className="px-3 py-3 font-semibold">Contract</th>
                   <th className="px-3 py-3 font-semibold">Customer</th>
                   <th className="px-3 py-3 font-semibold">Deal</th>
                   <th className="px-3 py-3 font-semibold">Contract Type</th>

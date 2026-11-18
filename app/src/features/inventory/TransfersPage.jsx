@@ -72,7 +72,7 @@ export const TransfersPage = () => {
         <table className="w-full min-w-[900px]">
           <thead className="table-head-std">
             <tr className="table-head-row-std">
-              <th className="text-left">Transfer #</th>
+              <th className="text-left">Transfer</th>
               <th className="text-left">From</th>
               <th className="text-left">To</th>
               <th className="text-left">Date</th>

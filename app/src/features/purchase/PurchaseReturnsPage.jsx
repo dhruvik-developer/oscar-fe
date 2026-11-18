@@ -163,7 +163,7 @@ export const PurchaseReturnsPage = () => {
     const columns = [
         {
             key: 'debitNoteNumber',
-            header: 'Debit Note #',
+            header: 'Debit Note',
             width: '15%',
             render: (r) => (
               <button onClick={() => setSelectedReturn(r)} className="font-mono font-bold text-primary hover:underline flex items-center gap-1.5 whitespace-nowrap cursor-pointer text-left">
@@ -278,7 +278,7 @@ export const PurchaseReturnsPage = () => {
             Create Debit Note
           </Button>}/>
 
-      <DataTable title="Vendor Return Debit Notes" columns={columns} data={purchaseReturns} keyExtractor={(r) => r.id} searchPlaceholder="Search debit note # or vendor..." searchFilter={(r, term) => String(r.debitNoteNumber ?? '').toLowerCase().includes(term) ||
+      <DataTable title="Vendor Return Debit Notes" columns={columns} data={purchaseReturns} keyExtractor={(r) => r.id} searchPlaceholder="Search debit note or vendor..." searchFilter={(r, term) => String(r.debitNoteNumber ?? '').toLowerCase().includes(term) ||
             String(r.vendor ?? '').toLowerCase().includes(term) ||
             String(billNumberOf(r) ?? '').toLowerCase().includes(term) ||
             String(r.reason ?? '').toLowerCase().includes(term)}/>

@@ -1,5 +1,3 @@
-import { jsPDF } from 'jspdf';
-import { toPng } from 'html-to-image';
 import { modal } from '../context/ModalContext';
 
 export function exportToCSV(filename, headers, rows) {
@@ -27,6 +25,7 @@ export function exportToCSV(filename, headers, rows) {
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
 }
+
 export function exportObjectsToCSV(filename, data, columnMapping) {
     if (!data || data.length === 0) {
         modal.info('No data available to export.', 'Export CSV');
@@ -49,12 +48,14 @@ export function exportObjectsToCSV(filename, data, columnMapping) {
         exportToCSV(filename, headers, rows);
     }
 }
+
 export function triggerPrint() {
     window.print();
 }
 
 /**
  * Directly downloads an HTML DOM element as a high-quality A4 PDF without opening the printer dialog.
+ * Uses dynamic imports for jsPDF and html-to-image so pages importing exportToCSV don't pay bundle/load overhead.
  */
 export async function downloadElementAsPdf(element, filename = 'document.pdf') {
     if (!element) {
@@ -62,6 +63,10 @@ export async function downloadElementAsPdf(element, filename = 'document.pdf') {
         return;
     }
     try {
+        const [{ jsPDF }, { toPng }] = await Promise.all([
+            import('jspdf'),
+            import('html-to-image'),
+        ]);
         const dataUrl = await toPng(element, {
             pixelRatio: 2,
             backgroundColor: '#ffffff',

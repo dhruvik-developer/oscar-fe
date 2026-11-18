@@ -324,33 +324,52 @@ function NotificationRow({ row, now, onOpen, onToggleRead, onAcknowledge, onDism
   const task = taskLabel(row, now);
   const openTask = openTaskOf(row);
   const [snoozeOpen, setSnoozeOpen] = useState(false);
+  const snoozeRef = useRef(null);
   const accent = ACCENT[row.severity] || (row.unread ? 'bg-primary' : '');
-  const hasQuick = openTask || row.incidentId || canToggle || row.path;
+  const hasQuick = Boolean(openTask || row.incidentId || row.path);
+
+  useEffect(() => {
+    if (!snoozeOpen) return;
+    const onPointer = (e) => {
+      if (snoozeRef.current && !snoozeRef.current.contains(e.target)) {
+        setSnoozeOpen(false);
+      }
+    };
+    const onKey = (e) => {
+      if (e.key === 'Escape') setSnoozeOpen(false);
+    };
+    document.addEventListener('mousedown', onPointer);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onPointer);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [snoozeOpen]);
 
   return (
-    <li className={`notif-row group relative mx-2 my-1 rounded-xl border transition-colors ${row.unread ? 'bg-primary/[0.035] border-primary/15' : 'bg-card border-transparent hover:border-border'}`}>
+    <li className={`notif-row group relative mx-2 my-1 rounded-xl border transition-all duration-150 ${row.unread ? 'bg-primary/[0.04] border-primary/20 shadow-2xs' : 'bg-card border-transparent hover:border-border hover:bg-soft/40'}`}>
       {accent && <span className={`absolute left-0 top-3 bottom-3 w-[3px] rounded-r-full ${accent}`} aria-hidden="true" />}
       <button
         type="button"
         data-notif-main
         onClick={() => onOpen(row)}
-        className="w-full flex items-start gap-3 pl-3.5 pr-3 pt-3 pb-1.5 text-left rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 cursor-pointer"
+        className="w-full flex items-start gap-3 pl-3.5 pr-3 pt-2.5 pb-2 text-left rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 cursor-pointer"
         aria-label={`${row.unread ? 'Unread. ' : ''}${row.severity === 'critical' ? 'Critical. ' : ''}${row.title}. ${moduleLabel}${time ? `, ${time}` : ''}${row.path ? '. Opens record.' : ''}`}
       >
-        <span className={`relative h-9 w-9 shrink-0 inline-flex items-center justify-center rounded-full ${tint}`}>
-          <Icon size={16} strokeWidth={2} />
+        <span className={`relative h-8.5 w-8.5 shrink-0 inline-flex items-center justify-center rounded-xl ${tint}`}>
+          <Icon size={15} strokeWidth={2} />
           {row.unread && <span className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-primary ring-2 ring-card" aria-hidden="true" />}
         </span>
         <span className="min-w-0 flex-1">
           <span className="flex items-start gap-2">
-            <span className={`min-w-0 flex-1 line-clamp-2 text-[13px] leading-[18px] ${row.unread ? 'font-semibold text-text' : 'font-medium text-[var(--text-secondary)]'}`}>
+            <span className={`min-w-0 flex-1 line-clamp-2 text-[12.5px] leading-[17px] ${row.unread ? 'font-semibold text-text' : 'font-medium text-slate-700 dark:text-slate-300'}`}>
               {row.title}
             </span>
             <span className={`notif-row-time shrink-0 pt-px text-[11px] tabular-nums ${row.live ? 'text-primary font-semibold' : 'text-muted'}`}>
               {row.live ? (<span className="inline-flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />Live</span>) : time}
             </span>
           </span>
-          {row.desc && <span className="mt-0.5 block line-clamp-2 text-[12px] leading-[17px] text-muted">{row.desc}</span>}
+          {row.desc && <span className="mt-0.5 block line-clamp-2 text-[11.5px] leading-[16px] text-muted">{row.desc}</span>}
           <span className="mt-1.5 flex flex-wrap items-center gap-1">
             <Pill className="border-border bg-card text-[var(--text-secondary)]">{moduleLabel}</Pill>
             {row.severity === 'critical' && <Pill className="border-rose-200 bg-rose-50 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300 dark:border-rose-500/30">Critical</Pill>}
@@ -363,7 +382,7 @@ function NotificationRow({ row, now, onOpen, onToggleRead, onAcknowledge, onDism
       </button>
 
       {hasQuick && (
-        <div className="flex flex-wrap items-center gap-0.5 pl-[58px] pr-3 pb-2">
+        <div className="flex flex-wrap items-center gap-1 pl-[54px] pr-3 pb-2 pt-0.5">
           {openTask && (
             <QuickAction tone="primary" disabled={busy} onClick={() => onCompleteTask(row)}>
               <CheckCircle2 size={13} /> {busy ? 'Saving…' : 'Mark done'}
@@ -374,25 +393,6 @@ function NotificationRow({ row, now, onOpen, onToggleRead, onAcknowledge, onDism
               <BellOff size={13} /> Acknowledge
             </QuickAction>
           )}
-          {canToggle && (
-            <span className="relative">
-              <QuickAction aria-haspopup="menu" aria-expanded={snoozeOpen} onClick={() => setSnoozeOpen(!snoozeOpen)}>
-                <AlarmClock size={13} /> Snooze
-              </QuickAction>
-              {snoozeOpen && (
-                <div role="menu" className="absolute left-0 top-full mt-1 z-20 w-40 rounded-lg border border-border bg-card p-1 shadow-[var(--shadow-popover)]">
-                  <p className="px-2 pt-1 pb-0.5 text-[10.5px] font-semibold uppercase tracking-wide text-muted">Remind me</p>
-                  {SNOOZE_OPTIONS.map((opt) => (
-                    <button key={opt.label} type="button" role="menuitem"
-                      onClick={() => { setSnoozeOpen(false); onSnooze(row, opt.when()); }}
-                      className="w-full text-left rounded-md px-2 py-1.5 text-[12px] text-text hover:bg-soft cursor-pointer">
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </span>
-          )}
           {row.path && (
             <QuickAction onClick={() => onOpen(row)}>
               Open <ArrowUpRight size={13} />
@@ -402,10 +402,33 @@ function NotificationRow({ row, now, onOpen, onToggleRead, onAcknowledge, onDism
       )}
 
       {canToggle && (
-        <div className="notif-row-actions absolute right-2 top-2 items-center gap-0.5 rounded-lg border border-border bg-card p-0.5 shadow-sm">
+        <div className="notif-row-actions absolute right-2 top-2 items-center gap-0.5 rounded-lg border border-border bg-card p-0.5 shadow-xs">
           <IconButton label={row.unread ? 'Mark as read' : 'Mark as unread'} onClick={() => onToggleRead(row)}>
             {row.unread ? <Check size={14} /> : <CircleDot size={14} />}
           </IconButton>
+          <span className="relative" ref={snoozeRef}>
+            <IconButton
+              label="Snooze"
+              aria-haspopup="menu"
+              aria-expanded={snoozeOpen}
+              active={snoozeOpen}
+              onClick={() => setSnoozeOpen(!snoozeOpen)}
+            >
+              <AlarmClock size={14} />
+            </IconButton>
+            {snoozeOpen && (
+              <div role="menu" className="absolute right-0 top-full mt-1 z-30 w-40 rounded-lg border border-border bg-card p-1 shadow-[var(--shadow-popover)]">
+                <p className="px-2 pt-1 pb-0.5 text-[10.5px] font-semibold uppercase tracking-wide text-muted">Remind me</p>
+                {SNOOZE_OPTIONS.map((opt) => (
+                  <button key={opt.label} type="button" role="menuitem"
+                    onClick={() => { setSnoozeOpen(false); onSnooze(row, opt.when()); }}
+                    className="w-full text-left rounded-md px-2 py-1.5 text-[12px] text-text hover:bg-soft cursor-pointer">
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </span>
           {!row.incidentId && (
             <IconButton label="Dismiss" onClick={() => onDismiss(row)}>
               <Archive size={14} />
@@ -680,7 +703,11 @@ export default function NotificationCenter() {
         ref={bellRef}
         type="button"
         onClick={() => (open ? close(false) : setOpen(true))}
-        className="w-9 h-9 rounded-full border border-slate-200/90 dark:border-slate-800 bg-white/90 dark:bg-slate-900/80 hover:bg-white dark:hover:bg-slate-800 hover:border-blue-400/60 text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 flex items-center justify-center transition-all duration-200 cursor-pointer relative shadow-[0_1px_2px_rgba(15,23,42,0.04)] hover:shadow-[0_3px_10px_rgba(37,99,235,0.12)] hover:-translate-y-px active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
+        className={`w-9 h-9 rounded-full border transition-all duration-200 cursor-pointer relative flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 active:scale-95 ${
+          open
+            ? 'bg-blue-50 dark:bg-blue-950/60 border-blue-500 text-blue-600 dark:text-blue-400 ring-2 ring-blue-500/25 shadow-md -translate-y-px'
+            : 'border-slate-200/90 dark:border-slate-800 bg-white/90 dark:bg-slate-900/80 hover:bg-white dark:hover:bg-slate-800 hover:border-blue-400/60 text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 shadow-[0_1px_2px_rgba(15,23,42,0.04)] hover:shadow-[0_3px_10px_rgba(37,99,235,0.12)] hover:-translate-y-px'
+        }`}
         aria-label={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : 'Notifications'}
         aria-haspopup="dialog"
         aria-expanded={open}
@@ -703,19 +730,40 @@ export default function NotificationCenter() {
           onKeyDown={onPanelKeyDown}
           className="notif-panel top-dropdown-menu sm:w-[440px] p-0 flex flex-col overflow-hidden rounded-2xl focus:outline-none animate-in fade-in zoom-in-95 duration-150"
         >
+          {/* Subtle top indicator caret pointing towards the bell */}
+          <div className="absolute right-3.5 -top-1.5 w-3 h-3 rotate-45 border-t border-l border-border bg-card z-10 hidden sm:block pointer-events-none" />
+
           {/* Header */}
-          <div className="px-4 pt-4 pb-3 bg-gradient-to-b from-primary/[0.07] to-transparent border-b border-border">
-            <div className="flex items-start gap-3">
-              <span className="h-10 w-10 shrink-0 inline-flex items-center justify-center rounded-xl bg-primary text-white shadow-sm">
-                <Bell size={18} />
-              </span>
-              <div className="min-w-0 flex-1">
-                <h2 className="text-[15px] font-bold text-text leading-5">Notifications</h2>
-                <p className="mt-0.5 text-[12px] text-muted truncate">
-                  {summary.length ? summary.join(' · ') : 'You’re all caught up'}
-                </p>
+          <div className="px-4 pt-3.5 pb-3 bg-gradient-to-b from-primary/[0.06] via-transparent to-transparent border-b border-border relative z-[1]">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="h-8 w-8 shrink-0 inline-flex items-center justify-center rounded-xl bg-primary/10 text-primary border border-primary/20 shadow-2xs">
+                  <Bell size={16} />
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-[14.5px] font-bold text-text leading-tight">Notifications</h2>
+                    {unreadCount > 0 ? (
+                      <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-500 text-white shadow-2xs tabular-nums">
+                        {unreadCount} new
+                      </span>
+                    ) : (
+                      <span className="px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-soft text-muted border border-border tabular-nums">
+                        {rows.length} total
+                      </span>
+                    )}
+                  </div>
+                  <p className="mt-0.5 text-[11.5px] text-muted truncate">
+                    {unreadCount > 0
+                      ? `${unreadCount} unread notification${unreadCount > 1 ? 's' : ''}${criticalCount > 0 ? ` · ${criticalCount} critical` : ''}`
+                      : rows.length > 0
+                      ? 'All caught up · No unread notifications'
+                      : 'You’re all caught up'}
+                  </p>
+                </div>
               </div>
-              <div className="flex items-center gap-0.5">
+
+              <div className="flex items-center gap-0.5 shrink-0">
                 <IconButton
                   label={searchOpen ? 'Close search' : 'Search notifications'}
                   active={searchOpen}
@@ -727,7 +775,11 @@ export default function NotificationCenter() {
                 >
                   <Search size={15} />
                 </IconButton>
-                <IconButton label="Mark all as read" onClick={markAllNotificationsRead} disabled={!serverUnread}>
+                <IconButton
+                  label="Mark all as read"
+                  onClick={markAllNotificationsRead}
+                  disabled={!serverUnread && unreadCount === 0}
+                >
                   <CheckCheck size={15} />
                 </IconButton>
                 <div className="relative" ref={menuRef}>
@@ -741,7 +793,7 @@ export default function NotificationCenter() {
                     <MoreHorizontal size={15} />
                   </IconButton>
                   {menuOpen && (
-                    <div role="menu" className="absolute right-0 top-full mt-1 z-10 w-56 rounded-xl border border-border bg-card p-1 shadow-[var(--shadow-popover)]">
+                    <div role="menu" className="absolute right-0 top-full mt-1 z-30 w-56 rounded-xl border border-border bg-card p-1 shadow-[var(--shadow-popover)]">
                       {[
                         { label: 'Refresh', icon: RefreshCw, run: () => { retry(); setMenuOpen(false); } },
                         { label: 'All notifications', icon: ListChecks, run: () => go('/notifications') },
@@ -768,7 +820,7 @@ export default function NotificationCenter() {
             </div>
 
             {searchOpen && (
-              <label className="mt-3 flex items-center gap-2 h-9 px-3 rounded-lg border border-border bg-card focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20">
+              <label className="mt-2.5 flex items-center gap-2 h-8.5 px-3 rounded-lg border border-border bg-card focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20">
                 <Search size={14} className="text-muted shrink-0" />
                 <input
                   ref={searchRef}
@@ -777,7 +829,7 @@ export default function NotificationCenter() {
                   onChange={(e) => setQuery(e.target.value)}
                   placeholder="Search title, text, person or module"
                   aria-label="Search notifications"
-                  className="w-full bg-transparent text-[12.5px] text-text placeholder:text-muted focus:outline-none"
+                  className="w-full bg-transparent text-[12px] text-text placeholder:text-muted focus:outline-none"
                 />
                 {query && (
                   <button type="button" onClick={() => { setQuery(''); searchRef.current?.focus(); }} aria-label="Clear search" className="text-muted hover:text-text cursor-pointer">
@@ -788,7 +840,7 @@ export default function NotificationCenter() {
             )}
 
             {/* Filters: segmented */}
-            <div role="tablist" aria-label="Filter notifications" onKeyDown={onTabKeyDown} className="mt-3 grid grid-cols-4 gap-1 rounded-xl bg-soft p-1">
+            <div role="tablist" aria-label="Filter notifications" onKeyDown={onTabKeyDown} className="mt-2.5 grid grid-cols-4 gap-1 rounded-xl bg-soft/80 p-1">
               {FILTERS.map((f) => {
                 const selected = filter === f.id;
                 return (
@@ -799,43 +851,67 @@ export default function NotificationCenter() {
                     data-filter={f.id}
                     aria-selected={selected}
                     tabIndex={selected ? 0 : -1}
-                    onClick={() => setFilter(f.id)}
-                    className={`inline-flex items-center justify-center gap-1.5 h-7 rounded-lg text-[12px] transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${selected ? 'bg-card text-text font-semibold shadow-sm' : 'text-muted hover:text-text font-medium'}`}
+                    onClick={() => { setFilter(f.id); setModuleFilter(''); }}
+                    className={`inline-flex items-center justify-center gap-1.5 h-7 rounded-lg text-[12px] transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${selected ? 'bg-card text-text font-semibold shadow-xs' : 'text-muted hover:text-text font-medium'}`}
                   >
                     {f.label}
                     {counts[f.id] > 0 && (
-                      <span className={`min-w-[18px] h-[18px] px-1 inline-flex items-center justify-center rounded-full text-[10px] font-bold tabular-nums ${selected ? 'bg-primary text-white' : 'bg-card text-muted'}`}>{counts[f.id]}</span>
+                      <span className={`min-w-[17px] h-[17px] px-1 inline-flex items-center justify-center rounded-full text-[10px] font-bold tabular-nums ${selected ? 'bg-primary text-white' : 'bg-card text-muted border border-border/60'}`}>{counts[f.id]}</span>
                     )}
                   </button>
                 );
               })}
             </div>
+
+            {/* Sub-filter chips by module */}
+            {modulesHere.length > 1 && (
+              <div
+                role="group"
+                aria-label="Filter by module"
+                className="mt-2.5 flex items-center gap-1.5 overflow-x-auto scrollbar-none whitespace-nowrap pt-0.5"
+              >
+                {['', ...modulesHere].map((m) => {
+                  const selected = activeModule === m;
+                  const ChipIcon = m ? (MODULE_ICONS[m] || Bell) : ListChecks;
+                  const label = m ? (MODULE_LABELS[m] || m) : 'All';
+                  const count = m ? moduleCounts[m] : inTab.length;
+                  return (
+                    <button
+                      key={m || 'all'}
+                      type="button"
+                      aria-pressed={selected}
+                      onClick={() => setModuleFilter(m)}
+                      className={`shrink-0 inline-flex items-center gap-1.5 h-6.5 px-2.5 rounded-full text-[11px] font-medium cursor-pointer transition-all ${
+                        selected
+                          ? 'border border-primary bg-primary text-white shadow-xs font-semibold'
+                          : 'border border-border/80 bg-card text-[var(--text-secondary)] hover:text-text hover:bg-soft'
+                      }`}
+                    >
+                      <ChipIcon size={11} className={selected ? 'text-white' : 'text-muted'} />
+                      <span>{label}</span>
+                      <span
+                        className={`tabular-nums text-[10px] px-1.5 py-0.2 rounded-full font-semibold ${
+                          selected
+                            ? 'bg-white/20 text-white'
+                            : 'bg-soft text-muted'
+                        }`}
+                      >
+                        {count}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           {criticalCount > 0 && filter !== 'alerts' && (
             <button type="button" onClick={() => { setFilter('alerts'); setModuleFilter(''); }}
-              className="mx-3 mt-3 flex items-center gap-2.5 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-left text-[12px] text-rose-800 hover:bg-rose-100 cursor-pointer dark:bg-rose-500/10 dark:border-rose-500/30 dark:text-rose-200">
-              <span className="h-7 w-7 shrink-0 inline-flex items-center justify-center rounded-full bg-rose-600 text-white"><AlertTriangle size={14} /></span>
+              className="mx-3 mt-2.5 flex items-center gap-2.5 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-left text-[12px] text-rose-800 hover:bg-rose-100 cursor-pointer dark:bg-rose-500/10 dark:border-rose-500/30 dark:text-rose-200">
+              <span className="h-6.5 w-6.5 shrink-0 inline-flex items-center justify-center rounded-full bg-rose-600 text-white"><AlertTriangle size={13} /></span>
               <span className="flex-1"><b>{criticalCount} critical alert{criticalCount > 1 ? 's' : ''}</b> need{criticalCount > 1 ? '' : 's'} attention</span>
-              <span className="font-semibold">View →</span>
+              <span className="font-semibold text-[11.5px]">View →</span>
             </button>
-          )}
-
-          {modulesHere.length > 1 && (
-            <div role="group" aria-label="Filter by module" className="flex items-center gap-1.5 px-3 pt-3 pb-1 overflow-x-auto">
-              {['', ...modulesHere].map((m) => {
-                const selected = activeModule === m;
-                const ChipIcon = m ? (MODULE_ICONS[m] || Bell) : ListChecks;
-                return (
-                  <button key={m || 'all'} type="button" aria-pressed={selected} onClick={() => setModuleFilter(m)}
-                    className={`shrink-0 inline-flex items-center gap-1.5 h-7 px-2.5 rounded-full border text-[11.5px] font-medium cursor-pointer transition-colors ${selected ? 'border-primary bg-primary text-white shadow-sm' : 'border-border bg-card text-[var(--text-secondary)] hover:text-text hover:bg-soft'}`}>
-                    <ChipIcon size={12} />
-                    {m ? MODULE_LABELS[m] || m : 'All'}
-                    {m && <span className={`tabular-nums ${selected ? 'text-white/80' : 'text-muted'}`}>{moduleCounts[m]}</span>}
-                  </button>
-                );
-              })}
-            </div>
           )}
 
           {actionNote && !actionError && (
@@ -856,24 +932,24 @@ export default function NotificationCenter() {
           )}
 
           {/* List */}
-          <div className="notif-scroll flex-1 min-h-0 overflow-y-auto overscroll-contain pb-2">
+          <div className="notif-scroll custom-scrollbar flex-1 min-h-0 overflow-y-auto overscroll-contain py-1 pb-3">
             {loading ? (
               <SkeletonRows />
             ) : groups.length === 0 ? (
               <div className="flex flex-col items-center text-center px-6 py-12">
-                <span className="h-14 w-14 rounded-2xl bg-gradient-to-br from-primary/15 to-primary/5 inline-flex items-center justify-center text-primary mb-3">
-                  {query.trim() ? <Search size={22} /> : <CheckCheck size={22} />}
+                <span className="h-12 w-12 rounded-2xl bg-gradient-to-br from-primary/15 to-primary/5 inline-flex items-center justify-center text-primary mb-3">
+                  {query.trim() ? <Search size={20} /> : <CheckCheck size={20} />}
                 </span>
-                <p className="text-[14px] font-semibold text-text">{emptyTitle}</p>
+                <p className="text-[13.5px] font-semibold text-text">{emptyTitle}</p>
                 <p className="mt-1 text-[12px] text-muted max-w-[260px]">{emptyBody}</p>
               </div>
             ) : (
               groups.map((group) => (
                 <section key={group.id} aria-label={group.label}>
-                  <h3 className="sticky top-0 z-[1] flex items-center gap-2 px-4 pt-3 pb-1.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-muted bg-card/95 backdrop-blur-sm">
+                  <h3 className="sticky top-0 z-[2] flex items-center gap-2 px-3.5 pt-2.5 pb-1 text-[10.5px] font-bold uppercase tracking-[0.08em] text-muted/90 bg-card/95 backdrop-blur-md">
                     {group.label}
                     <span className="h-4 min-w-4 px-1 inline-flex items-center justify-center rounded-full bg-soft text-[10px] tabular-nums normal-case tracking-normal">{group.items.length}</span>
-                    <span className="flex-1 h-px bg-border" aria-hidden="true" />
+                    <span className="flex-1 h-px bg-border/70" aria-hidden="true" />
                   </h3>
                   <ul>
                     {group.items.map((row) => (
@@ -897,11 +973,22 @@ export default function NotificationCenter() {
           </div>
 
           {/* Footer */}
-          <div className="flex items-center justify-between gap-3 px-4 py-2.5 border-t border-border bg-soft/50 text-[11.5px] text-muted">
-            <span className="truncate">Live alerts clear once the issue is resolved.</span>
+          <div className="flex items-center justify-between gap-3 px-4 py-2 border-t border-border bg-soft/40 text-[11.5px] text-muted relative z-[1]">
+            <span className="truncate">
+              {rows.some((r) => r.live)
+                ? 'Live alerts clear once resolved.'
+                : unreadCount > 0
+                ? `${unreadCount} unread notification${unreadCount > 1 ? 's' : ''}`
+                : 'All caught up · Real-time notifications'}
+            </span>
             <span className="shrink-0">
-              <button type="button" onClick={() => go('/notifications')} className="h-7 px-2.5 rounded-lg border border-border bg-card font-semibold text-text hover:bg-soft cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40">
-                View all
+              <button
+                type="button"
+                onClick={() => go('/notifications')}
+                className="h-6.5 px-2.5 rounded-lg border border-border bg-card text-[11px] font-semibold text-text hover:bg-soft hover:border-border/80 cursor-pointer transition-colors shadow-2xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 inline-flex items-center gap-1"
+              >
+                <span>View all</span>
+                <span className="text-muted">→</span>
               </button>
             </span>
           </div>

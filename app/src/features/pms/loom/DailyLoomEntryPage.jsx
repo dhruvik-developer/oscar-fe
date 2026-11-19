@@ -118,7 +118,8 @@ export default function DailyLoomEntryPage() {
     return factories.find((f) => f.id === selectedFactoryId) || factories[0] || null;
   }, [factories, selectedFactoryId]);
 
-  // When a project / PI is selected, filter machines running this quality or beam
+  // [OLD CODE - COMMENTED OUT]: Basic matching on projectFilter and urlFabric
+  /*
   const displayedRows = useMemo(() => {
     if (!projectFilter) return rows;
     const q = projectFilter.toLowerCase().trim();
@@ -136,6 +137,32 @@ export default function DailyLoomEntryPage() {
 
     // If specific matching machines are found, show only them; otherwise show all so user can input data
     return matched.length > 0 ? matched : rows;
+  }, [rows, projectFilter, urlFabric]);
+  */
+
+  // [UPDATED CODE]: Multi-token and substring matching for project/PI and fabric quality
+  const { displayedRows, matchedCount } = useMemo(() => {
+    if (!projectFilter) return { displayedRows: rows, matchedCount: null };
+    const q = projectFilter.toLowerCase().trim();
+    const fab = (urlFabric || '').toLowerCase().trim();
+    const fabTokens = fab ? fab.split(/[\s\-_/,]+/).map((t) => t.trim()).filter((t) => t.length >= 2) : [];
+
+    const matched = rows.filter((r) => {
+      const qual = (r.quality_name || '').toLowerCase();
+      const beam = (r.beam_no || '').toLowerCase();
+      const matchQ = q && (qual.includes(q) || beam.includes(q));
+      const matchFab = fab && (
+        qual.includes(fab) ||
+        fab.includes(qual) ||
+        fabTokens.some((tok) => qual.includes(tok))
+      );
+      return matchQ || matchFab;
+    });
+
+    return {
+      displayedRows: matched.length > 0 ? matched : rows,
+      matchedCount: matched.length,
+    };
   }, [rows, projectFilter, urlFabric]);
 
   const paginatedRows = useMemo(() => {
@@ -644,12 +671,27 @@ export default function DailyLoomEntryPage() {
           <div className="flex items-center gap-2 text-blue-800 dark:text-blue-200 font-medium">
             <CheckCircle2 size={15} className="text-blue-600 shrink-0" />
             <span>
-              Showing machines for PO / Project:{' '}
-              <strong className="font-mono font-bold text-slate-900 dark:text-slate-100">
-                {projectFilter}
-              </strong>
-              {urlFabric && (
-                <span className="ml-1 text-slate-500 font-normal">({urlFabric})</span>
+              {matchedCount > 0 ? (
+                <>
+                  Showing <strong>{matchedCount}</strong> machine{matchedCount === 1 ? '' : 's'} running PO / Project:{' '}
+                  <strong className="font-mono font-bold text-slate-900 dark:text-slate-100">
+                    {projectFilter}
+                  </strong>
+                  {urlFabric && (
+                    <span className="ml-1 text-slate-500 font-normal">({urlFabric})</span>
+                  )}
+                </>
+              ) : (
+                <>
+                  No looms currently running PO / Project:{' '}
+                  <strong className="font-mono font-bold text-slate-900 dark:text-slate-100">
+                    {projectFilter}
+                  </strong>
+                  {urlFabric && (
+                    <span className="ml-1 text-slate-500 font-normal">({urlFabric})</span>
+                  )}
+                  . Showing all machines for this unit so you can log or allocate.
+                </>
               )}
             </span>
           </div>

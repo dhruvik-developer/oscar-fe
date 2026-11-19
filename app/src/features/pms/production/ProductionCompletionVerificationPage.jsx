@@ -255,6 +255,8 @@ export default function ProductionCompletionVerificationPage() {
     }
   };
 
+  // [OLD CODE - COMMENTED OUT]: Fallback to /pms/daily-production when no matching loom factory was found or processType was not weaving
+  /*
   const handleAddDailyEntry = async () => {
     try {
       const res = await loomService.getFactories();
@@ -288,6 +290,62 @@ export default function ProductionCompletionVerificationPage() {
       }
     } catch {
       navigate(`/pms/daily-production?pi=${encodeURIComponent(activePiId || '')}`);
+    }
+  };
+  */
+
+  // [UPDATED IMPLEMENTATION]: Always redirect to Daily Loom Production Entry (/pms/loom-daily)
+  // Automatically maps factory and carries project, PI, and fabric filters.
+  const handleAddDailyEntry = async () => {
+    try {
+      const res = await loomService.getFactories();
+      const factoryList = Array.isArray(res) ? res : res?.results || [];
+
+      const vName = (vendor && vendor !== '—') ? vendor.toLowerCase().trim() : '';
+      const cleanPiNumber = (piNumber && piNumber !== '—') ? piNumber : '';
+      const cleanFabric = (fabric && fabric !== '—') ? fabric : '';
+      const cleanPiId = activePiId || '';
+
+      // Determine target factory
+      let targetFactoryId = '';
+      if (factoryList.length > 0) {
+        // 1. Check if vendor/agency matches factory name or job worker party
+        const matchingFactory = factoryList.find((f) => {
+          const name = (f.name || '').toLowerCase();
+          const partyName = (f.job_worker_party_name || '').toLowerCase();
+          return (
+            (name && vName && (name.includes(vName) || vName.includes(name))) ||
+            (partyName && vName && (partyName.includes(vName) || vName.includes(partyName)))
+          );
+        });
+
+        if (matchingFactory) {
+          targetFactoryId = matchingFactory.id;
+        } else {
+          // 2. Check localStorage selected factory or fallback to first factory with machines
+          const savedId = localStorage.getItem('oscar_pms_selected_factory');
+          const savedValid = factoryList.find((f) => f.id === savedId);
+          if (savedValid) {
+            targetFactoryId = savedValid.id;
+          } else {
+            const activeF = factoryList.find((f) => f.machines_count > 0) || factoryList[0];
+            targetFactoryId = activeF.id;
+          }
+        }
+      }
+
+      // Build search params for /pms/loom-daily
+      const params = new URLSearchParams();
+      if (targetFactoryId) params.set('factory', targetFactoryId);
+      if (cleanPiNumber) params.set('project', cleanPiNumber);
+      if (cleanPiId) params.set('pi', cleanPiId);
+      if (cleanFabric) params.set('fabric', cleanFabric);
+
+      const qs = params.toString();
+      navigate(`/pms/loom-daily${qs ? `?${qs}` : ''}`);
+    } catch (err) {
+      console.error('Failed to load factories for loom-daily redirection:', err);
+      navigate('/pms/loom-daily');
     }
   };
 

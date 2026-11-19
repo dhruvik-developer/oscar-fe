@@ -139,13 +139,13 @@ const ROW_SELECTOR = '[data-notif-main]';
  * Operational alerts read straight from ERP collections. Same rules the bell
  * has always used; each row is live state, so it clears when the data does.
  */
-function useErpAlerts() {
+function useErpAlerts(enabled = false) {
   const erp = useERP();
   const ready = useIdleReady();
-  const items = ready ? erp?.items : undefined;
-  const deliveryChallans = ready ? erp?.deliveryChallans : undefined;
-  const zoneRequests = ready ? erp?.zoneRequests : undefined;
-  const invoices = ready ? erp?.invoices : undefined;
+  const items = enabled && ready ? erp?.items : undefined;
+  const deliveryChallans = enabled && ready ? erp?.deliveryChallans : undefined;
+  const zoneRequests = enabled && ready ? erp?.zoneRequests : undefined;
+  const invoices = enabled && ready ? erp?.invoices : undefined;
 
   return useMemo(() => {
     const list = [];
@@ -204,10 +204,11 @@ function useErpAlerts() {
 }
 
 /** Active alert incidents. Loads once on open/acknowledge (no background poll). */
-function useActiveIncidents() {
+function useActiveIncidents(enabled = false) {
   const [state, setState] = useState({ list: [], badge: 0, status: 'idle' });
 
   const load = useCallback(async () => {
+    if (!enabled) return;
     setState((prev) => ({ ...prev, status: prev.list.length ? prev.status : 'loading' }));
     try {
       const body = await alertService.getIncidents({ status: 'Active' });
@@ -483,9 +484,9 @@ export default function NotificationCenter() {
   const searchRef = useRef(null);
   const menuRef = useRef(null);
 
-  const digest = useCrmNotificationDigest();
-  const erpAlerts = useErpAlerts();
-  const incidents = useActiveIncidents();
+  const digest = useCrmNotificationDigest(open);
+  const erpAlerts = useErpAlerts(open);
+  const incidents = useActiveIncidents(open);
   const feed = useFeedState();
 
   const rows = useMemo(() => buildNotificationRows({

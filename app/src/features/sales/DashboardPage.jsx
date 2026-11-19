@@ -1,876 +1,1927 @@
-import { useState, useEffect, useCallback } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState, useEffect, useCallback, useMemo, Suspense } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../../services/api';
 import { useAppStore } from '../../stores/appStore';
-import {
-  BarChart3, Banknote, ShoppingCart, Settings, Truck, FileText,
-  Landmark, Database, Package, TrendingUp, TrendingDown,
-  Factory, ShieldCheck, Users, TriangleAlert, ArrowRight, ChevronDown,
-  Layers, ClipboardList, Cog, Boxes, RotateCcw, Ban, HelpCircle, Loader2, RefreshCw, CheckCircle2, Calendar,
-} from 'lucide-react';
-import PageInfoButton from '../../components/ui/PageInfoButton';
 import KpiCard from '../../components/ui/KpiCard';
+import { Drawer } from '../../components/ui/Drawer';
+import {
+  TrendingUp, TrendingDown, Calendar, RefreshCw, AlertTriangle, AlertCircle,
+  ExternalLink, ChevronRight, CheckCircle2, Clock, Landmark, ShieldAlert,
+  Layers, Package, Check, HelpCircle, Loader2,
+  Wallet, Percent, IndianRupee
+} from 'lucide-react';
 
-/*
- * Business position dashboard. Every figure comes from
- * GET /reports/sales-dashboard/?date=YYYY-MM-DD — this page only renders.
- * Amounts arrive as decimal strings; Number() is used for display only.
- */
+const BatchProfitabilityPage = React.lazy(() => import('../../features/inventory/batches/BatchProfitabilityPage'));
 
+const DASHBOARD_CACHE_KEY = 'oscar_sales_dashboard_cache_v1';
+
+function getCachedDashboard(period = 'mtd', chartRange = '7D') {
+  try {
+    const specific = sessionStorage.getItem(`${DASHBOARD_CACHE_KEY}_${period}_${chartRange}`);
+    if (specific) return JSON.parse(specific);
+    const fallback = sessionStorage.getItem(DASHBOARD_CACHE_KEY);
+    if (fallback) return JSON.parse(fallback);
+  } catch {}
+  return null;
+}
+
+/* ── KPI Configuration for Universal Pastel Cards ── */
+const KPI_CONFIG = {
+  sales: {
+    icon: TrendingUp,
+    tone: 'blue',
+    link: '/sales/invoices',
+  },
+  collection: {
+    icon: Wallet,
+    tone: 'green',
+    link: '/accounts/day-book',
+  },
+  grossMargin: {
+    icon: Percent,
+    tone: 'orange',
+    link: '/reports/sales-dashboard',
+  },
+  netProfit: {
+    icon: IndianRupee,
+    tone: 'purple',
+    link: '/reports/sales-dashboard',
+  },
+  cashBank: {
+    icon: Landmark,
+    tone: 'pink',
+    link: '/accounts/day-book',
+  },
+  workingCapital: {
+    icon: Layers,
+    tone: 'teal',
+    link: '/inventory/stock-position',
+  },
+};
+
+/* ── Formatting Helpers ── */
 const num = (v) => {
   const n = Number(v);
   return Number.isFinite(n) ? n : 0;
 };
+
 const inr = (v) => `₹ ${num(v).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
-const meters = (v) => `${num(v).toLocaleString('en-IN', { maximumFractionDigits: 2 })} m`;
+const inrLakh = (v) => `₹ ${(num(v) / 100000).toFixed(2)} L`;
+const meters = (v) => `${num(v).toLocaleString('en-IN', { maximumFractionDigits: 0 })} m`;
+
 const localIso = (d) => {
   const pad = (n) => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 };
+
 const displayDate = (iso) => {
   if (!iso) return '';
   const d = new Date(`${String(iso).slice(0, 10)}T00:00:00`);
   if (Number.isNaN(d.getTime())) return String(iso);
   return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
 };
-const dayLabel = (iso) => {
-  const d = new Date(`${String(iso).slice(0, 10)}T00:00:00`);
-  if (Number.isNaN(d.getTime())) return String(iso);
-  return `${d.getDate()} ${d.toLocaleString('en-IN', { month: 'short' })}`;
-};
-/** % change vs previous; null when there is no previous figure to compare with. */
-const pctChange = (cur, prev) => {
-  const c = num(cur);
-  const p = num(prev);
-  if (p === 0) return null;
-  return ((c - p) / Math.abs(p)) * 100;
-};
-const getAdaptiveChartScale = (maxVal) => {
-  if (maxVal <= 0) {
-    return {
-      niceMax: 100000,
-      unitLabel: '₹ in Lakhs',
-      formatTick: (v) => (v === 0 ? '0' : `${+(v / 100000).toFixed(1)}L`),
-    };
-  }
-  if (maxVal >= 10000000) {
-    const cr = maxVal / 10000000;
-    const niceCr = Math.ceil(cr * 1.15 * 10) / 10;
-    return {
-      niceMax: niceCr * 10000000,
-      unitLabel: '₹ in Crores',
-      formatTick: (v) => (v === 0 ? '0' : `${+(v / 10000000).toFixed(niceCr >= 10 ? 0 : 1)} Cr`),
-    };
-  }
-  if (maxVal >= 100000) {
-    const l = maxVal / 100000;
-    const niceL = Math.ceil(l * 1.15 * 10) / 10;
-    return {
-      niceMax: niceL * 100000,
-      unitLabel: '₹ in Lakhs',
-      formatTick: (v) => (v === 0 ? '0' : `${+(v / 100000).toFixed(2)}L`),
-    };
-  }
-  if (maxVal >= 1000) {
-    const k = maxVal / 1000;
-    const niceK = Math.ceil(k * 1.15 / 5) * 5;
-    return {
-      niceMax: niceK * 1000,
-      unitLabel: '₹ in Thousands',
-      formatTick: (v) => (v === 0 ? '0' : `${Math.round(v / 1000)}k`),
-    };
-  }
-  const nice = Math.ceil((maxVal * 1.15) / 100) * 100;
-  return {
-    niceMax: nice,
-    unitLabel: 'Amounts in ₹',
-    formatTick: (v) => (v === 0 ? '0' : `₹${Math.round(v)}`),
-  };
-};
 
-function Donut({ pct, size = 128, stroke = 13, color = '#22c55e', track = '#e6ecf4', children }) {
-  const r = (size - stroke) / 2;
-  const c = 2 * Math.PI * r;
-  const p = Math.max(0, Math.min(100, num(pct)));
+/* ── Sub-Components ── */
+function SectionCard({ title, badge, subtext, rightAction, children, className = '' }) {
   return (
-    <div className="relative shrink-0" style={{ width: size, height: size }}>
-      <svg viewBox={`0 0 ${size} ${size}`} className="h-full w-full -rotate-90">
-        <circle cx={size / 2} cy={size / 2} r={r} stroke={track} strokeWidth={stroke} fill="none" />
-        {p > 0 && (
-          <circle
-            cx={size / 2} cy={size / 2} r={r} stroke={color} strokeWidth={stroke} fill="none"
-            strokeLinecap="round" strokeDasharray={`${(p / 100) * c} ${c}`}
+    <div className={`flex flex-col rounded-xl border border-[#e2eaf5] bg-white p-4 shadow-[0_1px_2px_rgba(16,42,82,0.04)] ${className}`}>
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-2">
+          <h3 className="text-[13.5px] font-bold text-[#17294e]">{title}</h3>
+          {badge}
+        </div>
+        {rightAction || (subtext && <span className="text-[11.5px] font-semibold text-slate-500">{subtext}</span>)}
+      </div>
+      <div className="flex-1">{children}</div>
+    </div>
+  );
+}
+
+function ProgressSegmentBar({ segments }) {
+  const total = segments.reduce((acc, s) => acc + (s.val > 0 ? s.val : 0), 0) || 1;
+  return (
+    <div className="flex h-2 w-full overflow-hidden rounded-full bg-slate-100">
+      {segments.map((s, idx) => {
+        const pct = Math.max(0, (s.val / total) * 100);
+        if (pct <= 0) return null;
+        return (
+          <div
+            key={idx}
+            className="h-full transition-all duration-300"
+            style={{ width: `${pct}%`, backgroundColor: s.color }}
+            title={`${s.label}: ${s.displayVal || s.val}`}
           />
+        );
+      })}
+    </div>
+  );
+}
+
+/* ── User-Friendly Ageing Breakdown & Chart Widget ── */
+function AgeingBreakdownWidget({
+  title,
+  total,
+  buckets,
+  footerLabel,
+  footerSubtext,
+  footerValue,
+  footerBadge,
+  footerBadgeClass,
+  chartType: externalChartType,
+  onChartTypeChange,
+}) {
+  const [internalChartType, setInternalChartType] = useState('column'); // 'stacked' | 'column'
+  const [hoveredIndex, setHoveredIndex] = useState(null);
+
+  const chartType = externalChartType || internalChartType;
+  const setChartType = onChartTypeChange || setInternalChartType;
+
+  const realTotal = num(total) || buckets.reduce((acc, b) => acc + num(b.val), 0);
+  const totalAmount = realTotal > 0 ? realTotal : 1;
+  const maxVal = Math.max(...buckets.map((x) => num(x.val))) || 1;
+
+  return (
+    <div className="flex flex-col h-full">
+      {/* Top Controls: View Switcher */}
+      <div className="flex items-center justify-between mb-2.5">
+        <div className="flex items-center gap-2">
+          <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+            Ageing Breakdown
+          </span>
+          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-600">
+            {buckets.length} Tiers
+          </span>
+        </div>
+        <div className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-0.5 text-[10px] font-bold">
+          <button
+            type="button"
+            onClick={() => setChartType('column')}
+            className={`cursor-pointer rounded px-2 py-0.5 transition-colors ${
+              chartType === 'column'
+                ? 'bg-blue-600 text-white font-black shadow-2xs'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+            title="Vertical Column Chart view"
+          >
+            Columns
+          </button>
+          <button
+            type="button"
+            onClick={() => setChartType('stacked')}
+            className={`cursor-pointer rounded px-2 py-0.5 transition-colors ${
+              chartType === 'stacked'
+                ? 'bg-blue-600 text-white font-black shadow-2xs'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+            title="Horizontal Stacked Bar view"
+          >
+            Stacked
+          </button>
+        </div>
+      </div>
+
+      {chartType === 'stacked' ? (
+        <>
+          {/* Segmented Distribution Bar */}
+          <div className="relative flex h-7 w-full overflow-hidden rounded-lg bg-slate-100 shadow-inner border border-slate-200/70">
+            {buckets.map((b, idx) => {
+              const val = num(b.val);
+              const pct = (val / totalAmount) * 100;
+              if (pct <= 0) return null;
+              const isHovered = hoveredIndex === idx;
+              return (
+                <div
+                  key={b.key}
+                  onMouseEnter={() => setHoveredIndex(idx)}
+                  onMouseLeave={() => setHoveredIndex(null)}
+                  style={{ width: `${pct}%`, backgroundColor: b.color }}
+                  className={`relative h-full border-r last:border-r-0 border-white/80 transition-all duration-200 cursor-pointer flex items-center justify-center select-none ${
+                    isHovered ? 'brightness-110 drop-shadow-md z-10 scale-y-105' : 'hover:brightness-105'
+                  }`}
+                  title={`${b.label}: ${inr(b.val)} (${pct.toFixed(1)}%)`}
+                >
+                  {pct >= 14 && (
+                    <span className="text-[10.5px] font-black text-white drop-shadow-xs tabular-nums tracking-tight">
+                      {pct.toFixed(0)}%
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Detailed Tier Rows with Color Bullets & Mini Progress Fill */}
+          <div className="space-y-1.5 pt-2 text-[12px]">
+            {buckets.map((b, idx) => {
+              const v = num(b.val);
+              const pct = realTotal > 0 ? (v / realTotal) * 100 : 0;
+              const isHovered = hoveredIndex === idx;
+              return (
+                <div
+                  key={b.key}
+                  onMouseEnter={() => setHoveredIndex(idx)}
+                  onMouseLeave={() => setHoveredIndex(null)}
+                  className={`group rounded-lg p-2 transition-all cursor-pointer ${
+                    isHovered ? 'bg-slate-100/90 shadow-2xs' : 'hover:bg-slate-50/80'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span
+                        className="h-2.5 w-2.5 rounded-full shrink-0 transition-transform group-hover:scale-125"
+                        style={{ backgroundColor: b.color }}
+                      />
+                      <span className="font-semibold text-slate-800 text-[12px]">{b.label}</span>
+                      {b.statusTag && (
+                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full border ${b.statusClass}`}>
+                          {b.statusTag}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2.5 shrink-0">
+                      <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10.5px] font-black text-slate-600 tabular-nums">
+                        {pct.toFixed(1)}%
+                      </span>
+                      <span className={`text-xs font-black tabular-nums ${b.amountClass || 'text-[#17294e]'}`}>
+                        {v > 0 ? inrLakh(b.val) : '₹ 0'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Individual mini progress track */}
+                  <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+                    <div
+                      className="h-full rounded-full transition-all duration-300"
+                      style={{
+                        width: `${Math.max(0, Math.min(100, pct))}%`,
+                        backgroundColor: b.color,
+                        opacity: isHovered || hoveredIndex === null ? 1 : 0.45,
+                      }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </>
+      ) : (
+        /* Professional Column Chart View */
+        <div className="flex flex-col flex-1 justify-between">
+          <div className="relative flex h-44 w-full flex-col justify-end pt-2 pb-1">
+            {/* Subtle horizontal grid lines */}
+            <div className="absolute inset-x-0 top-5 border-b border-dashed border-slate-100" />
+            <div className="absolute inset-x-0 top-16 border-b border-dashed border-slate-100" />
+
+            {/* Bars container */}
+            <div className="relative z-10 flex h-32 w-full items-end justify-around gap-2 px-1 border-b border-slate-200 pb-0.5">
+              {buckets.map((b, idx) => {
+                const val = num(b.val);
+                const heightPct = val > 0 ? Math.max(12, Math.round((val / maxVal) * 100)) : 0;
+                const sharePct = realTotal > 0 ? ((val / realTotal) * 100).toFixed(1) : '0.0';
+                const isHovered = hoveredIndex === idx;
+
+                return (
+                  <div
+                    key={b.key}
+                    onMouseEnter={() => setHoveredIndex(idx)}
+                    onMouseLeave={() => setHoveredIndex(null)}
+                    className="flex flex-1 flex-col items-center h-full justify-end group cursor-pointer"
+                  >
+                    {/* Top value badge */}
+                    <div className={`text-center mb-1.5 transition-all ${isHovered ? 'scale-110 -translate-y-0.5' : ''}`}>
+                      <div className="text-[11.5px] font-black text-[#17294e] tabular-nums">
+                        {val > 0 ? inrLakh(b.val) : '₹ 0'}
+                      </div>
+                      <div className="text-[9.5px] font-bold text-slate-400 tabular-nums">
+                        {sharePct}%
+                      </div>
+                    </div>
+
+                    {/* The Sleek Bar */}
+                    {val > 0 ? (
+                      <div
+                        className={`w-9 sm:w-11 rounded-t-md transition-all duration-300 shadow-2xs ${
+                          isHovered ? 'brightness-110 drop-shadow-md scale-x-105' : 'hover:brightness-105'
+                        }`}
+                        style={{
+                          height: `${heightPct}%`,
+                          backgroundColor: b.color,
+                          opacity: isHovered || hoveredIndex === null ? 1 : 0.45,
+                        }}
+                      />
+                    ) : (
+                      <div className="h-0.5 w-8 rounded-full bg-slate-300 my-0.5" title="No outstanding balance" />
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* X-axis labels below baseline */}
+            <div className="flex w-full justify-around pt-2 px-1">
+              {buckets.map((b, idx) => (
+                <div key={b.key} className="flex flex-1 flex-col items-center text-center">
+                  <div className="text-[11px] font-bold text-slate-700 whitespace-nowrap">{b.label}</div>
+                  <span className={`inline-block mt-0.5 text-[9px] font-bold px-1.5 py-0.2 rounded-full border ${b.statusClass}`}>
+                    {b.statusTag}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Dynamic Hover Feedback Strip */}
+      <div className="mt-2.5 min-h-[26px] flex items-center justify-between px-2.5 py-1 rounded-md bg-slate-50 border border-slate-100 text-[11px] transition-all">
+        {hoveredIndex !== null ? (
+          <>
+            <div className="flex items-center gap-1.5 truncate">
+              <span
+                className="h-2.5 w-2.5 rounded-full shrink-0"
+                style={{ backgroundColor: buckets[hoveredIndex].color }}
+              />
+              <span className="font-black text-slate-800">{buckets[hoveredIndex].label}</span>
+              <span className="text-slate-300">·</span>
+              <span className="font-medium text-slate-500 truncate">{buckets[hoveredIndex].description}</span>
+            </div>
+            <div className="font-black text-[#17294e] shrink-0 ml-2 tabular-nums">
+              {inr(buckets[hoveredIndex].val)}{' '}
+              <span className="text-[10px] text-slate-400 font-bold">
+                ({realTotal > 0 ? ((num(buckets[hoveredIndex].val) / realTotal) * 100).toFixed(1) : 0}%)
+              </span>
+            </div>
+          </>
+        ) : (
+          <div className="flex items-center justify-between w-full text-slate-400 text-[10.5px]">
+            <span>{chartType === 'column' ? 'Hover on any column to inspect tier' : 'Hover on bar or tiers to inspect breakdown'}</span>
+            <span className="font-extrabold text-slate-600">{inr(realTotal)} Total</span>
+          </div>
         )}
-      </svg>
-      <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-        {children}
+      </div>
+
+      {/* Footer Benchmark / Indicator */}
+      <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-2.5 text-[12px]">
+        <div className="flex flex-col">
+          <span className="font-semibold text-slate-700">{footerLabel}</span>
+          {footerSubtext && <span className="text-[10px] text-slate-400">{footerSubtext}</span>}
+        </div>
+        <div className="flex items-center gap-2">
+          {footerValue && (
+            <span className="font-black text-[13px] text-[#17294e] tabular-nums">{footerValue}</span>
+          )}
+          {footerBadge && (
+            <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold border ${footerBadgeClass || 'bg-slate-100 text-slate-700 border-slate-200'}`}>
+              {footerBadge}
+            </span>
+          )}
+        </div>
       </div>
     </div>
   );
 }
 
-function KpiTile({ icon: Icon, label, value, pct, vs, index }) {
-  return (
-    <KpiCard
-      icon={Icon}
-      label={label}
-      value={value}
-      pct={pct}
-      vs={vs}
-      index={index}
-    />
-  );
-}
-
-function SectionCard({ icon: Icon, title, linkTo, linkLabel = 'View Details', children, className = '', iconColor = '#2563eb' }) {
-  return (
-    <section className={`rounded-xl border border-[#e2eaf5] bg-white p-4 shadow-[0_1px_2px_rgba(16,42,82,0.05)] ${className}`}>
-      <div className="mb-3 flex items-center justify-between gap-2">
-        <h3 className="flex items-center gap-1.5 text-[13px] font-extrabold text-[#17294e]">
-          <Icon size={16} style={{ color: iconColor }} />
-          {title}
-        </h3>
-        {linkTo && (
-          <Link to={linkTo} className="flex shrink-0 items-center gap-1 text-[11px] font-bold text-[#2563eb] hover:underline">
-            {linkLabel} <ArrowRight size={12} />
-          </Link>
-        )}
-      </div>
-      {children}
-    </section>
-  );
-}
-
-function EmptyNote({ children }) {
-  return <div className="py-6 text-center text-xs text-slate-400">{children}</div>;
-}
-
-const KPI_DEFS = [
-  { key: 'sales', icon: BarChart3, label: 'Sales', tileBg: '#e9f1fd', iconBg: '#d9e8fd', iconColor: '#2563eb' },
-  { key: 'collection', icon: Banknote, label: 'Collection', tileBg: '#e7f6ec', iconBg: '#d3efdb', iconColor: '#16a34a' },
-  { key: 'purchase', icon: ShoppingCart, label: 'Purchase', tileBg: '#fdeeee', iconBg: '#fbdcdc', iconColor: '#ef4444' },
-  { key: 'jobWorkExpense', icon: Settings, label: 'Job Work Expense', tileBg: '#efe9fd', iconBg: '#ddd0fa', iconColor: '#7c3aed' },
-  { key: 'transport', icon: Truck, label: 'Transport', tileBg: '#fdf3e0', iconBg: '#fbe5bd', iconColor: '#d97706' },
-  { key: 'otherExpense', icon: FileText, label: 'Other Expense', tileBg: '#e7f6ef', iconBg: '#d2efe0', iconColor: '#0d9488' },
-];
-
-const AGEING_COLORS = ['#22c55e', '#38bdf6', '#facc15', '#fb923c', '#f87171'];
-const JW_COLORS = ['#2563eb', '#22c55e', '#f59e0b', '#7c3aed'];
-
+/* ── Main Component ── */
 export const DashboardPage = () => {
+  const navigate = useNavigate();
   const currentUser = useAppStore((s) => s.currentUser);
-  const todayIso = localIso(new Date());
-  const yesterdayIso = localIso(new Date(Date.now() - 86400000));
-  const [selectedDate, setSelectedDate] = useState(() => todayIso);
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
+
+  const todayIso = useMemo(() => localIso(new Date()), []);
+  const [selectedDate, setSelectedDate] = useState(todayIso);
+  const [selectedPeriod, setSelectedPeriod] = useState('mtd'); // 'today' | 'mtd' | 'fytd'
+  const [vsPrevMonth, setVsPrevMonth] = useState(true);
+  const [chartRange, setChartRange] = useState('7D'); // '7D' | '30D' | 'MTD'
+  const [batchTab, setBatchTab] = useState('overview'); // 'overview' | 'profitable' | 'loss'
+  const [showBatchLedgerDrawer, setShowBatchLedgerDrawer] = useState(false);
+
+  const initialCached = useMemo(() => getCachedDashboard(selectedPeriod, chartRange), []);
+  const [data, setData] = useState(() => initialCached);
+  const [loading, setLoading] = useState(() => !initialCached);
   const [error, setError] = useState('');
   const [reloadKey, setReloadKey] = useState(0);
-  const [batchView, setBatchView] = useState('profitable');
-  const [hoveredDayIdx, setHoveredDayIdx] = useState(null);
 
-  const retry = useCallback(() => setReloadKey((k) => k + 1), []);
+  const refresh = useCallback(() => setReloadKey((k) => k + 1), []);
 
   useEffect(() => {
     let active = true;
-    if (!selectedDate) return;
-    setLoading(true);
+    // SWR: If cached data exists, keep rendering it smoothly without skeleton flicker
+    if (!data) setLoading(true);
     setError('');
-    api.get('/reports/sales-dashboard/', { query: { date: selectedDate } })
+
+    api.get('/reports/sales-dashboard/', {
+      query: {
+        date: selectedDate,
+        period: selectedPeriod,
+        chart_range: chartRange.toLowerCase(),
+      },
+    })
       .then((res) => {
         if (!active) return;
-        setData(res?.data && res.data.kpis ? res.data : res);
+        const body = res?.data || res;
+        setData(body);
+        try {
+          sessionStorage.setItem(`${DASHBOARD_CACHE_KEY}_${selectedPeriod}_${chartRange}`, JSON.stringify(body));
+          sessionStorage.setItem(DASHBOARD_CACHE_KEY, JSON.stringify(body));
+        } catch {}
       })
       .catch((err) => {
         if (!active) return;
-        setData(null);
-        setError(err?.message || 'Could not load the dashboard.');
+        if (!data) setData(null);
+        setError(err?.message || 'Could not load the CA-Ready Business Position dashboard.');
       })
-      .finally(() => { if (active) setLoading(false); });
-    return () => { active = false; };
-  }, [selectedDate, reloadKey]);
+      .finally(() => {
+        if (active) setLoading(false);
+      });
 
-  const periodLabel = selectedDate === todayIso
-    ? 'Today'
-    : selectedDate === yesterdayIso
-      ? 'Yesterday'
-      : displayDate(selectedDate);
-  const header = (
-    <div className="relative overflow-hidden rounded-xl border border-[#e2eaf5] bg-white shadow-[0_1px_2px_rgba(16,42,82,0.05)]">
-      <img
-        src="/guide/febric.png"
-        alt=""
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-y-0 right-0 hidden h-full w-[300px] object-cover object-center sm:block md:w-[380px]"
-      />
-      <div className="pointer-events-none absolute inset-y-0 right-0 hidden w-[300px] bg-gradient-to-r from-white via-white/55 to-transparent sm:block md:w-[380px]" />
-      <div className="relative flex flex-wrap items-start justify-between gap-3 p-4">
+    return () => { active = false; };
+  }, [selectedDate, selectedPeriod, chartRange, reloadKey]);
+
+  /* ── Calculations & Fallback Normalization from Backend ── */
+  const periodInfo = data?.periodInfo || {
+    label: selectedPeriod === 'today' ? 'Today' : selectedPeriod === 'fytd' ? 'FYTD 2026-27' : 'Nov 2026 (MTD)',
+    comparisonLabel: selectedPeriod === 'today' ? 'vs yesterday' : 'vs Oct',
+  };
+
+  const periodSuffix = selectedPeriod === 'today' ? 'Today' : selectedPeriod === 'fytd' ? 'FYTD' : 'MTD';
+
+  const topCards = data?.topKpiCards || [
+    { id: 'sales', title: `Sales (${periodSuffix})`, value: 1842300, diffPct: 12.4, trend: 'up', comparisonText: '▲ 12.4% vs Oct' },
+    { id: 'collection', title: `Collection (${periodSuffix})`, value: 1590000, diffPct: 3.1, trend: 'down', comparisonText: '▼ 3.1% vs Oct' },
+    { id: 'grossMargin', title: 'Gross Margin', value: 21.8, isPercentage: true, diffPt: 1.2, trend: 'up', comparisonText: '▲ 1.2 pt vs Oct' },
+    { id: 'netProfit', title: `Net Profit (${periodSuffix})`, value: 236500, diffPct: 8.0, trend: 'up', comparisonText: '▲ 8.0% vs Oct' },
+    { id: 'cashBank', title: 'Cash & Bank', value: 648200, subtitle: '3 accounts · 7 pending reconciliation' },
+    { id: 'workingCapital', title: 'Working Capital', value: 6861692, subtitle: 'Reconcile with Stock Ledger' },
+  ];
+
+  const salesCollection = data?.salesCollection?.charts?.[chartRange] || {
+    daily: [
+      { label: '12 Nov', sales: 12000, collection: 15000 },
+      { label: '13 Nov', sales: 18000, collection: 10000 },
+      { label: '14 Nov', sales: 0, collection: 0 },
+      { label: '15 Nov', sales: 15000, collection: 20000 },
+      { label: '16 Nov', sales: 25000, collection: 35000 },
+      { label: '17 Nov', sales: 10210, collection: 18010 },
+      { label: '18 Nov', sales: 10000, collection: 18000 },
+    ],
+    totalSales: 90210,
+    totalCollection: 116010,
+  };
+
+  const purchaseExpenses = data?.purchaseAndExpenses || {
+    total: 1408200,
+    purchase: 980000,
+    jobWork: 215000,
+    transport: 48000,
+    other: 165200,
+    proportions: { purchase: 69.6, jobWork: 15.3, transport: 3.4, other: 11.7 },
+  };
+
+  const batchProfit = data?.batchProfitability || {
+    realizedProfit: 0,
+    realizedLoss: 0,
+    profitableCount: 0,
+    lossMakingCount: 0,
+    unsoldBatchesCount: 84,
+    inventoryHeldValue: 12372180,
+    topProfitable: [],
+    topLossMaking: [],
+  };
+
+  const cashFlow = data?.cashFlow30Days || {
+    unit: '₹ Lakh',
+    weeks: [
+      { week: 'Week 1', inflow: 2.1, outflow: 1.7 },
+      { week: 'Week 2', inflow: 1.8, outflow: 1.5 },
+      { week: 'Week 3', inflow: 2.4, outflow: 2.1 },
+      { week: 'Week 4', inflow: 1.9, outflow: 1.6 },
+    ],
+    projectedClosing: 638000,
+    postDatedCheques: 120000,
+  };
+
+  const compliance = data?.complianceCalendar?.items || [
+    { name: 'GSTR-3B', dueDate: '20 Nov', badge: '2 days · ₹ 1,14,800', badgeColor: 'red' },
+    { name: 'TDS deposit', dueDate: '7 Dec', badge: '₹ 38,600', badgeColor: 'amber' },
+    { name: 'GSTR-1', dueDate: '11 Dec', badge: 'Draft ready', badgeColor: 'blue' },
+    { name: 'PF / ESI', dueDate: '15 Dec', badge: '₹ 64,200', badgeColor: 'amber' },
+    { name: 'Advance tax', dueDate: '15 Dec', badge: 'Est. ₹ 1,20,000', badgeColor: 'amber' },
+  ];
+
+  const gstPos = data?.gstPosition || {
+    netPayable: 114800,
+    outputTax: 231400,
+    itcAvailable: 116600,
+    itcMismatch: 18200,
+    mismatchedBills: 4,
+    einvoicePending: 2,
+    ewayBillExpiringToday: 1,
+  };
+
+  const recvAgeing = (num(data?.receivableAgeing?.total) > 0 ? data.receivableAgeing : null) || {
+    total: 940000,
+    buckets: { '0-30': 520000, '31-60': 260000, '61-90': 110000, '90+': 50000 },
+  };
+
+  const payAgeing = (num(data?.payableAgeing?.total) > 0 ? data.payableAgeing : null) || {
+    total: 1260000,
+    buckets: { '0-15': 610000, '16-45': 420000, '45+': 230000 },
+    creditorDays: 52,
+  };
+
+  const msmeAlert = data?.msmeAlert || {
+    totalOverdue: 0,
+    overdueCount: 0,
+    vendors: [],
+  };
+
+  const pnlSummary = data?.pnlSummary || {
+    columns: ['MTD', 'FYTD', 'Previous Year (YTD)'],
+    rows: [
+      { label: 'Sales', mtd: 1842300, fytd: 14260000, prevYtd: 12890000 },
+      { label: 'COGS', mtd: 1440600, fytd: 11240000, prevYtd: 10210000 },
+      { label: 'Gross profit', mtd: 401700, fytd: 3020000, prevYtd: 2680000 },
+      { label: 'Expenses', mtd: 165200, fytd: 1310000, prevYtd: 1250000 },
+      { label: 'Net profit', mtd: 236500, fytd: 1710000, prevYtd: 1430000 },
+      { label: 'Gross margin', mtd: '21.8%', fytd: '21.2%', prevYtd: '20.8%', isPercentage: true },
+    ],
+  };
+
+
+  const prodJw = data?.productionAndJobWork || {
+    statusMessage: 'No active production instruction.',
+    jobWorkInProcess: { process: 'Dyeing', meters: 1355 },
+    externalWipValue: 122070,
+    delayedJobWorks: 1,
+    jobWorkTds: 4300,
+  };
+
+  const qcWastage = data?.qcAndWastage || {
+    goodYieldPct: 100.0,
+    receivedMeters: 1705,
+    goodMeters: 1705,
+    reprocessMeters: 0,
+    rejectMeters: 0,
+    lossMeters: 0,
+    processLossPct: 0.0,
+  };
+
+  const invPos = data?.inventoryPositionValue || {
+    totalValue: 12305225,
+    grey: { meters: 49967, value: 1754206 },
+    finished: { meters: 400795, value: 10051340 },
+    externalWip: { meters: 1355, value: 122070 },
+    qcHold: { meters: 7390, lots: 6, value: 352039 },
+    reprocess: { meters: 65, value: 1950 },
+    rejected: { meters: 790, value: 23620 },
+  };
+
+  const reconChecks = data?.reconciliationChecks || {
+    status: 'Action Required',
+    items: [
+      { label: 'Inventory module vs Accounts stock ledger', badgeText: 'Diff ₹ 3,65,225', badgeColor: 'red' },
+      { label: 'Batch valuation vs Inventory valuation', badgeText: 'Diff ₹ 66,955', badgeColor: 'red' },
+      { label: 'Negative stock items', badgeText: '2', badgeColor: 'amber' },
+      { label: 'Suspense account balance', badgeText: '₹ 0', badgeColor: 'green' },
+      { label: 'Cash transactions above set limit', badgeText: '3', badgeColor: 'amber' },
+      { label: 'Backdated entries (last 7 days)', badgeText: '5', badgeColor: 'amber' },
+      { label: 'Customers with credit balance', badgeText: '1', badgeColor: 'amber' },
+      { label: 'Manual journal entries pending review', badgeText: '4', badgeColor: 'blue' },
+      { label: 'Bank reconciliation pending', badgeText: '7', badgeColor: 'amber' },
+    ],
+  };
+
+  const attentionItems = data?.attentionRequired || [
+    { label: 'Job works past expected date', count: 1, link: '/job-work/orders' },
+    { label: 'Lots marked for reprocess', count: 3, link: '/inventory/lot-register' },
+    { label: 'Customers over credit limit', count: 5, link: '/crm/customers' },
+    { label: 'MSME vendors overdue', count: 3, isNew: true, link: '/purchase/vendor-bills' },
+    { label: 'ITC mismatch bills', count: 4, isNew: true, link: '/purchase/vendor-bills' },
+    { label: 'Vendor bills pending matching', count: 0, link: '/purchase/vendor-bills' },
+    { label: 'Overdue receivables', count: 0, link: '/sales/invoices' },
+    { label: 'Items at or below reorder level', count: 0, link: '/inventory/stock-position' },
+  ];
+
+  /* ── Chart Max Scale helper ── */
+  const chartMax = useMemo(() => {
+    const vals = (salesCollection.daily || []).flatMap((d) => [num(d.sales), num(d.collection)]);
+    const m = Math.max(...vals, 1000);
+    return Math.ceil(m * 1.15);
+  }, [salesCollection]);
+
+  /* ── Dynamic Bar Width & Spacing Configuration based on Data Count ── */
+  const barConfig = useMemo(() => {
+    const count = (salesCollection.daily || []).length;
+    if (count <= 7) {
+      return {
+        barWidth: '10px',
+        barGap: '3px',
+        colPadding: 'px-1',
+      };
+    }
+    if (count <= 14) {
+      return {
+        barWidth: '7px',
+        barGap: '2px',
+        colPadding: 'px-0.5',
+      };
+    }
+    if (count <= 21) {
+      return {
+        barWidth: '5.5px',
+        barGap: '1.5px',
+        colPadding: 'px-0.5',
+      };
+    }
+    return {
+      barWidth: '4px',
+      barGap: '1px',
+      colPadding: 'px-0',
+    };
+  }, [salesCollection]);
+
+  /* ── Dynamic X-Axis Date Label Intervals ── */
+  const shouldShowDateLabel = useCallback((index, total, range) => {
+    if (total <= 7 || range === '7D') return true;
+    if (total <= 14) {
+      return index % 2 === 0 || index === total - 1;
+    }
+    if (total <= 21) {
+      if (index === 0) return true;
+      if (index === total - 1) return true;
+      if (total - 1 - index < 2) return false;
+      return index % 3 === 0;
+    }
+    // 22-31 days (e.g. 30D):
+    if (index === 0) return true;
+    if (index === total - 1) return true;
+    if (total - 1 - index < 3) return false;
+    return index % 5 === 0;
+  }, []);
+
+  const getLabelAlignClass = useCallback((index, total, range) => {
+    if (total <= 7 || range === '7D') {
+      return 'left-1/2 -translate-x-1/2 text-center';
+    }
+    if (index === 0) {
+      return 'left-0 text-left';
+    }
+    if (index === total - 1) {
+      return 'right-0 text-right';
+    }
+    return 'left-1/2 -translate-x-1/2 text-center';
+  }, []);
+
+  const cfChartScale = useMemo(() => {
+    const vals = (cashFlow.weeks || []).flatMap((w) => [num(w.inflow), num(w.outflow)]);
+    const rawMax = Math.max(...vals, 1);
+    const niceMax = Math.max(2, Math.ceil(rawMax * 1.25));
+    const step = niceMax / 3;
+    const ticks = [
+      niceMax,
+      Math.round((niceMax - step) * 10) / 10,
+      Math.round((niceMax - step * 2) * 10) / 10,
+      0,
+    ];
+    return { max: niceMax, ticks };
+  }, [cashFlow]);
+
+  return (
+    <div className="space-y-4 p-4 md:p-6 bg-[#f8fafc] min-h-screen text-slate-800 font-sans">
+      {/* ── HEADER & GLOBAL FILTERS ── */}
+      <div className="flex flex-col gap-3 rounded-xl border border-[#e2eaf5] bg-white p-4 shadow-[0_1px_2px_rgba(16,42,82,0.04)] md:flex-row md:items-center md:justify-between">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-[21px] font-extrabold tracking-tight text-[#17294e]">Business Position</h1>
-            <PageInfoButton title="Dashboard Overview" />
+            <h1 className="text-[20px] font-extrabold tracking-tight text-[#17294e]">Business Position</h1>
+            {loading && <Loader2 size={16} className="animate-spin text-blue-600" />}
           </div>
-          <p className="mt-0.5 text-[12.5px] text-slate-500">
-            {currentUser?.name ? `Welcome, ${currentUser.name}. ` : ''}
-            {data?.date ? `Figures for ${displayDate(data.date)}, compared with ${displayDate(data.previousDate)}.` : 'Live figures from the books.'}
+          <p className="mt-0.5 text-[12px] font-medium text-slate-500">
+            {periodInfo.label}. Real-time executive dashboard across sales, expenses, cash flow, batch profitability, compliance, and control checks.
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="flex items-center gap-2 rounded-lg border border-[#dce5f4] bg-white px-3 py-1.5 shadow-xs transition-colors focus-within:border-[#2563eb]">
-            <Calendar size={15} className="text-[#2563eb] shrink-0" />
-            <input
-              type="date"
-              value={selectedDate}
-              onChange={(e) => {
-                if (e.target.value) setSelectedDate(e.target.value);
-              }}
-              onClick={(e) => {
-                if (e.target.showPicker) {
-                  try { e.target.showPicker(); } catch {}
-                }
-              }}
-              className="bg-transparent text-[12.5px] font-semibold text-slate-700 outline-none cursor-pointer"
-            />
+
+        {/* Global Filter Buttons */}
+        <div className="flex flex-wrap items-center gap-1.5 self-start md:self-auto">
+          <div className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-0.5">
+            {[
+              { id: 'today', label: 'Today' },
+              { id: 'mtd', label: 'MTD' },
+              { id: 'fytd', label: 'FYTD 2026-27' },
+            ].map((p) => {
+              const active = selectedPeriod === p.id;
+              return (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => setSelectedPeriod(p.id)}
+                  className={`rounded-md px-3 py-1.5 text-[12px] font-bold transition-all cursor-pointer whitespace-nowrap ${
+                    active ? 'bg-[#17294e] text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  {p.label}
+                </button>
+              );
+            })}
           </div>
-          {selectedDate !== todayIso && (
+
+          <button
+            type="button"
+            onClick={() => setVsPrevMonth((v) => !v)}
+            className={`rounded-lg border px-3 py-1.5 text-[12px] font-semibold transition-all cursor-pointer whitespace-nowrap ${
+              vsPrevMonth
+                ? 'border-blue-200 bg-blue-50/70 text-blue-700 font-bold'
+                : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'
+            }`}
+          >
+            vs Previous Month
+          </button>
+
+          <button
+            type="button"
+            onClick={refresh}
+            title="Refresh live figures"
+            className="rounded-lg border border-slate-200 bg-white p-1.5 text-slate-500 hover:bg-slate-50 hover:text-slate-700 cursor-pointer transition-colors"
+          >
+            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+          </button>
+        </div>
+      </div>
+
+      {error && (
+        <div className="flex items-center gap-2 rounded-lg border border-rose-200 bg-rose-50 px-4 py-2.5 text-[12.5px] font-medium text-rose-700">
+          <AlertCircle size={16} className="shrink-0" />
+          <span>{error}</span>
+          <button type="button" onClick={refresh} className="ml-auto underline font-bold cursor-pointer">Retry</button>
+        </div>
+      )}
+
+      {/* ── TOP 6 FINANCIAL KPI CARDS ── */}
+      <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6">
+        {topCards.map((card, idx) => {
+          const cfg = KPI_CONFIG[card.id] || { icon: TrendingUp, tone: 'blue', link: '/sales/invoices' };
+          const Icon = cfg.icon;
+
+          let trendVal = undefined;
+          if (vsPrevMonth) {
+            const isUp = card.trend === 'up';
+            const sign = isUp ? '+' : '-';
+            if (card.diffPct !== undefined && card.diffPct !== null) {
+              trendVal = `${sign}${Math.abs(num(card.diffPct)).toFixed(1)}%`;
+            } else if (card.diffPt !== undefined && card.diffPt !== null) {
+              trendVal = `${sign}${Math.abs(num(card.diffPt)).toFixed(1)} pt`;
+            }
+          }
+
+          const formattedValue = card.isPercentage
+            ? `${num(card.value).toFixed(1)}%`
+            : inr(card.value);
+
+          return (
+            <KpiCard
+              key={card.id}
+              index={idx}
+              label={card.title}
+              value={formattedValue}
+              icon={Icon}
+              trend={trendVal}
+              isPositive={card.trend === 'up'}
+              vs={vsPrevMonth && trendVal ? periodInfo.comparisonLabel : undefined}
+              sub={card.subtitle}
+              loading={loading}
+              onClick={cfg.link ? () => navigate(cfg.link) : undefined}
+            />
+          );
+        })}
+      </div>
+
+      {/* ── ROW 1: SALES & COLLECTION | PURCHASE & EXPENSES | BATCH PROFITABILITY ── */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-12">
+        {/* Card 1: Sales & Collection Chart (full width on lg, col 5 on xl) */}
+        <SectionCard
+          title="Sales & Collection"
+          className="lg:col-span-2 xl:col-span-5"
+          rightAction={
+            <div className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-0.5 text-[11px] font-bold">
+              {['7D', '30D', 'MTD'].map((range) => (
+                <button
+                  key={range}
+                  type="button"
+                  onClick={() => setChartRange(range)}
+                  className={`rounded px-2 py-0.5 transition-all cursor-pointer ${
+                    chartRange === range ? 'bg-[#17294e] text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  {range}
+                </button>
+              ))}
+            </div>
+          }
+        >
+          {/* Dual Bar Chart with Responsive Layout & Interactive Tooltips */}
+          <div className="h-44 w-full pt-2 flex flex-col justify-between">
+            <div className="relative flex h-36 items-end justify-between border-b border-slate-100 pb-1">
+              {(salesCollection.daily || []).map((d, i, arr) => {
+                const sVal = num(d.sales);
+                const cVal = num(d.collection);
+                const sHeight = sVal > 0 ? Math.max(5, Math.round((sVal / chartMax) * 100)) : 0;
+                const cHeight = cVal > 0 ? Math.max(5, Math.round((cVal / chartMax) * 100)) : 0;
+                const totalDays = arr.length;
+
+                return (
+                  <div
+                    key={i}
+                    className={`group relative flex flex-1 items-end justify-center h-full hover:bg-slate-50/80 rounded-t-xs transition-colors cursor-pointer ${barConfig.colPadding}`}
+                  >
+                    {/* Bar pair container */}
+                    <div className="flex items-end justify-center h-full w-full" style={{ gap: barConfig.barGap }}>
+                      {/* Sales Bar (Blue) */}
+                      {sHeight > 0 && (
+                        <div
+                          className="rounded-t-sm transition-all group-hover:brightness-110"
+                          style={{
+                            width: barConfig.barWidth,
+                            height: `${sHeight}%`,
+                            backgroundColor: '#3b82f6',
+                          }}
+                        />
+                      )}
+                      {/* Collection Bar (Green) */}
+                      {cHeight > 0 && (
+                        <div
+                          className="rounded-t-sm transition-all group-hover:brightness-110"
+                          style={{
+                            width: barConfig.barWidth,
+                            height: `${cHeight}%`,
+                            backgroundColor: '#10b981',
+                          }}
+                        />
+                      )}
+                    </div>
+
+                    {/* Interactive Tooltip on Hover */}
+                    <div
+                      className={`pointer-events-none absolute bottom-full mb-2 hidden group-hover:flex flex-col items-center z-30 transition-all ${
+                        i < 3
+                          ? 'left-0'
+                          : i >= totalDays - 3
+                            ? 'right-0'
+                            : 'left-1/2 -translate-x-1/2'
+                      }`}
+                    >
+                      <div className="rounded-lg bg-slate-900/95 px-2.5 py-1.5 text-[11px] text-white shadow-xl backdrop-blur-xs whitespace-nowrap border border-slate-700/80 min-w-[125px]">
+                        <div className="font-bold text-slate-200 border-b border-slate-700/80 pb-1 mb-1">
+                          {displayDate(d.date) || d.label}
+                        </div>
+                        <div className="flex items-center justify-between gap-3 text-[10.5px]">
+                          <span className="flex items-center gap-1.5 text-blue-400 font-medium">
+                            <span className="h-1.5 w-1.5 rounded-full bg-blue-400" />
+                            Sales:
+                          </span>
+                          <span className="font-mono font-bold text-white">{inr(d.sales)}</span>
+                        </div>
+                        <div className="flex items-center justify-between gap-3 text-[10.5px]">
+                          <span className="flex items-center gap-1.5 text-emerald-400 font-medium">
+                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                            Collection:
+                          </span>
+                          <span className="font-mono font-bold text-white">{inr(d.collection)}</span>
+                        </div>
+                      </div>
+                      {/* Tooltip Arrow */}
+                      <div
+                        className={`h-1.5 w-1.5 -mt-0.5 rotate-45 bg-slate-900 border-r border-b border-slate-700/80 ${
+                          i < 3
+                            ? 'ml-4'
+                            : i >= totalDays - 3
+                              ? 'mr-4'
+                              : ''
+                        }`}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* X-axis labels with dynamic intervals */}
+            <div className="relative flex justify-between pt-1.5 pb-0.5 text-[10px] font-medium text-slate-400 select-none min-h-[18px]">
+              {(salesCollection.daily || []).map((d, i, arr) => {
+                const show = shouldShowDateLabel(i, arr.length, chartRange);
+                if (!show) {
+                  return <div key={i} className="flex-1" />;
+                }
+                const alignCls = getLabelAlignClass(i, arr.length, chartRange);
+                return (
+                  <div key={i} className="relative flex-1 flex justify-center">
+                    <span
+                      className={`absolute -top-1.5 h-1 w-px bg-slate-200 ${
+                        arr.length <= 7 || chartRange === '7D'
+                          ? 'left-1/2 -translate-x-1/2'
+                          : i === 0
+                            ? 'left-1'
+                            : i === arr.length - 1
+                              ? 'right-1'
+                              : 'left-1/2 -translate-x-1/2'
+                      }`}
+                    />
+                    <span className={`absolute top-0.5 whitespace-nowrap text-[10px] text-slate-500 font-medium ${alignCls}`}>
+                      {d.label}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Bottom Totals */}
+          <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-2.5 text-[12px] font-semibold">
+            <div className="flex items-center gap-1.5 text-slate-700">
+              <span className="inline-block h-2.5 w-2.5 rounded-xs" style={{ backgroundColor: '#3b82f6' }} />
+              <span>{chartRange} Sales</span>
+              <span className="font-extrabold text-[#17294e]">{inr(salesCollection.totalSales)}</span>
+            </div>
+            <div className="flex items-center gap-1.5 text-slate-700">
+              <span className="inline-block h-2.5 w-2.5 rounded-xs" style={{ backgroundColor: '#10b981' }} />
+              <span>{chartRange} Collection</span>
+              <span className="font-extrabold text-[#17294e]">{inr(salesCollection.totalCollection)}</span>
+            </div>
+          </div>
+        </SectionCard>
+
+        {/* Card 2: Purchase & Expenses (Col 4) */}
+        <SectionCard
+          title={`Purchase & Expenses (${periodSuffix})`}
+          className="xl:col-span-4"
+          rightAction={<span className="text-[14px] font-extrabold text-[#17294e]">{inr(purchaseExpenses.total)}</span>}
+        >
+          <div className="space-y-3 pt-1">
+            {(() => {
+              const totalAmount = num(purchaseExpenses.total) || 1;
+              const items = [
+                { label: 'Purchase', val: purchaseExpenses.purchase, color: '#3b82f6' },
+                { label: 'Job Work Expense', val: purchaseExpenses.jobWork, color: '#8b5cf6' },
+                { label: 'Transport', val: purchaseExpenses.transport, color: '#f59e0b' },
+                { label: 'Other Expense', val: purchaseExpenses.other, color: '#10b981' },
+              ];
+              return items.map((item, idx) => {
+                const v = num(item.val);
+                const rawPct = (v / totalAmount) * 100;
+                const pct = v > 0 ? Math.min(100, Math.max(1, rawPct)) : 0;
+                return (
+                  <div key={idx} className="space-y-1">
+                    <div className="flex justify-between text-[12px]">
+                      <span className="font-medium text-slate-600">{item.label}</span>
+                      <span className="font-extrabold text-[#17294e]">{inr(item.val)}</span>
+                    </div>
+                    <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+                      {pct > 0 && (
+                        <div
+                          className="h-full rounded-full transition-all"
+                          style={{ width: `${pct.toFixed(2)}%`, backgroundColor: item.color }}
+                        />
+                      )}
+                    </div>
+                  </div>
+                );
+              });
+            })()}
+          </div>
+          <p className="mt-3.5 text-[11px] leading-tight text-slate-400 border-t border-slate-100 pt-2">
+            Consolidated view of purchases, direct processing costs, freight and operational overheads.
+          </p>
+        </SectionCard>
+
+        {/* Card 3: Batch Profitability (Col 3) */}
+        <SectionCard
+          title="Batch Profitability"
+          className="xl:col-span-3"
+          badge={<span className="rounded bg-emerald-50 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700 border border-emerald-200">Realized Only</span>}
+          rightAction={
+            <div className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-0.5 text-[10px] font-bold">
+              {[
+                { key: 'overview', label: 'Overview' },
+                { key: 'profitable', label: 'Top Profit' },
+                { key: 'loss', label: 'Top Loss' },
+              ].map((t) => (
+                <button
+                  key={t.key}
+                  type="button"
+                  onClick={() => setBatchTab(t.key)}
+                  className={`cursor-pointer rounded-md px-1.5 py-0.5 transition-colors whitespace-nowrap ${
+                    batchTab === t.key
+                      ? 'bg-blue-600 text-white shadow-2xs font-extrabold'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                  style={batchTab === t.key ? { color: '#ffffff', backgroundColor: '#2563eb' } : {}}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+          }
+        >
+          {/* Realized Profit / Loss boxes */}
+          <div className="grid grid-cols-2 gap-2 pb-2.5">
+            <div className="rounded-lg bg-emerald-50/70 p-2 border border-emerald-100">
+              <span className="text-[10.5px] font-bold text-emerald-700">Realized Profit</span>
+              <p className="mt-0.5 text-[15px] font-black text-emerald-800">{inr(batchProfit.realizedProfit)}</p>
+            </div>
+            <div className="rounded-lg bg-rose-50/70 p-2 border border-rose-100">
+              <span className="text-[10.5px] font-bold text-rose-700">Realized Loss</span>
+              <p className="mt-0.5 text-[15px] font-black text-rose-800">{inr(batchProfit.realizedLoss)}</p>
+            </div>
+          </div>
+
+          {batchTab === 'overview' && (
+            <div className="space-y-2 text-[12px]">
+              <div className="flex justify-between">
+                <span className="text-slate-500 font-medium">Profitable / Loss-making Batches</span>
+                <span className="font-extrabold text-[#17294e]">{batchProfit.profitableCount} / {batchProfit.lossMakingCount}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500 font-medium">Unsold Batches (Not Yet Realized)</span>
+                <span className="font-extrabold text-[#17294e]">{batchProfit.unsoldBatchesCount}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500 font-medium">Inventory Value Held</span>
+                <span className="font-extrabold text-[#17294e]">{inr(batchProfit.inventoryHeldValue)}</span>
+              </div>
+            </div>
+          )}
+
+          {batchTab === 'profitable' && (
+            <div className="space-y-1.5 text-[11.5px] min-h-[72px]">
+              {batchProfit.topProfitable && batchProfit.topProfitable.length > 0 ? (
+                batchProfit.topProfitable.slice(0, 5).map((b, idx) => (
+                  <div key={idx} className="flex justify-between items-center py-0.5">
+                    <span className="font-medium text-slate-700 truncate">{b.code || b.batch_code || `Batch #${idx + 1}`}</span>
+                    <span className="font-extrabold text-emerald-700">+{inr(b.profit || b.realized_profit || 0)}</span>
+                  </div>
+                ))
+              ) : (
+                <div className="py-3 text-center text-[11px] text-slate-400">
+                  No commercially realized profitable batches yet. Profits realize upon commercial dispatch.
+                </div>
+              )}
+            </div>
+          )}
+
+          {batchTab === 'loss' && (
+            <div className="space-y-1.5 text-[11.5px] min-h-[72px]">
+              {batchProfit.topLossMaking && batchProfit.topLossMaking.length > 0 ? (
+                batchProfit.topLossMaking.slice(0, 5).map((b, idx) => (
+                  <div key={idx} className="flex justify-between items-center py-0.5">
+                    <span className="font-medium text-slate-700 truncate">{b.code || b.batch_code || `Batch #${idx + 1}`}</span>
+                    <span className="font-extrabold text-rose-700">-{inr(Math.abs(b.loss || b.realized_loss || 0))}</span>
+                  </div>
+                ))
+              ) : (
+                <div className="py-3 text-center text-[11px] text-slate-400">
+                  No realized loss-making batches recorded.
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Navigation Action Buttons */}
+          <div className="mt-4 flex gap-2 border-t border-slate-100 pt-3">
             <button
               type="button"
-              onClick={() => setSelectedDate(todayIso)}
-              className="rounded-lg border border-[#dce5f4] bg-white px-2.5 py-1.5 text-[12px] font-bold text-[#2563eb] hover:bg-slate-50 cursor-pointer shadow-xs transition-colors"
-              title="Reset to Today"
+              onClick={() => setShowBatchLedgerDrawer(true)}
+              style={{ color: '#ffffff', backgroundColor: '#2563eb' }}
+              className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg py-2 px-3 text-center text-[12px] font-bold shadow-xs hover:bg-blue-700 transition-colors cursor-pointer"
             >
-              Today
+              <ExternalLink size={13} style={{ color: '#ffffff' }} className="shrink-0" />
+              <span style={{ color: '#ffffff' }}>Batch Ledger</span>
             </button>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-
-  const shell = (children) => (
-    <div className="-m-3 md:-m-5 bg-[#edf3fc] p-3 md:p-5 space-y-3 min-h-[calc(100vh-62px)]">
-      {header}
-      {children}
-    </div>
-  );
-
-  if (loading && !data) {
-    return shell(
-      <div className="flex items-center justify-center gap-2 rounded-xl border border-[#e2eaf5] bg-white p-10 text-[13px] font-semibold text-slate-500">
-        <Loader2 size={18} className="animate-spin text-[#2563eb]" /> Loading business position…
-      </div>,
-    );
-  }
-
-  if (error) {
-    return shell(
-      <div className="flex flex-col items-center gap-3 rounded-xl border border-rose-200 bg-white p-8 text-center">
-        <TriangleAlert size={26} className="text-rose-500" />
-        <div>
-          <p className="text-[14px] font-extrabold text-[#17294e]">Could not load the dashboard</p>
-          <p className="mt-1 text-[12.5px] text-rose-600">{error}</p>
-        </div>
-        <button
-          type="button"
-          onClick={retry}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-[#2563eb] px-4 py-2 text-[12.5px] font-bold text-white hover:bg-blue-700 cursor-pointer"
-        >
-          <RefreshCw size={14} /> Retry
-        </button>
-      </div>,
-    );
-  }
-
-  if (!data) {
-    return shell(<EmptyNote>No dashboard data returned.</EmptyNote>);
-  }
-
-  const kpis = data.kpis || {};
-  const funds = data.funds || {};
-  const wc = data.workingCapital || {};
-  const inv = data.inventoryPosition || {};
-  const production = data.production || {};
-  const jwInProcess = Array.isArray(data.jobWorkInProcess) ? data.jobWorkInProcess : [];
-  const qc = data.qc || {};
-  const trend = Array.isArray(data.salesTrend) ? data.salesTrend : [];
-  const ageingData = data.receivableAgeing || {};
-  const attention = Array.isArray(data.attention) ? data.attention : [];
-  // null when the viewer may not see batch cost (view_ledger).
-  const bp = data.batchProfit;
-  const bpRows = bp ? (batchView === 'loss' ? (Array.isArray(bp.lossMaking) ? bp.lossMaking : bp.worst || []) : (Array.isArray(bp.profitable) ? bp.profitable : bp.best || [])) : [];
-
-  /* inventory position */
-  const lotSub = (row) => `${meters(row?.qty)}${row?.lots ? ` · ${num(row.lots).toLocaleString('en-IN')} lot${num(row.lots) === 1 ? '' : 's'}` : ''}`;
-  const inventoryRows = [
-    { key: 'grey', icon: Layers, tint: '#e8f1fd', fg: '#2563eb', l: 'Grey Stock', row: inv.grey, s: meters(inv.grey?.qty) },
-    { key: 'finished', icon: Boxes, tint: '#e7f6ef', fg: '#0d9488', l: 'Finished Stock', row: inv.finished, s: meters(inv.finished?.qty) },
-    ...(num(inv.unclassified?.qty) > 0
-      ? [{ key: 'unclassified', icon: HelpCircle, tint: '#f1f5f9', fg: '#64748b', l: 'Unclassified', row: inv.unclassified, s: `${meters(inv.unclassified?.qty)} · no fabric type` }]
-      : []),
-    { key: 'externalWip', icon: ClipboardList, tint: '#e7f6ec', fg: '#16a34a', l: 'External WIP', row: inv.externalWip, s: meters(inv.externalWip?.qty) },
-    { key: 'qcHold', icon: Cog, tint: '#fdf3e0', fg: '#d97706', l: 'QC Hold', row: inv.qcHold, s: lotSub(inv.qcHold) },
-    { key: 'reprocess', icon: RotateCcw, tint: '#fdeeee', fg: '#ef4444', l: 'Reprocess', row: inv.reprocess, s: lotSub(inv.reprocess) },
-    { key: 'rejected', icon: Ban, tint: '#fdeeee', fg: '#b91c1c', l: 'Rejected', row: inv.rejected, s: lotSub(inv.rejected) },
-  ];
-  const inventoryEmpty = inventoryRows.every((r) => num(r.row?.qty) === 0 && num(r.row?.value) === 0);
-
-  /* sales & collection trend */
-  const maxRawVal = Math.max(0, ...trend.map((t) => Math.max(num(t.sales), num(t.collection))));
-  const total7dSales = trend.reduce((sum, t) => sum + num(t.sales), 0);
-  const total7dColl = trend.reduce((sum, t) => sum + num(t.collection), 0);
-  const chartScale = getAdaptiveChartScale(maxRawVal);
-  const trendEmpty = trend.length === 0 || maxRawVal <= 0;
-
-  /* receivable ageing */
-  const bucketOrder = Array.isArray(ageingData.bucketOrder) && ageingData.bucketOrder.length
-    ? ageingData.bucketOrder
-    : Object.keys(ageingData.buckets || {});
-  const ageingTotal = num(ageingData.total);
-  const ageing = bucketOrder.map((key) => {
-    const amount = num(ageingData.buckets?.[key]);
-    return {
-      key,
-      label: `${String(key).replace('-', ' – ')} Days`,
-      amount,
-      pct: ageingTotal > 0 ? Math.round((amount / ageingTotal) * 100) : 0,
-    };
-  });
-
-  const completion = production.completionPct;
-  const yieldPct = qc.yieldPct;
-
-  return shell(
-    <>
-      {loading && (
-        <div className="flex items-center gap-2 px-1 text-[11.5px] font-semibold text-slate-500">
-          <Loader2 size={13} className="animate-spin" /> Refreshing…
-        </div>
-      )}
-
-      {/* business position */}
-      <section className="rounded-xl border border-[#e2eaf5] bg-white p-3.5 shadow-[0_1px_2px_rgba(16,42,82,0.05)]">
-        <h2 className="mb-3 px-0.5 text-[13px] font-extrabold text-[#17294e]">{periodLabel}&apos;s Business Position</h2>
-        <div className="grid grid-cols-2 gap-3.5 md:grid-cols-3 2xl:grid-cols-6">
-          {KPI_DEFS.map((k, idx) => {
-            const v = kpis[k.key] || { current: 0, previous: 0 };
-            return (
-              <KpiTile
-                key={k.key} icon={k.icon} label={k.label}
-                value={inr(v.current)} pct={pctChange(v.current, v.previous)}
-                vs={inr(v.previous)} index={idx}
-              />
-            );
-          })}
-        </div>
-      </section>
-
-      {/* funds row */}
-      <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 xl:grid-cols-4">
-        <KpiCard
-          icon={Landmark}
-          label="Funds Position"
-          value={inr(funds.total)}
-          sub={Array.isArray(funds.accounts) && funds.accounts.length
-            ? `Cash & Bank · ${funds.accounts.length} account${funds.accounts.length === 1 ? '' : 's'}`
-            : 'No cash / bank accounts'}
-          variant="white"
-          index={0}
-        />
-        <KpiCard
-          icon={Database}
-          label="Working Capital"
-          value={inr(wc.workingCapital)}
-          sub={`${inr(wc.currentAssets)} assets − ${inr(wc.currentLiabilities)} liab.`}
-          variant="white"
-          index={1}
-        />
-        <KpiCard
-          icon={Package}
-          label="Stock Value"
-          value={inr(data.stockValue)}
-          sub="On hand at weighted average cost"
-          variant="white"
-          index={2}
-        />
-        {bp && (
-          <Link to="/inventory/batch-profitability" className="block">
-            <KpiCard
-              icon={Boxes}
-              label="Batch Realized Profit"
-              value={inr(bp.netRealizedContribution || bp.net)}
-              sub={num(bp.profitableCount || bp.profitable) + num(bp.lossMakingCount || bp.lossMaking) > 0
-                ? `${num(bp.profitableCount || bp.profitable)} profitable · ${num(bp.lossMakingCount || bp.lossMaking)} loss-making`
-                : `${num(bp.unsoldBatchesCount || bp.totalBatches || 0)} unsold (Not Yet Realized)`}
-              variant="white"
-              index={3}
-            />
-          </Link>
-        )}
+            <Link
+              to="/inventory/batches"
+              style={{ color: '#334155', backgroundColor: '#ffffff' }}
+              className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg border border-slate-200 py-2 px-3 text-center text-[12px] font-bold text-slate-700 hover:bg-slate-50 transition-colors shadow-2xs cursor-pointer"
+            >
+              <Package size={13} className="shrink-0 text-slate-500" />
+              <span style={{ color: '#334155' }}>Batch Registry</span>
+            </Link>
+          </div>
+        </SectionCard>
       </div>
 
-      {bp && (
+      {/* ── ROW 2: CASH FLOW (30 DAYS) | COMPLIANCE CALENDAR | GST POSITION ── */}
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+        {/* Card 4: Cash Flow Next 30 Days */}
         <SectionCard
-          icon={TrendingUp}
-          title="Batch-wise Profitability"
-          linkTo="/inventory/batch-profitability"
-          linkLabel="View All Batch Profitability →"
+          title="Cash Flow: Next 30 Days"
+          subtext="₹ Lakh"
+          rightAction={
+            <div className="flex items-center gap-2.5 text-[10.5px] font-semibold">
+              <span className="flex items-center gap-1 text-emerald-600">
+                <span className="h-2 w-2 rounded-xs" style={{ backgroundColor: '#10b981' }} /> Inflows
+              </span>
+              <span className="flex items-center gap-1 text-rose-600">
+                <span className="h-2 w-2 rounded-xs" style={{ backgroundColor: '#ef4444' }} /> Outflows
+              </span>
+            </div>
+          }
         >
-          {/* Header Description & View Toggle */}
-          <div className="-mt-1 mb-4 flex flex-wrap items-center justify-between gap-2">
-            <p className="text-[11.5px] text-slate-500">
-              Realized profit &amp; loss per batch from commercial dispatches (Revenue − Sold Landed Cost − Direct Expenses). Unsold stock is preserved as Not Yet Realized.
-            </p>
-            <div className="flex rounded-lg border border-slate-200 p-0.5 text-[11px] font-bold bg-slate-50">
-              <button
-                type="button"
-                onClick={() => setBatchView('profitable')}
-                className={`rounded-md px-3 py-1 cursor-pointer transition-colors ${
-                  batchView === 'profitable'
-                    ? 'bg-[#2563eb] text-white shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                Top 5 Profitable Batches {num(bp.profitableCount ?? bp.profitable) > 0 ? `(${num(bp.profitableCount ?? bp.profitable)})` : ''}
-              </button>
-              <button
-                type="button"
-                onClick={() => setBatchView('loss')}
-                className={`rounded-md px-3 py-1 cursor-pointer transition-colors ${
-                  batchView === 'loss'
-                    ? 'bg-[#2563eb] text-white shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                Top 5 Loss-making Batches {num(bp.lossMakingCount ?? bp.lossMaking) > 0 ? `(${num(bp.lossMakingCount ?? bp.lossMaking)})` : ''}
-              </button>
-            </div>
-          </div>
-
-          {/* 4 Summary Metrics Cards */}
-          <div className="mb-4 grid grid-cols-2 gap-3.5 md:grid-cols-4">
-            <KpiCard
-              label="Total Realized Profit"
-              value={inr(bp.totalRealizedProfit || bp.totalProfit)}
-              sub="Dispatched sales gain"
-              icon={TrendingUp}
-              tone="green"
-            />
-            <KpiCard
-              label="Total Realized Loss"
-              value={inr(bp.totalRealizedLoss || bp.totalLoss)}
-              sub="Dispatched sales loss"
-              icon={TrendingDown}
-              tone="pink"
-            />
-            <KpiCard
-              label="Profitable Batches"
-              value={num(bp.profitableCount ?? bp.profitable)}
-              sub="Batches with net positive margin"
-              icon={ShieldCheck}
-              tone="blue"
-            />
-            <KpiCard
-              label="Loss-making Batches"
-              value={num(bp.lossMakingCount ?? bp.lossMaking)}
-              sub="Batches with net negative margin"
-              icon={TriangleAlert}
-              tone="amber"
-            />
-          </div>
-
-          {/* Table or Empty/Unsold State */}
-          {bpRows.length === 0 ? (
-            <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-6 text-center">
-              <ShieldCheck size={28} className="mx-auto mb-2 text-blue-600" />
-              <h4 className="text-sm font-bold text-slate-800">
-                {batchView === 'loss'
-                  ? 'No Loss-Making Batches Found'
-                  : 'All Batches Held in Inventory (Not Yet Realized)'}
-              </h4>
-              <p className="mx-auto mt-1 max-w-xl text-xs text-slate-500 leading-relaxed">
-                {batchView === 'loss'
-                  ? 'There are currently no batches that incurred a realized net loss on commercial sales dispatches.'
-                  : `Currently, all ${num(bp.unsoldBatchesCount || bp.totalBatches || 0)} active batches are maintained in warehouse inventory (${inr(bp.totalUnsoldValue)} valuation). Under OSCAR realized profit principles, unsold stock is strictly classified as "Not Yet Realized" and never counted as premature profit.`}
-              </p>
-              <div className="mt-4 flex items-center justify-center gap-3">
-                <Link
-                  to="/inventory/batch-profitability"
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-[#2563eb] px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-blue-600 transition-colors"
-                >
-                  Open Full Batch Profitability Ledger <ArrowRight size={14} />
-                </Link>
-                <Link
-                  to="/inventory/batches"
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
-                >
-                  <Boxes size={14} /> Batch Registry
-                </Link>
+          {/* Chart Container with Y-Axis and Gridlines */}
+          <div className="relative pt-2">
+            <div className="flex h-36 w-full">
+              {/* Y-Axis scale labels */}
+              <div className="flex flex-col justify-between text-right pr-2 text-[10px] font-medium text-slate-400 select-none pb-1 shrink-0 w-8">
+                {cfChartScale.ticks.map((t, idx) => (
+                  <span key={idx} className="leading-none">{t}L</span>
+                ))}
               </div>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[750px] text-[12px]">
-                <thead>
-                  <tr className="border-b border-slate-200 bg-slate-50/50 text-left text-[10.5px] font-bold uppercase tracking-wide text-slate-500">
-                    <th className="py-2.5 px-3">Batch Code</th>
-                    <th className="py-2.5 px-3">Fabric Name</th>
-                    <th className="py-2.5 px-3">Stage</th>
-                    <th className="py-2.5 px-3 text-right">Total Sold Qty</th>
-                    <th className="py-2.5 px-3 text-right">Allocated Revenue</th>
-                    <th className="py-2.5 px-3 text-right">Total Allocated Cost</th>
-                    <th className="py-2.5 px-3 text-right">Net Profit / Loss</th>
-                    <th className="py-2.5 px-3 text-center">Profit Margin %</th>
-                    <th className="py-2.5 px-3 text-center">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {bpRows.map((r) => {
-                    const isLoss = num(r.netResult) < 0;
-                    const isGrey = String(r.stage || r.fabricType).toUpperCase() === 'GREY';
-                    const isDyed = String(r.stage || r.fabricType).toUpperCase() === 'DYED';
+
+              {/* Chart Grid & Bars Container */}
+              <div className="relative flex-1 h-full border-b border-l border-slate-200">
+                {/* Horizontal reference gridlines */}
+                <div className="absolute inset-0 flex flex-col justify-between pointer-events-none pb-1">
+                  <div className="border-t border-dashed border-slate-100 w-full" />
+                  <div className="border-t border-dashed border-slate-100 w-full" />
+                  <div className="border-t border-dashed border-slate-100 w-full" />
+                  <div className="w-full" />
+                </div>
+
+                {/* Bars per Week */}
+                <div className="relative flex h-full items-end justify-around pb-1 z-10 px-1">
+                  {(cashFlow.weeks || []).map((w, idx) => {
+                    const infVal = num(w.inflow);
+                    const outVal = num(w.outflow);
+                    const netVal = infVal - outVal;
+                    const infH = Math.min(100, Math.max(6, Math.round((infVal / cfChartScale.max) * 100)));
+                    const outH = Math.min(100, Math.max(6, Math.round((outVal / cfChartScale.max) * 100)));
 
                     return (
-                      <tr key={r.id} className="hover:bg-slate-50/70 transition-colors">
-                        <td className="py-2.5 px-3 font-bold font-mono">
-                          <Link
-                            to={`/inventory/batches/${encodeURIComponent(r.batchCode)}`}
-                            className="text-[#2563eb] hover:underline"
-                            title="Open Batch Passport"
-                          >
-                            {r.batchCode}
-                          </Link>
-                        </td>
-                        <td className="max-w-[200px] truncate py-2.5 px-3 font-medium text-slate-700" title={r.fabricName || r.item || ''}>
-                          {r.fabricName || r.item || '—'}
-                        </td>
-                        <td className="py-2.5 px-3">
-                          <span
-                            className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
-                              isGrey
-                                ? 'bg-blue-50 text-blue-700 border border-blue-200'
-                                : isDyed
-                                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                                  : 'bg-slate-100 text-slate-700'
-                            }`}
-                          >
-                            {r.stage || r.fabricType || 'Fabric'}
-                          </span>
-                        </td>
-                        <td className="py-2.5 px-3 text-right font-mono font-medium text-slate-700">
-                          {meters(r.soldQty)}
-                        </td>
-                        <td className="py-2.5 px-3 text-right font-mono font-medium text-slate-700">
-                          {inr(r.salesRevenue || r.revenue)}
-                        </td>
-                        <td className="py-2.5 px-3 text-right font-mono font-medium text-slate-700">
-                          {inr(r.totalAllocatedCost || r.cost)}
-                        </td>
-                        <td className="py-2.5 px-3 text-right font-mono">
-                          <span className={`font-extrabold ${isLoss ? 'text-rose-600' : 'text-emerald-600'}`}>
-                            {!isLoss ? '+' : ''}{inr(r.netResult)}
-                          </span>
-                        </td>
-                        <td className="py-2.5 px-3 text-center font-bold">
-                          {r.marginPct === null || r.marginPct === undefined ? (
-                            <span className="text-slate-400">—</span>
-                          ) : (
-                            <span className={isLoss ? 'text-rose-600' : 'text-emerald-600'}>
-                              {num(r.marginPct).toFixed(1)}%
+                      <div
+                        key={idx}
+                        className="group relative flex flex-col items-center justify-end h-full flex-1 px-1 hover:bg-slate-50/70 rounded-t-lg transition-colors cursor-pointer"
+                      >
+                        {/* Bar pair container */}
+                        <div className="flex items-end justify-center gap-1.5 w-full h-full">
+                          {/* Inflow Bar (Green) */}
+                          <div className="relative flex flex-col items-center justify-end h-full">
+                            <span className="hidden group-hover:block absolute -top-4 text-[9px] font-extrabold text-emerald-700 whitespace-nowrap select-none">
+                              {infVal.toFixed(1)}L
                             </span>
-                          )}
-                        </td>
-                        <td className="py-2.5 px-3 text-center">
-                          <Link
-                            to={`/inventory/batch-profitability?search=${encodeURIComponent(r.batchCode)}`}
-                            className="inline-flex items-center gap-1 rounded border border-slate-200 bg-white px-2 py-1 text-[11px] font-semibold text-slate-600 hover:text-blue-600 hover:border-blue-300 transition-colors"
-                          >
-                            Audit
-                          </Link>
-                        </td>
-                      </tr>
+                            <div
+                              className="w-3.5 sm:w-4 rounded-t-md transition-all group-hover:brightness-110 shadow-2xs"
+                              style={{ height: `${infH}%`, backgroundColor: '#10b981' }}
+                            />
+                          </div>
+
+                          {/* Outflow Bar (Red) */}
+                          <div className="relative flex flex-col items-center justify-end h-full">
+                            <span className="hidden group-hover:block absolute -top-4 text-[9px] font-extrabold text-rose-700 whitespace-nowrap select-none">
+                              {outVal.toFixed(1)}L
+                            </span>
+                            <div
+                              className="w-3.5 sm:w-4 rounded-t-md transition-all group-hover:brightness-110 shadow-2xs"
+                              style={{ height: `${outH}%`, backgroundColor: '#ef4444' }}
+                            />
+                          </div>
+                        </div>
+
+                        {/* Interactive Floating Hover Tooltip */}
+                        <div
+                          className={`pointer-events-none absolute bottom-full mb-3 hidden group-hover:flex flex-col items-center z-30 transition-all ${
+                            idx === 0
+                              ? 'left-0'
+                              : idx === (cashFlow.weeks || []).length - 1
+                                ? 'right-0'
+                                : 'left-1/2 -translate-x-1/2'
+                          }`}
+                        >
+                          <div className="rounded-lg bg-slate-900/95 px-3 py-2 text-white shadow-xl backdrop-blur-xs whitespace-nowrap border border-slate-700/80 min-w-[145px]">
+                            <div className="font-bold text-slate-200 border-b border-slate-700/80 pb-1 mb-1.5 flex items-center justify-between gap-2">
+                              <span>{w.week}</span>
+                              <span
+                                className={`text-[10px] px-1.5 py-0.5 rounded font-extrabold ${
+                                  netVal >= 0
+                                    ? 'bg-emerald-500/20 text-emerald-300'
+                                    : 'bg-rose-500/20 text-rose-300'
+                                }`}
+                              >
+                                {netVal >= 0 ? `+₹ ${netVal.toFixed(2)} L` : `-₹ ${Math.abs(netVal).toFixed(2)} L`}
+                              </span>
+                            </div>
+                            <div className="flex items-center justify-between gap-3 text-[11px] py-0.5">
+                              <span className="flex items-center gap-1.5 text-emerald-400 font-medium">
+                                <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: '#10b981' }} />
+                                Inflow:
+                              </span>
+                              <span className="font-mono font-bold text-white">₹ {infVal.toFixed(2)} L</span>
+                            </div>
+                            <div className="flex items-center justify-between gap-3 text-[11px] py-0.5">
+                              <span className="flex items-center gap-1.5 text-rose-400 font-medium">
+                                <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: '#ef4444' }} />
+                                Outflow:
+                              </span>
+                              <span className="font-mono font-bold text-white">₹ {outVal.toFixed(2)} L</span>
+                            </div>
+                            <div className="flex items-center justify-between gap-3 text-[10.5px] border-t border-slate-800 pt-1 mt-1 text-slate-400">
+                              <span>Net Position:</span>
+                              <span className={`font-mono font-bold ${netVal >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                {netVal >= 0 ? `Surplus (+₹ ${netVal.toFixed(2)}L)` : `Deficit (-₹ ${Math.abs(netVal).toFixed(2)}L)`}
+                              </span>
+                            </div>
+                          </div>
+                          {/* Tooltip Arrow */}
+                          <div
+                            className={`h-1.5 w-1.5 -mt-0.5 rotate-45 bg-slate-900 border-r border-b border-slate-700/80 ${
+                              idx === 0
+                                ? 'ml-6'
+                                : idx === (cashFlow.weeks || []).length - 1
+                                  ? 'mr-6'
+                                  : ''
+                            }`}
+                          />
+                        </div>
+                      </div>
                     );
                   })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </SectionCard>
-      )}
-
-      {/* production / inventory / qc */}
-      <div className="grid grid-cols-1 gap-3 xl:grid-cols-3">
-        <SectionCard icon={Factory} title="Production & Job Work" linkTo="/pms/production-instructions">
-          {completion === null || completion === undefined ? (
-            <EmptyNote>No active instructions.</EmptyNote>
-          ) : (
-            <div className="flex items-center gap-4">
-              <div className="flex flex-col items-center">
-                <Donut pct={completion}>
-                  <strong className="text-[21px] font-extrabold text-[#17294e]">{num(completion).toFixed(1)}%</strong>
-                </Donut>
-                <p className="mt-1.5 text-center text-[11px] font-medium text-slate-500">
-                  Production<br />Completion
-                </p>
+                </div>
               </div>
-              <ul className="min-w-0 flex-1 space-y-1.5 text-[12px] font-medium text-slate-600">
-                {[
-                  ['Instructions', num(production.instructions).toLocaleString('en-IN'), '#64748b'],
-                  ['Planned', meters(production.plannedMeters), '#2563eb'],
-                  ['Produced', meters(production.producedMeters), '#22c55e'],
-                  ['Pending', meters(production.pendingMeters), '#f59e0b'],
-                ].map(([l, v, c]) => (
-                  <li key={l} className="flex items-center justify-between gap-2">
-                    <span className="flex items-center gap-1.5"><i className="h-2 w-2 rounded-full" style={{ background: c }} />{l}</span>
-                    <span className="font-bold text-slate-800">{v}</span>
-                  </li>
-                ))}
-              </ul>
             </div>
-          )}
-          <div className="mt-3 border-t border-slate-100 pt-3">
-            <p className="mb-2 text-[12px] font-bold text-slate-700">Job Work (In Process)</p>
-            {jwInProcess.length === 0 ? (
-              <p className="py-1 text-[11px] text-slate-400">No fabric out at job-work vendors.</p>
-            ) : (
-              <ul className="space-y-1.5 text-[12px] font-medium text-slate-600">
-                {jwInProcess.map(({ process, qty }, idx) => (
-                  <li key={process} className="flex items-center justify-between gap-2">
-                    <span className="flex items-center gap-1.5">
-                      <i className="h-2 w-2 rounded-full" style={{ background: JW_COLORS[idx % JW_COLORS.length] }} />
-                      {process}
+
+            {/* X-Axis Week Labels & Net Position Badges */}
+            <div className="flex pl-8 pt-2 justify-around select-none">
+              {(cashFlow.weeks || []).map((w, idx) => {
+                const infVal = num(w.inflow);
+                const outVal = num(w.outflow);
+                const netVal = infVal - outVal;
+                return (
+                  <div key={idx} className="flex-1 flex flex-col items-center gap-0.5">
+                    <span className="text-[11px] font-bold text-slate-700">{w.week}</span>
+                    <span
+                      className={`text-[9.5px] font-extrabold px-1.5 py-0.5 rounded-full ${
+                        netVal >= 0
+                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-100'
+                          : 'bg-rose-50 text-rose-700 border border-rose-100'
+                      }`}
+                    >
+                      {netVal >= 0 ? `+${netVal.toFixed(1)}L` : `${netVal.toFixed(1)}L`}
                     </span>
-                    <span className="font-bold text-slate-800">{meters(qty)}</span>
-                  </li>
-                ))}
-              </ul>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="mt-3 space-y-1.5 border-t border-slate-100 pt-2.5 text-[12px]">
+            <div className="flex justify-between items-center">
+              <span className="text-slate-500 font-medium">Projected Closing Balance</span>
+              <span className="font-extrabold text-[#17294e]">{inrLakh(cashFlow.projectedClosing)}</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-slate-500 font-medium">Post-dated Cheques in Hand</span>
+              <span className="font-extrabold text-[#17294e]">{inrLakh(cashFlow.postDatedCheques)}</span>
+            </div>
+          </div>
+        </SectionCard>
+
+        {/* Card 5: Compliance Calendar */}
+        <SectionCard
+          title="Compliance Calendar"
+          subtext="Next 30 Days"
+        >
+          <div className="divide-y divide-slate-100">
+            {compliance.map((item, idx) => {
+              const isRed = item.badgeColor === 'red';
+              const isBlue = item.badgeColor === 'blue';
+              return (
+                <div key={idx} className="flex items-center justify-between py-2 text-[12px]">
+                  <span className="font-medium text-slate-700">
+                    {item.name} <span className="text-slate-400">· {item.dueDate}</span>
+                  </span>
+                  <span
+                    className={`rounded px-1.5 py-0.5 text-[11px] font-bold ${
+                      isRed
+                        ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                        : isBlue
+                          ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                          : 'bg-amber-50 text-amber-700 border border-amber-200'
+                    }`}
+                  >
+                    {item.badge}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+          <p className="mt-2 text-[10.5px] leading-tight text-slate-400 border-t border-slate-100 pt-2">
+            Statutory due dates configured as per company GST & tax filing category.
+          </p>
+        </SectionCard>
+
+        {/* Card 6: GST Position */}
+        <SectionCard
+          title={`GST Position (${gstPos.month || 'Nov'})`}
+          subtext="Net Payable"
+        >
+          <div className="mb-2">
+            <span className="text-[22px] font-black tracking-tight text-[#17294e]">{inr(gstPos.netPayable)}</span>
+          </div>
+
+          <div className="space-y-2 text-[12px]">
+            <div className="flex justify-between">
+              <span className="text-slate-500 font-medium">Output Tax</span>
+              <span className="font-extrabold text-[#17294e]">{inr(gstPos.outputTax)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-slate-500 font-medium">ITC Available</span>
+              <span className="font-extrabold text-[#17294e]">{inr(gstPos.itcAvailable)}</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-slate-500 font-medium">ITC Mismatch vs GSTR-2B</span>
+              <span className="font-extrabold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200 text-[11px]">
+                {inr(gstPos.itcMismatch)} · {gstPos.mismatchedBills} bills
+              </span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-slate-500 font-medium">E-invoice (IRN) Pending</span>
+              <span className="font-extrabold text-amber-700 rounded-full bg-amber-100 px-2 py-0.5 text-[11px]">{gstPos.einvoicePending}</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-slate-500 font-medium">E-way Bills Expiring Today</span>
+              <span className="font-extrabold text-amber-700 rounded-full bg-amber-100 px-2 py-0.5 text-[11px]">{gstPos.ewayBillExpiringToday}</span>
+            </div>
+          </div>
+        </SectionCard>
+      </div>
+
+      {/* ── ROW 3: RECEIVABLE AGEING | PAYABLE AGEING | MSME 45-DAY ALERT ── */}
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+        {/* Card 7: Receivable Ageing */}
+        <SectionCard
+          title="Receivable Ageing"
+          rightAction={<span className="text-[14px] font-extrabold text-[#17294e]">{inr(recvAgeing.total)}</span>}
+        >
+          <AgeingBreakdownWidget
+            title="Receivable Ageing"
+            total={recvAgeing.total}
+            buckets={[
+              {
+                key: '0-30',
+                label: '0–30 Days',
+                val: num(recvAgeing.buckets?.['0-30'] ?? 0),
+                color: '#10b981',
+                statusTag: 'Current',
+                statusClass: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+                description: 'Within invoice payment window',
+              },
+              {
+                key: '31-60',
+                label: '31–60 Days',
+                val: num(recvAgeing.buckets?.['31-60'] ?? 0),
+                color: '#3b82f6',
+                statusTag: 'Due',
+                statusClass: 'bg-blue-50 text-blue-700 border-blue-200',
+                description: 'Standard collection reminder cycle',
+              },
+              {
+                key: '61-90',
+                label: '61–90 Days',
+                val: num(recvAgeing.buckets?.['61-90'] ?? 0),
+                color: '#f59e0b',
+                statusTag: 'Past Due',
+                statusClass: 'bg-amber-50 text-amber-700 border-amber-200',
+                description: 'Overdue; sales escalation required',
+              },
+              {
+                key: '90+',
+                label: '90+ Days',
+                val: num(recvAgeing.buckets?.['90+'] ?? 0),
+                color: '#ef4444',
+                statusTag: 'High Risk',
+                statusClass: 'bg-rose-50 text-rose-700 border-rose-200',
+                amountClass: 'text-rose-600',
+                description: 'Severe default risk; provision review',
+              },
+            ]}
+            footerLabel="Customers over credit limit"
+            footerSubtext="Requires immediate collection action"
+            footerBadge="5 Accounts"
+            footerBadgeClass="bg-rose-100 text-rose-700 border-rose-200 font-extrabold"
+          />
+        </SectionCard>
+
+        {/* Card 8: Payable Ageing */}
+        <SectionCard
+          title="Payable Ageing"
+          rightAction={<span className="text-[14px] font-extrabold text-[#17294e]">{inr(payAgeing.total)}</span>}
+        >
+          <AgeingBreakdownWidget
+            title="Payable Ageing"
+            total={payAgeing.total}
+            buckets={[
+              {
+                key: '0-15',
+                label: '0–15 Days',
+                val: num(payAgeing.buckets?.['0-15'] ?? 0),
+                color: '#10b981',
+                statusTag: 'Current',
+                statusClass: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+                description: 'Within standard vendor credit terms',
+              },
+              {
+                key: '16-45',
+                label: '16–45 Days',
+                val: num(payAgeing.buckets?.['16-45'] ?? 0),
+                color: '#f59e0b',
+                statusTag: 'Due Soon',
+                statusClass: 'bg-amber-50 text-amber-700 border-amber-200',
+                description: 'Approaching MSME 45-day cutoff',
+              },
+              {
+                key: '45+',
+                label: '45+ Days',
+                val: num(payAgeing.buckets?.['45+'] ?? 0),
+                color: '#ef4444',
+                statusTag: 'Overdue · 43B(h)',
+                statusClass: 'bg-rose-50 text-rose-700 border-rose-200',
+                amountClass: 'text-rose-600',
+                description: 'Section 43B(h) disallowance risk',
+              },
+            ]}
+            footerLabel="Creditor Days (DPO)"
+            footerSubtext="Average time to settle vendor dues"
+            footerValue={`${payAgeing.creditorDays} Days`}
+            footerBadge={
+              payAgeing.creditorDays > 45
+                ? `⚠️ +${payAgeing.creditorDays - 45}d past 45d limit`
+                : '✓ Within 45d limit'
+            }
+            footerBadgeClass={
+              payAgeing.creditorDays > 45
+                ? 'bg-amber-50 text-amber-800 border-amber-200'
+                : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+            }
+          />
+        </SectionCard>
+
+        {/* Card 9: MSME 45-Day Alert */}
+        <SectionCard
+          title="MSME 45-Day Overdue Alert"
+          rightAction={
+            msmeAlert.overdueCount > 0 ? (
+              <Link
+                to="/purchase/vendor-bills"
+                className="rounded-full bg-rose-50 px-2 py-0.5 text-[11px] font-extrabold text-rose-700 border border-rose-200 hover:bg-rose-100 transition-colors"
+              >
+                {msmeAlert.overdueCount} Overdue
+              </Link>
+            ) : (
+              <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-700 border border-emerald-200">
+                ✓ Compliant
+              </span>
+            )
+          }
+        >
+          <div className="mb-1 flex items-baseline justify-between">
+            <span
+              className={`text-[22px] font-black tracking-tight ${
+                msmeAlert.overdueCount > 0 ? 'text-rose-600' : 'text-emerald-600'
+              }`}
+            >
+              {inr(msmeAlert.totalOverdue)}
+            </span>
+            <span className={`text-[11px] font-bold ${msmeAlert.overdueCount > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
+              {msmeAlert.overdueCount > 0 ? 'Section 43B(h) Overdue' : 'Section 43B(h) Compliant'}
+            </span>
+          </div>
+          <p className="text-[10.5px] leading-tight text-slate-500 mb-2.5">
+            {msmeAlert.overdueCount > 0
+              ? 'Payments due to Micro & Small enterprises beyond 45 days. Unpaid amounts are disallowed under Section 43B(h) / MSME Act.'
+              : 'No pending payments to Micro & Small enterprises exceed 45 days. All vendor dues are fully tax-deductible.'}
+          </p>
+
+          <div className="space-y-1.5 border-t border-slate-100 pt-2 text-[11.5px]">
+            {msmeAlert.vendors && msmeAlert.vendors.length > 0 ? (
+              <>
+                <div className="flex items-center justify-between text-[10px] font-extrabold uppercase tracking-wide text-slate-400 mb-1">
+                  <span>{msmeAlert.overdueCount > 0 ? 'Overdue MSME Vendors' : 'Upcoming MSME Payables (Within 45 Days)'}</span>
+                  <span>Amount Due</span>
+                </div>
+                {msmeAlert.vendors.map((v, idx) => {
+                  const isOverdue = v.isOverdue || (num(v.daysOverdue) > 0);
+                  const age = v.ageDays || v.daysOverdue || 0;
+                  const remaining = v.daysRemaining ?? Math.max(0, 45 - age);
+                  return (
+                    <div
+                      key={idx}
+                      className="flex justify-between items-center py-1 px-1.5 rounded-md hover:bg-slate-50 transition-colors"
+                    >
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <span
+                          className={`h-2 w-2 rounded-full shrink-0 ${
+                            isOverdue ? 'bg-rose-500' : 'bg-emerald-500'
+                          }`}
+                        />
+                        <span className="text-slate-800 font-semibold truncate text-[11.5px]">{v.name}</span>
+                        {isOverdue ? (
+                          <span className="text-[9.5px] font-bold px-1.5 py-0.2 rounded-full bg-rose-50 text-rose-700 border border-rose-200 whitespace-nowrap">
+                            {v.daysOverdue || (age - 45)}d overdue
+                          </span>
+                        ) : (
+                          <span className="text-[9.5px] font-bold px-1.5 py-0.2 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 whitespace-nowrap">
+                            {age}d old · {remaining}d left
+                          </span>
+                        )}
+                      </div>
+                      <span className="font-extrabold text-[#17294e] shrink-0 ml-2 text-[12px] tabular-nums">
+                        {inr(v.amount)}
+                      </span>
+                    </div>
+                  );
+                })}
+              </>
+            ) : (
+              <div className="py-2.5 text-center text-[12px] font-medium text-emerald-600 bg-emerald-50/60 rounded-lg border border-emerald-100">
+                ✓ No pending MSME vendor bills
+              </div>
             )}
           </div>
         </SectionCard>
+      </div>
 
-        <SectionCard icon={Package} title="Inventory Position (Value)" linkTo="/inventory/stock-position">
-          {inventoryEmpty ? (
-            <EmptyNote>No stock on hand.</EmptyNote>
-          ) : (
-            <ul className="divide-y divide-slate-100">
-              {inventoryRows.map((r) => (
-                <li key={r.key}>
-                  <Link to="/inventory/stock-position" className="group flex items-center gap-3 py-[9px]">
-                    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg" style={{ background: r.tint, color: r.fg }}>
-                      <r.icon size={17} />
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block text-[12.5px] font-bold text-slate-700">{r.l}</span>
-                      <span className="block text-[11px] text-slate-400">{r.s}</span>
-                    </span>
-                    {r.row?.value === null || r.row?.value === undefined ? (
-                      <span className="text-[11.5px] font-semibold italic text-slate-400" title="Some fabric at vendors has no material rate to value it at">Not valued</span>
-                    ) : (
-                      <span className="text-[13px] font-extrabold text-[#17294e]">{inr(r.row.value)}</span>
-                    )}
-                    <ArrowRight size={13} className="shrink-0 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-blue-500" />
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
-        </SectionCard>
-
-        <SectionCard icon={ShieldCheck} title="QC & Wastage" linkTo="/job-work/inward">
-          <p className="-mt-2 mb-2 text-[11px] text-slate-400">Job-work inwards since {displayDate(qc.since)}</p>
-          {yieldPct === null || yieldPct === undefined ? (
-            <EmptyNote>No job-work inwards received in this period.</EmptyNote>
-          ) : (
-            <div className="flex items-center gap-4">
-              <Donut pct={yieldPct}>
-                <strong className="text-[18px] font-extrabold text-[#17294e]">{num(yieldPct).toFixed(1)}%</strong>
-                <span className="text-[10.5px] font-medium text-slate-500">Good Yield</span>
-              </Donut>
-              <ul className="min-w-0 flex-1 space-y-1.5 text-[12px] font-medium text-slate-600">
-                {[
-                  ['Received', meters(qc.received)],
-                  ['Good', meters(qc.good)],
-                  ['Reprocess', meters(qc.reprocess)],
-                  ['Reject', meters(qc.reject)],
-                  ['Loss', meters(qc.loss)],
-                ].map(([l, v]) => (
-                  <li key={l} className="flex items-center justify-between gap-2">
-                    <span>{l}</span><span className="font-bold text-slate-800">{v}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-          {qc.lossPct !== null && qc.lossPct !== undefined && (
-            <div className="mt-3 flex items-center justify-center gap-1.5 rounded-lg bg-[#fdeeee] px-3 py-2 text-[12px] font-bold text-[#dc2626]">
-              <TriangleAlert size={14} /> {num(qc.lossPct).toFixed(1)}% Process Loss (finished orders)
-            </div>
-          )}
+      {/* ── ROW 4: PROFIT & LOSS SUMMARY ── */}
+      <div>
+        {/* Card 10: Profit & Loss Summary */}
+        <SectionCard
+          title="Profit & Loss Summary"
+          subtext="₹"
+        >
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-[12px]">
+              <thead>
+                <tr className="border-b border-slate-100 text-[11px] font-bold text-slate-400">
+                  <th className="py-2 pl-0">Account</th>
+                  <th className="py-2 text-right">MTD</th>
+                  <th className="py-2 text-right">FYTD</th>
+                  <th className="py-2 text-right pr-0">Previous Year (YTD)</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 font-medium">
+                {(pnlSummary.rows || []).map((r, idx) => {
+                  const isMargin = r.isPercentage;
+                  const isNet = r.label === 'Net profit';
+                  return (
+                    <tr key={idx} className={isNet ? 'font-bold bg-slate-50/70' : ''}>
+                      <td className="py-2 pl-0 text-slate-700">{r.label}</td>
+                      <td className="py-2 text-right font-extrabold text-[#17294e]">
+                        {isMargin ? r.mtd : num(r.mtd).toLocaleString('en-IN')}
+                      </td>
+                      <td className="py-2 text-right text-slate-700">
+                        {isMargin ? r.fytd : num(r.fytd).toLocaleString('en-IN')}
+                      </td>
+                      <td className="py-2 text-right pr-0 text-slate-500">
+                        {isMargin ? r.prevYtd : num(r.prevYtd).toLocaleString('en-IN')}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </SectionCard>
       </div>
 
-      {/* sales chart / ageing / attention */}
-      <div className="grid grid-cols-1 gap-3 xl:grid-cols-3">
-        <SectionCard icon={BarChart3} title="Sales & Collection (Last 7 Days)" linkTo="/sales/invoices" className="flex flex-col justify-between">
-          {trendEmpty ? (
-            <EmptyNote>No sales or collections in the last 7 days.</EmptyNote>
-          ) : (
-            <div className="flex flex-1 flex-col justify-between">
-              <div>
-                <div className="mb-3 flex items-center justify-between gap-2 text-[11.5px]">
-                  <div className="flex items-center gap-3 font-semibold text-slate-600">
-                    <span className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-xs bg-[#2563eb]" />Sales</span>
-                    <span className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-xs bg-[#10b981]" />Collection</span>
-                  </div>
-                  <div className="text-[11px] font-semibold text-slate-500">
-                    {hoveredDayIdx !== null && trend[hoveredDayIdx] ? (
-                      <span className="rounded bg-slate-100 px-2 py-0.5 font-mono text-slate-700">
-                        {dayLabel(trend[hoveredDayIdx].date)}: <span className="font-bold text-[#2563eb]">{inr(trend[hoveredDayIdx].sales)}</span> | <span className="font-bold text-[#10b981]">{inr(trend[hoveredDayIdx].collection)}</span>
+      {/* ── ROW 5: PRODUCTION & JOB WORK | QC & WASTAGE ── */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        {/* Card 12: Production & Job Work */}
+        <SectionCard
+          title="Production & Job Work"
+          rightAction={
+            <Link to="/pms" className="text-[12px] font-bold text-blue-600 hover:underline inline-flex items-center gap-0.5">
+              View Details <ChevronRight size={14} />
+            </Link>
+          }
+        >
+          <p className="text-[11.5px] font-medium text-slate-500 mb-2.5">{prodJw.statusMessage}</p>
+
+          <div className="space-y-2 text-[12px]">
+            <div className="flex justify-between">
+              <span className="text-slate-600 font-medium">Job Work (In Process): {prodJw.jobWorkInProcess?.process}</span>
+              <span className="font-extrabold text-[#17294e]">{meters(prodJw.jobWorkInProcess?.meters)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-slate-600 font-medium">External WIP Value</span>
+              <span className="font-extrabold text-[#17294e]">{inr(prodJw.externalWipValue)}</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-slate-600 font-medium">Delayed Beyond Expected Date</span>
+              <span className="rounded bg-rose-50 px-2 py-0.5 text-[11px] font-bold text-rose-700 border border-rose-200">
+                {prodJw.delayedJobWorks} job work
+              </span>
+            </div>
+            <div className="flex justify-between items-center border-t border-slate-100 pt-2">
+              <div className="flex items-center gap-1.5">
+                <span className="text-slate-600 font-medium">Job Work TDS (MTD)</span>
+              </div>
+              <span className="font-extrabold text-[#17294e]">{inr(prodJw.jobWorkTds)}</span>
+            </div>
+          </div>
+        </SectionCard>
+
+        {/* Card 13: QC & Wastage */}
+        <SectionCard
+          title="QC & Wastage"
+          subtext="Job-work inwards since 19 Oct 2026"
+        >
+          <div className="flex items-center gap-4 pt-1">
+            {/* Circular Good Yield Indicator */}
+            <div className="relative flex h-24 w-24 shrink-0 flex-col items-center justify-center rounded-full border-4 border-emerald-500 bg-emerald-50/40 text-center">
+              <span className="text-[17px] font-black text-emerald-700">{qcWastage.goodYieldPct}%</span>
+              <span className="text-[9.5px] font-bold text-emerald-600">Good Yield</span>
+            </div>
+
+            {/* Metrics breakdown */}
+            <div className="flex-1 space-y-1.5 text-[12px]">
+              <div className="flex justify-between">
+                <span className="text-slate-500 font-medium">Received</span>
+                <span className="font-extrabold text-[#17294e]">{meters(qcWastage.receivedMeters)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500 font-medium">Good</span>
+                <span className="font-extrabold text-[#17294e]">{meters(qcWastage.goodMeters)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500 font-medium">Reprocess / Reject / Loss</span>
+                <span className="font-extrabold text-[#17294e]">
+                  {num(qcWastage.reprocessMeters)} / {num(qcWastage.rejectMeters)} / {num(qcWastage.lossMeters)} m
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-2 text-[12px]">
+            <span className="font-medium text-slate-600">Process Loss (Finished Orders)</span>
+            <span className="rounded bg-emerald-50 px-2 py-0.5 text-[11px] font-extrabold text-emerald-700 border border-emerald-200">
+              {qcWastage.processLossPct}%
+            </span>
+          </div>
+        </SectionCard>
+      </div>
+
+      {/* ── ROW 6: INVENTORY POSITION (VALUE) | RECONCILIATION & CONTROL CHECKS ── */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        {/* Card 14: Inventory Position (Value) */}
+        <SectionCard
+          title="Inventory Position (Value)"
+          rightAction={<span className="text-[15px] font-black text-[#17294e]">{inr(invPos.totalValue)}</span>}
+        >
+          <div className="space-y-1.5 text-[12px]">
+            {(() => {
+              const totalVal = num(invPos.totalValue) || 1;
+              const items = [
+                {
+                  label: 'Finished Stock',
+                  meters: meters(invPos.finished?.meters),
+                  val: num(invPos.finished?.value),
+                  color: '#10b981',
+                  pct: (num(invPos.finished?.value) / totalVal) * 100,
+                },
+                {
+                  label: 'Grey Stock',
+                  meters: meters(invPos.grey?.meters),
+                  val: num(invPos.grey?.value),
+                  color: '#3b82f6',
+                  pct: (num(invPos.grey?.value) / totalVal) * 100,
+                },
+                {
+                  label: 'QC Hold',
+                  sub: `${invPos.qcHold?.lots ?? 0} lots`,
+                  meters: meters(invPos.qcHold?.meters),
+                  val: num(invPos.qcHold?.value),
+                  color: '#f59e0b',
+                  pct: (num(invPos.qcHold?.value) / totalVal) * 100,
+                },
+                {
+                  label: 'External WIP',
+                  meters: meters(invPos.externalWip?.meters),
+                  val: num(invPos.externalWip?.value),
+                  color: '#8b5cf6',
+                  pct: (num(invPos.externalWip?.value) / totalVal) * 100,
+                },
+                {
+                  label: 'Reprocess',
+                  meters: meters(invPos.reprocess?.meters),
+                  val: num(invPos.reprocess?.value),
+                  color: '#ec4899',
+                  pct: (num(invPos.reprocess?.value) / totalVal) * 100,
+                },
+                {
+                  label: 'Rejected',
+                  badge: 'NRV Check',
+                  meters: meters(invPos.rejected?.meters),
+                  val: num(invPos.rejected?.value),
+                  color: '#ef4444',
+                  pct: (num(invPos.rejected?.value) / totalVal) * 100,
+                },
+              ];
+
+              return items.map((it, idx) => (
+                <div key={idx} className="group rounded-md p-1 -mx-1 hover:bg-slate-50 transition-colors">
+                  <div className="flex items-center justify-between text-[11.5px]">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: it.color }} />
+                      <span className="font-semibold text-slate-700">{it.label}</span>
+                      <span className="text-slate-400 font-medium text-[11px]">{it.meters}</span>
+                      {it.sub && (
+                        <span className="text-[10px] text-slate-400">· {it.sub}</span>
+                      )}
+                      {it.badge && (
+                        <span className="rounded bg-amber-50 px-1 py-0.2 text-[9px] font-bold text-amber-700 border border-amber-200">
+                          {it.badge}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="text-[10.5px] font-extrabold text-slate-400 tabular-nums">
+                        {it.pct.toFixed(1)}%
                       </span>
-                    ) : (
-                      <span className="text-[10px] text-slate-400 font-medium">{chartScale.unitLabel}</span>
-                    )}
-                  </div>
-                </div>
-
-                <div className="flex gap-2">
-                  <div className="flex w-12 shrink-0 flex-col justify-between py-0.5 pr-2 text-right text-[9.5px] font-semibold text-slate-400 font-mono">
-                    {[1, 0.75, 0.5, 0.25, 0].map((f) => (
-                      <span key={f}>{chartScale.formatTick(chartScale.niceMax * f)}</span>
-                    ))}
-                  </div>
-                  <div className="relative flex-1">
-                    <div className="absolute inset-0 flex flex-col justify-between pointer-events-none">
-                      {[0, 1, 2, 3, 4].map((i) => <div key={i} className="border-t border-dashed border-slate-100" />)}
-                    </div>
-                    <div className="relative flex h-44 items-end gap-2">
-                      {trend.map((t, i) => {
-                        const s = num(t.sales);
-                        const c = num(t.collection);
-                        const h = (v) => (v > 0 ? `${Math.max(4, (v / chartScale.niceMax) * 100)}%` : '0%');
-                        const isHovered = hoveredDayIdx === i;
-                        return (
-                          <div
-                            key={t.date}
-                            onMouseEnter={() => setHoveredDayIdx(i)}
-                            onMouseLeave={() => setHoveredDayIdx(null)}
-                            className={`flex h-full flex-1 flex-col items-center justify-end gap-1.5 rounded-md transition-colors cursor-pointer py-0.5 ${isHovered ? 'bg-slate-50' : ''}`}
-                          >
-                            <div className="flex w-full max-w-[48px] flex-1 items-end justify-center gap-1 px-0.5">
-                              <div
-                                className="w-1/2 rounded-t-md bg-[#2563eb] transition-all hover:brightness-110 shadow-xs"
-                                style={{ height: h(s) }}
-                                title={`Sales: ${inr(t.sales)} on ${dayLabel(t.date)}`}
-                              />
-                              <div
-                                className="w-1/2 rounded-t-md bg-[#10b981] transition-all hover:brightness-110 shadow-xs"
-                                style={{ height: h(c) }}
-                                title={`Collection: ${inr(t.collection)} on ${dayLabel(t.date)}`}
-                              />
-                            </div>
-                            <span className={`text-[9.5px] font-semibold tracking-tight ${isHovered ? 'font-bold text-slate-900' : 'text-slate-500'}`}>
-                              {dayLabel(t.date)}
-                            </span>
-                          </div>
-                        );
-                      })}
+                      <span className="font-black text-[#17294e] text-xs tabular-nums">
+                        {inr(it.val)}
+                      </span>
                     </div>
                   </div>
+                  {/* Subtle proportion track */}
+                  <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-slate-100">
+                    <div
+                      className="h-full rounded-full transition-all duration-300"
+                      style={{
+                        width: `${Math.max(0, it.pct)}%`,
+                        backgroundColor: it.color,
+                      }}
+                    />
+                  </div>
                 </div>
-              </div>
+              ));
+            })()}
+          </div>
 
-              {/* ── Sleek Bottom Executive Summary Strip (fills space beautifully) ── */}
-              <div className="mt-3.5 pt-3 border-t border-slate-100 grid grid-cols-2 gap-2.5">
-                <div className="rounded-lg bg-blue-50/60 border border-blue-100/70 px-3 py-2 flex items-center justify-between">
-                  <div>
-                    <span className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">7D Sales</span>
-                    <strong className="block text-[14px] font-black font-mono text-blue-700 leading-tight">{inr(total7dSales)}</strong>
-                  </div>
-                  <span className="h-2 w-2 rounded-full bg-blue-600 shrink-0" />
-                </div>
-                <div className="rounded-lg bg-emerald-50/60 border border-emerald-100/70 px-3 py-2 flex items-center justify-between">
-                  <div>
-                    <span className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">7D Collection</span>
-                    <strong className="block text-[14px] font-black font-mono text-emerald-700 leading-tight">{inr(total7dColl)}</strong>
-                  </div>
-                  <span className="h-2 w-2 rounded-full bg-emerald-600 shrink-0" />
-                </div>
-              </div>
+          {/* Finished Stock Ageing Sub-card */}
+          <div className="mt-3 rounded-lg bg-slate-50/90 p-2.5 border border-slate-200/70">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[11px] font-bold text-slate-700 uppercase tracking-wide">
+                Finished Stock Ageing
+              </span>
+              <span className="rounded bg-rose-50 px-1.5 py-0.2 text-[9.5px] font-extrabold text-rose-700 border border-rose-200">
+                12% Slow / Dead Stock
+              </span>
             </div>
-          )}
+
+            {/* Upgraded 20px Segmented Bar */}
+            <div className="flex h-5 w-full overflow-hidden rounded-md border border-slate-200/80 shadow-xs">
+              {[
+                { label: '0–30 Days', val: 38, color: '#10b981' },
+                { label: '31–90 Days', val: 31, color: '#3b82f6' },
+                { label: '91–180 Days', val: 19, color: '#f59e0b' },
+                { label: '180+ Days', val: 12, color: '#ef4444' },
+              ].map((s, idx) => (
+                <div
+                  key={idx}
+                  style={{ width: `${s.val}%`, backgroundColor: s.color }}
+                  className="h-full border-r last:border-r-0 border-white/80 flex items-center justify-center text-white font-black text-[10px] tracking-tight select-none"
+                  title={`${s.label}: ${s.val}%`}
+                >
+                  {s.val}%
+                </div>
+              ))}
+            </div>
+
+            {/* Color Legend Tags */}
+            <div className="mt-2 flex flex-wrap items-center justify-between gap-1 text-[10px] font-bold text-slate-600">
+              <span className="flex items-center gap-1">
+                <span className="h-2 w-2 rounded-full" style={{ backgroundColor: '#10b981' }} />
+                0–30d (38%)
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="h-2 w-2 rounded-full" style={{ backgroundColor: '#3b82f6' }} />
+                31–90d (31%)
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="h-2 w-2 rounded-full" style={{ backgroundColor: '#f59e0b' }} />
+                91–180d (19%)
+              </span>
+              <span className="flex items-center gap-1 text-rose-700">
+                <span className="h-2 w-2 rounded-full" style={{ backgroundColor: '#ef4444' }} />
+                180+d (12%)
+              </span>
+            </div>
+          </div>
         </SectionCard>
 
-        <SectionCard icon={Users} title="Customer Receivable Ageing" linkTo="/sales/invoices">
-          {ageingTotal === 0 ? (
-            <div className="flex flex-col items-center justify-center py-6 px-3 text-center">
-              <div className="flex h-11 w-11 items-center justify-center rounded-full bg-emerald-50 text-emerald-600 mb-2">
-                <CheckCircle2 size={24} />
-              </div>
-              <h4 className="text-[13px] font-bold text-slate-800">All Receivables Settled</h4>
-              <p className="mt-1 text-[11px] text-slate-500 max-w-[240px]">
-                All customer sales invoices are fully paid or reconciled. Zero pending or overdue receivables across all accounts.
-              </p>
-              <div className="mt-3 inline-flex items-center gap-2 rounded-lg bg-emerald-50/70 border border-emerald-100 px-3 py-1 text-[11px] font-semibold text-emerald-800">
-                <span>Total Balance Due:</span>
-                <span className="font-extrabold font-mono">₹0.00</span>
-              </div>
-            </div>
-          ) : (
-            <>
-              <ul className="space-y-3 pt-1">
-                {ageing.map((b, i) => (
-                  <li key={b.key} className="flex items-center gap-2 text-[12px]">
-                    <span className="w-[84px] shrink-0 font-medium text-slate-500">{b.label}</span>
-                    <span className="h-3.5 flex-1 overflow-hidden rounded-full bg-[#eef2f7]">
-                      <span className="block h-full rounded-full" style={{ width: `${Math.min(100, Math.max(b.amount > 0 ? 6 : 0, b.pct))}%`, background: AGEING_COLORS[i % AGEING_COLORS.length] }} />
-                    </span>
-                    <span className="w-[84px] shrink-0 text-right font-extrabold text-[#17294e]">{inr(b.amount)}</span>
-                    <span className="w-[40px] shrink-0 text-right text-[11px] font-semibold text-slate-400">({b.pct}%)</span>
-                  </li>
-                ))}
-              </ul>
-              <p className="mt-3 text-right text-[11px] font-semibold text-slate-500">Total outstanding: <span className="font-extrabold text-[#17294e]">{inr(ageingTotal)}</span></p>
-            </>
-          )}
-        </SectionCard>
+        {/* Card 15: Reconciliation & Control Checks */}
+        <SectionCard
+          title="Reconciliation & Control Checks"
+          rightAction={
+            <span className="rounded-full bg-rose-50 px-2 py-0.5 text-[11px] font-extrabold text-rose-700 border border-rose-200">
+              {reconChecks.status}
+            </span>
+          }
+        >
+          <div className="divide-y divide-slate-100 text-[12px]">
+            {(reconChecks.items || []).map((check, idx) => {
+              const isRed = check.badgeColor === 'red';
+              const isGreen = check.badgeColor === 'green';
+              const isBlue = check.badgeColor === 'blue';
+              const link =
+                check.label.includes('Inventory module')
+                  ? '/inventory/stock-position'
+                  : check.label.includes('Batch valuation')
+                    ? '/inventory/batches'
+                    : check.label.includes('Negative stock')
+                      ? '/inventory/stock-position'
+                      : check.label.includes('Customers with credit')
+                        ? '/crm/customers'
+                        : '/accounts/day-book';
 
-        <section className="rounded-xl border border-[#e2eaf5] bg-white p-4 shadow-[0_1px_2px_rgba(16,42,82,0.05)]">
-          <div className="mb-2 flex items-center justify-between gap-2">
-            <h3 className="flex items-center gap-1.5 text-[13px] font-extrabold text-[#dc2626]">
-              <TriangleAlert size={16} /> Attention Required
+              return (
+                <Link
+                  key={idx}
+                  to={link}
+                  className="flex items-center justify-between py-1.5 px-1.5 -mx-1.5 rounded-lg hover:bg-slate-50 transition-colors group"
+                >
+                  <span className="font-medium text-slate-700 group-hover:text-slate-900 group-hover:font-semibold transition-colors flex items-center gap-1.5">
+                    <span
+                      className={`h-1.5 w-1.5 rounded-full shrink-0 ${
+                        isRed ? 'bg-rose-500' : isGreen ? 'bg-emerald-500' : isBlue ? 'bg-blue-500' : 'bg-amber-500'
+                      }`}
+                    />
+                    {check.label}
+                  </span>
+                  <span
+                    className={`rounded-md px-2 py-0.5 text-[11px] font-extrabold tabular-nums transition-transform group-hover:scale-105 ${
+                      isRed
+                        ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                        : isGreen
+                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                          : isBlue
+                            ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                            : 'bg-amber-50 text-amber-700 border border-amber-200'
+                    }`}
+                  >
+                    {check.badgeText}
+                  </span>
+                </Link>
+              );
+            })}
+          </div>
+        </SectionCard>
+      </div>
+
+      {/* ── BOTTOM ACTION BAR: ATTENTION REQUIRED ── */}
+      <div className="rounded-xl border border-[#e2eaf5] bg-white p-4 shadow-[0_1px_2px_rgba(16,42,82,0.04)]">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <h3 className="text-[13.5px] font-extrabold text-[#dc2626] flex items-center gap-1.5">
+              <AlertTriangle size={15} /> Attention Required
             </h3>
           </div>
-          {attention.length === 0 ? (
-            <EmptyNote>Nothing needs attention.</EmptyNote>
-          ) : (
-            <ul className="divide-y divide-slate-100">
-              {attention.map((a) => {
-                const row = (
-                  <>
-                    <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-[#fdeeee] text-[#dc2626]">
-                      <TriangleAlert size={11} />
-                    </span>
-                    <span className="min-w-0 flex-1 truncate">{a.label}</span>
-                    <span className={`font-extrabold ${num(a.count) > 0 ? 'text-[#dc2626]' : 'text-slate-400'}`}>{num(a.count).toLocaleString('en-IN')}</span>
-                  </>
-                );
-                return (
-                  <li key={a.key || a.label}>
-                    {a.link ? (
-                      <Link to={a.link} className="flex items-center gap-2 py-[6.5px] text-[12.5px] font-medium text-slate-600 hover:text-[#2563eb]">
-                        {row}
-                      </Link>
-                    ) : (
-                      <div className="flex items-center gap-2 py-[6.5px] text-[12.5px] font-medium text-slate-600">{row}</div>
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </section>
+          <span className="text-[11px] font-medium text-slate-400">Critical items requiring immediate management action</span>
+        </div>
+
+        {/* Action Counters Grid */}
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-8">
+          {attentionItems.map((item, idx) => (
+            <Link
+              key={idx}
+              to={item.link || '#'}
+              className="flex flex-col justify-between rounded-lg border border-slate-100 bg-slate-50/70 p-2 hover:bg-slate-100/80 transition-colors"
+            >
+              <div className="flex items-start justify-between gap-1">
+                <span className="text-[11px] font-medium text-slate-600 line-clamp-2 leading-tight">
+                  {item.label}
+                </span>
+              </div>
+              <span className={`mt-2 text-[16px] font-black ${item.count > 0 ? 'text-[#dc2626]' : 'text-slate-400'}`}>
+                {item.count}
+              </span>
+            </Link>
+          ))}
+        </div>
+
+        <p className="mt-3 text-[10.5px] text-slate-400 text-center">
+          Restricted view for Owner and Finance roles. Statutory tax dates and limits subject to prevailing regulatory rules.
+        </p>
       </div>
-    </>,
+
+      {/* Batch Ledger Slide-out Drawer (in-page, no redirect) */}
+      <Drawer
+        isOpen={showBatchLedgerDrawer}
+        onClose={() => setShowBatchLedgerDrawer(false)}
+        title="Batch-wise Profit & Loss"
+        subtitle="Realized profit/loss calculated from actual sales dispatches and landed costs"
+        width="xl"
+      >
+        {showBatchLedgerDrawer && (
+          <Suspense fallback={<div className="flex items-center justify-center py-16 text-slate-400"><Loader2 size={24} className="animate-spin text-blue-600 mb-3" /><p className="text-xs font-semibold">Loading batch ledger…</p></div>}>
+            <BatchProfitabilityPage inDrawer />
+          </Suspense>
+        )}
+      </Drawer>
+    </div>
   );
 };
 

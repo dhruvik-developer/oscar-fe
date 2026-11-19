@@ -684,8 +684,20 @@ export function StockPositionPage() {
 
   const godownOptions = useMemo(() => {
     const list = data?.filters?.godowns || [];
-    if (list.length) return list.map((g) => g.name);
-    return locations.map((l) => l.name);
+    const source = list.length ? list : locations;
+    return source
+      .filter((l) => {
+        if (l.is_active === false || l.isActive === false) return false;
+        const code = String(l.code || '');
+        const type = String(l.type || '');
+        const name = String(l.name || '');
+        if (code.startsWith('SYS-')) return false;
+        if (['Transit', 'Scrap', 'Zone'].includes(type)) return false;
+        if (name.startsWith('WIP -')) return false;
+        if (['QC Hold', 'Goods In Transit', 'Reject / Scrap', 'Reprocess Stock', 'Second Quality Stock'].includes(name)) return false;
+        return true;
+      })
+      .map((l) => l.name);
   }, [data, locations]);
 
   const itemOptions = useMemo(() => {

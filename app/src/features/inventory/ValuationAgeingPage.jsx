@@ -8,6 +8,7 @@ import { api } from '../../services/api';
 import { useTableSort } from '../../hooks/useTableSort';
 import SortableTh from '../../components/ui/SortableTh';
 import { inventoryService } from '../../services/domainServices';
+import TablePagination from '../../components/ui/TablePagination';
 
 // Must match the backend's STOCK_AGE_BUCKETS (apps/inventory/views.py).
 const BUCKETS = ['0-30', '31-60', '61-90', '91-180', '180+'];
@@ -35,6 +36,8 @@ export const ValuationAgeingPage = () => {
   const [ageingData, setAgeingData] = useState(null);
   const [loadingAgeing, setLoadingAgeing] = useState(false);
   const [ageingError, setAgeingError] = useState(null);
+  const [qualityPage, setQualityPage] = useState(1);
+  const [qualityPageSize, setQualityPageSize] = useState(10);
 
   // Tab 3: Slow-Moving Stock State
   const [slowMovingRows, setSlowMovingRows] = useState([]);
@@ -107,6 +110,11 @@ export const ValuationAgeingPage = () => {
   const qualitySort = useTableSort(ageingData?.byQuality || [], {
     accessors: { qty: (q) => Number(q.qty), value: (q) => Number(q.value) },
   });
+  const qualityTotal = qualitySort.rows.length;
+  const paginatedQualityRows = qualitySort.rows.slice(
+    (qualityPage - 1) * qualityPageSize,
+    qualityPage * qualityPageSize
+  );
 
   const columnsValuation = [
     {
@@ -419,7 +427,7 @@ export const ValuationAgeingPage = () => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#dce5f4]">
-                    {qualitySort.rows.map((q) => (
+                    {paginatedQualityRows.map((q) => (
                       <tr key={q.quality} className="hover:bg-slate-50">
                         <td className="py-2.5 px-4 font-semibold text-slate-800">{q.quality}</td>
                         <td className="py-2.5 px-4 text-center font-mono text-slate-600">{q.takas}</td>
@@ -434,6 +442,17 @@ export const ValuationAgeingPage = () => {
                   </tbody>
                 </table>
               </div>
+              <TablePagination
+                total={qualityTotal}
+                page={qualityPage}
+                pageSize={qualityPageSize}
+                onPageChange={setQualityPage}
+                onPageSizeChange={(newSize) => {
+                  setQualityPageSize(newSize);
+                  setQualityPage(1);
+                }}
+                pageSizeOptions={[10, 25, 50, 100]}
+              />
             </div>
           )}
         </div>

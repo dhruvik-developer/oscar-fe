@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
-import { X } from 'lucide-react';
+import { X, Layers, Palette, Plus } from 'lucide-react';
 import { useERP } from '../../../context/ERPContext';
 import { api } from '../../../services/api';
 import { inventoryService } from '../../../services/domainServices';
@@ -124,14 +124,36 @@ export default function AddBatchModal({ onClose, onDone, defaultFabricType = 'GR
   );
 
   return createPortal(
-    <div className="fixed inset-0 z-[1000] bg-slate-900/50 flex items-center justify-center p-3" onMouseDown={(e) => { if (e.target === e.currentTarget && !saving) onClose(); }}>
+    <div className="fixed inset-0 z-[1000] bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-3" onMouseDown={(e) => { if (e.target === e.currentTarget && !saving) onClose(); }}>
       <form onSubmit={submit} role="dialog" aria-modal="true" aria-labelledby="add-batch-title" className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[92vh] flex flex-col text-xs">
-        <div className="flex items-center justify-between px-5 py-3 border-b border-slate-200">
-          <div>
-            <h3 id="add-batch-title" className="text-sm font-bold">Create batch</h3>
-            <p className="text-[11px] text-slate-500">The batch ID and QR code are generated when you save.</p>
+        <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-200 bg-white rounded-t-2xl">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-sky-100 text-sky-700 flex items-center justify-center text-sm font-bold shrink-0">
+              {form.fabricType === 'GREY' ? <Layers size={17} /> : <Palette size={17} />}
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 id="add-batch-title" className="text-sm font-bold text-slate-900">
+                  {form.fabricType === 'GREY' ? 'Add Grey Batch' : 'Add Dyeing Batch'}
+                </h3>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold border bg-sky-50 text-sky-700 border-sky-200">
+                  {form.fabricType === 'GREY' ? 'Grey Inventory' : 'Dyeing Inventory'}
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-500 mt-0.5">
+                The batch ID and QR code are generated automatically when you save.
+              </p>
+            </div>
           </div>
-          <button type="button" onClick={onClose} disabled={saving} aria-label="Close" className="p-1.5 rounded-lg hover:bg-slate-100 cursor-pointer"><X size={16} /></button>
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={saving}
+            aria-label="Close"
+            className="w-8 h-8 rounded-lg border border-slate-200 bg-slate-50 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 flex items-center justify-center cursor-pointer transition-colors text-slate-500"
+          >
+            <X size={15} />
+          </button>
         </div>
         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
           <fieldset className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -139,7 +161,7 @@ export default function AddBatchModal({ onClose, onDone, defaultFabricType = 'GR
             {METHODS.map(([key, label, hint]) => (
               <label key={key} className={`p-3 rounded-xl border cursor-pointer ${method === key ? 'border-blue-500 bg-blue-50/50' : 'border-slate-200 hover:border-slate-300'}`}>
                 <span className="flex items-center gap-2 font-semibold text-slate-800">
-                  <input type="radio" name="method" checked={method === key} onChange={() => setMethod(key)} /> {label}
+                  <input type="radio" name="method" checked={method === key} onChange={() => setMethod(key)} className="accent-blue-600" /> {label}
                 </span>
                 <span className="block text-[11px] text-slate-500 mt-0.5">{hint}</span>
               </label>
@@ -183,10 +205,44 @@ export default function AddBatchModal({ onClose, onDone, defaultFabricType = 'GR
 
           {method === 'manual' && (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <fieldset className="sm:col-span-2 flex flex-wrap gap-x-4 gap-y-1">
-                <legend className="font-semibold mb-1">Fabric type *</legend>
-                <label className="inline-flex items-center gap-1.5 cursor-pointer"><input type="radio" name="fabricType" checked={form.fabricType === 'GREY'} onChange={() => setForm({ ...form, fabricType: 'GREY' })} /> Grey fabric</label>
-                <label className="inline-flex items-center gap-1.5 cursor-pointer"><input type="radio" name="fabricType" checked={form.fabricType === 'DYED'} onChange={() => setForm({ ...form, fabricType: 'DYED' })} /> Dyed fabric</label>
+              <fieldset className="sm:col-span-2">
+                <legend className="font-semibold mb-1 text-slate-700">Fabric type *</legend>
+                <div className="flex items-center gap-2.5">
+                  <label
+                    className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border cursor-pointer transition-all ${
+                      form.fabricType === 'GREY'
+                        ? 'border-blue-500 bg-blue-50/70 text-blue-800 font-bold shadow-2xs'
+                        : 'border-slate-200 bg-slate-50/50 text-slate-600 hover:bg-slate-100'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="fabricType"
+                      checked={form.fabricType === 'GREY'}
+                      onChange={() => setForm({ ...form, fabricType: 'GREY' })}
+                      className="accent-blue-600"
+                    />
+                    <Layers size={13} className={form.fabricType === 'GREY' ? 'text-blue-600' : 'text-slate-400'} />
+                    <span>Grey fabric</span>
+                  </label>
+                  <label
+                    className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border cursor-pointer transition-all ${
+                      form.fabricType === 'DYED'
+                        ? 'border-blue-500 bg-blue-50/70 text-blue-800 font-bold shadow-2xs'
+                        : 'border-slate-200 bg-slate-50/50 text-slate-600 hover:bg-slate-100'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="fabricType"
+                      checked={form.fabricType === 'DYED'}
+                      onChange={() => setForm({ ...form, fabricType: 'DYED' })}
+                      className="accent-blue-600"
+                    />
+                    <Palette size={13} className={form.fabricType === 'DYED' ? 'text-blue-600' : 'text-slate-400'} />
+                    <span>Dyed fabric</span>
+                  </label>
+                </div>
               </fieldset>
               <label className="block"><span className="block font-semibold mb-1">Fabric *</span>
                 <select required value={form.itemId} onChange={set('itemId')} className={inputCls}>
@@ -211,8 +267,8 @@ export default function AddBatchModal({ onClose, onDone, defaultFabricType = 'GR
               <fieldset className="sm:col-span-2">
                 <legend className="font-semibold mb-1">Quantity *</legend>
                 <div className="flex flex-wrap gap-x-4 gap-y-1 mb-2">
-                  <label className="inline-flex items-center gap-1.5 cursor-pointer"><input type="radio" name="mode" checked={mode === 'bulk'} onChange={() => setMode('bulk')} /> Total metres now, register takas later</label>
-                  <label className="inline-flex items-center gap-1.5 cursor-pointer"><input type="radio" name="mode" checked={mode === 'takas'} onChange={() => setMode('takas')} /> Enter each taka now</label>
+                  <label className="inline-flex items-center gap-1.5 cursor-pointer"><input type="radio" name="mode" checked={mode === 'bulk'} onChange={() => setMode('bulk')} className="accent-blue-600" /> Total metres now, register takas later</label>
+                  <label className="inline-flex items-center gap-1.5 cursor-pointer"><input type="radio" name="mode" checked={mode === 'takas'} onChange={() => setMode('takas')} className="accent-blue-600" /> Enter each taka now</label>
                 </div>
                 {mode === 'bulk' ? (
                   <input required type="number" min="0.0001" step="any" value={form.totalMeters} onChange={set('totalMeters')} placeholder="Total metres in the batch, e.g. 1000" className={inputCls} aria-label="Total metres" />
@@ -236,8 +292,8 @@ export default function AddBatchModal({ onClose, onDone, defaultFabricType = 'GR
               <fieldset className="sm:col-span-2">
                 <legend className="font-semibold mb-1">QC</legend>
                 <div className="flex flex-wrap gap-x-4 gap-y-1">
-                  <label className="inline-flex items-center gap-1.5 cursor-pointer"><input type="radio" name="qc" checked={form.qc === 'later'} onChange={() => setForm({ ...form, qc: 'later' })} /> No QC now — usable as “Not inspected” (QC can be done any time)</label>
-                  <label className="inline-flex items-center gap-1.5 cursor-pointer"><input type="radio" name="qc" checked={form.qc === 'now'} onChange={() => setForm({ ...form, qc: 'now' })} /> Hold for QC before use</label>
+                  <label className="inline-flex items-center gap-1.5 cursor-pointer"><input type="radio" name="qc" checked={form.qc === 'later'} onChange={() => setForm({ ...form, qc: 'later' })} className="accent-blue-600" /> No QC now — usable as “Not inspected” (QC can be done any time)</label>
+                  <label className="inline-flex items-center gap-1.5 cursor-pointer"><input type="radio" name="qc" checked={form.qc === 'now'} onChange={() => setForm({ ...form, qc: 'now' })} className="accent-blue-600" /> Hold for QC before use</label>
                 </div>
               </fieldset>
             </div>
@@ -245,10 +301,21 @@ export default function AddBatchModal({ onClose, onDone, defaultFabricType = 'GR
           {error && <div role="alert" className="p-2.5 rounded-lg bg-rose-50 border border-rose-200 text-rose-700">{error}</div>}
         </div>
         <div className="flex justify-end gap-2 px-5 py-3 border-t border-slate-200">
-          <button type="button" onClick={onClose} disabled={saving} className="h-9 px-3 rounded-lg border border-slate-200 font-semibold cursor-pointer">Cancel</button>
+          <button type="button" onClick={onClose} disabled={saving} className="h-9 px-3 rounded-lg border border-slate-200 font-semibold cursor-pointer hover:bg-slate-50 transition-colors">Cancel</button>
           {(method === 'manual' || method === 'production') && (
-            <button type="submit" disabled={saving} className="h-9 px-4 rounded-lg bg-blue-600 text-white font-semibold disabled:opacity-60 cursor-pointer">
-              {saving ? 'Saving…' : method === 'production' ? 'Start production batch' : 'Create batch'}
+            <button
+              type="submit"
+              disabled={saving}
+              className="h-9 px-4 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold disabled:opacity-60 cursor-pointer shadow-xs transition-colors flex items-center gap-1.5"
+            >
+              <Plus size={14} />
+              {saving
+                ? 'Saving…'
+                : method === 'production'
+                  ? 'Start production batch'
+                  : form.fabricType === 'GREY'
+                    ? 'Add Grey Batch'
+                    : 'Add Dyeing Batch'}
             </button>
           )}
         </div>

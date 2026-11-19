@@ -124,14 +124,13 @@ export const ERPProvider = ({ children, }) => {
     const [qualityStandards, setQualityStandards] = useState([]);
     const [inventoryMovements, setInventoryMovements] = useState([]);
     const [warranties, setWarranties] = useState([]);
-    const [currency, setCurrencyState] = useState(() => {
-        const stored = localStorage.getItem('evenmore_currency');
-        if (!stored || stored.includes('USD') || stored.includes('?')) {
+    const [currency] = useState('INR (₹)');
+    useEffect(() => {
+        try {
             localStorage.setItem('evenmore_currency', 'INR (₹)');
-            return 'INR (₹)';
-        }
-        return stored;
-    });
+            localStorage.removeItem('evenmore_live_rates');
+        } catch (e) {}
+    }, []);
     // Filled from GET /settings/company-profile/ — no invented company details.
     const [companyProfile, setCompanyProfileState] = useState({
         name: '',
@@ -140,16 +139,8 @@ export const ERPProvider = ({ children, }) => {
         address: '',
         phone: '',
     });
-    const [liveRates, setLiveRates] = useState(DEFAULT_RATES);
+    const [liveRates] = useState(DEFAULT_RATES);
     const [toastMessage, setToastMessage] = useState(null);
-
-    useEffect(() => {
-        fetchLiveExchangeRates()
-            .then((rates) => {
-                if (rates) setLiveRates(rates);
-            })
-            .catch((err) => console.warn('Live forex rate sync:', err));
-    }, []);
 
     // ── Live backend synchronization ────────────────────────────────────
     //
@@ -346,12 +337,8 @@ export const ERPProvider = ({ children, }) => {
         };
     }, [refreshFromBackend, loadCompanyProfile]);
 
-    const setCurrency = (newCurr) => {
-        setCurrencyState(newCurr);
-        try {
-            localStorage.setItem('evenmore_currency', newCurr);
-        } catch (e) {}
-        showToast(`System base currency updated to ${newCurr}`);
+    const setCurrency = () => {
+        // OSCAR ERP strictly operates in Indian Rupee (INR / ₹)
     };
 
     const setCompanyProfile = async (profile) => {
@@ -3545,23 +3532,49 @@ export const ERPProvider = ({ children, }) => {
         if (!po) return { success: false, message: 'Purchase Order not found.' };
         if (po.status === 'Cancelled') return { success: true, message: 'Already cancelled.' };
 
+        // 1. Cannot cancel if goods have already been received / QC passed
+        const hasReceived = Number(po.receivedQty || po.totalReceivedQty || 0) > 0 ||
+                            ['Partially Received', 'Fully Received', 'Received'].includes(po.status);
+        if (hasReceived) {
+            modal.alert({
+                title: 'Cannot Cancel Purchase Order',
+                variant: 'warning',
+                confirmText: 'Understood',
+                message: `Purchase Order ${po.poNumber} cannot be cancelled because goods have already been received and QC-inspected.\n\nOnce physical stock is received, standard accounting prevents order cancellation to protect inventory ledger integrity.\n\nTo reverse received stock, please process a Purchase Return (Goods Return) or cancel the linked Goods Receipt (GRN).`,
+            });
+            return { success: false, message: 'Goods already received.' };
+        }
+
+        // 2. Cannot cancel if active bill exists
         const activeBill = purchaseBills.find((b) => (b.purchaseOrderId === poId || b.poRef === po.poNumber || b.linkedPo === po.poNumber) && b.status !== 'Cancelled');
         if (activeBill) {
-            showToast(`Cannot cancel PO: active Bill ${activeBill.billNumber} exists. Cancel the bill first.`);
+            modal.alert({
+                title: 'Cannot Cancel Purchase Order',
+                variant: 'warning',
+                confirmText: 'Understood',
+                message: `Cannot cancel Purchase Order ${po.poNumber}: active Purchase Bill ${activeBill.billNumber} exists. Cancel the bill first.`,
+            });
             return { success: false, message: `Active bill ${activeBill.billNumber} exists.` };
         }
 
-        setPurchaseOrders((prev) => prev.map((p) => p.id === poId ? { ...p, status: 'Cancelled' } : p));
         runDocAction('purchaseOrders', poId, 'cancel', {}, setPurchaseOrders, {
             refresh: ['purchaseOrders', 'purchaseBills'],
         })
             .then(() => {
+                setPurchaseOrders((prev) => prev.map((p) => p.id === poId ? { ...p, status: 'Cancelled' } : p));
                 showToast(`Purchase Order ${po.poNumber} cancelled.`);
             })
-            .catch(() => {
+            .catch((err) => {
                 refreshCollections(['purchaseOrders']);
+                const errDetail = err?.response?.data?.detail || err?.response?.data?.message || err?.message || 'Failed to cancel Purchase Order.';
+                modal.alert({
+                    title: 'Cannot Cancel Purchase Order',
+                    variant: 'warning',
+                    confirmText: 'Understood',
+                    message: errDetail,
+                });
             });
-        return { success: true, message: `Purchase Order ${po.poNumber} cancelled.` };
+        return { success: true, message: `Cancelling Purchase Order ${po.poNumber}...` };
     };
     const deletePurchaseOrder = (id) => {
         const po = purchaseOrders.find((p) => p.id === id);

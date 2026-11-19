@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useERP } from "../../../context/ERPContext";
 import { useCrmStore } from '../../../stores/crmStore';
 import { loadForms, findForm, getLiveLeadFormId, LEAD_FORM } from '../../../services/crmForms';
@@ -46,11 +46,27 @@ function describeScheme(scheme) {
 export function leadSourceOptions(sources, current) {
   // Sources deactivated under CRM Setup -> Lead Sources are not offered for
   // new selection (a lead already carrying one keeps it, see below).
-  const rows = (sources || []).filter((s) => s?.isActive !== false);
-  const cur = String(current ?? '');
-  if (cur && !rows.some((s) => String(s.id) === cur || String(s?.name ?? '').toLowerCase() === cur.toLowerCase())) {
-    const known = (sources || []).find((s) => String(s.id) === cur);
-    rows.push({ id: cur, name: known?.name ?? cur });
+  const rows = (sources || []).filter((s) => {
+    if (s?.isActive === false || s?.is_active === false) return false;
+    if (String(s?.status || '').toLowerCase() === 'inactive') return false;
+    return true;
+  });
+  const cur = String(current ?? '').trim();
+  if (
+    cur &&
+    cur !== 'Select source' &&
+    cur !== 'undefined' &&
+    cur !== 'null' &&
+    !rows.some((s) => String(s.id) === cur || String(s?.name ?? '').trim().toLowerCase() === cur.toLowerCase())
+  ) {
+    const known = (sources || []).find(
+      (s) => String(s.id) === cur || String(s?.name ?? '').trim().toLowerCase() === cur.toLowerCase()
+    );
+    if (known) {
+      rows.push({ id: known.id, name: known.name });
+    } else {
+      rows.push({ id: cur, name: cur });
+    }
   }
   return rows.map((s) => ({ id: s.id, name: s.name }));
 }
@@ -242,7 +258,7 @@ function DropdownField({ field, sources, userOptions, value, onChange }) {
 
   if (isSource) {
     return (
-      <select value={value} onChange={(e) => onChange(e.target.value)}>
+      <select value={value || ""} onChange={(e) => onChange(e.target.value)}>
         <option value="">Select source</option>
         {leadSourceOptions(sources, value).map((opt) => (
           <option key={opt.id} value={opt.id}>{opt.name}</option>
@@ -775,17 +791,34 @@ export default function CreateLeadModal({ isOpen, onClose, onCreate, onEditLayou
   const [brokers, setBrokers] = useState([]);
   const [incentiveSchemes, setIncentiveSchemes] = useState([]);
   const loadIncentiveSchemes = () => { pullIncentiveSchemes().then(setIncentiveSchemes); };
+
+  const reloadSources = useCallback(() => {
+    useCrmStore.getState().refresh('sources').catch(() => {});
+  }, []);
+
   useMasterDataRefresh(loadIncentiveSchemes, ['incentiveSchemes']);
+  useMasterDataRefresh(reloadSources, ['leadSources', 'sources']);
+
+  useEffect(() => {
+    const handleSourcesUpdated = () => reloadSources();
+    window.addEventListener('crm:sources-updated', handleSourcesUpdated);
+    window.addEventListener('master-data-changed', handleSourcesUpdated);
+    return () => {
+      window.removeEventListener('crm:sources-updated', handleSourcesUpdated);
+      window.removeEventListener('master-data-changed', handleSourcesUpdated);
+    };
+  }, [reloadSources]);
 
   useEffect(() => {
     if (isOpen) {
+      reloadSources();
       salesService.getBrokersList().then((res) => {
         const rows = res?.data || res?.results || res || [];
         if (Array.isArray(rows)) setBrokers(rows);
       }).catch(() => {});
       pullIncentiveSchemes().then(setIncentiveSchemes);
     }
-  }, [isOpen]);
+  }, [isOpen, reloadSources]);
 
   // Only the lead name is truly required — the server stores every other
   // field as optional, so filling just the name is enough to create a lead.

@@ -1086,7 +1086,8 @@ export default function Sidebar() {
   // `.raw` subscribes without pulling PMS: a badge in the sidebar must not be
   // the reason every screen in the app loads the project list. `useModuleWhenIdle`
   // asks for it once the browser has finished with the page the user opened.
-  const shellReady = useModuleWhenIdle('pms');
+  const isPmsScope = location.pathname.startsWith('/pms') || location.pathname.startsWith('/inventory/qc');
+  const shellReady = useModuleWhenIdle(isPmsScope ? 'pms' : null);
   const pmsProjects = usePmsStore.raw((s) => s.projects);
   const pmsCurrentUserId = usePmsStore.raw((s) => s.currentUserId);
   const pmsBadges = useMemo(
@@ -1107,8 +1108,8 @@ export default function Sidebar() {
   let badges = { zone: 0, faulty: 0, ...pmsBadges };
   try {
     const erp = useERP();
-    // Reading these is what loads them, so they wait for the same idle moment.
-    if (erp && shellReady) {
+    // Reading these is what loads them, so they wait for the same idle moment and relevant section.
+    if (erp && shellReady && isPmsScope) {
       badges.zone = erp.zoneRequests?.filter((r) => r.status === 'Requested')?.length || 0;
       badges.faulty = erp.faultyParts?.filter((f) => f.status === 'Reported' || f.status === 'Sent for Replacement')?.length || 0;
     }

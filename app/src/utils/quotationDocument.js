@@ -10,7 +10,7 @@ export function quotationTotals(quote) {
 }
 
 // Explicit customer-facing projection. Never publish CRM notes, costs, balances or contacts.
-export function publicQuotation(quote, currency = 'USD') {
+export function publicQuotation(quote, currency = 'INR') {
   const fields = ['quoteNumber', 'date', 'validUntil', 'customer', 'amount', 'freight', 'terms', 'termsAndConditions', 'dealReference'];
   const result = Object.fromEntries(fields.filter(key => quote[key] != null).map(key => [key, quote[key]]));
   result.currency = currency;

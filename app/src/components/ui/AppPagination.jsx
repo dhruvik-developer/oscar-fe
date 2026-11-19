@@ -92,9 +92,8 @@ export function AppPagination({
     if (next !== current) go?.(next);
   };
 
-  const sizes = pageSizeOptions?.length
-    ? [...new Set([...pageSizeOptions, size])].sort((a, b) => a - b)
-    : [];
+  const rawSizes = pageSizeOptions?.length ? pageSizeOptions : [10, 25, 50, 100];
+  const sizes = [...new Set([10, ...rawSizes, size])].sort((a, b) => a - b);
   const showSizes = Boolean(showPageSizeSelector && onPageSizeChange && sizes.length > 0);
   const showEdges = totalPages > MAX_SLOTS;
   const fmt = (n) => n.toLocaleString('en-IN');

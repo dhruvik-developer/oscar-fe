@@ -63,6 +63,7 @@ const QUANTITY_METRICS = [
 
 const KIND_STYLE = {
   BATCH_CREATED: { dot: 'bg-slate-300', tag: 'bg-slate-800 text-slate-300 border-slate-700' },
+  TRANSFER: { dot: 'bg-indigo-400', tag: 'bg-indigo-950/60 text-indigo-300 border-indigo-800/60' },
   MOVEMENT: { dot: 'bg-blue-400', tag: 'bg-blue-950/60 text-blue-300 border-blue-800/60' },
   LOSS: { dot: 'bg-rose-400', tag: 'bg-rose-950/60 text-rose-300 border-rose-800/60' },
   QC: { dot: 'bg-amber-400', tag: 'bg-amber-950/60 text-amber-300 border-amber-800/60' },
@@ -74,7 +75,7 @@ const KIND_STYLE = {
 
 const KIND_FILTERS = [
   ['', 'All Events'],
-  ['MOVEMENT', 'Stock Movements'],
+  ['MOVEMENT', 'Stock Movements & Transfers'],
   ['QC', 'Quality Control'],
   ['JOB_WORK', 'Job Work & Processing'],
   ['YARN', 'Yarn Usage'],
@@ -282,7 +283,11 @@ export default function BatchPassportView({ isPublic = false }) {
   // Filtered timeline
   const filteredTimeline = useMemo(() => {
     if (!historyKind) return timeline;
-    return timeline.filter((e) => (historyKind === 'JOB_WORK' ? e.kind?.startsWith('JOB_WORK') : e.kind === historyKind));
+    return timeline.filter((e) => {
+      if (historyKind === 'JOB_WORK') return e.kind?.startsWith('JOB_WORK');
+      if (historyKind === 'MOVEMENT') return e.kind === 'MOVEMENT' || e.kind === 'TRANSFER';
+      return e.kind === historyKind;
+    });
   }, [timeline, historyKind]);
 
   // Navigation tab definitions
@@ -1498,10 +1503,27 @@ export default function BatchPassportView({ isPublic = false }) {
                         </div>
 
                         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-400 pt-0.5">
-                          {e.quantity && <span className="font-mono text-slate-200 font-semibold">Qty: {formatNumberIN(e.quantity)} {e.uom || uom}</span>}
+                          {e.quantity != null && e.quantity !== '' && (
+                            <span className="font-mono text-slate-200 font-semibold">
+                              Qty: {formatNumberIN(Math.abs(Number(e.quantity)))} {e.uom || uom}
+                              {e.kind === 'TRANSFER'
+                                ? ' (Transfer)'
+                                : (e.direction === 'OUT' || Number(e.quantity) < 0)
+                                  ? ' (Outward)'
+                                  : ' (Inward)'}
+                            </span>
+                          )}
                           {e.amount && <span className="font-mono font-bold text-emerald-400">{formatINR(e.amount)}</span>}
                           {e.unitCost && <span className="font-mono text-slate-300">@ {formatINR(e.unitCost)}</span>}
-                          {e.location && <span>Godown: <strong className="text-slate-200 font-normal">{e.location}</strong></span>}
+                          {e.fromLocation && e.toLocation ? (
+                            <span className="inline-flex items-center gap-1.5">
+                              Route: <strong className="text-slate-200 font-normal">{e.fromLocation}</strong>
+                              <ArrowRight size={12} className="text-blue-400 shrink-0" />
+                              <strong className="text-emerald-400 font-semibold">{e.toLocation}</strong>
+                            </span>
+                          ) : e.location ? (
+                            <span>Godown: <strong className="text-slate-200 font-normal">{e.location}</strong></span>
+                          ) : null}
                           {e.taka && <span className="font-mono text-blue-400">{e.taka}</span>}
                           {e.reference && <span>Ref: <span className="font-mono text-slate-200">{e.referenceType ? `${e.referenceType} ` : ''}{e.reference}</span></span>}
                           {e.status && <span className="px-1.5 py-0.2 rounded text-[10px] bg-slate-700 text-slate-200">{e.status}</span>}

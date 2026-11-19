@@ -9,6 +9,7 @@ import PageHeader from '../../../components/ui/PageHeader';
 import KpiCard from '../../../components/ui/KpiCard';
 import TablePagination from '../../../components/ui/TablePagination';
 import { api } from '../../../services/api';
+import { loomService } from '../../../services/loomService';
 import {
   statusPill, canMarkComplete, canVerify, canGeneratePo, errorText, fmtNum, listOf,
 } from './productionStatus';
@@ -140,10 +141,42 @@ export default function ProductionCompletionVerificationPage() {
   const finalAmount = completionData ? completionData.finalAmount : null;
   const status = completionData?.status || detail?.status || '';
   const greyLotNo = detail?.greyLotNo || null;
-  const finalPoNumber = detail?.finalPoNumber || completionData?.finalPoNumber || null;
-  const finalPoId = detail?.finalPoId || completionData?.finalPoId || null;
-  const finalPoStatus = detail?.finalPoStatus || completionData?.finalPoStatus || (status === 'PO Created' ? 'Approved' : (finalPoNumber ? 'Pending Approval' : null));
-  const hasFinalPo = Boolean(finalPoNumber || finalPoId || status === 'PO Created');
+
+  // Resolve final PO number and ID across camelCase and snake_case properties
+  const finalPoNumber =
+    detail?.finalPoNumber ||
+    detail?.final_po_number ||
+    completionData?.finalPoNumber ||
+    completionData?.final_po_number ||
+    completionData?.fjwpoMetadata?.poNumber ||
+    detail?.fjwpoMetadata?.poNumber ||
+    detail?.final_po?.po_number ||
+    (typeof detail?.final_po === 'string' && detail?.final_po.startsWith('FJWPO') ? detail.final_po : null) ||
+    null;
+
+  const finalPoId =
+    detail?.finalPoId ||
+    detail?.final_po_id ||
+    detail?.final_po?.id ||
+    completionData?.finalPoId ||
+    completionData?.final_po_id ||
+    null;
+
+  const finalPoStatus =
+    detail?.finalPoStatus ||
+    detail?.final_po_status ||
+    completionData?.finalPoStatus ||
+    detail?.final_po?.status ||
+    (status === 'PO Created' ? 'Approved' : (finalPoNumber ? 'Pending Approval' : null));
+
+  // If a final PO number or ID exists, or status is 'PO Created', PO is generated
+  const isPoGenerated = Boolean(
+    finalPoNumber ||
+    finalPoId ||
+    status === 'PO Created' ||
+    (status === 'PO Pending' && (finalPoNumber || finalPoId || completionData?.finalPoNumber || detail?.finalPoNumber))
+  );
+  const hasFinalPo = isPoGenerated;
   const isPoApproved = status === 'PO Created' || finalPoStatus === 'Approved';
 
   const rows = useMemo(() => {
@@ -219,6 +252,100 @@ export default function ProductionCompletionVerificationPage() {
       setVerifyError(errorText(err, 'Verification failed'));
     } finally {
       setVerifying(false);
+    }
+  };
+
+  // [OLD CODE - COMMENTED OUT]: Fallback to /pms/daily-production when no matching loom factory was found or processType was not weaving
+  /*
+  const handleAddDailyEntry = async () => {
+    try {
+      const res = await loomService.getFactories();
+      const factoryList = Array.isArray(res) ? res : res?.results || [];
+
+      const vName = (vendor || '').toLowerCase().trim();
+      const pType = (processType || '').toLowerCase().trim();
+
+      // Check if project is open in a specific loom factory
+      const matchingFactory = factoryList.find((f) => {
+        const name = (f.name || '').toLowerCase();
+        const partyName = (f.job_worker_party_name || '').toLowerCase();
+        return (
+          (name && vName && (name.includes(vName) || vName.includes(name))) ||
+          (partyName && vName && (partyName.includes(vName) || vName.includes(partyName)))
+        );
+      });
+
+      if (matchingFactory) {
+        // Redirect to Daily Loom Entry with factory & project filter so only that project shows
+        navigate(
+          `/pms/loom-daily?factory=${encodeURIComponent(matchingFactory.id)}&project=${encodeURIComponent(piNumber)}&pi=${encodeURIComponent(activePiId || '')}&fabric=${encodeURIComponent(fabric || '')}`
+        );
+      } else if (factoryList.length > 0 && (pType.includes('weaving') || pType.includes('loom'))) {
+        navigate(
+          `/pms/loom-daily?factory=${encodeURIComponent(factoryList[0].id)}&project=${encodeURIComponent(piNumber)}&pi=${encodeURIComponent(activePiId || '')}&fabric=${encodeURIComponent(fabric || '')}`
+        );
+      } else {
+        // Standard processing / dyeing PI -> redirect to daily production register
+        navigate(`/pms/daily-production?pi=${encodeURIComponent(activePiId || '')}`);
+      }
+    } catch {
+      navigate(`/pms/daily-production?pi=${encodeURIComponent(activePiId || '')}`);
+    }
+  };
+  */
+
+  // [UPDATED IMPLEMENTATION]: Always redirect to Daily Loom Production Entry (/pms/loom-daily)
+  // Automatically maps factory and carries project, PI, and fabric filters.
+  const handleAddDailyEntry = async () => {
+    try {
+      const res = await loomService.getFactories();
+      const factoryList = Array.isArray(res) ? res : res?.results || [];
+
+      const vName = (vendor && vendor !== '—') ? vendor.toLowerCase().trim() : '';
+      const cleanPiNumber = (piNumber && piNumber !== '—') ? piNumber : '';
+      const cleanFabric = (fabric && fabric !== '—') ? fabric : '';
+      const cleanPiId = activePiId || '';
+
+      // Determine target factory
+      let targetFactoryId = '';
+      if (factoryList.length > 0) {
+        // 1. Check if vendor/agency matches factory name or job worker party
+        const matchingFactory = factoryList.find((f) => {
+          const name = (f.name || '').toLowerCase();
+          const partyName = (f.job_worker_party_name || '').toLowerCase();
+          return (
+            (name && vName && (name.includes(vName) || vName.includes(name))) ||
+            (partyName && vName && (partyName.includes(vName) || vName.includes(partyName)))
+          );
+        });
+
+        if (matchingFactory) {
+          targetFactoryId = matchingFactory.id;
+        } else {
+          // 2. Check localStorage selected factory or fallback to first factory with machines
+          const savedId = localStorage.getItem('oscar_pms_selected_factory');
+          const savedValid = factoryList.find((f) => f.id === savedId);
+          if (savedValid) {
+            targetFactoryId = savedValid.id;
+          } else {
+            const activeF = factoryList.find((f) => f.machines_count > 0) || factoryList[0];
+            targetFactoryId = activeF.id;
+          }
+        }
+      }
+
+      // Build search params for /pms/loom-daily
+      const params = new URLSearchParams();
+      if (targetFactoryId) params.set('factory', targetFactoryId);
+      if (cleanPiNumber) params.set('project', cleanPiNumber);
+      if (cleanPiId) params.set('pi', cleanPiId);
+      if (cleanFabric) params.set('fabric', cleanFabric);
+
+      const qs = params.toString();
+      navigate(`/pms/loom-daily${qs ? `?${qs}` : ''}`);
+    } catch (err) {
+      console.error('Failed to load factories for loom-daily redirection:', err);
+      navigate('/pms/loom-daily');
     }
   };
 
@@ -358,27 +485,21 @@ export default function ProductionCompletionVerificationPage() {
                 <Check size={14} /> Verify & Approve
               </button>
             )}
-            {hasData && !hasFinalPo && canGeneratePo(status) && (
+            {/* Generate Final PO: ONLY show if PO has NOT already been generated */}
+            {hasData && !isPoGenerated && canGeneratePo(status) && (
               <button
+                type="button"
                 onClick={() => setShowGeneratePoModal(true)}
                 disabled={busy !== null}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3.5 py-1.5 text-[12px] font-bold text-white hover:bg-emerald-700 disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3.5 py-1.5 text-[12px] font-bold text-white hover:bg-emerald-700 disabled:opacity-50 cursor-pointer"
               >
                 <FileText size={14} /> Generate Final PO
               </button>
             )}
-            {hasData && hasFinalPo && !isPoApproved && (
+            {/* When PO is already generated: 'Generate Final PO' is disabled & gone from screen. Show View Final PO */}
+            {hasData && isPoGenerated && (
               <button
-                onClick={() => setShowGeneratePoModal(true)}
-                disabled={busy !== null}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3.5 py-1.5 text-[12px] font-bold text-white hover:bg-blue-700 disabled:opacity-50"
-                title="Edit Final Job Work PO"
-              >
-                <Pencil size={13} /> Edit Final PO
-              </button>
-            )}
-            {hasData && hasFinalPo && isPoApproved && (
-              <button
+                type="button"
                 onClick={() => {
                   if (finalPoId) {
                     navigate(`/purchase/orders?po=${encodeURIComponent(finalPoId)}`);
@@ -386,10 +507,10 @@ export default function ProductionCompletionVerificationPage() {
                     setShowGeneratePoModal(true);
                   }
                 }}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-300 bg-emerald-50 px-3.5 py-1.5 text-[12px] font-bold text-emerald-700 hover:bg-emerald-100"
-                title="Final PO Approved - Click to view in Purchase Orders"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-purple-200 bg-purple-50 px-3.5 py-1.5 text-[12px] font-bold text-purple-700 hover:bg-purple-100 transition-colors cursor-pointer"
+                title={`Final Job Work PO ${finalPoNumber || ''} is already generated. Click to view.`}
               >
-                <Eye size={13} /> View Final PO (Approved)
+                <Eye size={13} /> View Final PO ({finalPoNumber || (isPoApproved ? 'Approved' : 'Generated')})
               </button>
             )}
             <button
@@ -412,9 +533,9 @@ export default function ProductionCompletionVerificationPage() {
             </button>
             <button
               type="button"
-              onClick={() => navigate(`/pms/daily-production?pi=${encodeURIComponent(activePiId || '')}`)}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-[#e2eaf5] px-3 py-1.5 text-[12px] font-bold text-slate-600 hover:bg-slate-50 transition-colors"
-              title="Add daily production entry"
+              onClick={handleAddDailyEntry}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-[#e2eaf5] px-3 py-1.5 text-[12px] font-bold text-slate-600 hover:bg-slate-50 transition-colors cursor-pointer"
+              title="Add daily production entry in factory"
             >
               <Plus size={13} /> Add Daily Entry
             </button>

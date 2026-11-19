@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from "react";
-import { Calendar as CalendarIcon, Search, AlertTriangle, Lock, RefreshCw } from "lucide-react";
+import { Calendar as CalendarIcon, Search, AlertTriangle, Lock, RefreshCw, Download } from "lucide-react";
+import { exportToCSV } from "../../../services/exportUtils";
 import { useAppStore } from "../../../stores/appStore";
 import { useAttendanceStore } from "../../../stores/attendanceStore";
 import { ConfirmModal } from "../../../components/hrms/Shared";
@@ -200,12 +201,54 @@ export default function BulkAttendance() {
     }
   }
 
+  const handleExport = () => {
+    const list = filtered.length > 0 ? filtered : rows;
+    if (!list || list.length === 0) {
+      showToast?.("No attendance records to export.");
+      return;
+    }
+    const headers = [
+      "Employee Code",
+      "Employee Name",
+      "Department",
+      "Location",
+      "Shift",
+      "Status",
+      "Check-In",
+      "Check-Out",
+      "Work Duration",
+    ];
+    const exportRows = list.map((e) => [
+      e.employeeCode || e.empId || "",
+      e.name || "",
+      e.department || "",
+      e.location || "",
+      e.shift || "",
+      e.status || "Not Marked",
+      e.checkIn || "",
+      e.checkOut || "",
+      e.workHours || e.formattedWorkingHours || "",
+    ]);
+    exportToCSV(`Muster_Roll_${date}`, headers, exportRows);
+    showToast?.("Muster roll exported to CSV.");
+  };
+
   return (
     <div className="bulk-att-page">
       <PageHeader
         title="Bulk Attendance"
         subtitle="Update attendance for multiple employees at once."
         guide={hrmsGuides.attendanceBulk}
+        actions={
+          <button
+            type="button"
+            onClick={handleExport}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2.5 bg-white border border-slate-300 text-slate-700 rounded-xl text-[13px] font-medium shadow-2xs hover:bg-slate-50 transition-colors cursor-pointer"
+          >
+            <Download size={15} />
+            Export Muster Roll (CSV)
+          </button>
+        }
       />
 
       {/* Top Filter Card */}

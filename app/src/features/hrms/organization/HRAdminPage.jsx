@@ -181,7 +181,7 @@ export default function HRAdminPage({ defaultTab }) {
 
   useEffect(() => {
     let cancelled = false;
-    hrmsSync.pullMany(['teams', 'approvalChains', 'terminations', 'complaints', 'departments', 'offers', 'resignations', 'holidays', 'applications'])
+    hrmsSync.pullMany(['teams', 'approvalChains', 'terminations', 'complaints', 'departments', 'offers', 'resignations', 'holidays', 'applications', 'employees'])
       .then((rows) => {
         if (cancelled) return;
         if (rows.teams) setTeams(rows.teams);
@@ -281,30 +281,92 @@ export default function HRAdminPage({ defaultTab }) {
     return filteredOffers.slice(start, start + adminPageSize);
   }, [filteredOffers, adminPage, adminPageSize]);
 
+  const resolveEmployeeInfo = (item, empKey = "employee", empIdKey = "employeeId", empCodeKey = "employeeCode") => {
+    const rawName = item?.[empKey] || item?.employeeName || "";
+    const rawId = item?.[empIdKey];
+    const rawCode = item?.[empCodeKey];
+
+    const matchedEmp = (employees || []).find((e) =>
+      (rawId && (String(e.id) === String(rawId) || String(e.empId) === String(rawId) || String(e.employeeCode) === String(rawId))) ||
+      (rawCode && (String(e.employeeCode || '').toLowerCase() === String(rawCode).toLowerCase() || String(e.empId || '').toLowerCase() === String(rawCode).toLowerCase())) ||
+      (rawName && e.name && e.name.toLowerCase() === String(rawName).toLowerCase())
+    );
+
+    const name = matchedEmp?.name || (isServerId(rawName) ? "" : rawName) || "Staff Member";
+    let empNumber = matchedEmp?.employeeCode || matchedEmp?.empId || rawCode || "";
+    if (!empNumber && rawId && !isServerId(rawId)) {
+      empNumber = rawId;
+    }
+    if (isServerId(empNumber)) {
+      empNumber = "";
+    }
+
+    return { name, empNumber };
+  };
+
   const filteredTerminations = useMemo(() => terminations.filter((t) => {
     if (!search) return true;
+    const q = search.toLowerCase();
+    const info = resolveEmployeeInfo(t);
     return (
-      t.employee?.toLowerCase().includes(search.toLowerCase()) ||
-      t.employeeId?.toLowerCase().includes(search.toLowerCase()) ||
-      t.role?.toLowerCase().includes(search.toLowerCase()) ||
-      t.id?.toLowerCase().includes(search.toLowerCase())
+      info.name.toLowerCase().includes(q) ||
+      info.empNumber.toLowerCase().includes(q) ||
+      t.role?.toLowerCase().includes(q) ||
+      t.dept?.toLowerCase().includes(q)
     );
-  }), [terminations, search]);
+  }), [terminations, search, employees]);
 
   const paginatedTerminations = useMemo(() => {
     const start = (adminPage - 1) * adminPageSize;
     return filteredTerminations.slice(start, start + adminPageSize);
   }, [filteredTerminations, adminPage, adminPageSize]);
 
+  const filteredResignations = useMemo(() => resignations.filter((r) => {
+    if (!search) return true;
+    const q = search.toLowerCase();
+    const info = resolveEmployeeInfo(r);
+    return (
+      info.name.toLowerCase().includes(q) ||
+      info.empNumber.toLowerCase().includes(q) ||
+      r.role?.toLowerCase().includes(q) ||
+      r.dept?.toLowerCase().includes(q) ||
+      r.handoverTo?.toLowerCase().includes(q)
+    );
+  }), [resignations, search, employees]);
+
   const paginatedResignations = useMemo(() => {
     const start = (adminPage - 1) * adminPageSize;
-    return resignations.slice(start, start + adminPageSize);
-  }, [resignations, adminPage, adminPageSize]);
+    return filteredResignations.slice(start, start + adminPageSize);
+  }, [filteredResignations, adminPage, adminPageSize]);
+
+  const filteredComplaints = useMemo(() => complaints.filter((c) => {
+    if (!search) return true;
+    const q = search.toLowerCase();
+    const cInfo = resolveEmployeeInfo({
+      employee: c.complainant || c.raisedBy,
+      employeeId: c.raisedByEmployeeId,
+      employeeCode: c.complainantEmployeeCode || c.raisedByEmployeeCode,
+    });
+    const aInfo = resolveEmployeeInfo({
+      employee: c.against || c.againstName,
+      employeeId: c.againstEmployeeId,
+      employeeCode: c.againstEmployeeCode,
+    });
+    return (
+      cInfo.name.toLowerCase().includes(q) ||
+      cInfo.empNumber.toLowerCase().includes(q) ||
+      aInfo.name.toLowerCase().includes(q) ||
+      aInfo.empNumber.toLowerCase().includes(q) ||
+      c.category?.toLowerCase().includes(q) ||
+      c.summary?.toLowerCase().includes(q) ||
+      c.assignedInvestigator?.toLowerCase().includes(q)
+    );
+  }), [complaints, search, employees]);
 
   const paginatedComplaints = useMemo(() => {
     const start = (adminPage - 1) * adminPageSize;
-    return complaints.slice(start, start + adminPageSize);
-  }, [complaints, adminPage, adminPageSize]);
+    return filteredComplaints.slice(start, start + adminPageSize);
+  }, [filteredComplaints, adminPage, adminPageSize]);
 
   const paginatedHolidays = useMemo(() => {
     const start = (adminPage - 1) * adminPageSize;
@@ -1809,7 +1871,7 @@ export default function HRAdminPage({ defaultTab }) {
             <table className="w-full min-w-[800px] lg:min-w-0 text-left text-[13px]">
               <thead className="bg-off border-b border-bdr text-[11px] uppercase text-muted">
                 <tr>
-                  <th className="py-3 px-5">Employee &amp; ID</th>
+                  <th className="py-3 px-5">Employee</th>
                   <th className="py-3 px-5">Department &amp; Role</th>
                   <th className="py-3 px-5">Termination Type</th>
                   <th className="py-3 px-5">Notice &amp; Exit Date</th>
@@ -1819,11 +1881,15 @@ export default function HRAdminPage({ defaultTab }) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-bdr/40">
-                {paginatedTerminations.map((t) => (
+                {paginatedTerminations.map((t) => {
+                  const empInfo = resolveEmployeeInfo(t);
+                  return (
                     <tr key={t.id} className="hover:bg-off/60 transition">
                       <td className="py-4 px-5">
-                        <div className="font-bold text-slate-900">{t.employee}</div>
-                        <div className="text-[11px] font-mono text-muted">{t.employeeId} • {t.id}</div>
+                        <div className="font-bold text-slate-900">{empInfo.name}</div>
+                        {empInfo.empNumber ? (
+                          <div className="text-[11px] font-mono text-muted">{empInfo.empNumber}</div>
+                        ) : null}
                       </td>
                       <td className="py-4 px-5">
                         <div className="text-slate-800 font-medium">{t.role}</div>
@@ -1890,7 +1956,8 @@ export default function HRAdminPage({ defaultTab }) {
                         </div>
                       </td>
                     </tr>
-                  ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -1927,7 +1994,7 @@ export default function HRAdminPage({ defaultTab }) {
             <table className="w-full min-w-[800px] lg:min-w-0 text-left text-[13px]">
               <thead className="bg-off border-b border-bdr text-[11px] uppercase text-muted">
                 <tr>
-                  <th className="py-3 px-5">Employee &amp; ID</th>
+                  <th className="py-3 px-5">Employee</th>
                   <th className="py-3 px-5">Role &amp; Department</th>
                   <th className="py-3 px-5">Submission Date</th>
                   <th className="py-3 px-5">Last Working Day</th>
@@ -1937,12 +2004,16 @@ export default function HRAdminPage({ defaultTab }) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-bdr/40">
-                {paginatedResignations.map((r) => (
-                  <tr key={r.id} className="hover:bg-off/60 transition">
-                    <td className="py-4 px-5">
-                      <div className="font-bold text-slate-900">{r.employee}</div>
-                      <div className="text-[11px] font-mono text-muted">{r.employeeId} • {r.id}</div>
-                    </td>
+                {paginatedResignations.map((r) => {
+                  const empInfo = resolveEmployeeInfo(r);
+                  return (
+                    <tr key={r.id} className="hover:bg-off/60 transition">
+                      <td className="py-4 px-5">
+                        <div className="font-bold text-slate-900">{empInfo.name}</div>
+                        {empInfo.empNumber ? (
+                          <div className="text-[11px] font-mono text-muted">{empInfo.empNumber}</div>
+                        ) : null}
+                      </td>
                     <td className="py-4 px-5">
                       <div className="text-slate-800 font-medium">{r.role}</div>
                       <div className="text-[11px] text-muted">{r.dept}</div>
@@ -1979,12 +2050,13 @@ export default function HRAdminPage({ defaultTab }) {
                       </button>
                     </td>
                   </tr>
-                ))}
+                );
+              })}
               </tbody>
             </table>
           </div>
           <AppPagination
-            total={resignations.length}
+            total={filteredResignations.length}
             page={adminPage}
             pageSize={adminPageSize}
             onPageChange={setAdminPage}
@@ -2026,16 +2098,45 @@ export default function HRAdminPage({ defaultTab }) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-bdr/40">
-                {paginatedComplaints.map((c) => (
-                  <tr key={c.id} className="hover:bg-off/60 transition">
-                    <td className="py-4 px-5">
-                      <div className="font-bold text-slate-900">{c.id}</div>
-                      <div className="text-[11px] text-muted">{c.filedOn}</div>
-                    </td>
-                    <td className="py-4 px-5">
-                      <div className="text-slate-900 font-medium">By: {c.complainant}</div>
-                      <div className="text-[11px] text-muted">Target: {c.against}</div>
-                    </td>
+                {paginatedComplaints.map((c) => {
+                  const complainantInfo = resolveEmployeeInfo({
+                    employee: c.complainant || c.raisedBy,
+                    employeeId: c.raisedByEmployeeId,
+                    employeeCode: c.complainantEmployeeCode || c.raisedByEmployeeCode,
+                  });
+                  const againstInfo = resolveEmployeeInfo({
+                    employee: c.against || c.againstName,
+                    employeeId: c.againstEmployeeId,
+                    employeeCode: c.againstEmployeeCode,
+                  });
+                  return (
+                    <tr key={c.id} className="hover:bg-off/60 transition">
+                      <td className="py-4 px-5">
+                        <div className="font-bold text-slate-900 font-mono">
+                          {isServerId(c.id) ? `GRV-${c.id.slice(0, 6).toUpperCase()}` : c.id}
+                        </div>
+                        <div className="text-[11px] text-muted">{c.filedOn}</div>
+                      </td>
+                      <td className="py-4 px-5">
+                        <div className="text-slate-900 font-medium">
+                          By: {complainantInfo.name || "Anonymous / Confidential"}
+                          {complainantInfo.empNumber ? (
+                            <span className="text-[11px] font-mono text-muted ml-1.5 font-normal">
+                              ({complainantInfo.empNumber})
+                            </span>
+                          ) : null}
+                        </div>
+                        {againstInfo.name && againstInfo.name !== "Management / General" ? (
+                          <div className="text-[11px] text-muted">
+                            Target: {againstInfo.name}
+                            {againstInfo.empNumber ? (
+                              <span className="font-mono ml-1 font-normal">({againstInfo.empNumber})</span>
+                            ) : null}
+                          </div>
+                        ) : c.against ? (
+                          <div className="text-[11px] text-muted">Target: {c.against}</div>
+                        ) : null}
+                      </td>
                     <td className="py-4 px-5 text-slate-800 font-medium">{c.category}</td>
                     <td className="py-4 px-5">
                       <span
@@ -2077,12 +2178,13 @@ export default function HRAdminPage({ defaultTab }) {
                       </button>
                     </td>
                   </tr>
-                ))}
+                );
+              })}
               </tbody>
             </table>
           </div>
           <AppPagination
-            total={complaints.length}
+            total={filteredComplaints.length}
             page={adminPage}
             pageSize={adminPageSize}
             onPageChange={setAdminPage}
@@ -2879,7 +2981,7 @@ export default function HRAdminPage({ defaultTab }) {
                       setNewTermination({
                         ...newTermination,
                         employee: emp.name,
-                        employeeId: emp.id,
+                        employeeId: emp.employeeCode || emp.empId || emp.id,
                         dept: emp.department || newTermination.dept,
                         role: emp.designation || newTermination.role,
                       });
@@ -2890,7 +2992,7 @@ export default function HRAdminPage({ defaultTab }) {
                   <option value="">-- Choose active staff member (or enter below) --</option>
                   {employees.map((emp) => (
                     <option key={emp.id} value={emp.id}>
-                      {emp.name} ({emp.id}) — {emp.designation} ({emp.department})
+                      {emp.name}{emp.employeeCode || emp.empId ? ` (${emp.employeeCode || emp.empId})` : ""} — {emp.designation} ({emp.department})
                     </option>
                   ))}
                 </select>
@@ -3056,7 +3158,7 @@ export default function HRAdminPage({ defaultTab }) {
                       setNewResignation({
                         ...newResignation,
                         employee: emp.name,
-                        employeeId: emp.id,
+                        employeeId: emp.employeeCode || emp.empId || emp.id,
                         dept: emp.department || newResignation.dept,
                         role: emp.designation || newResignation.role,
                       });
@@ -3067,7 +3169,7 @@ export default function HRAdminPage({ defaultTab }) {
                   <option value="">-- Choose active staff member (or enter below) --</option>
                   {employees.map((emp) => (
                     <option key={emp.id} value={emp.id}>
-                      {emp.name} ({emp.id}) — {emp.designation} ({emp.department})
+                      {emp.name}{emp.employeeCode || emp.empId ? ` (${emp.employeeCode || emp.empId})` : ""} — {emp.designation} ({emp.department})
                     </option>
                   ))}
                 </select>
@@ -3280,7 +3382,7 @@ export default function HRAdminPage({ defaultTab }) {
                   <option value="Sarah Mitchell (CEO)">Sarah Mitchell (CEO)</option>
                   {employees.map((e) => (
                     <option key={e.id || e.name} value={`${e.name} (${e.designation})`}>
-                      {e.name} ({e.designation})
+                      {e.name}{e.employeeCode || e.empId ? ` (${e.employeeCode || e.empId})` : ""} — {e.designation}
                     </option>
                   ))}
                 </select>

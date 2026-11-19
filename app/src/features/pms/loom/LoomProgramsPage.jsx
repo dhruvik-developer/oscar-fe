@@ -239,10 +239,20 @@ export default function LoomProgramsPage() {
             icon={Calendar}
             color="blue"
           />
+          {/* [OLD CODE - COMMENTED OUT]: Gross efficiency only without net/gross distinction
           <KpiCard
             title="Efficiency vs Target"
             value={`${formatNum(progStats.eff_pct, 1)}%`}
             subtitle={`Target: ${activeProg.t_eff}% | Avg RPM: ${formatNum(progStats.avg_rpm)}`}
+            icon={Cpu}
+            color={progStats.eff_pct >= activeProg.t_eff ? 'green' : 'rose'}
+          />
+          */}
+          {/* [REAL-LIFE TEXTILE STANDARD]: Shows Net efficiency (power cut adjusted) and Gross efficiency */}
+          <KpiCard
+            title="Efficiency (Net vs Target)"
+            value={`${formatNum(progStats.eff_pct, 1)}%`}
+            subtitle={`Target: ${activeProg.t_eff}% | Gross: ${formatNum(progStats.gross_eff_pct || progStats.eff_pct, 1)}% | RPM: ${formatNum(progStats.avg_rpm)}`}
             icon={Cpu}
             color={progStats.eff_pct >= activeProg.t_eff ? 'green' : 'rose'}
           />

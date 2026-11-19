@@ -189,7 +189,7 @@ function downloadPayslipPdf(p) {
     `(NET PAYABLE: INR ${inr(remaining)}) Tj`,
     "0 -24 Td",
     "/F1 10 Tf",
-    `(Payout Status: ${status}   |   Disbursed: ${status === "Paid" && paidAmt !== null ? inr(paidAmt) : "—"}   |   Date: ${paidDate}) Tj`,
+    `(Payout Status: ${status}   |   Disbursed: ${status === "Paid" && paidAmt !== null ? inr(paidAmt) : "-"}   |   Date: ${paidDate}) Tj`,
     "0 -32 Td",
     "/F1 9 Tf",
     "(This is a computer-generated salary slip. Attendance and leave figures are taken from HRMS records.) Tj",

@@ -169,14 +169,14 @@ export function SupplierLedgerDrawer({
   return (
     <>
       <div
-        className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex justify-end animate-in fade-in duration-150"
+        className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 animate-in fade-in duration-150"
         onClick={onClose}
         role="dialog"
         aria-modal="true"
         aria-label={`${partyLabel} Ledger - ${supplier.name}`}
       >
         <div
-          className="bg-white w-full lg:w-[62vw] max-w-5xl h-full shadow-2xl rounded-l-2xl border-l border-slate-200 flex flex-col overflow-hidden"
+          className="bg-white w-full max-w-6xl h-[92vh] shadow-2xl rounded-2xl border border-slate-200 flex flex-col overflow-hidden animate-in zoom-in-95 duration-150"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Drawer Header */}
@@ -187,7 +187,7 @@ export function SupplierLedgerDrawer({
                   {supplier.code || (isCustomer ? 'CUST' : 'VEND')}
                 </span>
                 <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
-                  {partyLabel} Ledger Drawer
+                  {partyLabel} Ledger Statement
                 </span>
               </div>
               <h2 className="text-lg sm:text-xl font-bold text-slate-900 tracking-tight">

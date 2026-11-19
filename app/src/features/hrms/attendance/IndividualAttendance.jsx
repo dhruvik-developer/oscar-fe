@@ -897,6 +897,53 @@ export default function IndividualAttendance() {
     setEditItem(null);
   };
 
+  const handleExportAttendance = () => {
+    if (!records || records.length === 0) {
+      setToast?.("No attendance records to export.");
+      return;
+    }
+    const empName = currentEmp?.name || "Employee";
+    const empCode = currentEmp?.empId || currentEmp?.employeeCode || currentEmp?.id || "";
+    const headers = [
+      "Date",
+      "Day",
+      "Employee Code",
+      "Employee Name",
+      "Check-In",
+      "Check-Out",
+      "Break Duration",
+      "Work Hours",
+      "Late",
+      "Shift",
+      "Status",
+      "Remarks",
+    ];
+    const exportRows = records.map((r) => [
+      r.date || r.isoDate || "",
+      r.day || "",
+      empCode,
+      empName,
+      r.checkIn || "",
+      r.checkOut || "",
+      r.breakDuration || "",
+      r.workHours || "",
+      r.lateMinutes || "",
+      r.shift || "",
+      r.status || "",
+      r.remarks || "",
+    ]);
+    const fileLabel =
+      selectedMonth === "All"
+        ? `attendance_${empName}_${selectedYear}`
+        : `attendance_${empName}_${selectedMonth}_${selectedYear}`;
+    exportToCSV(fileLabel, headers, exportRows);
+    setToast?.("Attendance records exported to CSV.");
+  };
+
+  const handlePrintAttendance = () => {
+    window.print();
+  };
+
   return (
     <div className="ind-att-page">
       {/* Breadcrumb */}

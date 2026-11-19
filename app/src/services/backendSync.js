@@ -239,23 +239,23 @@ function documentResource(path, {
 
 // ── parties ─────────────────────────────────────────────────────────────────
 
-function partyToApi(party) {
+function partyToApi(party, { partial = false } = {}) {
   return compact({
-    // `code` is deliberately omitted: the server allocates CUST-/VEND- numbers
-    // (api.md §1.7) and a client-invented one would collide.
-    type: party.type || party.partyType || 'Customer',
-    // Nullable on the server; `null` clears a stale classification when the
+    // code is deliberately omitted: the server allocates CUST-/VEND- numbers
+    // and a client-invented one would collide.
+    type: party.type !== undefined ? (party.type || party.partyType) : (!partial ? 'Customer' : undefined),
+    // Nullable on the server; null clears a stale classification when the
     // role is edited away from Vendor.
-    vendorType: party.vendorType || null,
+    vendorType: party.vendorType !== undefined ? party.vendorType : (!partial ? null : undefined),
     // Transporter fleet details — same clear-on-role-change contract.
-    vehicleNumber: party.vehicleNumber || null,
-    vehicleType: party.vehicleType || null,
+    vehicleNumber: party.vehicleNumber !== undefined ? party.vehicleNumber : (!partial ? null : undefined),
+    vehicleType: party.vehicleType !== undefined ? party.vehicleType : (!partial ? null : undefined),
     vehicleCapacity:
       party.vehicleCapacity !== undefined && party.vehicleCapacity !== '' && party.vehicleCapacity !== null
         ? num(party.vehicleCapacity)
-        : null,
-    vehicleCapacityUnit: party.vehicleCapacityUnit || null,
-    name: party.name,
+        : (!partial ? null : undefined),
+    vehicleCapacityUnit: party.vehicleCapacityUnit !== undefined ? party.vehicleCapacityUnit : (!partial ? null : undefined),
+    name: party.name !== undefined ? party.name : undefined,
     phone: party.phone || undefined,
     email: party.email || undefined,
     gstTreatment: party.gstTreatment || undefined,
@@ -274,10 +274,12 @@ function partyToApi(party) {
     bankName: party.bankName || undefined,
     accountHolderName: party.accountHolderName || undefined,
     openingBalance: party.openingBalance !== undefined ? num(party.openingBalance) : undefined,
-    openingBalanceType: party.openingBalanceType || (party.type === 'Customer' ? 'Advance' : 'Payable'),
+    openingBalanceType: party.openingBalanceType !== undefined
+      ? party.openingBalanceType
+      : (!partial ? (party.type === 'Customer' ? 'Advance' : 'Payable') : undefined),
     billingAddress: party.billingAddress || undefined,
     shippingAddress: party.shippingAddress || undefined,
-    status: party.status || 'Active',
+    status: party.status || (!partial ? 'Active' : undefined),
   });
 }
 
@@ -352,19 +354,19 @@ function vendorFromParty(row) {
 export const RESOURCES = {
   parties: {
     path: '/parties/',
-    toApi: partyToApi,
+    toApi: (p, opts) => partyToApi(p, opts),
     fromApi: partyFromApi,
   },
   customers: {
     path: '/parties/',
     pullPath: '/parties/customers/',
-    toApi: (c) => partyToApi({ ...c, type: c.type || 'Customer' }),
+    toApi: (c, opts) => partyToApi({ ...c, ...(opts?.partial ? {} : { type: c.type || 'Customer' }) }, opts),
     fromApi: customerFromParty,
   },
   vendors: {
     path: '/parties/',
     pullPath: '/parties/vendors/',
-    toApi: (v) => partyToApi({ ...v, type: 'Vendor' }),
+    toApi: (v, opts) => partyToApi({ ...v, ...(opts?.partial ? {} : { type: 'Vendor' }) }, opts),
     fromApi: vendorFromParty,
   },
   categories: {

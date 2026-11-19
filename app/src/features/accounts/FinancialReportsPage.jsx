@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useERP } from '../../context/ERPContext';
 import { modal } from '../../context/ModalContext';
 import { useSearchParams } from 'react-router-dom';
 import {
@@ -52,30 +53,57 @@ const TABS = [
 
 const accountName = (a) => `${a.code ? `${a.code} - ` : ''}${a.name}`;
 
+const REPORT_TITLES = {
+  pl: 'Statement of Profit and Loss',
+  bs: 'Balance Sheet',
+  cashflow: 'Statement of Cash Flows',
+  gst: 'GST Summary Report (GSTR-1 & GSTR-3B)',
+  ageing: 'Accounts Receivable & Payable Ageing Statement',
+  discounts: 'Party Discounts Annual Audit Statement',
+  budget: 'Budget vs Actual Performance Statement',
+};
+
 function Amount({ value, strong = false }) {
   const n = Number(value);
   const tone = !Number.isFinite(n) || n === 0 ? 'text-slate-600' : n > 0 ? 'text-slate-900' : 'text-rose-600';
   return <span className={`font-mono ${strong ? 'font-bold' : ''} ${tone}`}>{formatINR(value)}</span>;
 }
 
-function SectionRow({ label, tone }) {
+function SectionRow({ label, tone = 'bg-slate-100 text-slate-800' }) {
   return (
-    <tr>
-      <td colSpan={2} className={`py-2 px-3 font-bold text-[11px] uppercase tracking-wider ${tone}`}>{label}</td>
+    <tr className="border-t border-b border-slate-300 print:border-slate-800 break-inside-avoid">
+      <td colSpan={2} className={`py-2 px-3 font-bold text-xs uppercase tracking-wider ${tone} print:bg-slate-200/80 print:text-slate-900`}>
+        {label}
+      </td>
     </tr>
   );
 }
 
-function LineRow({ label, value, total = false, indent = false }) {
+function LineRow({ label, value, total = false, grandTotal = false, indent = false, tone = '' }) {
+  if (grandTotal) {
+    return (
+      <tr className="border-t-2 border-b-4 border-double border-slate-900 bg-slate-100/80 font-black break-inside-avoid print:bg-slate-100">
+        <td className="py-2.5 px-3 text-slate-900 text-xs uppercase tracking-wide font-extrabold">{label}</td>
+        <td className="py-2.5 px-3 text-right text-sm font-mono font-extrabold text-slate-900">
+          <Amount value={value} strong />
+        </td>
+      </tr>
+    );
+  }
   return (
-    <tr className={total ? 'bg-slate-50 font-bold border-t border-[#dce5f4]' : 'hover:bg-slate-50'}>
-      <td className={`py-1.5 px-3 ${indent ? 'pl-8 text-slate-500' : 'text-slate-800'}`}>{label}</td>
-      <td className="py-1.5 px-3 text-right"><Amount value={value} strong={total} /></td>
+    <tr className={`${total ? 'bg-slate-50/90 font-bold border-t-2 border-slate-300 print:border-slate-700' : 'hover:bg-slate-50 border-b border-slate-100 print:border-slate-200'} break-inside-avoid`}>
+      <td className={`py-1.5 px-3 ${indent ? 'pl-8 text-slate-600 print:text-slate-800' : 'text-slate-800 font-semibold'} ${tone}`}>
+        {label}
+      </td>
+      <td className="py-1.5 px-3 text-right">
+        <Amount value={value} strong={total} />
+      </td>
     </tr>
   );
 }
 
 export function FinancialReportsPage() {
+  const { companyProfile } = useERP() || {};
   const [searchParams, setSearchParams] = useSearchParams();
   const reportType = searchParams.get('tab') || 'pl';
   const setReportType = (t) => {
@@ -271,7 +299,8 @@ export function FinancialReportsPage() {
 
   return (
     <div className="space-y-6 printable-document">
-      <PageHeader
+      <div className="no-print">
+        <PageHeader
         title="Financial Reports"
         subtitle="Profit & Loss, Balance Sheet, Cash Flow, GST Summaries, AR/AP Ageing, and Budgets Management."
         breadcrumb={[{ label: 'Accounts', to: '/accounts/cash-bank' }, { label: 'Reports' }]}
@@ -282,6 +311,7 @@ export function FinancialReportsPage() {
           </div>
         }
       />
+      </div>
 
       <div className="bg-white border border-[#dce5f4] rounded-xl p-4 grid grid-cols-1 sm:grid-cols-3 gap-3 no-print">
         <div>
@@ -298,7 +328,7 @@ export function FinancialReportsPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 no-print">
         <Kpi label="Revenue" value={p ? formatINR(p.revenue) : '—'} />
         <Kpi label="Cost of Goods" value={p ? formatINR(p.cogs) : '—'} />
         <Kpi label="Operating Expenses" value={p ? formatINR(p.operatingExpenses) : '—'} />
@@ -312,7 +342,55 @@ export function FinancialReportsPage() {
         <Kpi label="Total Equity" value={b ? formatINR(b.totalEquity) : '—'} note={b ? `Liabilities ${formatINR(b.totalLiabilities)}` : undefined} />
       </div>
 
-      <Card actions={<TabBar tabs={TABS} active={reportType} onChange={setReportType} />}>
+      
+      {/* ── OFFICIAL STANDARDIZED FINANCIAL REPORT LETTERHEAD (Visible only in Print / PDF) ── */}
+      <div className="hidden print:block mb-6 pb-4 border-b-2 border-slate-900">
+        <div className="flex justify-between items-start">
+          <div className="space-y-1">
+            <h1 className="text-xl font-black uppercase tracking-wider text-slate-900">
+              {companyProfile?.legalName || companyProfile?.tradeName || companyProfile?.name || 'OSCAR TEXTILES & APPARELS PVT. LTD.'}
+            </h1>
+            <p className="text-xs text-slate-600">
+              {typeof companyProfile?.address === 'object'
+                ? [companyProfile.address.line1, companyProfile.address.city, companyProfile.address.state, companyProfile.address.pincode].filter(Boolean).join(', ')
+                : (companyProfile?.address || 'Ring Road Textile Market, Surat, Gujarat - 395002')}
+            </p>
+            <div className="flex flex-wrap gap-4 text-[11px] text-slate-700 font-mono pt-0.5">
+              {companyProfile?.gstin && <span>GSTIN: <strong className="font-bold">{companyProfile.gstin}</strong></span>}
+              {companyProfile?.pan && <span>PAN: <strong className="font-bold">{companyProfile.pan}</strong></span>}
+              {companyProfile?.cin && <span>CIN: <strong className="font-bold">{companyProfile.cin}</strong></span>}
+            </div>
+          </div>
+          <div className="text-right shrink-0">
+            <span className="inline-block px-3 py-1 bg-slate-100 text-slate-900 text-xs font-bold uppercase rounded border border-slate-300">
+              OFFICIAL FINANCIAL STATEMENT
+            </span>
+            <p className="text-[10px] text-slate-500 font-mono mt-1">
+              Generated: {new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-4 pt-3 border-t border-slate-300 text-center space-y-0.5">
+          <h2 className="text-base font-black text-slate-900 uppercase tracking-widest">
+            {REPORT_TITLES[reportType] || 'Financial Statement'}
+          </h2>
+          <p className="text-xs font-bold text-slate-700">
+            {reportType === 'pl' && `For the period from ${dateFrom ? formatDate(dateFrom) : (p?.periodFrom ? formatDate(p.periodFrom) : 'Beginning')} to ${dateTo ? formatDate(dateTo) : (p?.periodTo ? formatDate(p.periodTo) : 'Current Date')}`}
+            {reportType === 'bs' && `As at ${asOf ? formatDate(asOf) : (b?.asOf ? formatDate(b.asOf) : 'Current Date')}`}
+            {reportType === 'cashflow' && `For the period from ${dateFrom ? formatDate(dateFrom) : 'Beginning'} to ${dateTo ? formatDate(dateTo) : 'Current Date'}`}
+            {reportType === 'gst' && `GST Reporting Period: ${dateFrom ? formatDate(dateFrom) : 'Beginning'} to ${dateTo ? formatDate(dateTo) : 'Current Date'}`}
+            {reportType === 'ageing' && `Ageing Position (${ageingType.toUpperCase()}) as at ${asOf ? formatDate(asOf) : 'Current Date'}`}
+            {reportType === 'discounts' && `Party Discount Performance - FY ${discountYear}`}
+            {reportType === 'budget' && `Budget Performance vs Actuals`}
+          </p>
+          <p className="text-[10px] text-slate-500 italic">
+            (Amounts denominated in Indian National Rupees ₹)
+          </p>
+        </div>
+      </div>
+
+      <Card className="print:border-none print:shadow-none print:p-0" actions={<div className="no-print"><TabBar tabs={TABS} active={reportType} onChange={setReportType} /></div>}>
         {/* PROFIT & LOSS */}
         {reportType === 'pl' && (
           <div className="space-y-3">
@@ -322,19 +400,29 @@ export function FinancialReportsPage() {
                 <p className="text-[11px] text-slate-500 mb-2">
                   Period: {p.periodFrom ? formatDate(p.periodFrom) : 'beginning'} to {p.periodTo ? formatDate(p.periodTo) : 'today'}
                 </p>
-                <table className="w-full min-w-[480px] text-left text-xs">
+                <table className="w-full min-w-[480px] text-left text-xs border border-slate-200 print:border-slate-800">
+                  <thead>
+                    <tr className="bg-slate-100 text-slate-800 font-bold border-b-2 border-slate-300 print:bg-slate-200">
+                      <th className="py-2.5 px-3 uppercase tracking-wider text-[11px]">Particulars</th>
+                      <th className="py-2.5 px-3 text-right uppercase tracking-wider text-[11px]">Amount (₹)</th>
+                    </tr>
+                  </thead>
                   <tbody>
-                    <SectionRow label="Income" tone="bg-blue-50 text-blue-800" />
+                    <SectionRow label="I. Revenue from Operations" tone="bg-blue-50/80 text-blue-900" />
                     {(p.incomeAccounts || []).length === 0 && <EmptyRow colSpan={2} message="No income postings in this period." />}
                     {(p.incomeAccounts || []).map((a) => <LineRow key={a.accountId} label={accountName(a)} value={a.amount} indent />)}
-                    <LineRow label="Revenue" value={p.revenue} total />
-                    <LineRow label="Cost of goods sold" value={p.cogs} />
-                    <LineRow label="Gross profit" value={p.grossProfit} total />
-                    <SectionRow label="Expenses" tone="bg-rose-50 text-rose-800" />
+                    <LineRow label="Total Revenue (A)" value={p.revenue} total />
+                    
+                    <SectionRow label="II. Cost of Goods Sold" tone="bg-slate-100 text-slate-800" />
+                    <LineRow label="Cost of Goods Sold (Material & Inward Stock)" value={p.cogs} indent />
+                    <LineRow label="Total Cost of Goods Sold (B)" value={p.cogs} total />
+                    <LineRow label="Gross Profit (A - B)" value={p.grossProfit} total tone="font-bold text-blue-900" />
+                    
+                    <SectionRow label="III. Operating & Administrative Expenses" tone="bg-rose-50/80 text-rose-900" />
                     {(p.expenseAccounts || []).length === 0 && <EmptyRow colSpan={2} message="No expense postings in this period." />}
                     {(p.expenseAccounts || []).map((a) => <LineRow key={a.accountId} label={accountName(a)} value={a.amount} indent />)}
-                    <LineRow label="Operating expenses" value={p.operatingExpenses} total />
-                    <LineRow label="Net operating profit" value={p.netOperatingProfit} total />
+                    <LineRow label="Total Operating Expenses (C)" value={p.operatingExpenses} total />
+                    <LineRow label={`Net Operating Profit / (Loss) (A - B - C) [Margin: ${Number(p.grossMarginPct).toLocaleString('en-IN')}%]`} value={p.netOperatingProfit} grandTotal />
                   </tbody>
                 </table>
               </div>
@@ -355,20 +443,30 @@ export function FinancialReportsPage() {
                   </div>
                 )}
                 <div className="overflow-x-auto">
-                  <table className="w-full min-w-[480px] text-left text-xs">
+                  <table className="w-full min-w-[480px] text-left text-xs border border-slate-200 print:border-slate-800">
+                    <thead>
+                      <tr className="bg-slate-100 text-slate-800 font-bold border-b-2 border-slate-300 print:bg-slate-200">
+                        <th className="py-2.5 px-3 uppercase tracking-wider text-[11px]">Particulars</th>
+                        <th className="py-2.5 px-3 text-right uppercase tracking-wider text-[11px]">Amount (₹)</th>
+                      </tr>
+                    </thead>
                     <tbody>
-                      <SectionRow label="Assets" tone="bg-blue-50 text-blue-800" />
+                      <SectionRow label="I. Assets" tone="bg-blue-50/80 text-blue-900" />
                       {(b.assets || []).length === 0 && <EmptyRow colSpan={2} message="No asset balances." />}
                       {(b.assets || []).map((a) => <LineRow key={a.accountId} label={accountName(a)} value={a.amount} indent />)}
-                      <LineRow label="Total assets" value={b.totalAssets} total />
-                      <SectionRow label="Liabilities" tone="bg-rose-50 text-rose-800" />
+                      <LineRow label="Total Assets (A)" value={b.totalAssets} grandTotal />
+
+                      <SectionRow label="II. Liabilities" tone="bg-rose-50/80 text-rose-900" />
                       {(b.liabilities || []).length === 0 && <EmptyRow colSpan={2} message="No liability balances." />}
                       {(b.liabilities || []).map((a) => <LineRow key={a.accountId} label={accountName(a)} value={a.amount} indent />)}
-                      <LineRow label="Total liabilities" value={b.totalLiabilities} total />
-                      <SectionRow label="Equity" tone="bg-emerald-50 text-emerald-800" />
+                      <LineRow label="Total Liabilities (B)" value={b.totalLiabilities} total />
+
+                      <SectionRow label="III. Equity & Reserves" tone="bg-emerald-50/80 text-emerald-900" />
                       {(b.equity || []).map((a) => <LineRow key={a.accountId} label={accountName(a)} value={a.amount} indent />)}
-                      <LineRow label="Retained earnings (net operating profit to date)" value={b.retainedEarnings} indent />
-                      <LineRow label="Total equity" value={b.totalEquity} total />
+                      <LineRow label="Retained Earnings (transferred from Profit & Loss)" value={b.retainedEarnings} indent />
+                      <LineRow label="Total Equity (C)" value={b.totalEquity} total />
+
+                      <LineRow label="Total Liabilities and Equity (B + C)" value={Number(b.totalLiabilities) + Number(b.totalEquity)} grandTotal />
                     </tbody>
                   </table>
                 </div>
@@ -729,6 +827,40 @@ export function FinancialReportsPage() {
             )}
           </div>
         )}
+
+        {/* ── OFFICIAL FINANCIAL REPORT SIGNATORY FOOTER (Visible only in Print / PDF) ── */}
+        <div className="hidden print:block mt-12 pt-6 border-t-2 border-slate-400 break-inside-avoid">
+          <div className="grid grid-cols-3 gap-8 text-center text-xs">
+            <div>
+              <div className="h-14"></div>
+              <div className="border-t border-slate-400 pt-1.5 font-bold text-slate-800 uppercase tracking-wider text-[11px]">
+                Prepared By
+              </div>
+              <div className="text-[10px] text-slate-500">Accounts &amp; Finance Department</div>
+            </div>
+            <div>
+              <div className="h-14"></div>
+              <div className="border-t border-slate-400 pt-1.5 font-bold text-slate-800 uppercase tracking-wider text-[11px]">
+                Checked &amp; Verified By
+              </div>
+              <div className="text-[10px] text-slate-500">Internal Audit / CFO</div>
+            </div>
+            <div>
+              <div className="h-14"></div>
+              <div className="border-t border-slate-400 pt-1.5 font-bold text-slate-800 uppercase tracking-wider text-[11px]">
+                Authorized Signatory
+              </div>
+              <div className="text-[10px] text-slate-500">
+                For {companyProfile?.legalName || companyProfile?.tradeName || companyProfile?.name || 'Oscar ERP'}
+              </div>
+            </div>
+          </div>
+          <div className="mt-6 pt-2 border-t border-slate-200 flex justify-between items-center text-[9px] text-slate-400 font-mono">
+            <span>Oscar Enterprise Cloud Financial Reporting Engine</span>
+            <span>Confidential - For Internal and Statutory Review Only</span>
+          </div>
+        </div>
+
       </Card>
 
       {/* ADD / EDIT BUDGET MODAL */}

@@ -705,6 +705,14 @@ export default function FabricOutPage() {
                       )}
                     </div>
                   </td>
+                  <td className="py-2 px-2.5 sm:py-2.5 sm:px-3">
+                    <div className="flex flex-col gap-0.5 font-mono">
+                      <span className="font-semibold text-blue-600 dark:text-blue-400">{d.challan || '—'}</span>
+                      {d.vehicle && (
+                        <span className="text-[10px] text-slate-400 tracking-wider uppercase">{d.vehicle}</span>
+                      )}
+                    </div>
+                  </td>
                   <td className="py-2 px-2.5 sm:py-2.5 sm:px-3 text-center">
                     <div className="inline-flex items-center gap-1">
                       <button

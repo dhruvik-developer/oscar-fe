@@ -439,7 +439,7 @@ export const SalesOrdersPage = () => {
                       stageVal === 'Invoiced' ? 'bg-purple-50 text-purple-700 border-purple-200' :
                       stageVal === 'Pending Approval' ? 'bg-orange-50 text-orange-700 border-orange-300' :
                       'bg-slate-50 text-slate-700 border-slate-200'
-                    }`} title={stageVal === 'Pending Approval' ? 'Discount or margin needs approval "” see the approvals inbox' : undefined}>
+                    }`} title={stageVal === 'Pending Approval' ? 'Discount or margin needs approval — see the approvals inbox' : undefined}>
                       {stageVal}
                     </span>
                   </div>
@@ -621,7 +621,7 @@ export const SalesOrdersPage = () => {
                         </span>
                       </div>
                       <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-slate-600 text-[10px]">
-                        <span>POC: <strong>{selectedCustomer.contactPerson || '"”'}</strong></span>
+                        <span>POC: <strong>{selectedCustomer.contactPerson || '—'}</strong></span>
                         <span>Email: {selectedCustomer.email}</span>
                         <span>Phone: {selectedCustomer.phone}</span>
                         <span>Outstanding: ₹{(selectedCustomer.balance || 0).toLocaleString('en-IN')}</span>

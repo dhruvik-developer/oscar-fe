@@ -5,6 +5,7 @@ import PageHeader from '../ui/PageHeader';
 import TablePagination from '../ui/TablePagination';
 import SortableTh from '../ui/SortableTh';
 import { useTableSort } from '../../hooks/useTableSort';
+import { useCrmStore } from '../../stores/crmStore';
 
 /** Every page of an envelope list (page_size is capped at 200 server-side). */
 async function fetchAll(endpoint, query) {
@@ -29,7 +30,12 @@ function errorText(err, fallback) {
   return err.message || fallback;
 }
 
-const isRowActive = (row) => row.isActive ?? row.is_active ?? true;
+const isRowActive = (row) => {
+  if (row.isActive !== undefined && row.isActive !== null) return Boolean(row.isActive);
+  if (row.is_active !== undefined && row.is_active !== null) return Boolean(row.is_active);
+  if (row.status !== undefined && row.status !== null) return String(row.status).toLowerCase() === 'active';
+  return true;
+};
 
 /**
  * A small list + add + edit + activate/deactivate screen for one REST master.
@@ -159,7 +165,19 @@ export default function SimpleMasterPage({
       if (editing?.id) await api.patch(`${endpoint}${editing.id}/`, body);
       else await api.post(endpoint, body);
       setEditing(null);
-      load();
+      await load();
+      if (endpoint?.includes('/crm/sources')) {
+        useCrmStore.getState().refresh('sources').catch(() => {});
+      }
+      const detail = { source: 'leadSources', endpoint };
+      window.dispatchEvent(new CustomEvent('crm:sources-updated', { detail }));
+      window.dispatchEvent(new CustomEvent('master-data-changed', { detail }));
+      if (typeof window !== 'undefined' && window.parent && window.parent !== window) {
+        try {
+          window.parent.dispatchEvent(new CustomEvent('crm:sources-updated', { detail }));
+          window.parent.dispatchEvent(new CustomEvent('master-data-changed', { detail }));
+        } catch (e) {}
+      }
     } catch (err) {
       setFormError(errorText(err, `Could not save the ${entityLabel.toLowerCase()}.`));
     } finally {
@@ -170,11 +188,45 @@ export default function SimpleMasterPage({
   const toggleActive = async (row) => {
     setBusyId(row.id);
     setError('');
+    const newActive = !isRowActive(row);
+
+    // Optimistically update SimpleMasterPage table row
+    setRows((prev) =>
+      prev.map((r) => (r.id === row.id ? { ...r, isActive: newActive, is_active: newActive } : r))
+    );
+
+    // Optimistically update CRM store so lead forms immediately see the change
+    if (endpoint?.includes('/crm/sources')) {
+      try {
+        useCrmStore.setState((s) => ({
+          sources: (s.sources || []).map((x) =>
+            String(x.id) === String(row.id) ? { ...x, isActive: newActive, is_active: newActive } : x
+          ),
+        }));
+      } catch (e) {}
+    }
+
     try {
-      await api.patch(`${endpoint}${row.id}/`, { isActive: !isRowActive(row) });
+      await api.patch(`${endpoint}${row.id}/`, { isActive: newActive, is_active: newActive });
       await load();
+      if (endpoint?.includes('/crm/sources')) {
+        await useCrmStore.getState().refresh('sources');
+      }
+      const detail = { source: 'leadSources', endpoint, id: row.id, isActive: newActive };
+      window.dispatchEvent(new CustomEvent('crm:sources-updated', { detail }));
+      window.dispatchEvent(new CustomEvent('master-data-changed', { detail }));
+      if (typeof window !== 'undefined' && window.parent && window.parent !== window) {
+        try {
+          window.parent.dispatchEvent(new CustomEvent('crm:sources-updated', { detail }));
+          window.parent.dispatchEvent(new CustomEvent('master-data-changed', { detail }));
+        } catch (e) {}
+      }
     } catch (err) {
       setError(errorText(err, 'Could not change the status.'));
+      await load();
+      if (endpoint?.includes('/crm/sources')) {
+        await useCrmStore.getState().refresh('sources');
+      }
     } finally {
       setBusyId(null);
     }

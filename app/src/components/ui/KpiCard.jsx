@@ -262,10 +262,10 @@ function resolveKpiValueMetrics(val) {
     sizeClass = 'text-[18px] sm:text-[20px]';
     wrapClass = 'break-all line-clamp-1';
   } else if (len > 10) {
-    sizeClass = 'text-[21px] sm:text-[23px]';
+    sizeClass = 'text-[19px] sm:text-[21px]';
     wrapClass = 'truncate';
   } else if (len > 7) {
-    sizeClass = 'text-[23px] sm:text-[25px]';
+    sizeClass = 'text-[22px] sm:text-[24px]';
     wrapClass = 'truncate';
   }
 

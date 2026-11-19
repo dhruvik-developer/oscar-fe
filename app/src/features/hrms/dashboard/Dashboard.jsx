@@ -517,7 +517,7 @@ export default function HRMSDashboard() {
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
               <h3 className="hrms-h3" style={{ fontSize: 15.5, display: "flex", alignItems: "center", gap: 8 }}>
                 Recent Activity
-                {unreadCount > 0 && <span className="hrms-unread">{unreadCount} new</span>}
+                {unreadCount > 0 && <span className="hrms-unread">{unreadCount}</span>}
               </h3>
               <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
                 {unreadCount > 0 && (

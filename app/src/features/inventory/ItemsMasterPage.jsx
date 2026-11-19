@@ -415,7 +415,7 @@ export const ItemsMasterPage = () => {
         await refreshCollections(['items']);
       }
       if (deleted.length) showToast?.(`Deleted ${deleted.length} item(s) successfully.`);
-      if (failed.length) showToast?.(`Could not delete ${failed.length} item(s) "” ${failed.join('; ')}`);
+      if (failed.length) showToast?.(`Could not delete ${failed.length} item(s) — ${failed.join('; ')}`);
       setSelectedIds((prev) => {
         const next = new Set(prev);
         deleted.forEach((it) => next.delete(String(it.id)));
@@ -501,7 +501,7 @@ export const ItemsMasterPage = () => {
       });
     });
     if (skipped > 0) {
-      showToast?.(`${skipped} row(s) skipped "” the item name is required.`);
+      showToast?.(`${skipped} row(s) skipped — the item name is required.`);
     }
   };
 
@@ -1365,7 +1365,7 @@ export const ItemsMasterPage = () => {
                 <Info size={16} className="text-blue-600 shrink-0 mt-0.5" />
                 <span>
                   The Purchase Order will be created in <strong>Draft status</strong> and can be approved according to company permissions.
-                  Creating or approving this PO does not increase physical stock "” stock increases strictly upon confirmed <strong>Goods Receipt (GRN)</strong>.
+                  Creating or approving this PO does not increase physical stock — stock increases strictly upon confirmed <strong>Goods Receipt (GRN)</strong>.
                 </span>
               </div>
 

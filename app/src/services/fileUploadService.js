@@ -1,6 +1,23 @@
 import api from './api';
 import { isBackendEnabled } from './resourceSync';
 
+const VALID_SCOPES = new Set([
+  'pms_document',
+  'crm_lead',
+  'hrms_document',
+  'expense_receipt',
+  'avatar',
+  'company_logo',
+  'company_signature',
+  'resume',
+  'offer_letter',
+  'contract',
+  'policy',
+  'import',
+  'export',
+  'other',
+]);
+
 /**
  * Uploads a file (File or Blob) to the backend using the 3-step file protocol:
  * 1. POST /files/upload-url/   -> { uploadUrl, fileId, expiresAt }
@@ -24,12 +41,14 @@ export async function uploadFileToBackend(file, fileName, scope = 'pms_document'
     file.type ||
     (resolvedName.toLowerCase().endsWith('.pdf') ? 'application/pdf' : 'image/png');
 
+  const resolvedScope = VALID_SCOPES.has(scope) ? scope : 'other';
+
   // Step 1: Request signed upload URL
   const uploadInit = await api.post('/files/upload-url/', {
     fileName: resolvedName,
     contentType,
     size,
-    scope,
+    scope: resolvedScope,
   });
 
   const payload = uploadInit?.data || uploadInit;

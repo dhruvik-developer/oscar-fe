@@ -751,13 +751,6 @@ export default function QCPendingInspectionsPage() {
                       </td>
                       <td className="py-2 px-3 text-center">
                         <div className="flex items-center justify-center gap-1.5">
-                          <Link
-                            to={`/inventory/qc/results?receiptId=${r.receiptId || r.id}`}
-                            className="px-2 py-1 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 font-semibold text-xs rounded-lg transition inline-flex items-center gap-1"
-                            title="Open in QC Results and Disposition"
-                          >
-                            Full QC
-                          </Link>
                           <button
                             type="button"
                             onClick={() => {
@@ -1457,12 +1450,6 @@ export default function QCPendingInspectionsPage() {
             </div>
 
             <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
-              <Link
-                to={`/inventory/qc/results?receiptId=${viewDetailsItem.receiptId || viewDetailsItem.id}`}
-                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs rounded-lg transition inline-flex items-center gap-1.5"
-              >
-                Full QC Disposition
-              </Link>
               <button
                 type="button"
                 onClick={() => {

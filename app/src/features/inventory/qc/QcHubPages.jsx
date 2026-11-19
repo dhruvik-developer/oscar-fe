@@ -1,6 +1,6 @@
 import React, { Suspense, lazy, useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { ClipboardCheck, ClipboardList, Gavel, RefreshCcw } from 'lucide-react';
+import { ClipboardCheck, ClipboardList, RefreshCcw } from 'lucide-react';
 import PageHeader from '../../../components/ui/PageHeader';
 import { inventoryService } from '../../../services/domainServices';
 import QcStageGate, { QcStageFilter } from './QcStageGate';
@@ -8,7 +8,6 @@ import { QcHubEmbed } from './QCPageHeader';
 
 const QCPendingInspectionsPage = lazy(() => import('./QCPendingInspectionsPage'));
 const QCInspectionRegisterPage = lazy(() => import('./QCInspectionRegisterPage'));
-const QCResultsDispositionPage = lazy(() => import('./QCResultsDispositionPage'));
 const QCReinspectionPage = lazy(() => import('./QCReinspectionPage'));
 const QCDashboardPage = lazy(() => import('./QCDashboardPage'));
 const QCReportsPage = lazy(() => import('./QCReportsPage'));
@@ -19,8 +18,6 @@ export const QC_STEPS = [
     hint: 'Fabric received from GRN or job-work inward, waiting for QC.' },
   { id: 'inspect', label: 'Inspect', icon: ClipboardCheck, component: QCInspectionRegisterPage,
     hint: 'Record the inspection: roll-by-roll defects, points, length and grade.' },
-  { id: 'decide', label: 'Decide', icon: Gavel, component: QCResultsDispositionPage,
-    hint: 'Route the inspected fabric: Good to godown, Hold, Reprocess, or Reject (debit note).' },
   { id: 'recheck', label: 'Re-check Rework', icon: RefreshCcw, component: QCReinspectionPage, count: 'recheck',
     hint: 'Inspect reprocessed / disputed fabric again: Pass, Repeat or Reject.' },
 ];

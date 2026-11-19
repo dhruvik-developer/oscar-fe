@@ -198,7 +198,7 @@ export const GoodsReceiptPage = () => {
   const pendingQtyText = useMemo(() => {
     if (allPendingLines.length === 0) return '0 MTR';
     const formatted = unitTotals(allPendingLines, (it) => Number(it.qty) || 0);
-    return !formatted || formatted === '"”' ? '0 MTR' : formatted;
+    return !formatted || formatted === '—' ? '0 MTR' : formatted;
   }, [allPendingLines, unitTotals]);
 
   const pendingValue = useMemo(() => {
@@ -883,8 +883,8 @@ export const GoodsReceiptPage = () => {
                         </td>
                         <td className="px-4 py-3 text-slate-700">{g.receipt_date}</td>
                         <td className="px-4 py-3 font-medium text-slate-900">{g.vendorName}</td>
-                        <td className="px-4 py-3 font-mono text-slate-700">{g.supplier_challan_no || '"”'}</td>
-                        <td className="px-4 py-3 font-mono text-slate-700">{g.poNumber || '"”'}</td>
+                        <td className="px-4 py-3 font-mono text-slate-700">{g.supplier_challan_no || '—'}</td>
+                        <td className="px-4 py-3 font-mono text-slate-700">{g.poNumber || '—'}</td>
                         <td className="px-4 py-3 text-right font-semibold text-slate-800">{g.lines?.length || 0}</td>
                         <td className="px-4 py-3 text-center">
                           <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold border ${
@@ -1298,7 +1298,7 @@ export const GoodsReceiptPage = () => {
                         <div className="flex items-center justify-between border-b border-slate-200/80 pb-2">
                           <span className="font-extrabold text-[#17294e] text-xs flex items-center gap-1.5">
                             <Package size={14} className="text-blue-700" />
-                            Batch Details "” Auto-Generated Batch
+                            Batch Details — Auto-Generated Batch
                           </span>
                           <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-100/70 text-blue-800 font-bold">
                             Batch Number: Auto (assigned on save)

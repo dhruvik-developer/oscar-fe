@@ -19,6 +19,8 @@ import {
   ChevronRight,
   X,
   FileText,
+  Eye,
+  Printer,
 } from 'lucide-react';
 import { api } from '../../../services/api';
 import { inventoryService, partiesService } from '../../../services/domainServices';
@@ -27,6 +29,7 @@ import MasterSourceLink from '../../../components/common/MasterSourceLink';
 import KpiCard from '../../../components/ui/KpiCard';
 import { useTableSort } from '../../../hooks/useTableSort';
 import SortableTh from '../../../components/ui/SortableTh';
+import { AppPagination } from '../../../components/ui/AppPagination';
 
 /** The API's names -> the names this screen reads. */
 const sampleFromApi = (s) => ({
@@ -40,7 +43,8 @@ const sampleFromApi = (s) => ({
   due_date: s.dueDate,
   quantity: Number(s.quantity) || 0,
   returned_quantity: Number(s.returnedQuantity) || 0,
-  outstanding: (Number(s.quantity) || 0) - (Number(s.returnedQuantity) || 0) - (Number(s.consumedQuantity) || 0),
+  consumed_quantity: Number(s.consumedQuantity) || 0,
+  outstanding: Math.max(0, (Number(s.quantity) || 0) - (Number(s.returnedQuantity) || 0) - (Number(s.consumedQuantity) || 0)),
 });
 
 const dashboardFromApi = (d) => (d ? {
@@ -64,6 +68,14 @@ export default function SampleListPage() {
   const [showReturnModal, setShowReturnModal] = useState(false);
   const [showConsumeModal, setShowConsumeModal] = useState(false);
   const [activeSample, setActiveSample] = useState(null);
+  const [viewSample, setViewSample] = useState(null);
+  const [printSample, setPrintSample] = useState(null);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
+
+  useEffect(() => {
+    setPage(1);
+  }, [search, statusFilter]);
 
   // Form states
   const [issueForm, setIssueForm] = useState({
@@ -199,6 +211,8 @@ export default function SampleListPage() {
       status: (s) => s.status || 'Issued',
     },
   });
+
+  const paginatedRows = sort.rows.slice((page - 1) * pageSize, page * pageSize);
 
   const getStatusBadge = (status) => {
     switch (status) {
@@ -358,10 +372,16 @@ export default function SampleListPage() {
                   <td colSpan="7" className="text-center py-10 text-slate-400">No samples found.</td>
                 </tr>
               ) : (
-                sort.rows.map((s) => (
+                paginatedRows.map((s) => (
                   <tr key={s.id} className="hover:bg-slate-50/75 transition-colors">
-                    <td className="py-3 px-4 font-semibold text-slate-900">
-                      {s.sample_number}
+                    <td className="py-3 px-4">
+                      <button
+                        type="button"
+                        onClick={() => setViewSample(s)}
+                        className="font-semibold text-indigo-600 hover:text-indigo-800 hover:underline text-left cursor-pointer"
+                      >
+                        {s.sample_number}
+                      </button>
                       <div className="text-xs text-slate-400 font-normal">{s.issue_date}</div>
                     </td>
                     <td className="py-3 px-4">
@@ -395,31 +415,57 @@ export default function SampleListPage() {
                       )}
                     </td>
                     <td className="py-3 px-4">{getStatusBadge(s.status)}</td>
-                    <td className="py-3 px-4 text-right space-x-1">
-                      {s.status !== 'Returned' && s.status !== 'Consumed' && (
-                        <>
-                          <button
-                            onClick={() => {
-                              setActiveSample(s);
-                              setReturnQty(String(s.outstanding));
-                              setShowReturnModal(true);
-                            }}
-                            className="px-2.5 py-1 text-xs font-medium text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded border border-emerald-200 transition-colors"
-                          >
-                            Return
-                          </button>
-                          <button
-                            onClick={() => {
-                              setActiveSample(s);
-                              setConsumeQty(String(s.outstanding));
-                              setShowConsumeModal(true);
-                            }}
-                            className="px-2.5 py-1 text-xs font-medium text-purple-700 bg-purple-50 hover:bg-purple-100 rounded border border-purple-200 transition-colors"
-                          >
-                            Consume
-                          </button>
-                        </>
-                      )}
+                    <td className="py-3 px-4 text-right">
+                      <div className="flex items-center justify-end gap-1.5 flex-wrap">
+                        {s.status !== 'Returned' && s.status !== 'Consumed' && (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setActiveSample(s);
+                                setReturnQty(String(s.outstanding > 0 ? s.outstanding : s.quantity));
+                                setShowReturnModal(true);
+                              }}
+                              className="px-2.5 py-1 text-xs font-medium text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded border border-emerald-200 transition-colors inline-flex items-center gap-1 cursor-pointer"
+                              title="Record Sample Return"
+                            >
+                              <RotateCcw className="w-3 h-3" />
+                              <span>Return</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setActiveSample(s);
+                                setConsumeQty(String(s.outstanding > 0 ? s.outstanding : s.quantity));
+                                setShowConsumeModal(true);
+                              }}
+                              className="px-2.5 py-1 text-xs font-medium text-purple-700 bg-purple-50 hover:bg-purple-100 rounded border border-purple-200 transition-colors inline-flex items-center gap-1 cursor-pointer"
+                              title="Book Sample Expense"
+                            >
+                              <Flame className="w-3 h-3" />
+                              <span>Consume</span>
+                            </button>
+                          </>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => setViewSample(s)}
+                          className="px-2.5 py-1 text-xs font-medium text-slate-700 bg-white hover:bg-slate-50 rounded border border-slate-200 transition-colors inline-flex items-center gap-1 cursor-pointer shadow-2xs"
+                          title="View Sample Details"
+                        >
+                          <Eye className="w-3.5 h-3.5 text-slate-500" />
+                          <span>View</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setPrintSample(s)}
+                          className="px-2 py-1 text-xs font-medium text-slate-700 bg-white hover:bg-slate-50 rounded border border-slate-200 transition-colors inline-flex items-center gap-1 cursor-pointer shadow-2xs"
+                          title="Print Sample Slip"
+                        >
+                          <Printer className="w-3.5 h-3.5 text-slate-500" />
+                          <span>Print</span>
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -427,6 +473,15 @@ export default function SampleListPage() {
             </tbody>
           </table>
         </div>
+        <AppPagination
+          total={filteredSamples.length}
+          page={page}
+          pageSize={pageSize}
+          onPageChange={setPage}
+          onPageSizeChange={setPageSize}
+          pageSizeOptions={[10, 25, 50, 100]}
+          loading={loading}
+        />
       </div>
 
       {/* Issue Sample Modal */}
@@ -674,6 +729,333 @@ export default function SampleListPage() {
           </div>
         </div>
       )}
+
+      {/* View Sample Details Modal */}
+      {viewSample && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden border border-slate-200 animate-in fade-in zoom-in-95 duration-150 flex flex-col max-h-[90vh]">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-4 border-b border-slate-200 bg-slate-50/70">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-indigo-50 border border-indigo-200 grid place-items-center">
+                  <FlaskConical className="w-5 h-5 text-indigo-600" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h2 className="font-bold text-slate-900 text-base">
+                      {viewSample.sample_number}
+                    </h2>
+                    {getStatusBadge(viewSample.status)}
+                  </div>
+                  <p className="text-xs text-slate-500">Issued on {viewSample.issue_date || '—'}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setViewSample(null)}
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 space-y-5 overflow-y-auto">
+              {/* Recipient & Staff Info */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3.5 bg-slate-50 rounded-xl border border-slate-200">
+                <div>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Customer / Party</span>
+                  <span className="text-sm font-semibold text-slate-900 block mt-0.5">
+                    {viewSample.party_name || viewSample.party?.name || '—'}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Salesperson</span>
+                  <span className="text-sm font-medium text-slate-800 block mt-0.5">
+                    {viewSample.salesperson_name || '—'}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Broker</span>
+                  <span className="text-sm font-medium text-slate-800 block mt-0.5">
+                    {viewSample.broker_name || '—'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Fabric & Material Details */}
+              <div>
+                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">Fabric & Item Details</h3>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3.5 bg-white rounded-xl border border-slate-200 text-xs">
+                  <div>
+                    <span className="text-[10px] text-slate-400 font-medium block">Sample Type</span>
+                    <span className="font-semibold text-slate-800 mt-0.5 block">
+                      {viewSample.sample_type?.replace('_', ' ') || 'Cut Piece'}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-slate-400 font-medium block">Fabric Quality</span>
+                    <span className="font-semibold text-slate-800 mt-0.5 block">
+                      {viewSample.fabricQualityName || viewSample.fabric_quality?.name || 'Fabric Sample'}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-slate-400 font-medium block">Design / Shade</span>
+                    <span className="font-semibold text-slate-800 mt-0.5 block">
+                      {viewSample.designName || '—'} / {viewSample.shadeName || '—'}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-slate-400 font-medium block">Batch / Lot / Taka</span>
+                    <span className="font-mono font-medium text-indigo-600 mt-0.5 block">
+                      {viewSample.batchCode || viewSample.sourceLotTakaId || '—'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Quantities & Status Breakdown */}
+              <div>
+                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">Quantity & Stock Status</h3>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase block">Total Issued</span>
+                    <span className="text-base font-bold text-slate-900 mt-0.5 block">
+                      {viewSample.quantity} <span className="text-xs font-normal text-slate-500">{viewSample.uom || 'MTR'}</span>
+                    </span>
+                  </div>
+                  <div className="p-3 bg-emerald-50/60 rounded-xl border border-emerald-200">
+                    <span className="text-[10px] font-bold text-emerald-700 uppercase block">Returned</span>
+                    <span className="text-base font-bold text-emerald-800 mt-0.5 block">
+                      {viewSample.returned_quantity || 0} <span className="text-xs font-normal text-emerald-600">{viewSample.uom || 'MTR'}</span>
+                    </span>
+                  </div>
+                  <div className="p-3 bg-purple-50/60 rounded-xl border border-purple-200">
+                    <span className="text-[10px] font-bold text-purple-700 uppercase block">Consumed (Expense)</span>
+                    <span className="text-base font-bold text-purple-800 mt-0.5 block">
+                      {viewSample.consumed_quantity || viewSample.consumedQuantity || 0} <span className="text-xs font-normal text-purple-600">{viewSample.uom || 'MTR'}</span>
+                    </span>
+                  </div>
+                  <div className="p-3 bg-amber-50/60 rounded-xl border border-amber-200">
+                    <span className="text-[10px] font-bold text-amber-700 uppercase block">Outstanding / Pending</span>
+                    <span className="text-base font-bold text-amber-800 mt-0.5 block">
+                      {Math.max(0, viewSample.outstanding ?? 0)} <span className="text-xs font-normal text-amber-600">{viewSample.uom || 'MTR'}</span>
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Due Date & Returnable & Financials */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3.5 bg-slate-50 rounded-xl border border-slate-200 text-xs">
+                <div>
+                  <span className="text-[10px] text-slate-400 font-bold uppercase block">Returnable Policy</span>
+                  <span className="font-semibold text-slate-800 mt-0.5 block">
+                    {viewSample.is_returnable || viewSample.isReturnable ? 'Returnable Sample' : 'Non-Returnable (Expensed)'}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-slate-400 font-bold uppercase block">Due Date</span>
+                  <span className="font-semibold text-slate-800 mt-0.5 block">
+                    {viewSample.due_date || '—'}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-slate-400 font-bold uppercase block">Estimated Value / Expense</span>
+                  <span className="font-semibold text-slate-900 mt-0.5 block">
+                    ₹{Number(viewSample.estimatedCost || viewSample.totalValue || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  </span>
+                </div>
+              </div>
+
+              {/* Remarks */}
+              {viewSample.remarks && (
+                <div>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Remarks / Fabric Notes</span>
+                  <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs text-slate-700">
+                    {viewSample.remarks}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer with Actions */}
+            <div className="flex items-center justify-between p-4 border-t border-slate-200 bg-slate-50/70">
+              <button
+                type="button"
+                onClick={() => {
+                  const s = viewSample;
+                  setViewSample(null);
+                  setPrintSample(s);
+                }}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 rounded-lg text-xs font-semibold cursor-pointer shadow-xs"
+              >
+                <Printer className="w-3.5 h-3.5 text-slate-600" />
+                Print Slip
+              </button>
+
+              <div className="flex items-center gap-2">
+                {viewSample.status !== 'Returned' && viewSample.status !== 'Consumed' && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const s = viewSample;
+                        setViewSample(null);
+                        setActiveSample(s);
+                        setReturnQty(String(s.outstanding > 0 ? s.outstanding : s.quantity));
+                        setShowReturnModal(true);
+                      }}
+                      className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold cursor-pointer"
+                    >
+                      Record Return
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const s = viewSample;
+                        setViewSample(null);
+                        setActiveSample(s);
+                        setConsumeQty(String(s.outstanding > 0 ? s.outstanding : s.quantity));
+                        setShowConsumeModal(true);
+                      }}
+                      className="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-xs font-semibold cursor-pointer"
+                    >
+                      Book Expense
+                    </button>
+                  </>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setViewSample(null)}
+                  className="px-4 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-lg text-xs font-semibold cursor-pointer"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Print Sample Slip Modal */}
+      {printSample && (
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-lg overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between p-4 border-b border-slate-200 bg-slate-50/70">
+              <div className="flex items-center gap-2">
+                <Printer size={16} className="text-slate-600" />
+                <h3 className="text-sm font-bold text-slate-900">Sample Issue Slip</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPrintSample(null)}
+                className="text-slate-400 hover:text-slate-600 text-sm cursor-pointer p-1"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Printable Slip Canvas */}
+            <div className="p-6 space-y-4 text-xs font-sans text-slate-800">
+              {/* Header */}
+              <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+                <div>
+                  <h2 className="text-base font-black text-slate-900 tracking-tight">OSCAR TEXTILE ERP</h2>
+                  <p className="text-[11px] text-slate-500">Fabric Sample Issue & Gate Pass</p>
+                </div>
+                <div className="text-right">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase block">Sample Slip No</span>
+                  <span className="font-mono font-bold text-blue-600 text-xs">{printSample.sample_number}</span>
+                </div>
+              </div>
+
+              {/* Fields */}
+              <div className="grid grid-cols-2 gap-y-2.5 text-xs py-2">
+                <div>
+                  <span className="text-[10px] text-slate-400 font-bold uppercase block">Issue Date</span>
+                  <span className="font-medium text-slate-800">{printSample.issue_date || '—'}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-slate-400 font-bold uppercase block">Party / Recipient</span>
+                  <span className="font-bold text-slate-900">{printSample.party_name || printSample.party?.name || '—'}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-slate-400 font-bold uppercase block">Salesperson</span>
+                  <span className="font-medium text-slate-800">{printSample.salesperson_name || '—'}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-slate-400 font-bold uppercase block">Broker</span>
+                  <span className="font-medium text-slate-800">{printSample.broker_name || '—'}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-slate-400 font-bold uppercase block">Sample Type</span>
+                  <span className="font-medium text-slate-800">{printSample.sample_type?.replace('_', ' ') || 'Cut Piece'}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-slate-400 font-bold uppercase block">Fabric / Quality</span>
+                  <span className="font-medium text-slate-800">{printSample.fabricQualityName || 'Fabric Sample'}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-slate-400 font-bold uppercase block">Design / Shade</span>
+                  <span className="font-medium text-slate-800">{printSample.designName || '—'} / {printSample.shadeName || '—'}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-slate-400 font-bold uppercase block">Batch / Taka No</span>
+                  <span className="font-mono font-medium text-slate-800">{printSample.batchCode || printSample.sourceLotTakaId || '—'}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-slate-400 font-bold uppercase block">Issued Quantity</span>
+                  <span className="font-mono font-black text-slate-900 text-sm">
+                    {printSample.quantity} {printSample.uom || 'MTR'}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-slate-400 font-bold uppercase block">Current Status</span>
+                  <span className="font-bold text-slate-800">{printSample.status}</span>
+                </div>
+                {printSample.remarks && (
+                  <div className="col-span-2">
+                    <span className="text-[10px] text-slate-400 font-bold uppercase block">Remarks</span>
+                    <span className="text-slate-700">{printSample.remarks}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Signatures */}
+              <div className="flex items-center justify-between pt-8 border-t border-slate-200 text-[10px] text-slate-400 font-semibold uppercase">
+                <div className="text-center w-36">
+                  <div className="border-b border-slate-300 mb-1 pb-6"></div>
+                  <span>Authorized Signatory</span>
+                </div>
+                <div className="text-center w-36">
+                  <div className="border-b border-slate-300 mb-1 pb-6"></div>
+                  <span>Receiver's Signature</span>
+                </div>
+              </div>
+
+              {/* Footer Buttons */}
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => setPrintSample(null)}
+                  className="px-3 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-lg text-xs font-semibold cursor-pointer"
+                >
+                  Close
+                </button>
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  className="inline-flex items-center gap-1.5 px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold shadow-xs cursor-pointer"
+                >
+                  <Printer size={13} />
+                  Print Slip
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
-import { ExternalLink, X } from 'lucide-react';
+import { ArrowRight, ExternalLink, X } from 'lucide-react';
 import { inventoryService } from '../../../services/domainServices';
 import { describeApiError, formatINR, formatNumberIN } from '../../accounts/accountingShared';
 
@@ -75,16 +75,88 @@ export default function BatchDrawer({ code, onClose }) {
               </dl>
             )}
             <div>
-              <h4 className="font-bold mb-1">Recent history (stock, QC, job work, rejections)</h4>
-              <ol className="space-y-1.5">
-                {timeline.map((e, i) => (
-                  <li key={i} className="border-l-2 border-slate-200 pl-2">
-                    <div className="flex justify-between gap-2"><span className="font-semibold">{e.title}</span><span className="text-slate-400">{e.date}</span></div>
-                    <div className="text-slate-500">{[e.quantity && formatNumberIN(e.quantity), e.location, e.reference, e.status].filter(Boolean).join(' · ')}</div>
-                  </li>
-                ))}
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="font-bold text-slate-800">Recent history (stock, QC, job work, rejections)</h4>
+                <div className="text-[10px] text-slate-500 flex items-center gap-2">
+                  <span className="inline-flex items-center gap-0.5 text-blue-700 font-medium">⇄ Transfer</span>
+                  <span className="inline-flex items-center gap-0.5 text-emerald-700 font-medium">↑ Inward</span>
+                  <span className="inline-flex items-center gap-0.5 text-rose-700 font-medium">↓ Outward</span>
+                </div>
+              </div>
+              <ol className="space-y-2">
+                {timeline.map((e, i) => {
+                  const num = e.quantity != null && e.quantity !== '' ? Number(e.quantity) : null;
+                  const isTransfer = e.kind === 'TRANSFER' || Boolean(e.fromLocation && e.toLocation);
+                  const isOut = !isTransfer && (e.direction === 'OUT' || (num != null && num < 0));
+                  const isIn = !isTransfer && (e.direction === 'IN' || (num != null && num > 0));
+                  const borderClass = isTransfer
+                    ? 'border-blue-400'
+                    : isOut
+                      ? 'border-rose-400'
+                      : isIn
+                        ? 'border-emerald-400'
+                        : 'border-slate-300';
+
+                  return (
+                    <li key={i} className={`border-l-2 pl-2.5 py-1 ${borderClass} bg-slate-50/50 rounded-r-lg`}>
+                      <div className="flex justify-between items-baseline gap-2">
+                        <span className="font-semibold text-slate-800">{e.title}</span>
+                        <span className="text-[11px] text-slate-400 tabular-nums">{e.date}</span>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-slate-600 mt-1">
+                        {isTransfer ? (
+                          <>
+                            {num != null && (
+                              <span className="inline-flex items-center gap-0.5 font-semibold text-blue-700 bg-blue-50 border border-blue-200 px-1.5 py-0.2 rounded text-[10px] tabular-nums">
+                                ⇄ {formatNumberIN(Math.abs(num))} {e.uom || 'm'}
+                              </span>
+                            )}
+                            <span className="inline-flex items-center gap-1 text-slate-700 font-medium text-[11px]">
+                              <span className="text-slate-600">{e.fromLocation}</span>
+                              <ArrowRight size={11} className="text-blue-500 shrink-0" />
+                              <span className="text-emerald-700 font-semibold">{e.toLocation}</span>
+                            </span>
+                          </>
+                        ) : isOut ? (
+                          <>
+                            {num != null && (
+                              <span className="inline-flex items-center font-semibold text-rose-700 bg-rose-50 border border-rose-200 px-1.5 py-0.2 rounded text-[10px] tabular-nums">
+                                ↓ -{formatNumberIN(Math.abs(num))} {e.uom || 'm'} (Out)
+                              </span>
+                            )}
+                            {(e.fromLocation || e.location) && (
+                              <span className="text-slate-600">
+                                from <strong>{e.fromLocation || e.location}</strong>
+                              </span>
+                            )}
+                          </>
+                        ) : isIn ? (
+                          <>
+                            {num != null && (
+                              <span className="inline-flex items-center font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.2 rounded text-[10px] tabular-nums">
+                                ↑ +{formatNumberIN(Math.abs(num))} {e.uom || 'm'} (In)
+                              </span>
+                            )}
+                            {(e.toLocation || e.location) && (
+                              <span className="text-slate-600">
+                                into <strong>{e.toLocation || e.location}</strong>
+                              </span>
+                            )}
+                          </>
+                        ) : e.kind === 'BATCH_CREATED' ? (
+                          <span className="inline-flex items-center font-medium text-slate-600 bg-slate-100 border border-slate-200 px-1.5 py-0.2 rounded text-[10px]">
+                            Initial Creation
+                          </span>
+                        ) : null}
+
+                        {e.reference && <span className="text-slate-400 font-mono text-[10px]">· {e.reference}</span>}
+                        {e.status && <span className="text-slate-500 font-medium text-[10px] bg-slate-100 px-1 rounded">· {e.status}</span>}
+                      </div>
+                    </li>
+                  );
+                })}
               </ol>
-              <Link to={`/inventory/batches/${encodeURIComponent(code)}`} className="inline-block mt-2 font-semibold text-blue-700 hover:underline">Full ledger and history →</Link>
+              <Link to={`/inventory/batches/${encodeURIComponent(code)}`} className="inline-block mt-3 font-semibold text-blue-700 hover:underline">Full ledger and history →</Link>
             </div>
           </div>
         )}

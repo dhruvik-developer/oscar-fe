@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2, AlertTriangle } from 'lucide-react';
 import { useERP } from '../../context/ERPContext';
 import { StatusBadge } from '../../components/ui/StatusBadge';
 import { PageHeader } from '../../components/common/PageHeader';
@@ -84,20 +84,20 @@ export const TransfersPage = () => {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {loading && <tr><td colSpan={9} className="p-6 text-center text-slate-400">Loading"¦</td></tr>}
+            {loading && <tr><td colSpan={9} className="p-6 text-center text-slate-400">Loading…</td></tr>}
             {!loading && rows.length === 0 && <tr><td colSpan={9} className="p-6 text-center text-slate-400">No transfers.</td></tr>}
             {!loading && rows.map((t) => {
               const sum = (k) => (t.lines || []).reduce((s, l) => s + Number(l[k] || 0), 0);
               return (
                 <tr key={t.id} onClick={() => setOpenId(t.id)} className="hover:bg-slate-50 cursor-pointer">
-                  <td className="p-2 font-mono font-bold text-blue-700">{t.transfer_number}</td>
+                  <td className="p-2 font-mono font-bold text-blue-700">{t.transferNumber || t.transfer_number || '—'}</td>
                   <td className="p-2">{t.sourceLocation}</td>
                   <td className="p-2 font-semibold">{t.destLocation}</td>
                   <td className="p-2">{t.date}</td>
                   <td className="p-2 text-right tabular-nums">{n(sum('qty'))}</td>
                   <td className="p-2 text-right tabular-nums">{n(sum('dispatchedQty'))}</td>
                   <td className="p-2 text-right tabular-nums">{n(sum('receivedQty'))}</td>
-                  <td className="p-2">{t.reference_number || '"”'}</td>
+                  <td className="p-2">{t.referenceNumber || t.reference_number || '—'}</td>
                   <td className="p-2"><StatusBadge status={t.status} /></td>
                 </tr>
               );
@@ -119,20 +119,44 @@ function CreateTransfer({ warehouses, onClose, onDone }) {
   const [notes, setNotes] = useState('');
   const [lines, setLines] = useState([emptyLine()]);
   const [takas, setTakas] = useState([]);
+  const [stockByItem, setStockByItem] = useState({});
   const [loadingTakas, setLoadingTakas] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
+  const sourceWarehouse = warehouses.find((w) => w.id === source);
+  const sourceName = sourceWarehouse ? `${sourceWarehouse.name}` : 'source warehouse';
+
   useEffect(() => {
-    if (!source) { setTakas([]); return undefined; }
+    if (!source) {
+      setTakas([]);
+      setStockByItem({});
+      return undefined;
+    }
     let alive = true;
     setLoadingTakas(true);
-    api.get('/inventory/lot-register/', { query: { location_id: source, available_only: 'true', page_size: 500 } })
-      .then((res) => alive && setTakas(Array.isArray(res?.records) ? res.records : []))
-      .catch(() => alive && setTakas([]))
-      .finally(() => alive && setLoadingTakas(false));
+
+    Promise.all([
+      api.get('/inventory/lot-register/', { query: { location_id: source, available_only: 'true', page_size: 500 } })
+        .then((res) => alive && setTakas(Array.isArray(res?.records) ? res.records : []))
+        .catch(() => alive && setTakas([])),
+      inventoryService.getWarehouseStock({ warehouseId: source, groupBy: 'item' })
+        .then((res) => {
+          if (!alive) return;
+          const map = {};
+          (res?.results || []).forEach((r) => {
+            map[r.itemId] = Number(r.available) || 0;
+          });
+          setStockByItem(map);
+        })
+        .catch(() => alive && setStockByItem({}))
+    ]).finally(() => {
+      if (alive) setLoadingTakas(false);
+    });
+
     return () => { alive = false; };
   }, [source]);
+
   const byItem = useMemo(() => {
     const map = {};
     takas.filter((t) => ['Available', 'Active'].includes(t.status || 'Available')).forEach((t) => { (map[t.itemId] ||= []).push(t); });
@@ -146,12 +170,41 @@ function CreateTransfer({ warehouses, onClose, onDone }) {
 
   const submit = async (asDraft) => {
     setError('');
-    if (!source || !dest || source === dest) { setError('Choose two different warehouses.'); return; }
+    if (!source || !dest || source === dest) {
+      setError('Please choose two different warehouses for the transfer.');
+      return;
+    }
     const payload = lines.filter((l) => l.itemId).map((l) => ({
       itemId: l.itemId, qty: lineQty(l),
       takas: Object.entries(l.takas).map(([lotTakaId, qty]) => ({ lotTakaId, qty: Number(qty) || 0 })),
     }));
-    if (!payload.length || payload.some((l) => l.qty <= 0)) { setError('Add at least one item with a quantity (or select its takas).'); return; }
+    if (!payload.length || payload.some((l) => l.qty <= 0)) {
+      setError('Please add at least one item with a valid quantity (or select individual takas to move).');
+      return;
+    }
+
+    // Pre-validate stock availability when requesting immediate transfer (which reserves stock)
+    if (!asDraft) {
+      for (const line of lines) {
+        if (!line.itemId) continue;
+        const itemObj = items.find((i) => i.id === line.itemId);
+        const itemName = itemObj?.name || 'Selected item';
+        const list = byItem[line.itemId] || [];
+        const takaAvailable = list.reduce((s, t) => s + (Number(t.availableQty) || 0), 0);
+        const availableQty = stockByItem[line.itemId] !== undefined ? stockByItem[line.itemId] : takaAvailable;
+        const requested = lineQty(line);
+
+        if (availableQty <= 0 && list.length === 0) {
+          setError(`Cannot request transfer: "${itemName}" has 0 ${itemObj?.uom || 'Meter'} available at ${sourceName}. Stock transfers require available inventory at the source warehouse to reserve.`);
+          return;
+        }
+        if (requested > availableQty) {
+          setError(`Cannot request transfer: Requested quantity (${n(requested)} ${itemObj?.uom || ''}) exceeds available stock (${n(availableQty)} ${itemObj?.uom || ''}) of "${itemName}" at ${sourceName}.`);
+          return;
+        }
+      }
+    }
+
     setSaving(true);
     try {
       const t = await inventoryService.createTransfer({
@@ -160,7 +213,12 @@ function CreateTransfer({ warehouses, onClose, onDone }) {
       });
       onDone(t);
     } catch (err) {
-      setError(describeApiError(err) || 'The transfer could not be saved.');
+      const msg = describeApiError(err) || 'The transfer could not be saved.';
+      if (msg.includes('is free at') || msg.includes('INSUFFICIENT_STOCK')) {
+        setError(`Insufficient stock: ${msg.replace(/free at/g, 'available at')}`);
+      } else {
+        setError(msg);
+      }
       setSaving(false);
     }
   };
@@ -178,66 +236,116 @@ function CreateTransfer({ warehouses, onClose, onDone }) {
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <label className="block"><span className="block font-semibold mb-1">From warehouse *</span>{whSelect(source, (v) => { setSource(v); setLines([emptyLine()]); }, null, 'From warehouse')}</label>
           <label className="block"><span className="block font-semibold mb-1">To warehouse *</span>{whSelect(dest, setDest, source, 'To warehouse')}</label>
-          <label className="block"><span className="block font-semibold mb-1">Notes</span><input value={notes} onChange={(e) => setNotes(e.target.value)} className="w-full h-9 px-2 rounded-lg border border-slate-200" /></label>
+          <label className="block"><span className="block font-semibold mb-1">Notes</span><input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Transfer reason or notes" className="w-full h-9 px-2 rounded-lg border border-slate-200" /></label>
         </div>
-        {!source && <p className="text-slate-500">Choose the source warehouse to see its free takas.</p>}
+        {!source && <p className="text-slate-500">Choose the source warehouse to see available stock and free takas.</p>}
         {lines.map((line) => {
+          const itemObj = items.find((i) => i.id === line.itemId);
           const list = byItem[line.itemId] || [];
           const picked = Object.keys(line.takas).length > 0;
+          const takaAvailable = list.reduce((s, t) => s + (Number(t.availableQty) || 0), 0);
+          const availableQty = stockByItem[line.itemId] !== undefined ? stockByItem[line.itemId] : takaAvailable;
+          const isOutOfStock = line.itemId && availableQty <= 0 && list.length === 0;
+
           return (
             <div key={line.key} className="border border-slate-200 rounded-xl p-3 space-y-2">
               <div className="grid grid-cols-1 sm:grid-cols-[1fr_140px_32px] gap-2 items-end">
                 <label className="block"><span className="block text-slate-600 mb-1">Item *</span>
                   <select value={line.itemId} onChange={(e) => update(line.key, { itemId: e.target.value, takas: {}, qty: '' })} className="w-full h-9 px-2 rounded-lg border border-slate-200 bg-white">
                     <option value="">Select item</option>
-                    {items.filter((i) => i.itemKind !== 'Service').map((i) => <option key={i.id} value={i.id}>{i.sku} "” {i.name}</option>)}
-                  </select></label>
-                <label className="block"><span className="block text-slate-600 mb-1">Quantity</span>
-                  <input type="number" min="0" step="any" value={picked ? lineQty(line) : line.qty} disabled={picked} onChange={(e) => update(line.key, { qty: e.target.value })} className="w-full h-9 px-2 rounded-lg border border-slate-200 disabled:bg-slate-50 tabular-nums" /></label>
-                <button type="button" onClick={() => setLines((p) => (p.length > 1 ? p.filter((l) => l.key !== line.key) : p))} className="p-2 text-slate-400 hover:text-rose-600 cursor-pointer" aria-label="Remove line"><Trash2 size={14} /></button>
-              </div>
-              {line.itemId && (loadingTakas ? <p className="text-slate-500">Loading takas"¦</p> : list.length === 0 ? (
-                <p className="text-slate-500">No free takas of this item at the source; an untracked item moves by quantity.</p>
-              ) : (
-                <table className="w-full text-xs">
-                  <thead className="table-head-std">
-                    <tr className="table-head-row-std">
-                      <th className="text-left">Move</th>
-                      <th className="text-left">Taka</th>
-                      <th className="text-left">Batch</th>
-                      <th className="text-right">Free</th>
-                      <th className="text-right">Qty to move</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {list.map((t) => {
-                      const sel = line.takas[t.id] !== undefined;
+                    {items.filter((i) => i.itemKind !== 'Service').map((i) => {
+                      const stock = source ? stockByItem[i.id] : null;
+                      const stockLabel = stock !== undefined && stock !== null ? (stock > 0 ? ` (${n(stock)} ${i.uom || ''} in stock)` : ' (Out of stock)') : '';
                       return (
-                        <tr key={t.id} className="border-t border-slate-100">
-                          <td className="p-1"><input type="checkbox" checked={sel} aria-label={`Move ${t.takaId}`} onChange={() => {
-                            const next = { ...line.takas };
-                            if (sel) delete next[t.id]; else next[t.id] = String(t.availableQty);
-                            update(line.key, { takas: next });
-                          }} /></td>
-                          <td className="p-1 font-mono">{t.takaId || '"”'}</td>
-                          <td className="p-1 font-mono">{t.batchCode || t.lotNo}</td>
-                          <td className="p-1 text-right tabular-nums">{n(t.availableQty)} {t.uom || ''}</td>
-                          <td className="p-1 text-right"><input type="number" min="0" max={t.availableQty} step="any" disabled={!sel} value={sel ? line.takas[t.id] : ''} aria-label={`Quantity of ${t.takaId}`} onChange={(e) => update(line.key, { takas: { ...line.takas, [t.id]: e.target.value } })} className="w-24 h-7 px-1 rounded border border-slate-200 text-right disabled:bg-slate-50" /></td>
-                        </tr>
+                        <option key={i.id} value={i.id}>
+                          {i.sku} — {i.name}{stockLabel}
+                        </option>
                       );
                     })}
-                  </tbody>
-                </table>
+                  </select></label>
+                <label className="block"><span className="block text-slate-600 mb-1">Quantity</span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="any"
+                    value={picked ? lineQty(line) : line.qty}
+                    disabled={picked || isOutOfStock}
+                    placeholder={isOutOfStock ? '0 (Out of stock)' : 'Qty to move'}
+                    onChange={(e) => update(line.key, { qty: e.target.value })}
+                    className="w-full h-9 px-2 rounded-lg border border-slate-200 disabled:bg-slate-50 tabular-nums"
+                  /></label>
+                <button type="button" onClick={() => setLines((p) => (p.length > 1 ? p.filter((l) => l.key !== line.key) : p))} className="p-2 text-slate-400 hover:text-rose-600 cursor-pointer" aria-label="Remove line"><Trash2 size={14} /></button>
+              </div>
+
+              {line.itemId && (loadingTakas ? (
+                <p className="text-slate-500">Checking available stock at {sourceName}…</p>
+              ) : list.length > 0 ? (
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between text-[11px] text-slate-600">
+                    <span>Select takas to move (Total available: <strong>{n(takaAvailable)} {itemObj?.uom || ''}</strong> across {list.length} taka{list.length > 1 ? 's' : ''}):</span>
+                    {picked && <span className="font-semibold text-blue-700">{n(lineQty(line))} {itemObj?.uom || ''} selected</span>}
+                  </div>
+                  <table className="w-full text-xs">
+                    <thead className="table-head-std">
+                      <tr className="table-head-row-std">
+                        <th className="text-left">Move</th>
+                        <th className="text-left">Taka</th>
+                        <th className="text-left">Batch</th>
+                        <th className="text-right">Free</th>
+                        <th className="text-right">Qty to move</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {list.map((t) => {
+                        const sel = line.takas[t.id] !== undefined;
+                        return (
+                          <tr key={t.id} className="border-t border-slate-100">
+                            <td className="p-1"><input type="checkbox" checked={sel} aria-label={`Move ${t.takaId}`} onChange={() => {
+                              const next = { ...line.takas };
+                              if (sel) delete next[t.id]; else next[t.id] = String(t.availableQty);
+                              update(line.key, { takas: next });
+                            }} /></td>
+                            <td className="p-1 font-mono">{t.takaId || '—'}</td>
+                            <td className="p-1 font-mono">{t.batchCode || t.lotNo}</td>
+                            <td className="p-1 text-right tabular-nums">{n(t.availableQty)} {t.uom || ''}</td>
+                            <td className="p-1 text-right"><input type="number" min="0" max={t.availableQty} step="any" disabled={!sel} value={sel ? line.takas[t.id] : ''} aria-label={`Quantity of ${t.takaId}`} onChange={(e) => update(line.key, { takas: { ...line.takas, [t.id]: e.target.value } })} className="w-24 h-7 px-1 rounded border border-slate-200 text-right disabled:bg-slate-50" /></td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              ) : isOutOfStock ? (
+                <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-xs">
+                  <div className="flex items-start gap-2">
+                    <AlertTriangle size={16} className="text-amber-600 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-semibold">Out of Stock at {sourceName}</p>
+                      <p className="mt-0.5 text-amber-700">
+                        There is <strong>0 {itemObj?.uom || 'Meter'}</strong> of <em>{itemObj?.name || 'this item'}</em> available at {sourceName}. Stock transfers require available inventory at the source warehouse to reserve. Please choose another source warehouse or select an item with available stock.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-2.5 rounded-lg bg-blue-50 border border-blue-200 text-blue-800 text-xs">
+                  <span className="font-semibold">Untracked stock:</span> <strong>{n(availableQty)} {itemObj?.uom || ''}</strong> available at {sourceName}. Enter the quantity to transfer above.
+                </div>
               ))}
             </div>
           );
         })}
         <button type="button" onClick={() => setLines((p) => [...p, emptyLine()])} className="font-semibold text-blue-700 inline-flex items-center gap-1 cursor-pointer"><Plus size={12} /> Add item</button>
-        {error && <div role="alert" className="p-2 rounded-lg bg-rose-50 border border-rose-200 text-rose-700">{error}</div>}
+        {error && (
+          <div role="alert" className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-start gap-2">
+            <AlertTriangle size={16} className="text-rose-500 shrink-0 mt-0.5" />
+            <div className="flex-1">{error}</div>
+          </div>
+        )}
         <div className="flex flex-wrap justify-end gap-2 pt-2 border-t border-slate-200">
           <button type="button" onClick={onClose} disabled={saving} className="h-9 px-3 rounded-lg border border-slate-200 font-semibold cursor-pointer">Cancel</button>
           <button type="button" onClick={() => submit(true)} disabled={saving} className="h-9 px-3 rounded-lg border border-slate-300 font-semibold cursor-pointer disabled:opacity-60">Save as draft</button>
-          <button type="submit" disabled={saving} className="h-9 px-4 rounded-lg bg-blue-600 text-white font-semibold disabled:opacity-60 cursor-pointer">{saving ? 'Saving"¦' : 'Request transfer (reserve stock)'}</button>
+          <button type="submit" disabled={saving} className="h-9 px-4 rounded-lg bg-blue-600 text-white font-semibold disabled:opacity-60 cursor-pointer">{saving ? 'Saving…' : 'Request transfer (reserve stock)'}</button>
         </div>
       </form>
     </Modal>
@@ -288,7 +396,7 @@ function TransferDetail({ id, onClose, onChanged }) {
     run(mode === 'dispatch' ? 'dispatch' : 'receive', { lines });
   };
 
-  if (!t) return <Modal title="Transfer" onClose={onClose}>{error ? <div role="alert" className="text-rose-700">{error}</div> : <p className="text-slate-400">Loading"¦</p>}</Modal>;
+  if (!t) return <Modal title="Transfer" onClose={onClose}>{error ? <div role="alert" className="text-rose-700">{error}</div> : <p className="text-slate-400">Loading…</p>}</Modal>;
   const lines = t.lines || [];
   const waiting = lines.filter((l) => Number(l.inTransitQty) > 0);
   const canDispatch = ['Approved', 'In Transit', 'Partially Received'].includes(t.status) && lines.some((l) => Number(l.pendingDispatchQty) > 0);
@@ -298,16 +406,16 @@ function TransferDetail({ id, onClose, onChanged }) {
   const btn = 'h-9 px-3 rounded-lg font-semibold cursor-pointer disabled:opacity-60';
 
   return (
-    <Modal title={`Transfer ${t.transfer_number}`} onClose={onClose} wide>
+    <Modal title={`Transfer ${t.transferNumber || t.transfer_number || ''}`} onClose={onClose} wide>
       <div className="space-y-3">
         <div className="flex flex-wrap items-center gap-3">
           <StatusBadge status={t.status} />
           <span className="font-semibold">{t.sourceLocation} → {t.destLocation}</span>
-          <span className="text-slate-500">{t.date}{t.reference_number ? ` · for ${t.reference_number}` : ''}</span>
+          <span className="text-slate-500">{t.date}{(t.referenceNumber || t.reference_number) ? ` · for ${t.referenceNumber || t.reference_number}` : ''}</span>
         </div>
         <dl className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px]">
-          {[['Requested by', t.requestedBy], ['Approved by', t.approvedBy], ['Shipped by', t.shipped_by], ['Received by', t.receivedBy]].map(([k, v]) => (
-            <div key={k}><dt className="text-[10px] uppercase text-slate-400">{k}</dt><dd className="font-semibold">{v || '"”'}</dd></div>
+          {[['Requested by', t.requestedBy], ['Approved by', t.approvedBy], ['Shipped by', t.shippedBy || t.shipped_by], ['Received by', t.receivedBy]].map(([k, v]) => (
+            <div key={k}><dt className="text-[10px] uppercase text-slate-400">{k}</dt><dd className="font-semibold">{v || '—'}</dd></div>
           ))}
         </dl>
         {t.notes && <p className="text-slate-600">{t.notes}</p>}
@@ -347,13 +455,13 @@ function TransferDetail({ id, onClose, onChanged }) {
                       {Number(l.inTransitQty) > 0 ? (
                         <div className="space-y-1">
                           <select required value={settle[l.id]?.action || ''} onChange={(e) => setSettle({ ...settle, [l.id]: { ...settle[l.id], action: e.target.value } })} className="h-8 px-1 rounded-md border border-slate-200" aria-label={`Settle ${l.name}`}>
-                            <option value="">{n(l.inTransitQty)} not received"¦</option>
+                            <option value="">{n(l.inTransitQty)} not received…</option>
                             <option value="RETURN">Return to source</option>
                             <option value="WRITE_OFF">Write off (transit loss)</option>
                           </select>
                           <input required placeholder="Reason" value={settle[l.id]?.reason || ''} onChange={(e) => setSettle({ ...settle, [l.id]: { ...settle[l.id], reason: e.target.value } })} className="block w-44 h-8 px-2 rounded-md border border-slate-200" aria-label={`Reason for ${l.name}`} />
                         </div>
-                      ) : <span className="text-slate-400">"”</span>}
+                      ) : <span className="text-slate-400">—</span>}
                     </td>
                   )}
                 </tr>
@@ -370,8 +478,8 @@ function TransferDetail({ id, onClose, onChanged }) {
             {canCancel && t.status !== 'Draft' && <button type="button" disabled={busy} onClick={() => run('cancel', { reason: 'Cancelled by user' })} className={`${btn} border border-rose-200 text-rose-700`}>Cancel transfer</button>}
             {t.status === 'Draft' && <button type="button" disabled={busy} onClick={() => run('request')} className={`${btn} bg-blue-600 text-white`}>Request (reserve stock)</button>}
             {t.status === 'Requested' && <button type="button" disabled={busy} onClick={() => run('approve')} className={`${btn} bg-blue-600 text-white`}>Approve</button>}
-            {canDispatch && <button type="button" disabled={busy} onClick={() => startMode('dispatch')} className={`${btn} bg-blue-600 text-white`}>Dispatch"¦</button>}
-            {canReceive && <button type="button" disabled={busy} onClick={() => startMode('receive')} className={`${btn} bg-emerald-600 text-white`}>Receive"¦</button>}
+            {canDispatch && <button type="button" disabled={busy} onClick={() => startMode('dispatch')} className={`${btn} bg-blue-600 text-white`}>Dispatch…</button>}
+            {canReceive && <button type="button" disabled={busy} onClick={() => startMode('receive')} className={`${btn} bg-emerald-600 text-white`}>Receive…</button>}
             {canComplete && <button type="button" disabled={busy} onClick={() => (waiting.length ? startMode('complete') : run('complete'))} className={`${btn} border border-slate-300`}>Complete</button>}
           </div>
         )}

@@ -115,7 +115,7 @@ export function QCReprocessPage() {
                   <td className="px-3 py-3 text-right whitespace-nowrap space-x-1">
                     {r.batchCode && (
                       <>
-                        <Link to={`/inventory/batches/${encodeURIComponent(r.batchCode)}?tab=dyeing`} className="h-8 px-3 rounded-lg bg-violet-600 hover:bg-violet-700 text-white font-semibold inline-flex items-center">Send to processor</Link>
+                        <Link to={`/inventory/batches/${encodeURIComponent(r.batchCode)}?tab=dyeing&action=send-to-processor`} className="h-8 px-3 rounded-lg bg-violet-600 hover:bg-violet-700 text-white font-semibold inline-flex items-center">Send to processor</Link>
                         <button type="button" disabled={busy === r.batchCode} onClick={() => backToQc(r)} className="h-8 px-3 rounded-lg border border-slate-200 font-semibold hover:bg-slate-50 disabled:opacity-50 cursor-pointer">Reworked in-house → QC</button>
                       </>
                     )}

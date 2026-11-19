@@ -1000,16 +1000,6 @@ export default function QCDashboardPage({ defaultTab = 'All' }) {
                 <ArrowRight className="w-3.5 h-3.5" />
               </Link>
             )}
-            {activeTab === 'On Hold' && (
-              <Link
-                to="/inventory/qc/advanced?step=decide"
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-700 rounded-lg text-xs font-semibold transition cursor-pointer"
-                title="Open full QC disposition & hold review workbench"
-              >
-                <span>Disposition Workbench</span>
-                <ArrowRight className="w-3.5 h-3.5" />
-              </Link>
-            )}
             <button
               type="button"
               onClick={handleExportCSV}

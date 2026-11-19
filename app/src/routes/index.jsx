@@ -543,7 +543,7 @@ const router = createBrowserRouter([
       { path: 'inventory/qc', element: <RedirectWith to="/inventory/qc/dashboard" set={{}} /> },
       { path: 'inventory/qc/pending', element: <RedirectWith to="/inventory/qc/advanced" set={{ step: 'pending' }} /> },
       { path: 'inventory/qc/register', element: <RedirectWith to="/inventory/qc/advanced" set={{ step: 'inspect' }} /> },
-      { path: 'inventory/qc/results', element: <RedirectWith to="/inventory/qc/advanced" set={{ step: 'decide' }} /> },
+      { path: 'inventory/qc/results', element: <RedirectWith to="/inventory/qc/advanced" set={{ step: 'inspect' }} /> },
       { path: 'inventory/qc/reinspection', element: <RedirectWith to="/inventory/qc/advanced" set={{ step: 'recheck' }} /> },
       { path: 'inventory/qc/dashboard', element: <Page component={QCDashboardHubPage} title="QC Dashboard" /> },
       { path: 'job-work/service-orders', element: <Page component={ServiceOrdersPage} title="Dyeing Service Orders" /> },

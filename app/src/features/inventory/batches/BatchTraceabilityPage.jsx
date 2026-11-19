@@ -56,6 +56,7 @@ export default function BatchTraceabilityPage() {
     const next = new URLSearchParams(searchParams);
     next.set('tab', key);
     next.delete('returnRejected');
+    next.delete('action');
     setSearchParams(next, { replace: true });
   };
 

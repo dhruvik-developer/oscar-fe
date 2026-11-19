@@ -206,37 +206,6 @@ export function Modal({
         )}
         <div className="modal-body">{children}</div>
         {footer && <div className="modal-footer">{footer}</div>}
-
-        {/* Resizable drag grip icon in bottom-right corner */}
-        {resizable && !isMaximized && (
-          <div
-            role="button"
-            tabIndex={-1}
-            aria-label="Resize modal"
-            title="Drag corner arrow to resize popup (double-click to reset size)"
-            onPointerDown={handleResizeStart}
-            onMouseDown={handleResizeStart}
-            onTouchStart={handleResizeStart}
-            onDoubleClick={() => setCustomSize(null)}
-            className="modal-resize-handle"
-          >
-            <svg
-              width="14"
-              height="14"
-              viewBox="0 0 16 16"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="pointer-events-none"
-            >
-              <path d="M14 9v5h-5" />
-              <path d="M2 7V2h5" />
-              <line x1="2.5" y1="2.5" x2="13.5" y2="13.5" />
-            </svg>
-          </div>
-        )}
       </div>
     </div>
   );

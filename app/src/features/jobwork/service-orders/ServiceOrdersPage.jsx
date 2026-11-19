@@ -260,7 +260,7 @@ function OrderDetail({ id, onClose, onChanged, onEdit }) {
               <p className="text-slate-600">
                 {Number(q.dyeingQcPending) > 0 ? `${n(q.dyeingQcPending)} ${o.uom} is waiting for inspection. ` : 'Nothing waiting for inspection. '}
                 Passed fabric becomes ready; re-dyeing goes back to the vendor as a reprocess.{' '}
-                <Link to="/inventory/qc/results?stage=dyeing" className="font-semibold text-blue-700 hover:underline">Open Dyeing QC →</Link>
+                <Link to="/inventory/qc/advanced?step=inspect&stage=dyeing" className="font-semibold text-blue-700 hover:underline">Open Dyeing QC →</Link>
               </p>
             </Section>
             <Section title={customer ? '4. Deliver to customer & bill the service' : '4. Invoice fabric + dyeing'}>

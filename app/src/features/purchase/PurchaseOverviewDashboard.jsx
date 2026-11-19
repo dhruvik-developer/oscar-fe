@@ -604,13 +604,13 @@ export function PurchaseOverviewDashboard({
                   onClick={onViewAllDeliveries}
                   className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-600 hover:text-blue-700 hover:underline cursor-pointer"
                 >
-                  View All <ChevronRight size={12} />
+                  View All Orders <ChevronRight size={12} />
                 </button>
               </div>
             </div>
             <div className="divide-y divide-slate-50 overflow-y-auto max-h-72">
               {upcomingDeliveries.length > 0 ? upcomingDeliveries.map((p, i) => (
-                <div key={p.id || i} className={`flex items-center justify-between gap-3 px-4 py-2.5 transition-colors ${p.overdue ? 'bg-amber-50/50 hover:bg-amber-50' : 'hover:bg-slate-50/60'}`}>
+                <div key={p.id || i} onClick={onViewAllDeliveries} className={`flex items-center justify-between gap-3 px-4 py-2.5 transition-colors cursor-pointer ${p.overdue ? 'bg-amber-50/50 hover:bg-amber-50' : 'hover:bg-slate-50/60'}`} title="Click to view in All Purchase Orders">
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
                       <span className="font-mono text-[11px] font-bold text-blue-600">{p.poNumber || '—'}</span>
@@ -637,9 +637,8 @@ export function PurchaseOverviewDashboard({
               )}
             </div>
           </div>
-          <div className="flex items-center justify-between gap-2 border-t border-slate-100 px-4 py-2 bg-slate-50/50 text-[10px] text-slate-400">
+          <div className="border-t border-slate-100 px-4 py-2 bg-slate-50/50 text-[10px] text-slate-400">
             <span>Showing next {upcomingDeliveries.length} of {allDeliveries.length} · overdue highlighted in amber</span>
-            <button type="button" onClick={onViewAllDeliveries} className="shrink-0 text-blue-600 font-semibold hover:underline">View All Deliveries →</button>
           </div>
         </div>
 
@@ -655,13 +654,6 @@ export function PurchaseOverviewDashboard({
                 </span>
               </div>
               <div className="flex items-center gap-2.5">
-                <button
-                  type="button"
-                  onClick={onViewAllPending}
-                  className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-600 hover:text-blue-700 hover:underline cursor-pointer"
-                >
-                  View All <ChevronRight size={12} />
-                </button>
                 <button
                   type="button"
                   onClick={onManageReceipts}
@@ -710,14 +702,6 @@ export function PurchaseOverviewDashboard({
           <div className="border-t border-slate-100 px-4 py-2 bg-slate-50/50 flex items-center justify-between text-[10px] text-slate-500">
             <span>Showing next {pendingReceipts.length} of {allPendingReceipts.length} pending orders</span>
             <span>Pending Intake Total: <strong className="text-amber-800 font-mono">{kpis.pendingQty.toLocaleString('en-IN')} Mtr</strong></span>
-            <button
-              type="button"
-              onClick={() => onRecordGrn?.(pendingReceipts[0] || null)}
-              className="text-blue-600 font-semibold hover:underline"
-              title="Open the All Purchase Orders tab with the most pending purchase order highlighted"
-            >
-              Record GRN in Orders Tab →
-            </button>
           </div>
         </div>
       </div>

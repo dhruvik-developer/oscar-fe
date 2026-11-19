@@ -39,6 +39,9 @@ const TABS = [
   { id: 'defects', label: 'Defect Master', singular: 'Defect', icon: AlertOctagon, desc: 'Quality defect taxonomy & severity' },
   { id: 'loss-reasons', label: 'Loss Reasons', singular: 'Loss Reason', icon: ArrowDownLeft, desc: 'Standard process & shrinkage loss codes' },
   { id: 'return-reasons', label: 'Return Reasons', singular: 'Return Reason', icon: RotateCcw, desc: 'Supplier & customer return dispute reasons' },
+  { id: 'transporters', label: 'Transporters', singular: 'Transporter', icon: Briefcase, desc: 'Transport companies, GSTIN & contact details (printed on the LR)' },
+  { id: 'vehicles', label: 'Vehicles', singular: 'Vehicle', icon: Truck, desc: 'Transport tempo & vehicle registry' },
+  { id: 'drivers', label: 'Drivers', singular: 'Driver', icon: UserCheck, desc: 'Driver profiles, mobile numbers & licenses' },
 ];
 
 // Create / update endpoint per tab (processors are Party rows).

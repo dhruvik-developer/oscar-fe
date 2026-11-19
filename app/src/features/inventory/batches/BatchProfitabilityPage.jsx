@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import PageHeader from '../../../components/ui/PageHeader';
 import KpiCard from '../../../components/ui/KpiCard';
+import AppPagination from '../../../components/ui/AppPagination';
 import { api } from '../../../services/api';
 import { formatINR } from '../../accounts/accountingShared';
 
@@ -23,7 +24,7 @@ const inr = (v) => {
 
 const meters = (v) => `${num(v).toLocaleString('en-IN', { maximumFractionDigits: 2 })} m`;
 
-export default function BatchProfitabilityPage() {
+export default function BatchProfitabilityPage({ inDrawer = false }) {
   const [searchParams, setSearchParams] = useSearchParams();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -36,6 +37,15 @@ export default function BatchProfitabilityPage() {
   const [sortBy, setSortBy] = useState(searchParams.get('sortBy') || 'highest_profit');
   const [dateFrom, setDateFrom] = useState(searchParams.get('from') || '');
   const [dateTo, setDateTo] = useState(searchParams.get('to') || '');
+
+  // Pagination
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  // Reset page to 1 whenever filters change
+  useEffect(() => {
+    setPage(1);
+  }, [search, fabricType, status, sortBy, dateFrom, dateTo]);
 
   // Detail slideout state
   const [selectedBatchCode, setSelectedBatchCode] = useState(null);
@@ -91,6 +101,11 @@ export default function BatchProfitabilityPage() {
   const summary = data.summary || {};
   const rows = data.rows || [];
 
+  const paginatedRows = useMemo(() => {
+    const start = (page - 1) * pageSize;
+    return rows.slice(start, start + pageSize);
+  }, [rows, page, pageSize]);
+
   const handleResetFilters = () => {
     setSearch('');
     setFabricType('ALL');
@@ -98,6 +113,7 @@ export default function BatchProfitabilityPage() {
     setSortBy('highest_profit');
     setDateFrom('');
     setDateTo('');
+    setPage(1);
   };
 
   return (
@@ -107,13 +123,15 @@ export default function BatchProfitabilityPage() {
         <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="flex items-center gap-3">
-              <Link
-                to="/dashboard"
-                className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors"
-                title="Back to Dashboard"
-              >
-                <ArrowLeft size={16} />
-              </Link>
+              {!inDrawer && (
+                <Link
+                  to="/dashboard"
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors"
+                  title="Back to Dashboard"
+                >
+                  <ArrowLeft size={16} />
+                </Link>
+              )}
               <div>
                 <div className="flex items-center gap-2">
                   <h1 className="text-xl font-extrabold tracking-tight text-[#17294e]">
@@ -310,7 +328,7 @@ export default function BatchProfitabilityPage() {
             <div className="flex items-center gap-2">
               <Boxes size={16} className="text-slate-500" />
               <h2 className="text-xs font-extrabold uppercase tracking-wide text-slate-700">
-                Batch Profitability Ledger ({rows.length} Batches)
+                Batch Profitability Ledger ({rows.length} Batches{rows.length > pageSize ? ` · Page ${page} of ${Math.ceil(rows.length / pageSize)}` : ''})
               </h2>
             </div>
             <span className="text-[11px] font-semibold text-slate-500">
@@ -330,8 +348,9 @@ export default function BatchProfitabilityPage() {
               <p className="text-xs text-slate-400 mt-1">Try resetting the search keywords or stage filter.</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[950px] text-xs">
+            <>
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[950px] text-xs">
                 <thead>
                   <tr className="border-b border-slate-200 bg-slate-50 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500">
                     <th className="py-3 px-4">Batch Code</th>
@@ -349,7 +368,7 @@ export default function BatchProfitabilityPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {rows.map((r) => {
+                  {paginatedRows.map((r) => {
                     const isSold = r.isSold;
                     const isProfitable = r.status === 'PROFITABLE';
                     const isLoss = r.status === 'LOSS_MAKING';
@@ -489,6 +508,23 @@ export default function BatchProfitabilityPage() {
                 </tbody>
               </table>
             </div>
+
+              {/* Pagination Controls */}
+              {rows.length > 0 && (
+                <AppPagination
+                  totalItems={rows.length}
+                  page={page}
+                  pageSize={pageSize}
+                  onPageChange={setPage}
+                  onPageSizeChange={(newSize) => {
+                    setPageSize(newSize);
+                    setPage(1);
+                  }}
+                  pageSizeOptions={[10, 25, 50, 100]}
+                  bordered={true}
+                />
+              )}
+            </>
           )}
         </div>
       </div>

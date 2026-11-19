@@ -639,11 +639,6 @@ export default function BatchRegistryPage() {
           { label: 'Batch Registry', path: '/inventory/batches' },
           { label: selectedPoGroup.poNumber },
         ] : undefined}
-        actions={(
-          !selectedPoGroup && <button type="button" onClick={() => setAdding(true)} className="h-9 px-4 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold inline-flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors">
-            <Plus size={14} /> Create Batch
-          </button>
-        )}
       />
 
       {/* PO-SPECIFIC WORKSPACE: CENTRAL HUB FOR RECEIPTS, QC, BATCHES, DISPATCH & COSTS */}

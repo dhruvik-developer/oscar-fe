@@ -165,7 +165,7 @@ export function PrintLorryReceiptModal({ isOpen, onClose, tripId }) {
                   <tr>
                     <th className={cell}>#</th>
                     <th className={`${cell} text-left`}>Description</th>
-                    <th className={cell}>Lot / Taka</th>
+                    <th className={cell}>Batch / Roll</th>
                     <th className={cell}>Packages</th>
                     <th className={`${cell} text-right`}>Meters</th>
                     <th className={`${cell} text-right`}>Weight (kg)</th>
@@ -178,8 +178,8 @@ export function PrintLorryReceiptModal({ isOpen, onClose, tripId }) {
                   {materials.map((m, i) => (
                     <tr key={m.id || i}>
                       <td className={`${cell} text-center`}>{i + 1}</td>
-                      <td className={cell}>{m.itemName || (m.lotNumber ? `Fabric roll — Lot ${m.lotNumber}` : '—')}</td>
-                      <td className={`${cell} font-mono text-center`}>{[m.lotNumber, m.takaNumber].filter(Boolean).join(' / ') || '—'}</td>
+                      <td className={cell}>{m.itemName || ((m.batchCode || m.lotNumber) ? `Fabric roll — Batch ${m.batchCode || m.lotNumber}` : '—')}{m.poNumber ? ` (PO: ${m.poNumber})` : ''}</td>
+                      <td className={`${cell} font-mono text-center`}>{[m.batchCode || m.lotNumber, m.takaNumber ? `Roll #${m.takaNumber}` : null].filter(Boolean).join(' / ') || '—'}</td>
                       <td className={`${cell} text-center`}>1 roll</td>
                       <td className={`${cell} text-right font-mono`}>{fmtNum(m.quantity)}</td>
                       <td className={`${cell} text-right font-mono`}>{fmtNum(m.rollWeight)}</td>

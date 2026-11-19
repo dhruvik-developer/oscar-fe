@@ -121,6 +121,17 @@ export function PoActionMenu({
   const canMatchBill = canPayBill;
   const canDelete = isDraft;
 
+  const hasReceivedGoods = Boolean(
+    Number(receivedQty) > 0 ||
+    isPartiallyReceived ||
+    isFullyReceived ||
+    (po?.receipts && po.receipts.length > 0) ||
+    (po?.batches && po.batches.length > 0) ||
+    (po?.fabric_batches && po.fabric_batches.length > 0)
+  );
+
+  const canCancel = !isCancelled && !hasReceivedGoods && !isPoFullyPaid && !isPoPartiallyPaid;
+
   const handleAction = (actionFn) => {
     onClose();
     actionFn?.(po);
@@ -302,18 +313,27 @@ export function PoActionMenu({
         role="menuitem"
         disabled={isCancelled}
         onClick={() => handleAction(onCancelPo || onDelete)}
-        title={isCancelled ? 'This purchase order is already cancelled' : 'Cancel this purchase order'}
+        title={
+          hasReceivedGoods
+            ? 'Click to see why this purchase order cannot be cancelled'
+            : isCancelled
+            ? 'This purchase order is already cancelled'
+            : 'Cancel this purchase order'
+        }
         className={`w-full px-3 py-1.5 text-left flex items-center justify-between gap-2 transition-colors ${
-          !isCancelled
-            ? 'text-rose-600 hover:bg-rose-50 cursor-pointer font-medium'
-            : 'opacity-40 cursor-not-allowed text-slate-400'
+          isCancelled
+            ? 'opacity-40 cursor-not-allowed text-slate-400'
+            : hasReceivedGoods
+            ? 'text-slate-600 hover:bg-amber-50 hover:text-amber-800 cursor-pointer font-medium'
+            : 'text-rose-600 hover:bg-rose-50 cursor-pointer font-medium'
         }`}
       >
         <span className="flex items-center gap-2">
-          <Ban size={13} className={!isCancelled ? 'text-rose-500 shrink-0' : 'text-slate-400 shrink-0'} />
+          <Ban size={13} className={isCancelled ? 'text-slate-400 shrink-0' : hasReceivedGoods ? 'text-amber-600 shrink-0' : 'text-rose-500 shrink-0'} />
           <span>{isCancelled ? 'Cancelled PO' : 'Cancel Purchase Order'}</span>
         </span>
         {isCancelled && <span className="text-[9.5px] text-rose-600 font-semibold bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200">Cancelled</span>}
+        {!isCancelled && hasReceivedGoods && <span className="text-[9.5px] text-amber-700 font-semibold bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">Locked</span>}
       </button>
     </div>,
     document.body

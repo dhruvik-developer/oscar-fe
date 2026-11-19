@@ -243,7 +243,7 @@ export default function SubInventoryPage() {
               <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2.5">
                 {activeSub === 'GREY' ? (
                   <>
-                    <div className="w-8 h-8 rounded-lg bg-stone-100 text-stone-700 flex items-center justify-center text-sm font-bold">
+                    <div className="w-8 h-8 rounded-lg bg-sky-100 text-sky-700 flex items-center justify-center text-sm font-bold">
                       <Layers size={18} />
                     </div>
                     Grey Inventory
@@ -257,13 +257,7 @@ export default function SubInventoryPage() {
                   </>
                 )}
               </h1>
-              <span
-                className={`px-2.5 py-0.5 rounded-full text-xs font-bold border ${
-                  activeSub === 'GREY'
-                    ? 'bg-stone-50 text-stone-700 border-stone-200'
-                    : 'bg-sky-50 text-sky-700 border-sky-200'
-                }`}
-              >
+              <span className="px-2.5 py-0.5 rounded-full text-xs font-bold border bg-sky-50 text-sky-700 border-sky-200">
                 {activeSub === 'GREY' ? 'Grey Batches Only' : 'Dyeing Batches Only'}
               </span>
             </div>
@@ -283,16 +277,16 @@ export default function SubInventoryPage() {
             >
               {showPhysical ? 'Hide' : 'Physical Stock'}
             </button>
-            <button
-              type="button"
-              onClick={() => setAdding(true)}
-              className={`h-9 px-3.5 rounded-lg text-white text-xs font-bold flex items-center gap-1.5 shadow-2xs cursor-pointer transition-colors ${
-                activeSub === 'GREY' ? 'bg-stone-800 hover:bg-stone-900' : 'bg-blue-600 hover:bg-blue-700'
-              }`}
-            >
-              <Plus size={15} />
-              {activeSub === 'GREY' ? 'Add Grey Batch' : 'Add Dyeing Batch'}
-            </button>
+            {activeSub !== 'GREY' && (
+              <button
+                type="button"
+                onClick={() => setAdding(true)}
+                className="h-9 px-3.5 rounded-lg text-white text-xs font-bold flex items-center gap-1.5 shadow-2xs cursor-pointer transition-colors bg-blue-600 hover:bg-blue-700"
+              >
+                <Plus size={15} />
+                Add Dyeing Batch
+              </button>
+            )}
           </div>
         </div>
 
@@ -303,15 +297,15 @@ export default function SubInventoryPage() {
             onClick={() => handleTabChange('GREY')}
             className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold cursor-pointer transition-all ${
               activeSub === 'GREY'
-                ? 'bg-stone-900 text-white shadow-xs'
+                ? 'bg-sky-600 text-white shadow-xs'
                 : 'bg-slate-100 text-slate-600 hover:bg-slate-200/80 hover:text-slate-900'
             }`}
           >
-            <Layers size={14} className={activeSub === 'GREY' ? 'text-stone-300' : 'text-slate-400'} />
+            <Layers size={14} className={activeSub === 'GREY' ? 'text-sky-200' : 'text-slate-400'} />
             <span>Grey Inventory</span>
             <span
               className={`ml-1 px-1.5 py-0.2 rounded-md text-[10px] font-mono ${
-                activeSub === 'GREY' ? 'bg-stone-700 text-stone-200' : 'bg-slate-200 text-slate-700'
+                activeSub === 'GREY' ? 'bg-sky-800 text-sky-100' : 'bg-slate-200 text-slate-700'
               }`}
             >
               {counts.grey}
@@ -397,7 +391,7 @@ export default function SubInventoryPage() {
         />
         <button
           type="submit"
-          className="h-9 px-3.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold cursor-pointer shrink-0"
+          className="h-9 px-3.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold cursor-pointer shrink-0 shadow-2xs transition-colors"
         >
           Open Batch 360°
         </button>
@@ -582,17 +576,19 @@ export default function SubInventoryPage() {
                     </p>
                     <p className="text-[11px] text-slate-400 mt-0.5">
                       {activeSub === 'GREY'
-                        ? 'Click "+ Add Grey Batch" or create a PO receipt to log incoming grey fabric batches.'
+                        ? 'Incoming grey fabric batches are created automatically through Goods Receipt (GRN) or production output.'
                         : 'Click "+ Add Dyeing Batch" or receive dyed fabric from external dyeing job workers.'}
                     </p>
-                    <button
-                      type="button"
-                      onClick={() => setAdding(true)}
-                      className="mt-3 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold inline-flex items-center gap-1 cursor-pointer"
-                    >
-                      <Plus size={13} />
-                      {activeSub === 'GREY' ? 'Add First Grey Batch' : 'Add First Dyeing Batch'}
-                    </button>
+                    {activeSub !== 'GREY' && (
+                      <button
+                        type="button"
+                        onClick={() => setAdding(true)}
+                        className="mt-3 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold inline-flex items-center gap-1 cursor-pointer"
+                      >
+                        <Plus size={13} />
+                        Add First Dyeing Batch
+                      </button>
+                    )}
                   </td>
                 </tr>
               )}
@@ -644,9 +640,9 @@ export default function SubInventoryPage() {
                       <td className="px-3 py-2.5">
                         <span
                           className={`px-2 py-0.5 rounded-full border text-[10px] font-semibold ${
-                            b.fabricType === 'DYED'
+                            b.fabricType === 'DYED' || activeSub === 'DYED'
                               ? 'bg-sky-50 text-sky-700 border-sky-200'
-                              : 'bg-stone-50 text-stone-700 border-stone-200'
+                              : 'bg-blue-50 text-blue-700 border-blue-200'
                           }`}
                         >
                           {b.fabricType === 'DYED' ? 'Dyeing / Dyed' : activeSub === 'DYED' ? 'At Dyeing Mill' : 'Grey Fabric'}

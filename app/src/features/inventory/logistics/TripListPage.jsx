@@ -40,6 +40,11 @@ export default function TripListPage() {
   const [statusFilter, setStatusFilter] = useState('');
   const [vehicles, setVehicles] = useState([]);
   const [drivers, setDrivers] = useState([]);
+  const [warehouses, setWarehouses] = useState([]);
+  const [availableBatches, setAvailableBatches] = useState([]);
+  const [loadingInventory, setLoadingInventory] = useState(false);
+  const [selectedBatchCode, setSelectedBatchCode] = useState('');
+  const [selectedTakaId, setSelectedTakaId] = useState('');
 
   // Create Transporter Modal
   const [showTransporterModal, setShowTransporterModal] = useState(false);
@@ -79,6 +84,8 @@ export default function TripListPage() {
     driverMobile: '',
     lrNumber: '',
     lrDate: '',
+    fromWarehouseId: '',
+    toWarehouseId: '',
     fromLocation: '',
     toLocation: '',
     freightAmount: '0',
@@ -91,27 +98,84 @@ export default function TripListPage() {
     materials: [],
   });
 
-  // Material line form in modal
   const [materialDraft, setMaterialDraft] = useState({
+    lotTakaId: '',
+    batchCode: '',
+    poNumber: '',
     lotNumber: '',
     takaNumber: '',
+    takaId: '',
+    itemId: '',
+    fabricName: '',
+    shade: '',
     meters: '',
+    availableMeters: 0,
     weightKg: '',
+    maxWeight: 0,
+    qcStatus: '',
   });
+
+  const resetTripForm = () => {
+    setTripForm({
+      tripType: 'OUTWARD',
+      tripDate: new Date().toISOString().slice(0, 10),
+      transporterId: '',
+      vehicleId: '',
+      driverId: '',
+      vehicleNumber: '',
+      driverName: '',
+      driverMobile: '',
+      lrNumber: '',
+      lrDate: '',
+      fromWarehouseId: '',
+      toWarehouseId: '',
+      fromLocation: '',
+      toLocation: '',
+      freightAmount: '0',
+      loadingCharges: '0',
+      unloadingCharges: '0',
+      otherCharges: '0',
+      paidBy: 'Company',
+      costAllocationTarget: 'LOT',
+      remarks: '',
+      materials: [],
+    });
+    setSelectedBatchCode('');
+    setSelectedTakaId('');
+    setMaterialDraft({
+      lotTakaId: '',
+      batchCode: '',
+      poNumber: '',
+      lotNumber: '',
+      takaNumber: '',
+      takaId: '',
+      itemId: '',
+      fabricName: '',
+      shade: '',
+      meters: '',
+      availableMeters: 0,
+      weightKg: '',
+      maxWeight: 0,
+      qcStatus: '',
+    });
+    setAvailableBatches([]);
+  };
 
   const fetchTrips = useCallback(async () => {
     try {
       setLoading(true);
-      const [tripsRes, transpRes, vehRes, drivRes] = await Promise.all([
+      const [tripsRes, transpRes, vehRes, drivRes, whRes] = await Promise.all([
         inventoryService.getTrips({ status: statusFilter || undefined }),
         inventoryService.getTransporters(),
         inventoryService.getVehicles().catch(() => []),
         inventoryService.getDrivers().catch(() => []),
+        inventoryService.getWarehouses().catch(() => []),
       ]);
       const data = tripsRes?.data || tripsRes?.results || tripsRes || [];
       const transpData = transpRes?.data || transpRes?.results || transpRes || [];
       const vehData = vehRes?.data || vehRes?.results || vehRes || [];
       const drivData = drivRes?.data || drivRes?.results || drivRes || [];
+      const whData = whRes?.results || whRes?.data || whRes || [];
       // API returns camelCase (tripNumber); the table reads snake_case (trip_number).
       const withSnakeKeys = (t) => ({
         ...Object.fromEntries(Object.entries(t).map(([k, v]) => [k.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`), v])),
@@ -121,6 +185,7 @@ export default function TripListPage() {
       setTransporters(Array.isArray(transpData) ? transpData : []);
       setVehicles(Array.isArray(vehData) ? vehData : []);
       setDrivers(Array.isArray(drivData) ? drivData : []);
+      setWarehouses(Array.isArray(whData) ? whData : []);
     } catch (err) {
       console.error('Failed to load trips:', err);
     } finally {
@@ -133,7 +198,7 @@ export default function TripListPage() {
   }, [fetchTrips]);
 
   // Vehicles / drivers added in the "+ Add / Manage" popup show up without reopening the form.
-  useMasterDataRefresh(fetchTrips, ['vehicles', 'drivers', 'transporters']);
+  useMasterDataRefresh(fetchTrips, ['vehicles', 'drivers', 'transporters', 'warehouses']);
 
   const handleVehicleSelect = (vehicleId) => {
     if (!vehicleId) {
@@ -204,7 +269,7 @@ export default function TripListPage() {
       setDeliveryError(null);
       let proofFileId = null;
       if (proofFile) {
-        proofFileId = await uploadFileToBackend(proofFile, proofFile.name, 'trip_delivery_proof');
+        proofFileId = await uploadFileToBackend(proofFile, proofFile.name, 'other');
       }
       await inventoryService.confirmTripDelivery(deliveryModalTrip.id, {
         delivery_time: deliveryTime,
@@ -214,19 +279,209 @@ export default function TripListPage() {
       setDeliveryModalTrip(null);
       fetchTrips();
     } catch (err) {
-      setDeliveryError(err?.response?.data?.message || err?.message || 'Failed to confirm delivery.');
+      const data = err?.response?.data || err?.payload;
+      let errMsg = data?.message || data?.detail || data?.error;
+      if (!errMsg && (data?.field_errors || data?.fieldErrors)) {
+        const fe = data.field_errors || data.fieldErrors;
+        errMsg = Object.entries(fe).map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(' ') : v}`).join(' · ');
+      } else if (!errMsg && typeof data === 'object' && !Array.isArray(data)) {
+        const msgs = Object.entries(data).map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(' ') : v}`).filter(Boolean);
+        if (msgs.length) errMsg = msgs.join(' · ');
+      }
+      setDeliveryError(errMsg || err?.message || 'Failed to confirm delivery.');
     } finally {
       setConfirmingDelivery(false);
     }
   };
 
-  const handleAddMaterial = () => {
-    if (!materialDraft.lotNumber || !materialDraft.meters) return;
-    setTripForm({
-      ...tripForm,
-      materials: [...tripForm.materials, { ...materialDraft }],
+  const handleSourceWarehouseChange = async (whId) => {
+    const selectedWh = warehouses.find((w) => String(w.id) === String(whId));
+    setTripForm((prev) => ({
+      ...prev,
+      fromWarehouseId: whId,
+      fromLocation: selectedWh ? selectedWh.name : '',
+      materials: [], // Reset selected materials on godown change
+    }));
+    setSelectedBatchCode('');
+    setSelectedTakaId('');
+    setMaterialDraft({
+      lotTakaId: '',
+      batchCode: '',
+      poNumber: '',
+      lotNumber: '',
+      takaNumber: '',
+      takaId: '',
+      itemId: '',
+      fabricName: '',
+      shade: '',
+      meters: '',
+      availableMeters: 0,
+      weightKg: '',
+      maxWeight: 0,
+      qcStatus: '',
     });
-    setMaterialDraft({ lotNumber: '', takaNumber: '', meters: '', weightKg: '' });
+
+    if (!whId) {
+      setAvailableBatches([]);
+      return;
+    }
+
+    try {
+      setLoadingInventory(true);
+      const res = await inventoryService.getTripAvailableInventory({ location_id: whId });
+      setAvailableBatches(res?.batches || res?.lots || []);
+    } catch (err) {
+      console.error('Failed to load godown batches:', err);
+      setAvailableBatches([]);
+    } finally {
+      setLoadingInventory(false);
+    }
+  };
+
+  const handleBatchChange = (batchCode) => {
+    setSelectedBatchCode(batchCode);
+    setSelectedTakaId('');
+    const batch = availableBatches.find(
+      (b) => (b.batchCode || b.batch_code || b.lotNumber || b.lot_number) === batchCode
+    );
+    setMaterialDraft({
+      lotTakaId: '',
+      batchCode: batch ? (batch.batchCode || batch.batch_code || batch.lot_number) : '',
+      poNumber: batch ? (batch.poNumber || batch.po_number || '') : '',
+      lotNumber: batch ? (batch.batchCode || batch.batch_code || batch.lot_number) : '',
+      takaNumber: '',
+      takaId: '',
+      itemId: batch?.itemId || '',
+      fabricName: batch?.fabricName || batch?.fabric_name || '',
+      shade: batch?.shade || '',
+      meters: '',
+      availableMeters: 0,
+      weightKg: '',
+      maxWeight: 0,
+      qcStatus: '',
+    });
+  };
+
+  const handleTakaChange = (takaId) => {
+    setSelectedTakaId(takaId);
+    if (!takaId) {
+      setMaterialDraft((prev) => ({
+        ...prev,
+        lotTakaId: '',
+        takaNumber: '',
+        takaId: '',
+        meters: '',
+        availableMeters: 0,
+        weightKg: '',
+        maxWeight: 0,
+        qcStatus: '',
+      }));
+      return;
+    }
+    const currentBatch = availableBatches.find(
+      (b) => (b.batchCode || b.batch_code || b.lotNumber || b.lot_number) === selectedBatchCode
+    );
+    const rollsList = currentBatch?.rolls || currentBatch?.takas || [];
+    const taka = rollsList.find((t) => String(t.id || t.lotTakaId) === String(takaId));
+    if (taka) {
+      const availMtr = Number(taka.availableMeters || taka.available_meters || 0);
+      const rollWt = taka.rollWeight != null ? taka.rollWeight : (taka.roll_weight != null ? taka.roll_weight : null);
+      setMaterialDraft({
+        lotTakaId: taka.id || taka.lotTakaId,
+        batchCode: currentBatch.batchCode || currentBatch.batch_code || currentBatch.lot_number,
+        poNumber: currentBatch.poNumber || currentBatch.po_number || taka.poNumber || taka.po_number || '',
+        lotNumber: currentBatch.batchCode || currentBatch.batch_code || currentBatch.lot_number,
+        takaNumber: taka.takaNumber || taka.taka_number,
+        takaId: taka.takaId || taka.taka_id,
+        itemId: taka.itemId || taka.item_id || currentBatch.itemId,
+        fabricName: currentBatch.fabricName || currentBatch.fabric_name,
+        shade: currentBatch.shade,
+        meters: String(availMtr),
+        availableMeters: availMtr,
+        weightKg: rollWt != null ? String(rollWt) : '',
+        maxWeight: rollWt != null ? Number(rollWt) : 0,
+        qcStatus: taka.qcStatus || taka.qc_status || 'Passed',
+      });
+    }
+  };
+
+  const handleMetersChange = (val) => {
+    const num = Number(val);
+    let newWeight = materialDraft.weightKg;
+    if (materialDraft.maxWeight > 0 && materialDraft.availableMeters > 0 && num > 0) {
+      newWeight = ((num / materialDraft.availableMeters) * materialDraft.maxWeight).toFixed(2);
+    }
+    setMaterialDraft((prev) => ({
+      ...prev,
+      meters: val,
+      weightKg: newWeight,
+    }));
+  };
+
+  const handleAddMaterial = () => {
+    if (!materialDraft.lotTakaId) {
+      setError('Please select a roll/taka from the dropdown.');
+      return;
+    }
+    const qty = Number(materialDraft.meters);
+    if (!qty || qty <= 0) {
+      setError('Dispatch quantity must be greater than 0.');
+      return;
+    }
+    if (qty > materialDraft.availableMeters) {
+      setError(`Cannot dispatch ${qty} M: Roll has only ${materialDraft.availableMeters} M available.`);
+      return;
+    }
+    if (tripForm.materials.some((m) => String(m.lotTakaId) === String(materialDraft.lotTakaId))) {
+      setError('This roll/taka has already been added to the trip materials.');
+      return;
+    }
+
+    setError(null);
+    setTripForm((prev) => ({
+      ...prev,
+      materials: [
+        ...prev.materials,
+        {
+          lotTakaId: materialDraft.lotTakaId,
+          batchCode: materialDraft.batchCode,
+          poNumber: materialDraft.poNumber,
+          lotNumber: materialDraft.batchCode,
+          takaNumber: materialDraft.takaNumber,
+          takaId: materialDraft.takaId,
+          itemId: materialDraft.itemId,
+          fabricName: materialDraft.fabricName,
+          shade: materialDraft.shade,
+          quantity: qty,
+          meters: qty,
+          availableMeters: materialDraft.availableMeters,
+          rollWeight: materialDraft.weightKg ? Number(materialDraft.weightKg) : null,
+          weightKg: materialDraft.weightKg,
+          qcStatus: materialDraft.qcStatus,
+          isPartial: qty < materialDraft.availableMeters - 0.0001,
+          documentReferenceType: materialDraft.poNumber ? 'PURCHASE_ORDER' : undefined,
+          documentReferenceNumber: materialDraft.poNumber || undefined,
+        },
+      ],
+    }));
+
+    setSelectedTakaId('');
+    setMaterialDraft({
+      lotTakaId: '',
+      batchCode: selectedBatchCode,
+      poNumber: materialDraft.poNumber,
+      lotNumber: selectedBatchCode,
+      takaNumber: '',
+      takaId: '',
+      itemId: materialDraft.itemId,
+      fabricName: materialDraft.fabricName,
+      shade: materialDraft.shade,
+      meters: '',
+      availableMeters: 0,
+      weightKg: '',
+      maxWeight: 0,
+      qcStatus: '',
+    });
   };
 
   const handleRemoveMaterial = (index) => {
@@ -236,45 +491,86 @@ export default function TripListPage() {
     });
   };
 
+  const handleCancelTrip = async (trip) => {
+    const tripNum = trip.trip_number || trip.tripNumber;
+    const confirmed = await modal.confirm(
+      `Are you sure you want to cancel Trip ${tripNum}? Any material in transit will be returned to ${trip.from_location || 'source godown'}.`,
+      'Confirm Trip Cancellation'
+    );
+    if (!confirmed) return;
+    try {
+      setListError(null);
+      await inventoryService.cancelTrip(trip.id);
+      await modal.alert(`Trip ${tripNum} has been cancelled and stock has been returned to ${trip.from_location}.`, 'Trip Cancelled');
+      fetchTrips();
+    } catch (err) {
+      const data = err?.response?.data || err?.payload;
+      const errMsg = data?.message || data?.detail || err?.message || 'Failed to cancel trip.';
+      setListError(errMsg);
+    }
+  };
+
   const handleCreateSubmit = async (e) => {
     e.preventDefault();
+    if (!tripForm.fromWarehouseId && !tripForm.fromLocation) {
+      setError('Please select a source godown.');
+      return;
+    }
+    if (!tripForm.toLocation) {
+      setError('Please enter or select a destination.');
+      return;
+    }
+    if (!tripForm.lrNumber?.trim()) {
+      setError('Please enter the LR Number.');
+      return;
+    }
     try {
       setSubmitting(true);
       setError(null);
-      // A lot typed into the draft row but not "Add"-ed would otherwise be silently dropped.
-      const pendingLine = materialDraft.lotNumber && materialDraft.meters ? [{ ...materialDraft }] : [];
+      let allMaterials = [...tripForm.materials];
+      if (
+        materialDraft.lotTakaId &&
+        Number(materialDraft.meters) > 0 &&
+        Number(materialDraft.meters) <= materialDraft.availableMeters &&
+        !allMaterials.some((m) => String(m.lotTakaId) === String(materialDraft.lotTakaId))
+      ) {
+        const qty = Number(materialDraft.meters);
+        allMaterials.push({
+          lotTakaId: materialDraft.lotTakaId,
+          batchCode: materialDraft.batchCode,
+          poNumber: materialDraft.poNumber,
+          lotNumber: materialDraft.batchCode,
+          takaNumber: materialDraft.takaNumber,
+          takaId: materialDraft.takaId,
+          itemId: materialDraft.itemId,
+          fabricName: materialDraft.fabricName,
+          shade: materialDraft.shade,
+          quantity: qty,
+          meters: qty,
+          availableMeters: materialDraft.availableMeters,
+          rollWeight: materialDraft.weightKg ? Number(materialDraft.weightKg) : null,
+          weightKg: materialDraft.weightKg,
+          qcStatus: materialDraft.qcStatus,
+          isPartial: qty < materialDraft.availableMeters - 0.0001,
+          documentReferenceType: materialDraft.poNumber ? 'PURCHASE_ORDER' : undefined,
+          documentReferenceNumber: materialDraft.poNumber || undefined,
+        });
+      }
+
       await inventoryService.createTrip({
         ...tripForm,
+        tripType: tripForm.tripType === 'TRANSFER' ? 'INTERNAL' : tripForm.tripType,
         lrDate: tripForm.lrDate || null,
-        materials: [...tripForm.materials, ...pendingLine],
+        materials: allMaterials,
       });
-      setMaterialDraft({ lotNumber: '', takaNumber: '', meters: '', weightKg: '' });
+
       setShowCreateModal(false);
-      setTripForm({
-        tripType: 'OUTWARD',
-        tripDate: new Date().toISOString().slice(0, 10),
-        transporterId: '',
-        vehicleId: '',
-        driverId: '',
-        vehicleNumber: '',
-        driverName: '',
-        driverMobile: '',
-        lrNumber: '',
-        lrDate: '',
-        fromLocation: '',
-        toLocation: '',
-        freightAmount: '0',
-        loadingCharges: '0',
-        unloadingCharges: '0',
-        otherCharges: '0',
-        paidBy: 'Company',
-        costAllocationTarget: 'LOT',
-        remarks: '',
-        materials: [],
-      });
+      resetTripForm();
       fetchTrips();
     } catch (err) {
-      setError(err?.response?.data?.message || err?.message || 'Failed to record trip.');
+      const data = err?.response?.data || err?.payload;
+      const errMsg = data?.message || data?.detail || err?.message || 'Failed to record trip.';
+      setError(errMsg);
     } finally {
       setSubmitting(false);
     }
@@ -289,6 +585,14 @@ export default function TripListPage() {
       setListError(err?.response?.data?.message || err?.message || 'Freight allocation failed.');
     }
   };
+
+  const selectedBatch = availableBatches.find(
+    (b) => (b.batchCode || b.batch_code || b.lotNumber || b.lot_number) === selectedBatchCode
+  );
+  const addedTakaIds = new Set(tripForm.materials.map((m) => String(m.lotTakaId)));
+  const availableTakasForBatch = (selectedBatch?.rolls || selectedBatch?.takas || []).filter(
+    (t) => !addedTakaIds.has(String(t.id || t.lotTakaId))
+  );
 
   const filteredTrips = trips.filter((t) => {
     const q = search.toLowerCase();
@@ -332,7 +636,7 @@ export default function TripListPage() {
             <PageInfoButton title="Logistics & Trip Register" />
           </div>
           <p className="text-[13px] text-slate-500 mt-0.5">
-            Track inward/outward vehicle trips, LR details, freight charges, and direct landed-cost allocation to lots.
+            Track inward/outward vehicle trips, LR details, freight charges, and direct landed-cost allocation to batches.
           </p>
         </div>
         <button
@@ -458,7 +762,7 @@ export default function TripListPage() {
                           )}
                           {(t.proof_file_url || t.proofFileUrl || t.proof_file) && (
                             <a
-                              href={t.proof_file_url || t.proofFileUrl || `/api/v1/files/${t.proof_file}/`}
+                              href={t.proofFileUrl || t.proof_file_url || `/api/v1/files/${t.proof_file || t.proofFileId}/download/?inline=true`}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="inline-flex items-center gap-1 text-[11px] text-indigo-600 hover:text-indigo-800 font-medium underline mt-0.5"
@@ -467,9 +771,13 @@ export default function TripListPage() {
                             </a>
                           )}
                         </div>
+                      ) : t.status === 'Cancelled' ? (
+                        <span className="inline-flex items-center gap-1 text-rose-700 bg-rose-50 px-2 py-0.5 rounded font-medium border border-rose-200">
+                          <X className="w-3 h-3" /> Cancelled
+                        </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 text-slate-700 bg-slate-100 px-2 py-0.5 rounded font-medium">
-                          <Truck className="w-3 h-3 text-slate-500" /> {t.status || 'In Transit'}
+                        <span className="inline-flex items-center gap-1 text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded font-medium border border-indigo-200">
+                          <Truck className="w-3 h-3 text-indigo-500" /> {t.status || 'In Transit'}
                         </span>
                       )}
                     </td>
@@ -480,13 +788,21 @@ export default function TripListPage() {
                       >
                         <FileText className="w-3 h-3" /> Print LR
                       </button>
-                      {t.status !== 'Delivered' && t.status !== 'Completed' && (
-                        <button
-                          onClick={() => handleOpenConfirmDelivery(t)}
-                          className="px-2.5 py-1 text-xs font-medium text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded border border-emerald-200 transition-colors inline-flex items-center gap-1"
-                        >
-                          <CheckCircle2 className="w-3 h-3" /> Confirm Delivery
-                        </button>
+                      {t.status !== 'Delivered' && t.status !== 'Completed' && t.status !== 'Cancelled' && (
+                        <>
+                          <button
+                            onClick={() => handleOpenConfirmDelivery(t)}
+                            className="px-2.5 py-1 text-xs font-medium text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded border border-emerald-200 transition-colors inline-flex items-center gap-1"
+                          >
+                            <CheckCircle2 className="w-3 h-3" /> Confirm Delivery
+                          </button>
+                          <button
+                            onClick={() => handleCancelTrip(t)}
+                            className="px-2.5 py-1 text-xs font-medium text-rose-700 bg-rose-50 hover:bg-rose-100 rounded border border-rose-200 transition-colors inline-flex items-center gap-1"
+                          >
+                            <X className="w-3 h-3" /> Cancel Trip
+                          </button>
+                        </>
                       )}
                       {!t.freight_allocated && !t.is_cost_allocated && (() => {
                         // Spreading cost to LOT / SALES_ORDER needs material lines; mirror the backend rule.
@@ -497,7 +813,7 @@ export default function TripListPage() {
                           <button
                             onClick={() => handleAllocateFreight(t.id)}
                             disabled={needsLines}
-                            title={needsLines ? 'No material (lot/taka) lines on this trip, so there is nothing to allocate the cost to.' : undefined}
+                            title={needsLines ? 'No material (batch/roll) lines on this trip, so there is nothing to allocate the cost to.' : undefined}
                             className="px-2.5 py-1 text-xs font-medium text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded border border-indigo-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-indigo-50"
                           >
                             Allocate Cost
@@ -506,7 +822,7 @@ export default function TripListPage() {
                       })()}
                       {!t.freight_allocated && !t.is_cost_allocated && (t.cost_allocation_target || 'LOT') !== 'EXPENSE'
                         && Number(t.total_charges) > 0 && !(t.materials || []).length && (
-                        <div className="text-[10px] text-amber-600 mt-1 whitespace-normal">No lot lines "” cost can't be allocated</div>
+                        <div className="text-[10px] text-amber-600 mt-1 whitespace-normal">No batch/roll lines — cost can't be allocated</div>
                       )}
                     </td>
                   </tr>
@@ -528,7 +844,7 @@ export default function TripListPage() {
           </span>
         }
         size="xl"
-        resizable={true}
+        resizable={false}
         allowMaximize={true}
         footer={
           <div className="flex justify-end gap-2 w-full">
@@ -570,15 +886,16 @@ export default function TripListPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-slate-700 mb-1">Trip Type</label>
+                  <label className="block text-xs font-medium text-slate-700 mb-1">Trip Type *</label>
                   <select
                     value={tripForm.tripType}
                     onChange={(e) => setTripForm({ ...tripForm, tripType: e.target.value })}
-                    className="w-full text-sm border border-slate-200 rounded-md p-2 bg-white"
+                    className="w-full text-sm border border-slate-200 rounded-md p-2 bg-white font-medium"
                   >
                     <option value="OUTWARD">Outward Dispatch</option>
+                    <option value="INTERNAL">Internal Transfer (Godown to Godown)</option>
+                    <option value="JOBWORK_OUT">Job Work Outward</option>
                     <option value="INWARD">Inward Purchase / JWO</option>
-                    <option value="TRANSFER">Internal Transfer</option>
                   </select>
                 </div>
                 <div>
@@ -683,32 +1000,69 @@ export default function TripListPage() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-medium text-slate-700 mb-1">From Location</label>
-                  <input
-                    type="text"
-                    placeholder="Main Godown"
-                    value={tripForm.fromLocation}
-                    onChange={(e) => setTripForm({ ...tripForm, fromLocation: e.target.value })}
-                    className="w-full text-sm border border-slate-200 rounded-md p-2"
-                  />
+                  <label className="block text-xs font-medium text-slate-700 mb-1">
+                    From Location (Source Godown) *
+                  </label>
+                  <select
+                    required
+                    value={tripForm.fromWarehouseId || ''}
+                    onChange={(e) => handleSourceWarehouseChange(e.target.value)}
+                    className="w-full text-sm border border-slate-200 rounded-md p-2 bg-white font-medium text-slate-800"
+                  >
+                    <option value="">-- Choose Source Godown / Warehouse --</option>
+                    {warehouses.map((w) => (
+                      <option key={w.id} value={w.id}>
+                        {w.name} ({w.code})
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-slate-700 mb-1">To Destination</label>
-                  <input
-                    type="text"
-                    placeholder="Party Godown / Job Worker"
-                    value={tripForm.toLocation}
-                    onChange={(e) => setTripForm({ ...tripForm, toLocation: e.target.value })}
-                    className="w-full text-sm border border-slate-200 rounded-md p-2"
-                  />
+                  <label className="block text-xs font-medium text-slate-700 mb-1">
+                    To Destination {tripForm.tripType === 'INTERNAL' || tripForm.tripType === 'TRANSFER' ? '(Destination Godown) *' : '*'}
+                  </label>
+                  {tripForm.tripType === 'INTERNAL' || tripForm.tripType === 'TRANSFER' ? (
+                    <select
+                      required
+                      value={tripForm.toWarehouseId || ''}
+                      onChange={(e) => {
+                        const destWh = warehouses.find((w) => String(w.id) === String(e.target.value));
+                        setTripForm((prev) => ({
+                          ...prev,
+                          toWarehouseId: e.target.value,
+                          toLocation: destWh ? destWh.name : '',
+                        }));
+                      }}
+                      className="w-full text-sm border border-slate-200 rounded-md p-2 bg-white font-medium text-slate-800"
+                    >
+                      <option value="">-- Choose Destination Godown --</option>
+                      {warehouses
+                        .filter((w) => String(w.id) !== String(tripForm.fromWarehouseId))
+                        .map((w) => (
+                          <option key={w.id} value={w.id}>
+                            {w.name} ({w.code})
+                          </option>
+                        ))}
+                    </select>
+                  ) : (
+                    <input
+                      type="text"
+                      required
+                      placeholder="Party Godown / Job Worker / Customer Location"
+                      value={tripForm.toLocation}
+                      onChange={(e) => setTripForm({ ...tripForm, toLocation: e.target.value })}
+                      className="w-full text-sm border border-slate-200 rounded-md p-2 bg-white"
+                    />
+                  )}
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-medium text-slate-700 mb-1">LR Number</label>
+                  <label className="block text-xs font-medium text-slate-700 mb-1">LR Number *</label>
                   <input
                     type="text"
+                    required
                     placeholder="LR / bilty no. from transporter"
                     value={tripForm.lrNumber}
                     onChange={(e) => setTripForm({ ...tripForm, lrNumber: e.target.value })}
@@ -795,7 +1149,7 @@ export default function TripListPage() {
                       onChange={(e) => setTripForm({ ...tripForm, costAllocationTarget: e.target.value })}
                       className="w-full text-sm border border-slate-200 rounded p-1.5 bg-white"
                     >
-                      <option value="LOT">LOT (Landed Cost to Fabric Lots)</option>
+                      <option value="LOT">BATCH (Landed Cost to Fabric Batches)</option>
                       <option value="SALES_ORDER">SALES_ORDER (Party Profitability / Transport Support)</option>
                       <option value="EXPENSE">EXPENSE (Freight Expense Journal)</option>
                     </select>
@@ -813,87 +1167,231 @@ export default function TripListPage() {
                 </div>
               </div>
 
-              {/* Material Lines (Optional for Lot Cost Allocation) */}
-              <div className="space-y-2">
-                <div className="text-xs font-semibold text-slate-700">Material Lines (For Landed Cost Allocation)</div>
-                <div className="grid grid-cols-5 gap-2 items-end">
-                  <div>
-                    <label className="block text-[11px] text-slate-500 mb-1">Lot Number</label>
-                    <input
-                      type="text"
-                      placeholder="LOT-2026-001"
-                      value={materialDraft.lotNumber}
-                      onChange={(e) => setMaterialDraft({ ...materialDraft, lotNumber: e.target.value })}
-                      className="w-full text-xs border border-slate-200 rounded p-1.5"
-                    />
+              {/* Material Lines: Dynamic Godown Batch & Roll Dispatch Selection */}
+              <div className="space-y-3 p-3 bg-slate-50 border border-slate-200 rounded-lg">
+                <div className="flex items-center justify-between">
+                  <div className="text-xs font-semibold text-slate-800 flex items-center gap-1.5">
+                    <Layers className="w-3.5 h-3.5 text-indigo-600" />
+                    Fabric Batches & Rolls Dispatch Selection
                   </div>
-                  <div>
-                    <label className="block text-[11px] text-slate-500 mb-1">Taka No</label>
-                    <input
-                      type="text"
-                      placeholder="TAK-01"
-                      value={materialDraft.takaNumber}
-                      onChange={(e) => setMaterialDraft({ ...materialDraft, takaNumber: e.target.value })}
-                      className="w-full text-xs border border-slate-200 rounded p-1.5"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] text-slate-500 mb-1">Meters *</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      placeholder="100"
-                      value={materialDraft.meters}
-                      onChange={(e) => setMaterialDraft({ ...materialDraft, meters: e.target.value })}
-                      className="w-full text-xs border border-slate-200 rounded p-1.5"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] text-slate-500 mb-1">Weight (Kg)</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      placeholder="12.5"
-                      value={materialDraft.weightKg}
-                      onChange={(e) => setMaterialDraft({ ...materialDraft, weightKg: e.target.value })}
-                      className="w-full text-xs border border-slate-200 rounded p-1.5"
-                    />
-                  </div>
-                  <div>
-                    <button
-                      type="button"
-                      onClick={handleAddMaterial}
-                      className="w-full py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-medium rounded"
-                    >
-                      + Add Line
-                    </button>
-                  </div>
+                  {tripForm.fromWarehouseId && availableBatches.length > 0 && (
+                    <span className="text-[11px] text-slate-500 font-medium">
+                      {availableBatches.length} Batches Available in Godown
+                    </span>
+                  )}
                 </div>
 
+                {!tripForm.fromWarehouseId ? (
+                  <div className="p-4 bg-white border border-dashed border-slate-200 rounded-md text-center text-xs text-slate-500">
+                    <MapPin className="w-5 h-5 text-slate-400 mx-auto mb-1.5" />
+                    Please select a <strong>From Location (Source Godown)</strong> above to load its live stock.
+                  </div>
+                ) : loadingInventory ? (
+                  <div className="p-4 bg-white border border-slate-200 rounded-md text-center text-xs text-slate-500">
+                    Loading available batches from {tripForm.fromLocation || 'godown'}...
+                  </div>
+                ) : availableBatches.length === 0 ? (
+                  <div className="p-4 bg-amber-50 border border-amber-200 rounded-md text-center text-xs text-amber-800">
+                    <AlertCircle className="w-5 h-5 text-amber-500 mx-auto mb-1.5" />
+                    No available fabric stock found in {tripForm.fromLocation || 'selected godown'}. All batches may be dispatched, in transit, or on QC hold.
+                  </div>
+                ) : (
+                  <>
+                    <div className="grid grid-cols-1 md:grid-cols-12 gap-2.5 items-end bg-white p-3 border border-slate-200 rounded-md">
+                      {/* Batch Selection */}
+                      <div className="md:col-span-5">
+                        <label className="block text-[11px] font-medium text-slate-700 mb-1">
+                          Batch Number *
+                        </label>
+                        <select
+                          value={selectedBatchCode}
+                          onChange={(e) => handleBatchChange(e.target.value)}
+                          className="w-full text-xs border border-slate-200 rounded p-1.5 bg-white font-medium"
+                        >
+                          <option value="">-- Choose Batch ({availableBatches.length} available) --</option>
+                          {availableBatches.map((b) => {
+                            const bCode = b.batchCode || b.batch_code || b.lotNumber || b.lot_number;
+                            const poText = b.poNumber || b.po_number ? ` · PO: ${b.poNumber || b.po_number}` : '';
+                            const fabricText = ` · ${b.fabricName || b.fabric_name || 'Fabric'}${b.shade && b.shade !== '-' ? ` (${b.shade})` : ''}`;
+                            const qtyText = ` · ${Number(b.availableMeters || b.available_meters || 0).toLocaleString()} M`;
+                            const rollsCount = (b.rolls || b.takas || []).length || b.availableRollsCount || b.available_takas_count;
+                            const rollsText = ` · ${rollsCount} Roll${rollsCount === 1 ? '' : 's'}`;
+                            return (
+                              <option key={bCode} value={bCode}>
+                                {bCode}{poText}{fabricText}{qtyText}{rollsText}
+                              </option>
+                            );
+                          })}
+                        </select>
+                      </div>
+
+                      {/* Roll / Taka Selection */}
+                      <div className="md:col-span-3">
+                        <label className="block text-[11px] font-medium text-slate-700 mb-1">
+                          Roll / Taka No. *
+                        </label>
+                        <select
+                          value={selectedTakaId}
+                          disabled={!selectedBatchCode || availableTakasForBatch.length === 0}
+                          onChange={(e) => handleTakaChange(e.target.value)}
+                          className="w-full text-xs border border-slate-200 rounded p-1.5 bg-white font-medium disabled:bg-slate-100 disabled:text-slate-400"
+                        >
+                          <option value="">
+                            {!selectedBatchCode
+                              ? '-- Pick batch first --'
+                              : availableTakasForBatch.length === 0
+                              ? '-- All rolls added --'
+                              : `-- Choose Roll (${availableTakasForBatch.length}) --`}
+                          </option>
+                          {availableTakasForBatch.map((t) => (
+                            <option key={t.id || t.lotTakaId} value={t.id || t.lotTakaId}>
+                              Roll #{t.takaNumber || t.taka_number} ({t.takaId || t.taka_id}) — {t.availableMeters || t.available_meters} M {(t.rollWeight || t.roll_weight) ? `| ${t.rollWeight || t.roll_weight} kg` : ''} [{t.qcStatus || t.qc_status || 'Passed'}]
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Quantity (Meters) */}
+                      <div className="md:col-span-2">
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="block text-[11px] font-medium text-slate-700">Dispatch Mtr *</label>
+                          {materialDraft.availableMeters > 0 && (
+                            <span className="text-[10px] text-slate-400">Max: {materialDraft.availableMeters}</span>
+                          )}
+                        </div>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0.01"
+                          max={materialDraft.availableMeters || undefined}
+                          placeholder={materialDraft.availableMeters ? String(materialDraft.availableMeters) : '0'}
+                          disabled={!materialDraft.lotTakaId}
+                          value={materialDraft.meters}
+                          onChange={(e) => handleMetersChange(e.target.value)}
+                          className="w-full text-xs border border-slate-200 rounded p-1.5 font-medium disabled:bg-slate-100"
+                        />
+                      </div>
+
+                      {/* Weight */}
+                      <div className="md:col-span-1">
+                        <label className="block text-[11px] font-medium text-slate-700 mb-1">Weight (Kg)</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          placeholder="kg"
+                          disabled={!materialDraft.lotTakaId}
+                          value={materialDraft.weightKg}
+                          onChange={(e) => setMaterialDraft((prev) => ({ ...prev, weightKg: e.target.value }))}
+                          className="w-full text-xs border border-slate-200 rounded p-1.5 disabled:bg-slate-100"
+                        />
+                      </div>
+
+                      {/* Add Line button */}
+                      <div className="md:col-span-1">
+                        <button
+                          type="button"
+                          onClick={handleAddMaterial}
+                          disabled={!materialDraft.lotTakaId || !materialDraft.meters || Number(materialDraft.meters) <= 0 || Number(materialDraft.meters) > materialDraft.availableMeters}
+                          className="w-full py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded disabled:opacity-40 disabled:cursor-not-allowed transition"
+                        >
+                          + Add
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Linked PO Reference and Batch Details Chip */}
+                    {selectedBatch && (
+                      <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 bg-indigo-50/90 border border-indigo-200 rounded-md text-xs text-indigo-950">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="inline-flex items-center gap-1 font-semibold text-indigo-800 bg-white px-2 py-0.5 rounded border border-indigo-200">
+                            Batch: {selectedBatch.batchCode || selectedBatch.batch_code}
+                          </span>
+                          <span className="inline-flex items-center gap-1 font-semibold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                            Linked PO: {selectedBatch.poNumber || selectedBatch.po_number || 'Direct Stock / None'}
+                          </span>
+                          <span className="text-slate-700 font-medium">
+                            {selectedBatch.fabricName || selectedBatch.fabric_name} {selectedBatch.shade && selectedBatch.shade !== '-' ? `(${selectedBatch.shade})` : ''}
+                          </span>
+                        </div>
+                        <div className="text-[11px] text-indigo-800 font-medium">
+                          Available: <strong>{Number(selectedBatch.availableMeters || 0).toLocaleString()} M</strong> across {(selectedBatch.rolls || selectedBatch.takas || []).length} roll{(selectedBatch.rolls || selectedBatch.takas || []).length === 1 ? '' : 's'}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Helper indicator when taka selected */}
+                    {materialDraft.lotTakaId && (
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 px-3 py-1.5 bg-emerald-50/80 border border-emerald-200 rounded text-[11px] text-emerald-900">
+                        <div>
+                          Selected: <strong>Roll #{materialDraft.takaNumber}</strong> ({materialDraft.takaId})
+                          <span className="mx-2 text-emerald-300">|</span>
+                          Available: <strong>{materialDraft.availableMeters} M</strong> {materialDraft.maxWeight > 0 ? `| ${materialDraft.maxWeight} kg` : ''} [{materialDraft.qcStatus}]
+                        </div>
+                        {Number(materialDraft.meters) > 0 && Number(materialDraft.meters) < materialDraft.availableMeters && (
+                          <div className="text-amber-800 font-semibold bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                            Partial Dispatch: {(materialDraft.availableMeters - Number(materialDraft.meters)).toFixed(2)} M remains in {tripForm.fromLocation}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {/* Materials Table */}
                 {tripForm.materials.length > 0 && (
-                  <div className="border border-slate-200 rounded overflow-hidden mt-2">
+                  <div className="border border-slate-200 rounded-lg overflow-hidden mt-3 bg-white">
                     <table className="w-full text-xs">
                       <thead className="table-head-std">
                         <tr className="table-head-row-std">
-                          <th className="text-left">Lot</th>
-                          <th className="text-left">Taka</th>
-                          <th className="text-right">Meters</th>
+                          <th className="text-left">Batch Number & Linked PO</th>
+                          <th className="text-left">Roll / Taka No.</th>
+                          <th className="text-right">Dispatch Meters</th>
                           <th className="text-right">Weight (Kg)</th>
+                          <th className="text-center">Dispatch Mode</th>
                           <th className="text-center">Action</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
                         {tripForm.materials.map((m, idx) => (
-                          <tr key={idx}>
-                            <td className="p-2 font-medium">{m.lotNumber}</td>
-                            <td className="p-2">{m.takaNumber || '-'}</td>
-                            <td className="p-2 text-right">{m.meters} M</td>
-                            <td className="p-2 text-right">{m.weightKg || '-'}</td>
+                          <tr key={idx} className="hover:bg-slate-50/75">
+                            <td className="p-2 font-medium text-slate-800">
+                              <div className="font-semibold text-slate-900">{m.batchCode || m.lotNumber}</div>
+                              <div className="text-[11px] text-indigo-600 font-medium">
+                                {m.poNumber ? `PO: ${m.poNumber}` : 'Direct Stock'}
+                              </div>
+                              <div className="text-[11px] text-slate-500 font-normal">
+                                {m.fabricName} {m.shade ? `(${m.shade})` : ''}
+                              </div>
+                            </td>
+                            <td className="p-2 text-slate-700">
+                              <div className="font-semibold">Roll #{m.takaNumber}</div>
+                              <div className="text-[10px] text-slate-400">{m.takaId}</div>
+                            </td>
+                            <td className="p-2 text-right font-semibold text-slate-900">
+                              {Number(m.quantity || m.meters).toLocaleString()} M
+                              {m.isPartial && (
+                                <div className="text-[10px] text-amber-600 font-normal">of {m.availableMeters} M (Partial)</div>
+                              )}
+                            </td>
+                            <td className="p-2 text-right text-slate-600">
+                              {m.rollWeight != null ? `${Number(m.rollWeight).toFixed(2)} kg` : '-'}
+                            </td>
+                            <td className="p-2 text-center">
+                              {m.isPartial ? (
+                                <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+                                  Partial Roll
+                                </span>
+                              ) : (
+                                <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                  Full Roll
+                                </span>
+                              )}
+                            </td>
                             <td className="p-2 text-center">
                               <button
                                 type="button"
                                 onClick={() => handleRemoveMaterial(idx)}
-                                className="text-rose-600 hover:text-rose-800"
+                                className="text-rose-600 hover:text-rose-800 font-medium hover:underline"
                               >
                                 Remove
                               </button>
@@ -901,6 +1399,20 @@ export default function TripListPage() {
                           </tr>
                         ))}
                       </tbody>
+                      <tfoot className="bg-slate-50 font-semibold text-slate-800 border-t border-slate-200">
+                        <tr>
+                          <td className="p-2" colSpan={2}>
+                            Total Dispatched: {tripForm.materials.length} Roll{tripForm.materials.length === 1 ? '' : 's'}
+                          </td>
+                          <td className="p-2 text-right">
+                            {tripForm.materials.reduce((s, m) => s + (Number(m.quantity || m.meters) || 0), 0).toLocaleString()} M
+                          </td>
+                          <td className="p-2 text-right">
+                            {tripForm.materials.reduce((s, m) => s + (Number(m.rollWeight) || 0), 0).toFixed(2)} kg
+                          </td>
+                          <td colSpan={2}></td>
+                        </tr>
+                      </tfoot>
                     </table>
                   </div>
                 )}
@@ -922,7 +1434,7 @@ export default function TripListPage() {
           </span>
         }
         size="md"
-        resizable={true}
+        resizable={false}
         allowMaximize={true}
         backdropClassName="z-[110]"
         footer={
@@ -1027,7 +1539,7 @@ export default function TripListPage() {
           </span>
         }
         size="lg"
-        resizable={true}
+        resizable={false}
         allowMaximize={true}
         footer={
           <div className="flex justify-end gap-2 w-full">

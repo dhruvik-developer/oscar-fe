@@ -503,14 +503,14 @@ const useAppStoreBase = create((set) => ({
 const HRMS_KEYS = [
   "employees", "leaves", "attendance", "candidates", "encashments",
   "compOffCredits", "carriedForwardLeaves", "sandwichRuleEnabled",
-  "maxCarryForwardDays", "recruitmentEnabled", "trainingEnabled", "hrmsStatus",
+  "maxCarryForwardDays", "hrmsStatus",
   "hydrateHrms", "refreshHrms", "addEmployee", "deleteEmployee", "updateEmployee",
   "updateEmployeeStatus", "addLeave", "updateLeaveStatus", "approveLeave",
   "rejectLeave", "addAttendance", "moveCandidate", "requestEncashment",
   "setEncashmentStatus", "approveEncashment", "rejectEncashment",
   "requestCompOff", "setCompOffStatus", "approveCompOff", "rejectCompOff",
-  "toggleSandwichRule", "setMaxCarryForwardDays", "setRecruitmentEnabled",
-  "setTrainingEnabled", "executeCarryForwardRollover",
+  "toggleSandwichRule", "setMaxCarryForwardDays",
+  "executeCarryForwardRollover",
 ];
 
 // Reading any of those is what loads HRMS; reading the theme is not.

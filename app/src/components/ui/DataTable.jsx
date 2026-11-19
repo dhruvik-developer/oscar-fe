@@ -7,7 +7,7 @@ import { sortRows } from '../../hooks/useTableSort';
 const NON_SORTABLE_KEYS = new Set(['actions', 'action', 'menu', 'select', 'more', '_actions']);
 
 /**
- * DataTable "” Unified CRM/ERP/HRMS Data Table.
+ * DataTable — Unified CRM/ERP/HRMS Data Table.
  * Supports both ERP props (header, accessor, title, subtitle, searchFilter, keyExtractor)
  * and CRM/HRMS props (label, key, searchable, selectable, emptyTitle, emptyDesc, etc.)
  */
@@ -24,7 +24,7 @@ export function DataTable({
   onRowClick,
   actions,
   searchable = false,
-  searchPlaceholder = 'Search"¦',
+  searchPlaceholder = 'Search…',
   searchFilter,
   emptyMessage,
   emptyTitle = 'No records found',
@@ -55,7 +55,7 @@ export function DataTable({
     return Array.from(set).sort((a, b) => a - b);
   }, [initialPageSize, pageSizeOptions]);
 
-  const isSearchEnabled = searchable || !!searchFilter || searchPlaceholder !== 'Search"¦' || !!title;
+  const isSearchEnabled = searchable || !!searchFilter || searchPlaceholder !== 'Search…' || !!title;
 
   const safeData = useMemo(() => (Array.isArray(data) ? data : []), [data]);
 

@@ -35,9 +35,9 @@ export const MASTER_SOURCES = {
   agencies: { to: '/parties', menu: 'Parties Directory' },
   processors: { to: '/parties', menu: 'Parties Directory' },
   brokers: { to: '/parties', menu: 'Parties Directory' },
-  vehicles: { to: '/inventory/trips', menu: 'Inventory → Logistics & Tempo Register' },
-  drivers: { to: '/inventory/trips', menu: 'Inventory → Logistics & Tempo Register' },
-  transporters: { to: '/inventory/trips', menu: 'Inventory → Logistics & Tempo Register' },
+  vehicles: { to: '/inventory/masters/textile?tab=vehicles', menu: 'Inventory → Textile Operations Masters → Vehicles' },
+  drivers: { to: '/inventory/masters/textile?tab=drivers', menu: 'Inventory → Textile Operations Masters → Drivers' },
+  transporters: { to: '/inventory/masters/textile?tab=transporters', menu: 'Inventory → Textile Operations Masters → Transporters' },
   rateMasters: { to: '/inventory/fabric-masters', menu: 'Inventory → Fabric Masters' },
 
   // CRM

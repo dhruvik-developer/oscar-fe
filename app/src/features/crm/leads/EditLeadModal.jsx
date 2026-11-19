@@ -83,6 +83,7 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSave }) {
 
   useEffect(() => {
     if (isOpen && lead) {
+      useCrmStore.getState().refresh("sources").catch(() => {});
       setValues(buildInitialValues(lead, sections, sources, team));
       setError('');
       setSaving(false);

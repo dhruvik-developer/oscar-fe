@@ -150,7 +150,7 @@ export function ErrorState({ message, onRetry }) {
   );
 }
 
-export function LoadingState({ label = 'Loading"¦' }) {
+export function LoadingState({ label = 'Loading…' }) {
   return (
     <div className="flex items-center justify-center gap-2 py-8 text-xs text-slate-500">
       <Loader2 size={16} className="animate-spin" /> {label}

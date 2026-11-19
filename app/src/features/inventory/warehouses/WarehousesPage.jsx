@@ -4,6 +4,7 @@ import { Download, Plus, RotateCcw, X, Warehouse, Package, CheckCircle2, Clock, 
 import PageHeader from '../../../components/ui/PageHeader';
 import KpiCard from '../../../components/ui/KpiCard';
 import AppPagination from '../../../components/ui/AppPagination';
+import { Modal as UIModal } from '../../../components/ui/Modal';
 import { useERP } from '../../../context/ERPContext';
 import { inventoryService } from '../../../services/domainServices';
 import { describeApiError, formatNumberIN } from '../../accounts/accountingShared';
@@ -210,6 +211,9 @@ const BLANK = { code: '', name: '', address: '', city: '', state: '', pincode: '
 function WarehouseTab({ warehouses, onChanged }) {
   const [editing, setEditing] = useState(null);
   const [error, setError] = useState('');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
   const toggle = async (w) => {
     setError('');
     try {
@@ -219,6 +223,9 @@ function WarehouseTab({ warehouses, onChanged }) {
       setError(describeApiError(err) || 'Could not change the status.');
     }
   };
+
+  const shown = warehouses.slice((page - 1) * pageSize, page * pageSize);
+
   return (
     <div className="space-y-3">
       <div className="flex justify-end">
@@ -232,7 +239,7 @@ function WarehouseTab({ warehouses, onChanged }) {
           </thead>
           <tbody className="divide-y divide-slate-100">
             {warehouses.length === 0 && <tr><td colSpan={7} className="p-6 text-center text-slate-400">No warehouses yet. Add the first one.</td></tr>}
-            {warehouses.map((w) => (
+            {shown.map((w) => (
               <tr key={w.id}>
                 <td className="p-2 font-mono font-semibold">{w.code}</td>
                 <td className="p-2 font-semibold">{w.name}{w.type !== 'Warehouse' && <span className="ml-1 text-[10px] text-slate-400">(was {w.type})</span>}</td>
@@ -249,6 +256,14 @@ function WarehouseTab({ warehouses, onChanged }) {
           </tbody>
         </table>
       </div>
+      <AppPagination
+        total={warehouses.length}
+        page={page}
+        pageSize={pageSize}
+        onPageChange={setPage}
+        onPageSizeChange={setPageSize}
+        pageSizeOptions={[10, 25, 50, 100]}
+      />
       {editing && <WarehouseForm initial={editing} onClose={() => setEditing(null)} onDone={() => { setEditing(null); onChanged(); }} />}
     </div>
   );
@@ -463,27 +478,41 @@ function LedgerTab({ warehouses }) {
           </tbody>
         </table>
       </div>
-      <AppPagination total={rows.length} page={page} pageSize={pageSize} onPageChange={setPage} onPageSizeChange={setPageSize} pageSizeOptions={[25, 50, 100, 200]} loading={loading} />
+      <AppPagination total={rows.length} page={page} pageSize={pageSize} onPageChange={setPage} onPageSizeChange={setPageSize} pageSizeOptions={[10, 25, 50, 100, 200]} loading={loading} />
     </div>
   );
 }
 
-export function Modal({ title, onClose, children, wide = false }) {
-  useEffect(() => {
-    const onKey = (e) => { if (e.key === 'Escape') onClose(); };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
+export function Modal({
+  isOpen = true,
+  title,
+  subtitle,
+  onClose,
+  children,
+  footer,
+  wide = false,
+  size,
+  allowMaximize = true,
+  resizable = true,
+  className = '',
+  backdropClassName = '',
+}) {
+  const modalSize = size || (wide ? '2xl' : 'lg');
   return (
-    <div className="fixed inset-0 z-[1000] bg-slate-900/50 flex items-center justify-center p-3" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div role="dialog" aria-modal="true" aria-label={title} className={`bg-white rounded-2xl shadow-2xl w-full ${wide ? 'max-w-4xl' : 'max-w-lg'} max-h-[92vh] flex flex-col text-xs`}>
-        <div className="flex items-center justify-between px-5 py-3 border-b border-slate-200">
-          <h3 className="text-sm font-bold">{title}</h3>
-          <button type="button" onClick={onClose} aria-label="Close" className="p-1.5 rounded-lg hover:bg-slate-100 cursor-pointer"><X size={16} /></button>
-        </div>
-        <div className="px-5 py-4 overflow-y-auto">{children}</div>
-      </div>
-    </div>
+    <UIModal
+      isOpen={isOpen}
+      onClose={onClose}
+      title={title}
+      subtitle={subtitle}
+      footer={footer}
+      size={modalSize}
+      allowMaximize={allowMaximize}
+      resizable={resizable}
+      className={`text-xs ${className}`}
+      backdropClassName={backdropClassName}
+    >
+      {children}
+    </UIModal>
   );
 }
 

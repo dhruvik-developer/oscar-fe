@@ -78,6 +78,33 @@ export default function LoginPage() {
 
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [retryCountdown, setRetryCountdown] = useState(0);
+  const [retryReady, setRetryReady] = useState(false);
+
+  useEffect(() => {
+    if (retryCountdown <= 0) return undefined;
+    setRetryReady(false);
+    const timer = setInterval(() => {
+      setRetryCountdown((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          setRetryReady(true);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [retryCountdown]);
+
+  const formatRetryCountdown = (secs) => {
+    if (secs >= 60) {
+      const m = Math.floor(secs / 60);
+      const s = secs % 60;
+      return s > 0 ? `${m}m ${s}s` : `${m}m`;
+    }
+    return `${secs}s`;
+  };
 
   const [isForgotModalOpen, setIsForgotModalOpen] = useState(false);
   const [forgotEmail, setForgotEmail] = useState('');
@@ -171,6 +198,7 @@ export default function LoginPage() {
     setError('');
     setNotice('');
 
+    setRetryReady(false);
     try {
       const result = await loginRequest({
         email,
@@ -193,7 +221,20 @@ export default function LoginPage() {
         setWorkspaces(choices);
         setTenant('');
       }
-      setError(describeError(err));
+
+      const isRateLimited =
+        err?.status === 429 ||
+        Boolean(err?.retryAfter) ||
+        Boolean(err?.payload?.retry_after) ||
+        /rate limit|too many requests/i.test(err?.message || '');
+
+      if (isRateLimited) {
+        const wait = Math.max(1, parseInt(err?.retryAfter || err?.payload?.retry_after || 60, 10));
+        setRetryCountdown(wait);
+        setError('');
+      } else {
+        setError(describeError(err));
+      }
     } finally {
       setIsLoading(false);
     }
@@ -424,11 +465,20 @@ export default function LoginPage() {
                     </button>
                   </div>
 
-                  <button type="submit" disabled={isLoading || !role} className="oscar-login__submit">
+                  <button
+                    type="submit"
+                    disabled={isLoading || !role || retryCountdown > 0}
+                    className="oscar-login__submit"
+                  >
                     {isLoading ? (
                       <>
                         <span className="oscar-login__spinner" aria-hidden="true" />
                         <span>Signing in...</span>
+                      </>
+                    ) : retryCountdown > 0 ? (
+                      <>
+                        <Clock size={18} aria-hidden="true" />
+                        <span>Retry in {formatRetryCountdown(retryCountdown)}</span>
                       </>
                     ) : (
                       <>
@@ -439,13 +489,24 @@ export default function LoginPage() {
                   </button>
                 </form>
 
-                {/* Error, or why the last session ended (expired / revoked) */}
+                {/* Error, retry countdown, or why the last session ended (expired / revoked) */}
                 <div
-                  className={`oscar-login__status${error ? ' oscar-login__status--error' : ''}`}
-                  role={error ? 'alert' : 'status'}
+                  className={`oscar-login__status${(error || retryCountdown > 0) ? ' oscar-login__status--error' : ''}`}
+                  role={(error || retryCountdown > 0) ? 'alert' : 'status'}
                   aria-live="polite"
                 >
-                  {error || notice}
+                  {retryCountdown > 0 ? (
+                    <span className="oscar-login__countdown" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                      <Clock size={15} aria-hidden="true" />
+                      <span>Too many requests. Please try again in {formatRetryCountdown(retryCountdown)}.</span>
+                    </span>
+                  ) : retryReady ? (
+                    <span style={{ color: '#16a34a', fontWeight: 500 }}>
+                      Rate limit window reset. You can sign in now.
+                    </span>
+                  ) : (
+                    error || notice
+                  )}
                 </div>
               </>
             )}

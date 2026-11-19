@@ -113,7 +113,7 @@ export function PoActionMenu({
     )
   );
 
-  const canEdit = isDraft;
+  const canEdit = isDraft || isPendingApproval;
   const canReceiveGoods = !isDraft && !isPendingApproval && !isCancelled && !isFullyReceived;
   const canPerformQc = !isDraft && !isPendingApproval && !isCancelled;
   // Factory -> OSCAR goes straight to GRN; only a mill PO has a dispatch to record.
@@ -159,7 +159,7 @@ export function PoActionMenu({
         role="menuitem"
         disabled={!canEdit}
         onClick={() => handleAction(onEdit)}
-        title={!canEdit ? 'Only draft purchase orders can be edited' : 'Edit this purchase order'}
+        title={!canEdit ? (isApproved ? 'Approved purchase orders cannot be edited' : 'Only unapproved purchase orders can be edited') : 'Edit this purchase order'}
         className={`w-full px-3 py-1.5 text-left flex items-center justify-between gap-2 transition-colors ${
           canEdit
             ? 'hover:bg-slate-50 hover:text-blue-600 cursor-pointer text-slate-700'
@@ -170,7 +170,7 @@ export function PoActionMenu({
           <Pencil size={13} className="text-slate-400 shrink-0" />
           <span>Edit Purchase Order</span>
         </span>
-        {!canEdit && <span className="text-[9px] text-slate-400">Locked</span>}
+        {!canEdit && <span className="text-[9px] text-slate-400">{isApproved ? 'Approved' : 'Locked'}</span>}
       </button>
 
       <button

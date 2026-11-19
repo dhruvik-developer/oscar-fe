@@ -16,7 +16,6 @@ export default function LeadFormsPage() {
   // Single source of truth: derived from store/storage instead of mirroring into
   // local state, preventing infinite re-render loops ("Maximum update depth exceeded").
   const storeForms = useCrmStore((s) => s.forms);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   const leadForms = useMemo(() => {
     const loaded = loadForms(LEAD_FORM);
     if (loaded.length === 0) {

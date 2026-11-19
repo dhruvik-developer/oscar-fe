@@ -426,6 +426,36 @@ export default function BrokerCommissionPage() {
     }
   };
 
+  const handleToggleHold = async (id, currentStatus) => {
+    if (actionBusyId) return;
+    const isHold = currentStatus === 'Hold';
+    const conf = await modal.confirm(
+      isHold
+        ? 'Release this broker commission payout from Hold?'
+        : 'Place this commission payout on Hold (overdue/commercial hold per Oscar Letter Pad §12)?',
+      isHold ? 'Release Hold' : 'Hold Commission',
+      { confirmLabel: isHold ? 'Release Hold' : 'Place on Hold', variant: isHold ? 'default' : 'warning' }
+    );
+    if (!conf) return;
+
+    setActionBusyId(id);
+    try {
+      await salesService.toggleBrokerCommissionHold(id, {
+        reason: isHold ? 'Hold released manually' : 'Administrative hold per §12',
+      });
+      fetchCommissions();
+      fetchStatement();
+      fetchAnalytics();
+    } catch (err) {
+      await modal.error(
+        err?.response?.data?.message || err?.message || 'Hold status change failed.',
+        'Hold Error'
+      );
+    } finally {
+      setActionBusyId(null);
+    }
+  };
+
   const openPayModal = (comm) => {
     setSelectedComm(comm);
     const outstanding = Math.max(0, (Number(comm.commission_amount) || 0) - (Number(comm.paid_amount) || 0));
@@ -588,8 +618,13 @@ export default function BrokerCommissionPage() {
   };
 
   // Status Badge helper
-  const renderStatusBadge = (status) => {
+  const renderStatusBadge = (status, isOverdue = false) => {
     const s = (status || '').toLowerCase();
+    const overdueTag = isOverdue && s !== 'paid' && s !== 'cancelled' ? (
+      <span className="block mt-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-300" title="Linked invoice is overdue and unpaid. Commission payout held per §12.">
+        Invoice Overdue
+      </span>
+    ) : null;
     if (s === 'paid') {
       return <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200">Paid</span>;
     }
@@ -597,7 +632,12 @@ export default function BrokerCommissionPage() {
       return <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 border border-amber-200">Partially Paid</span>;
     }
     if (s === 'payable') {
-      return <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-800 border border-blue-200">Payable</span>;
+      return (
+        <div className="flex flex-col items-center">
+          <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-800 border border-blue-200">Payable</span>
+          {overdueTag}
+        </div>
+      );
     }
     if (s === 'approved') {
       return <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-800 border border-indigo-200">Approved</span>;
@@ -609,10 +649,20 @@ export default function BrokerCommissionPage() {
       return <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-rose-100 text-rose-800 border border-rose-200">Cancelled</span>;
     }
     if (s === 'hold') {
-      return <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 border border-amber-200">On Hold</span>;
+      return (
+        <div className="flex flex-col items-center">
+          <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 border border-amber-300">On Hold</span>
+          {overdueTag}
+        </div>
+      );
     }
     if (s === 'accrued') {
-      return <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">Accrued</span>;
+      return (
+        <div className="flex flex-col items-center">
+          <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">Accrued</span>
+          {overdueTag}
+        </div>
+      );
     }
     if (s === 'lost deal (no commission)' || s.includes('lost')) {
       return <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-rose-100 text-rose-800 border border-rose-200">Lost (₹0)</span>;
@@ -1029,10 +1079,19 @@ export default function BrokerCommissionPage() {
                           ₹{balance.toLocaleString()}
                         </td>
                         <td className="py-2.5 px-3 text-xs align-middle text-text text-center">
-                          {renderStatusBadge(c.status)}
+                          {renderStatusBadge(c.status, c.isInvoiceOverdue || c.is_invoice_overdue)}
                         </td>
                         <td className="py-2.5 px-3 text-xs align-middle text-text text-center">
-                          <div className="flex items-center justify-center gap-1.5">
+                          <div className="flex items-center justify-center gap-1.5 flex-wrap">
+                            {c.status === 'Hold' && (
+                              <button
+                                onClick={() => handleToggleHold(c.id, c.status)}
+                                disabled={actionBusyId === c.id}
+                                className="px-2 py-1 text-xs font-semibold text-amber-800 bg-amber-50 hover:bg-amber-100 rounded border border-amber-300 transition-colors"
+                              >
+                                Release Hold
+                              </button>
+                            )}
                             {c.status === 'Accrued' && (
                               <button
                                 onClick={() => handleApprove(c.id)}
@@ -1057,6 +1116,16 @@ export default function BrokerCommissionPage() {
                                 className="px-2.5 py-1 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded shadow-sm transition-colors"
                               >
                                 Pay Voucher
+                              </button>
+                            )}
+                            {c.status !== 'Hold' && c.status !== 'Paid' && c.status !== 'Cancelled' && (
+                              <button
+                                onClick={() => handleToggleHold(c.id, c.status)}
+                                disabled={actionBusyId === c.id}
+                                title="Hold payout per §12"
+                                className="px-1.5 py-1 text-[11px] font-medium text-slate-500 hover:text-amber-800 hover:bg-amber-50 rounded border border-slate-200 transition-colors"
+                              >
+                                Hold
                               </button>
                             )}
                             {c.status === 'Paid' && (

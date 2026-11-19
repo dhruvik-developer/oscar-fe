@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ArrowLeft, Printer, Plus, Eye, ListChecks,
   ClipboardList, Package, XCircle, CheckCircle2, AlertTriangle,
-  IndianRupee, Check, X, FileText, LayoutGrid,
+  IndianRupee, Check, X, FileText, LayoutGrid, Pencil,
 } from 'lucide-react';
 import PageHeader from '../../../components/ui/PageHeader';
 import KpiCard from '../../../components/ui/KpiCard';
@@ -140,7 +140,11 @@ export default function ProductionCompletionVerificationPage() {
   const finalAmount = completionData ? completionData.finalAmount : null;
   const status = completionData?.status || detail?.status || '';
   const greyLotNo = detail?.greyLotNo || null;
-  const finalPoNumber = detail?.finalPoNumber || null;
+  const finalPoNumber = detail?.finalPoNumber || completionData?.finalPoNumber || null;
+  const finalPoId = detail?.finalPoId || completionData?.finalPoId || null;
+  const finalPoStatus = detail?.finalPoStatus || completionData?.finalPoStatus || (status === 'PO Created' ? 'Approved' : (finalPoNumber ? 'Pending Approval' : null));
+  const hasFinalPo = Boolean(finalPoNumber || finalPoId || status === 'PO Created');
+  const isPoApproved = status === 'PO Created' || finalPoStatus === 'Approved';
 
   const rows = useMemo(() => {
     return (completionData?.dailySummary || []).map((r) => {
@@ -287,7 +291,7 @@ export default function ProductionCompletionVerificationPage() {
 
       {/* Screen Section Switcher */}
       <div className="flex flex-wrap items-center justify-between gap-2.5 pt-1">
-        <div className="inline-flex p-1 bg-slate-100 dark:bg-slate-800/80 border border-slate-200/90 dark:border-slate-700/80 rounded-xl shadow-2xs">
+        <div className="inline-flex max-w-full overflow-x-auto no-scrollbar p-1 bg-slate-100 dark:bg-slate-800/80 border border-slate-200/90 dark:border-slate-700/80 rounded-xl shadow-2xs">
           {tabs.map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
@@ -296,7 +300,7 @@ export default function ProductionCompletionVerificationPage() {
                 key={tab.id}
                 type="button"
                 onClick={() => handleTabChange(tab.id)}
-                className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer whitespace-nowrap shrink-0 whitespace-nowrap shrink-0 ${
                   isActive
                     ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-xs'
                     : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
@@ -354,13 +358,38 @@ export default function ProductionCompletionVerificationPage() {
                 <Check size={14} /> Verify & Approve
               </button>
             )}
-            {hasData && canGeneratePo(status) && (
+            {hasData && !hasFinalPo && canGeneratePo(status) && (
               <button
                 onClick={() => setShowGeneratePoModal(true)}
                 disabled={busy !== null}
                 className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3.5 py-1.5 text-[12px] font-bold text-white hover:bg-emerald-700 disabled:opacity-50"
               >
                 <FileText size={14} /> Generate Final PO
+              </button>
+            )}
+            {hasData && hasFinalPo && !isPoApproved && (
+              <button
+                onClick={() => setShowGeneratePoModal(true)}
+                disabled={busy !== null}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3.5 py-1.5 text-[12px] font-bold text-white hover:bg-blue-700 disabled:opacity-50"
+                title="Edit Final Job Work PO"
+              >
+                <Pencil size={13} /> Edit Final PO
+              </button>
+            )}
+            {hasData && hasFinalPo && isPoApproved && (
+              <button
+                onClick={() => {
+                  if (finalPoId) {
+                    navigate(`/purchase/orders?po=${encodeURIComponent(finalPoId)}`);
+                  } else {
+                    setShowGeneratePoModal(true);
+                  }
+                }}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-300 bg-emerald-50 px-3.5 py-1.5 text-[12px] font-bold text-emerald-700 hover:bg-emerald-100"
+                title="Final PO Approved - Click to view in Purchase Orders"
+              >
+                <Eye size={13} /> View Final PO (Approved)
               </button>
             )}
             <button
@@ -402,11 +431,19 @@ export default function ProductionCompletionVerificationPage() {
             ['Process Type', processType],
             ['Assigned Employee', assignedEmployee],
             ...(greyLotNo ? [['Grey Lot No.', greyLotNo]] : []),
-            ...(finalPoNumber ? [['Final Job Work PO', finalPoNumber]] : []),
+            ...(finalPoNumber ? [[
+              'Final Job Work PO',
+              <span key="fjwpo-val" className="inline-flex items-center gap-1.5 flex-wrap">
+                <span>{finalPoNumber}</span>
+                <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${isPoApproved ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-purple-50 text-purple-700 border border-purple-200'}`}>
+                  {isPoApproved ? 'Approved' : 'Pending Approval'}
+                </span>
+              </span>
+            ]] : []),
           ].map(([k, v]) => (
             <div key={k}>
               <p className="text-[11px] font-medium text-slate-400">{k}</p>
-              <p className="mt-0.5 text-[13px] font-bold text-[#17294e]">{v}</p>
+              <div className="mt-0.5 text-[13px] font-bold text-[#17294e]">{v}</div>
             </div>
           ))}
         </div>
@@ -584,11 +621,14 @@ export default function ProductionCompletionVerificationPage() {
         isOpen={showGeneratePoModal}
         onClose={() => setShowGeneratePoModal(false)}
         initialInstructionId={activePiId}
+        initialPoId={finalPoId}
+        isEditMode={hasFinalPo}
+        isApproved={isPoApproved}
         onSuccess={(res) => {
           setActionNotice(
             res?.finalPoNumber
-              ? `Final Job Work PO ${res.finalPoNumber} created successfully.`
-              : 'Final Job Work PO created successfully.'
+              ? `Final Job Work PO ${res.finalPoNumber} ${hasFinalPo ? 'updated' : 'created'} successfully.`
+              : `Final Job Work PO ${hasFinalPo ? 'updated' : 'created'} successfully.`
           );
           if (activePiId) loadCompletionData(activePiId);
         }}

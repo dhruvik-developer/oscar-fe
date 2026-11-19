@@ -5,12 +5,11 @@ import {
   Search,
   RefreshCw,
   X,
-  Building2,
-  Phone,
-  Mail,
   AlertCircle,
   Users,
   Truck,
+  Phone,
+  Mail,
 } from 'lucide-react';
 import api from '../../services/api';
 import PageHeader from '../../components/ui/PageHeader';
@@ -20,10 +19,7 @@ import SupplierLedgerDrawer from './SupplierLedgerDrawer';
 
 export default function SupplierLedgerPage() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const initialType = searchParams.get('type') === 'customer' ? 'customer' : 'supplier';
-
-  // Active party tab: 'supplier' or 'customer'
-  const [activeTab, setActiveTab] = useState(initialType);
+  const activeTab = searchParams.get('type') === 'customer' ? 'customer' : 'supplier';
 
   const [suppliers, setSuppliers] = useState([]);
   const [customers, setCustomers] = useState([]);
@@ -37,69 +33,69 @@ export default function SupplierLedgerPage() {
   const [selectedParty, setSelectedParty] = useState(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
-  // Synchronize active tab with URL search parameter
-  useEffect(() => {
-    const type = searchParams.get('type');
-    if (type === 'customer' && activeTab !== 'customer') {
-      setActiveTab('customer');
-    } else if (type === 'supplier' && activeTab !== 'supplier') {
-      setActiveTab('supplier');
-    }
-  }, [searchParams, activeTab]);
-
   const handleTabChange = (newTab) => {
-    setActiveTab(newTab);
-    setSearchParams({ type: newTab });
+    if (newTab === activeTab) return;
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        if (newTab === 'customer') {
+          next.set('type', 'customer');
+        } else {
+          next.delete('type');
+        }
+        return next;
+      },
+      { replace: true }
+    );
     setSearchQuery('');
     setPage(1);
   };
 
-  // Fetch Suppliers
-  const fetchSuppliers = useCallback(async () => {
+  // Fetch both Suppliers & Customers together so switching tabs is instant without re-refreshing
+  const fetchAllData = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await api.get('/purchase/vendors/', { query: { page_size: 500 } });
-      const rows = Array.isArray(res) ? res : (res?.results || []);
-      setSuppliers(rows);
-    } catch (err) {
-      console.error('Failed to load supplier list:', err);
-      setError(err?.message || 'Failed to fetch supplier accounts.');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+      const [vendorRes, custRes] = await Promise.allSettled([
+        api.get('/purchase/vendors/', { query: { page_size: 500 } }),
+        api.get('/parties/customers/', { query: { page_size: 500 } }),
+      ]);
 
-  // Fetch Customers
-  const fetchCustomers = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await api.get('/parties/customers/', { query: { page_size: 500 } });
-      const rows = Array.isArray(res) ? res : (res?.results || []);
-      setCustomers(rows);
+      if (vendorRes.status === 'fulfilled') {
+        const rows = Array.isArray(vendorRes.value)
+          ? vendorRes.value
+          : (vendorRes.value?.results || []);
+        setSuppliers(rows);
+      } else {
+        console.error('Failed to load supplier list:', vendorRes.reason);
+      }
+
+      if (custRes.status === 'fulfilled') {
+        const rows = Array.isArray(custRes.value)
+          ? custRes.value
+          : (custRes.value?.results || []);
+        setCustomers(rows);
+      } else {
+        console.error('Failed to load customer list:', custRes.reason);
+      }
+
+      if (vendorRes.status === 'rejected' && custRes.status === 'rejected') {
+        setError('Failed to fetch accounts data.');
+      }
     } catch (err) {
-      console.error('Failed to load customer list:', err);
-      setError(err?.message || 'Failed to fetch customer accounts.');
+      console.error('Failed to load ledger parties:', err);
+      setError(err?.message || 'Failed to fetch accounts.');
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    if (activeTab === 'supplier') {
-      fetchSuppliers();
-    } else {
-      fetchCustomers();
-    }
-  }, [activeTab, fetchSuppliers, fetchCustomers]);
+    fetchAllData();
+  }, [fetchAllData]);
 
   const refreshCurrentTab = () => {
-    if (activeTab === 'supplier') {
-      fetchSuppliers();
-    } else {
-      fetchCustomers();
-    }
+    fetchAllData();
   };
 
   const isCustomerTab = activeTab === 'customer';

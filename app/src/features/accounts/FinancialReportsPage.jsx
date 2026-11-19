@@ -44,6 +44,7 @@ const TABS = [
   { id: 'pl', label: 'Profit & Loss (P&L)' },
   { id: 'bs', label: 'Balance Sheet' },
   { id: 'ageing', label: 'Outstanding (AR / AP Ageing)' },
+  { id: 'discounts', label: 'Party Discounts (PDF §12)' },
   { id: 'cashflow', label: 'Cash Flow' },
   { id: 'gst', label: 'GST Summary (GSTR-1 / 3B)' },
   { id: 'budget', label: 'Budgets & Variances' },
@@ -108,6 +109,11 @@ export function FinancialReportsPage() {
   const cf = useApiGet('/accounts/reports/cash-flow/', period, { enabled: reportType === 'cashflow' });
   const gst = useApiGet('/accounts/reports/gst-summary/', { dateFrom, dateTo }, { enabled: reportType === 'gst' });
   const ageing = useApiGet('/accounts/reports/ageing/', { type: ageingType, asOf }, { enabled: reportType === 'ageing' });
+  const [discountYear, setDiscountYear] = useState(new Date().getFullYear());
+  const [discountViewMode, setDiscountViewMode] = useState('annual'); // 'annual' | 'txns'
+  const [discountSearch, setDiscountSearch] = useState('');
+  const partyDiscountsAnnual = useApiGet('/sales/party-discounts/annual-report/', { year: discountYear }, { enabled: reportType === 'discounts' });
+  const partyDiscountsTxns = useApiGet('/sales/party-discounts/', { year: discountYear }, { enabled: reportType === 'discounts' });
   const budgets = useApiGet('/accounts/budgets/', { page_size: 200, date_from: dateFrom, date_to: dateTo }, { enabled: reportType === 'budget' });
   const chartOfAccounts = useApiGet('/accounts/chart-of-accounts/', { page_size: 200 }, { enabled: showBudgetModal });
   // Reload the budget account list after accounts are edited from the "+ Add / Manage" popup.
@@ -160,6 +166,22 @@ export function FinancialReportsPage() {
       exportToCSV(`GST_Summary_${stamp}`, ['HSN Code', 'Taxable Value', 'Tax', 'Count'], (g.byHsn || []).map((r) => [r.hsnCode, r.taxableValue, r.tax, r.lineCount]));
     } else if (reportType === 'ageing' && ag) {
       exportToCSV(`Ageing_${ageingType}_${stamp}`, ['Document #', 'Party', 'Date', 'Due Date', 'Total', 'Outstanding', 'Days Overdue', 'Bucket'], (ag.rows || []).map((r) => [r.documentNumber, r.partyName, r.date, r.dueDate, r.total, r.outstanding, r.daysOverdue, r.bucket]));
+    } else if (reportType === 'discounts') {
+      if (discountViewMode === 'annual') {
+        const rows = unwrapList(partyDiscountsAnnual.data);
+        exportToCSV(
+          `Party_Discounts_Annual_${discountYear}_${stamp}`,
+          ['Customer Name', 'Gross Sales', 'Total Discount', 'Effective Discount %', 'Default Limit %'],
+          rows.map((r) => [r.partyName, r.grossSales, r.totalDiscount, `${r.effectiveDiscountPct}%`, `${r.defaultDiscountLimit}%`])
+        );
+      } else {
+        const rows = unwrapList(partyDiscountsTxns.data);
+        exportToCSV(
+          `Party_Discounts_Transactions_${discountYear}_${stamp}`,
+          ['Invoice #', 'Date', 'Customer Name', 'Salesperson', 'Broker', 'Subtotal', 'Discount', 'Discount %', 'Total'],
+          rows.map((r) => [r.invoiceNumber, r.date, r.partyName, r.salesperson, r.broker, r.subtotal, r.totalDiscount, `${r.discountPct}%`, r.total])
+        );
+      }
     } else if (reportType === 'budget') {
       exportToCSV(`Budget_vs_Actual_${stamp}`, ['Account', 'Period start', 'Period end', 'Budget', 'Actual', 'Variance'], budgetRows.map((r) => [r.accountName, r.period_start || r.periodStart, r.period_end || r.periodEnd, r.amount, r.actual, r.variance]));
     }
@@ -244,7 +266,8 @@ export function FinancialReportsPage() {
     (reportType === 'cashflow' && c) ||
     (reportType === 'gst' && g) ||
     (reportType === 'ageing' && ag) ||
-    (reportType === 'budget' && budgets.data);
+    (reportType === 'budget' && budgets.data) ||
+    (reportType === 'discounts' && (partyDiscountsAnnual.data || partyDiscountsTxns.data));
 
   return (
     <div className="space-y-6 printable-document">

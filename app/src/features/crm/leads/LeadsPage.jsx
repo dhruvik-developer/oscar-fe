@@ -453,7 +453,6 @@ export default function LeadsPage() {
 
     ],
 
-    // eslint-disable-next-line react-hooks/exhaustive-deps
 
     [leadFormVersion],
 
@@ -1683,7 +1682,6 @@ export default function LeadsPage() {
 
     },
 
-    // eslint-disable-next-line react-hooks/exhaustive-deps
 
     [leadFormVersion],
 

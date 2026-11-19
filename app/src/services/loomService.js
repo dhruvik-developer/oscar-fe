@@ -10,8 +10,10 @@ export const loomService = {
   // Factories & Coordinators
   getCoordinators: () => api.get(`${BASE}/coordinators/`),
   createCoordinator: (data) => api.post(`${BASE}/coordinators/`, data),
-  getFactories: () => api.get(`${BASE}/factories/`),
+  getFactories: (params) => api.get(`${BASE}/factories/`, { params }),
   createFactory: (data) => api.post(`${BASE}/factories/`, data),
+  updateFactory: (id, data) => api.patch(`${BASE}/factories/${id}/`, data),
+  deleteFactory: (id) => api.delete(`${BASE}/factories/${id}/`),
   getFactoryStatus: (id) => api.get(`${BASE}/factories/${id}/status/`),
   getFactoryYarnStock: (id) => api.get(`${BASE}/factories/${id}/yarn_stock/`),
 

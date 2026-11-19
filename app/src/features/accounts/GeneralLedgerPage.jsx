@@ -2,7 +2,8 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { modal } from '../../context/ModalContext';
 import { useSearchParams } from 'react-router-dom';
 import StandaloneNotesPage from './StandaloneNotesPage';
-import { Plus, Trash2, RotateCcw, Search } from 'lucide-react';
+import { Plus, Trash2, RotateCcw, Search, Download, Printer } from 'lucide-react';
+import { exportToCSV } from '../../services/exportUtils';
 import { api } from '../../services/api';
 import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
@@ -121,6 +122,34 @@ function JournalTab({ accounts, accountsError, onPosted }) {
     }
   };
 
+  const handleExportJournal = () => {
+    if (!entries || entries.length === 0) return;
+    const headers = ['Entry Number', 'Date', 'Account Code', 'Account Name', 'Line Narration', 'Debit (INR)', 'Credit (INR)', 'Status'];
+    const rows = [];
+    entries.forEach((e) => {
+      const entryNum = e.entryNumber || '';
+      const entryDate = e.date || '';
+      const entryStatus = e.status || '';
+      if (Array.isArray(e.lines) && e.lines.length > 0) {
+        e.lines.forEach((l) => {
+          rows.push([
+            entryNum,
+            entryDate,
+            l.accountCode || '',
+            l.accountName || '',
+            l.narration || e.narration || '',
+            Number(l.debit) || 0,
+            Number(l.credit) || 0,
+            entryStatus,
+          ]);
+        });
+      } else {
+        rows.push([entryNum, entryDate, '', '', e.narration || '', Number(e.totalDebit) || 0, Number(e.totalCredit) || 0, entryStatus]);
+      }
+    });
+    exportToCSV(`Journal_Entries_${dateFrom || 'start'}_to_${dateTo || 'end'}`, headers, rows);
+  };
+
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -132,7 +161,17 @@ function JournalTab({ accounts, accountsError, onPosted }) {
       <Card
         title="Journal Entries"
         subtitle="Posted vouchers with their debit and credit lines, as recorded on the server."
-        actions={<Button icon={Plus} onClick={() => setShowForm(true)}>New Journal Voucher</Button>}
+        actions={
+          <div className="flex items-center gap-2">
+            {entries.length > 0 && (
+              <Button size="sm" variant="outline" onClick={handleExportJournal} className="flex items-center gap-1.5">
+                <Download size={14} />
+                Export CSV
+              </Button>
+            )}
+            <Button icon={Plus} onClick={() => setShowForm(true)}>New Journal Voucher</Button>
+          </div>
+        }
       >
         <form
           className="grid grid-cols-1 sm:grid-cols-[1fr_160px_160px_auto] gap-3 items-end mb-4"
@@ -459,8 +498,51 @@ function LedgerTab({ accounts, accountsError }) {
     },
   });
 
+  const currentAccount = accounts.find((a) => String(a.id) === String(accountId));
+
+  const handleExportLedger = () => {
+    if (!ledger) return;
+    const accName = currentAccount ? accountLabel(currentAccount) : 'Account_Ledger';
+    const headers = ['Date', 'Entry Number', 'Narration', 'Party', 'Debit (INR)', 'Credit (INR)', 'Running Balance (INR)'];
+    const rows = [
+      ['', 'OPENING', 'Opening Balance', '', '', '', Number(ledger.openingBalance) || 0],
+      ...entries.map((r) => [
+        r.date || '',
+        r.entryNumber || '',
+        r.narration || '',
+        r.party || '',
+        Number(r.debit) || 0,
+        Number(r.credit) || 0,
+        Number(r.balance) || 0,
+      ]),
+      ['', 'CLOSING', 'Closing Balance', '', '', '', Number(ledger.closingBalance) || 0],
+    ];
+    exportToCSV(`Ledger_${accName.replace(/[^a-zA-Z0-9_-]/g, '_')}`, headers, rows);
+  };
+
+  const handlePrintLedger = () => {
+    window.print();
+  };
+
   return (
-    <Card title="Account Ledger" subtitle="Opening balance, every posted line and the running balance for one account.">
+    <Card
+      title="Account Ledger"
+      subtitle="Opening balance, every posted line and the running balance for one account."
+      actions={
+        ledger ? (
+          <div className="flex items-center gap-2 no-print">
+            <Button size="sm" variant="outline" onClick={handleExportLedger} className="flex items-center gap-1.5">
+              <Download size={14} />
+              Export CSV
+            </Button>
+            <Button size="sm" variant="outline" onClick={handlePrintLedger} className="flex items-center gap-1.5">
+              <Printer size={14} />
+              Print
+            </Button>
+          </div>
+        ) : null
+      }
+    >
       <div className="grid grid-cols-1 sm:grid-cols-[1fr_160px_160px] gap-3 mb-4">
         <div>
           <div className="flex items-center justify-between gap-2">
@@ -558,12 +640,33 @@ function TrialBalanceTab({ refreshKey }) {
   const agg = data?.aggregates || {};
   const trialSort = useTableSort(rows, { accessors: { account: (r) => `${r.code ? `${r.code} - ` : ''}${r.name || ''}` } });
 
+  const handleExportTrial = () => {
+    if (!rows || rows.length === 0) return;
+    const headers = ['Account Code', 'Account Name', 'Type', 'Debit (INR)', 'Credit (INR)', 'Net Balance (INR)'];
+    const csvRows = rows.map((r) => [
+      r.code || '',
+      r.name || '',
+      r.type || '',
+      Number(r.debit) || 0,
+      Number(r.credit) || 0,
+      Number(r.balance) || 0,
+    ]);
+    csvRows.push(['', 'TOTAL', '', Number(agg.totalDebit) || 0, Number(agg.totalCredit) || 0, '']);
+    exportToCSV(`Trial_Balance_${asOf || 'Latest'}`, headers, csvRows);
+  };
+
   return (
     <Card
       title="Trial Balance"
       subtitle="Debit and credit totals per account from posted, un-reversed journal lines."
       actions={
         <div className="flex items-center gap-2">
+          {rows.length > 0 && (
+            <Button size="sm" variant="outline" onClick={handleExportTrial} className="flex items-center gap-1.5 mr-2">
+              <Download size={14} />
+              Export CSV
+            </Button>
+          )}
           <label className="text-[11px] font-semibold text-slate-600">As of</label>
           <input type="date" value={asOf} onChange={(e) => setAsOf(e.target.value)} className={`${inputClass} w-40`} />
         </div>

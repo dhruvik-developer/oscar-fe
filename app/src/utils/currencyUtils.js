@@ -8,7 +8,7 @@ export const CURRENCY_CONFIGS = {
   INR: { symbol: '₹', rate: 1.0, label: 'INR (₹) - Indian Rupee', locale: 'en-IN', code: 'INR' },
 };
 
-// Pure Indian Rupee ERP: Zero external forex requests
+// Live external exchange rate fetching disabled; uses default rates
 export async function fetchLiveExchangeRates() {
   return DEFAULT_RATES;
 }

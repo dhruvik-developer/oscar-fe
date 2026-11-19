@@ -36,8 +36,9 @@ export default function MainLayout() {
   const isErpRoute = ERP_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`));
 
   const isStandaloneQuery = searchParams.get('standalone') === '1' || searchParams.get('direct') === '1';
-  const isEmployeeOnLoomDaily = pathname === '/pms/loom-daily' && currentUser && !isLoomAdminOrManager(currentUser);
-  const showStandaloneOnly = IS_EMBEDDED || isStandaloneQuery || isEmployeeOnLoomDaily;
+  // Standalone kiosk view is ONLY active when accessed via link query (?standalone=1 or ?direct=1) or iframe.
+  // In the real system, the sidebar & full navigation shell remain visible for all users.
+  const showStandaloneOnly = IS_EMBEDDED || isStandaloneQuery;
 
   const handleSignOut = async () => {
     try {
@@ -173,8 +174,8 @@ export default function MainLayout() {
               </div>
             )}
 
-            {/* If Admin/GM, button to switch to Full System */}
-            {currentUser && isLoomAdminOrManager(currentUser) && (
+            {/* Button to switch to Full System with Sidebar */}
+            {currentUser && (
               <button
                 type="button"
                 onClick={() => {
@@ -183,7 +184,7 @@ export default function MainLayout() {
                   url.searchParams.delete('direct');
                   window.location.href = url.pathname + url.search;
                 }}
-                className="text-[11px] font-semibold text-blue-600 hover:text-blue-700 dark:text-blue-400 px-2.5 py-1.5 rounded-lg border border-blue-200 dark:border-blue-800 hover:bg-blue-50 dark:hover:bg-blue-950/40 transition-colors hidden sm:inline-flex"
+                className="text-[11px] font-semibold text-blue-600 hover:text-blue-700 dark:text-blue-400 px-2.5 py-1.5 rounded-lg border border-blue-200 dark:border-blue-800 hover:bg-blue-50 dark:hover:bg-blue-950/40 transition-colors inline-flex"
                 title="Open inside full ERP navigation shell"
               >
                 Open Full System

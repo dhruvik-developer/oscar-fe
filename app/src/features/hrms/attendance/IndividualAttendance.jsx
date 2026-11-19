@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from "react";
-import { ChevronRight, ChevronLeft, X, CheckCircle2, XCircle, Clock, Clock3, Calendar, Home } from "lucide-react";
+import { ChevronRight, ChevronLeft, X, CheckCircle2, XCircle, Clock, Clock3, Calendar, Home, Download, Printer } from "lucide-react";
+import { exportToCSV } from "../../../services/exportUtils";
 import KpiCard from "../../../components/ui/KpiCard";
 import { useAppStore } from "../../../stores/appStore";
 import { useAttendanceStore } from "../../../stores/attendanceStore";
@@ -896,6 +897,53 @@ export default function IndividualAttendance() {
     setEditItem(null);
   };
 
+  const handleExportAttendance = () => {
+    if (!records || records.length === 0) {
+      setToast?.("No attendance records to export.");
+      return;
+    }
+    const empName = currentEmp?.name || "Employee";
+    const empCode = currentEmp?.empId || currentEmp?.employeeCode || currentEmp?.id || "";
+    const headers = [
+      "Date",
+      "Day",
+      "Employee Code",
+      "Employee Name",
+      "Check-In",
+      "Check-Out",
+      "Break Duration",
+      "Work Hours",
+      "Late",
+      "Shift",
+      "Status",
+      "Remarks",
+    ];
+    const exportRows = records.map((r) => [
+      r.date || r.isoDate || "",
+      r.day || "",
+      empCode,
+      empName,
+      r.checkIn || "",
+      r.checkOut || "",
+      r.breakDuration || "",
+      r.workHours || "",
+      r.lateMinutes || "",
+      r.shift || "",
+      r.status || "",
+      r.remarks || "",
+    ]);
+    const fileLabel =
+      selectedMonth === "All"
+        ? `attendance_${empName}_${selectedYear}`
+        : `attendance_${empName}_${selectedMonth}_${selectedYear}`;
+    exportToCSV(fileLabel, headers, exportRows);
+    setToast?.("Attendance records exported to CSV.");
+  };
+
+  const handlePrintAttendance = () => {
+    window.print();
+  };
+
   return (
     <div className="ind-att-page">
       {/* Breadcrumb */}
@@ -906,13 +954,33 @@ export default function IndividualAttendance() {
       </nav>
 
       {/* Header Row */}
-      <div className="ind-title-row">
+      <div className="ind-title-row flex flex-wrap items-center justify-between gap-3">
         <div>
           <div className="flex items-center gap-2.5">
             <h1 className="ind-title">Individual Attendance</h1>
             <PageInfoButton guide={hrmsGuides.attendanceIndividual} />
           </div>
           <p className="ind-sub">View and manage per-employee attendance history.</p>
+        </div>
+        <div className="flex items-center gap-2 no-print">
+          <button
+            type="button"
+            onClick={handleExportAttendance}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-white border border-slate-300 text-slate-700 rounded-xl text-[13px] font-medium shadow-2xs hover:bg-slate-50 transition-colors cursor-pointer"
+            title="Export to CSV"
+          >
+            <Download size={14} />
+            Export CSV
+          </button>
+          <button
+            type="button"
+            onClick={handlePrintAttendance}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-white border border-slate-300 text-slate-700 rounded-xl text-[13px] font-medium shadow-2xs hover:bg-slate-50 transition-colors cursor-pointer"
+            title="Print Attendance Record"
+          >
+            <Printer size={14} />
+            Print Statement
+          </button>
         </div>
       </div>
 

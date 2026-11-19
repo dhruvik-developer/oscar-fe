@@ -22,8 +22,20 @@ export function qc(quality, yarnMap = {}) {
   const ppm = ppi * 39.37;
   const warpKgM = (ends * wd * (1 + crimp / 100)) / 9000000;
   const weftKgM = (fd * reedW * ppi * (1 + wastage / 100)) / 9000000;
-  const glm = ((ends * wd + fd * reedW * ppi) / 9000000) * 1000;
-  const gsm = reedW ? glm / (reedW * 0.0254) : 0;
+
+  // [OLD CODE - COMMENTED OUT]: Nominal weight without crimp & wastage, dividing by reed width
+  // const glm = ((ends * wd + fd * reedW * ppi) / 9000000) * 1000;
+  // const gsm = reedW ? glm / (reedW * 0.0254) : 0;
+
+  // [REAL-LIFE TEXTILE STANDARD]:
+  // 1. Physical scale weight of 1 linear meter (GLM) must include warp crimp and weft take-up.
+  const glm = (warpKgM + weftKgM) * 1000;
+  // 2. Off-loom greige fabric contracts by ~4-6% from reed space (standard contraction factor 0.95).
+  // Calculating GSM over contracted greige width accurately matches laboratory circular GSM scale cutters.
+  const greigeWidthInches = Number(quality.greige_width || (reedW * 0.95));
+  const greigeWidthMeters = greigeWidthInches * 0.0254;
+  const gsm = greigeWidthMeters > 0 ? (glm / greigeWidthMeters) : (reedW ? glm / (reedW * 0.0254) : 0);
+
   const warpCost = warpKgM * wyRate;
   const weftCost = weftKgM * fyRate;
   const jobCost = ppi * pickCharge;

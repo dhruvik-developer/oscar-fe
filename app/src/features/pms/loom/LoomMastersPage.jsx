@@ -469,10 +469,23 @@ export default function LoomMastersPage() {
                 </select>
               </div>
               <div>
-                <label className="pms-label">Total Ends (Tar)</label>
+                <div className="flex items-center justify-between">
+                  <label className="pms-label">Total Ends (Tar)</label>
+                  {qForm.reed && qForm.reed_w && (
+                    <button
+                      type="button"
+                      onClick={() => setQForm({ ...qForm, ends: Math.round(Number(qForm.reed) * Number(qForm.reed_w)) })}
+                      className="text-[10px] text-blue-600 dark:text-blue-400 hover:underline font-medium"
+                      title="Auto-calculate: Reed × Width"
+                    >
+                      Std: {Math.round(Number(qForm.reed) * Number(qForm.reed_w))}
+                    </button>
+                  )}
+                </div>
                 <input
                   type="number"
                   min="1"
+                  step="1"
                   placeholder="4872"
                   value={qForm.ends}
                   onChange={(e) => setQForm({ ...qForm, ends: e.target.value === '' ? '' : Math.max(0, Number(e.target.value)) })}
@@ -486,7 +499,7 @@ export default function LoomMastersPage() {
                 <input
                   type="number"
                   min="0"
-                  step="0.1"
+                  step="any"
                   value={qForm.crimp}
                   onChange={(e) => setQForm({ ...qForm, crimp: e.target.value === '' ? '' : Math.max(0, Number(e.target.value)) })}
                   onKeyDown={preventNegativeInput}
@@ -510,6 +523,7 @@ export default function LoomMastersPage() {
                 <input
                   type="number"
                   min="1"
+                  step="any"
                   placeholder="84"
                   value={qForm.reed}
                   onChange={(e) => setQForm({ ...qForm, reed: e.target.value === '' ? '' : Math.max(0, Number(e.target.value)) })}
@@ -522,20 +536,36 @@ export default function LoomMastersPage() {
                 <label className="pms-label">Reed Width (inch)</label>
                 <input
                   type="number"
-                  min="0.1"
-                  step="0.5"
+                  min="0"
+                  step="any"
                   value={qForm.reed_w}
                   onChange={(e) => setQForm({ ...qForm, reed_w: e.target.value === '' ? '' : Math.max(0, Number(e.target.value)) })}
                   onKeyDown={preventNegativeInput}
                   className="pms-input w-full"
                 />
+                <div className="flex flex-wrap gap-1 mt-1">
+                  {[48, 54, 58, 64, 72, 84, 89, 90, 110].map((w) => (
+                    <button
+                      key={w}
+                      type="button"
+                      onClick={() => setQForm({ ...qForm, reed_w: w })}
+                      className={`px-1 py-0.2 rounded text-[9px] font-mono border transition-colors ${
+                        Number(qForm.reed_w) === w
+                          ? 'bg-blue-100 text-blue-700 border-blue-300 font-bold dark:bg-blue-900/60 dark:text-blue-200 dark:border-blue-700'
+                          : 'bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700'
+                      }`}
+                    >
+                      {w}"
+                    </button>
+                  ))}
+                </div>
               </div>
               <div>
                 <label className="pms-label">Picks Per Inch (PPI)</label>
                 <input
                   type="number"
-                  min="1"
-                  step="0.5"
+                  min="0"
+                  step="any"
                   placeholder="56"
                   value={qForm.ppi}
                   onChange={(e) => setQForm({ ...qForm, ppi: e.target.value === '' ? '' : Math.max(0, Number(e.target.value)) })}
@@ -549,7 +579,7 @@ export default function LoomMastersPage() {
                 <input
                   type="number"
                   min="0"
-                  step="0.1"
+                  step="any"
                   value={qForm.wastage}
                   onChange={(e) => setQForm({ ...qForm, wastage: e.target.value === '' ? '' : Math.max(0, Number(e.target.value)) })}
                   onKeyDown={preventNegativeInput}
@@ -561,7 +591,7 @@ export default function LoomMastersPage() {
                 <input
                   type="number"
                   min="0"
-                  step="0.01"
+                  step="any"
                   value={qForm.pick_charge}
                   onChange={(e) => setQForm({ ...qForm, pick_charge: e.target.value === '' ? '' : Math.max(0, Number(e.target.value)) })}
                   onKeyDown={preventNegativeInput}
@@ -701,7 +731,7 @@ export default function LoomMastersPage() {
                 <input
                   type="number"
                   min="0.01"
-                  step="0.01"
+                  step="any"
                   placeholder="e.g. 89"
                   value={yForm.denier}
                   onChange={(e) => setYForm({ ...yForm, denier: e.target.value === '' ? '' : Math.max(0, Number(e.target.value)) })}
@@ -727,7 +757,7 @@ export default function LoomMastersPage() {
                 <input
                   type="number"
                   min="0"
-                  step="0.5"
+                  step="any"
                   placeholder="e.g. 210"
                   value={yForm.rate}
                   onChange={(e) => setYForm({ ...yForm, rate: e.target.value === '' ? '' : Math.max(0, Number(e.target.value)) })}
@@ -779,7 +809,7 @@ export default function LoomMastersPage() {
                         <input
                           type="number"
                           min="0"
-                          step="0.5"
+                          step="any"
                           defaultValue={y.rate}
                           onKeyDown={preventNegativeInput}
                           onBlur={(e) => {

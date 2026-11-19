@@ -56,8 +56,10 @@ export const loomService = {
   // Yarn Bookings & Deliveries
   getYarnBookings: () => api.get(`${BASE}/yarn-bookings/`),
   createYarnBooking: (data) => api.post(`${BASE}/yarn-bookings/`, data),
+  updateYarnBooking: (id, data) => api.patch(`${BASE}/yarn-bookings/${id}/`, data),
   deleteYarnBooking: (id) => api.delete(`${BASE}/yarn-bookings/${id}/`),
   createYarnDelivery: (data) => api.post(`${BASE}/yarn-deliveries/`, data),
+  updateYarnDelivery: (id, data) => api.patch(`${BASE}/yarn-deliveries/${id}/`, data),
   confirmYarnDelivery: (id, recdKgs, recdDate) => api.post(`${BASE}/yarn-deliveries/${id}/confirm_receipt/`, { recd_kgs: recdKgs, recd_date: recdDate }),
   deleteYarnDelivery: (id) => api.delete(`${BASE}/yarn-deliveries/${id}/`),
 

@@ -78,6 +78,16 @@ export default function DailyLoomEntryPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const urlFactoryId = searchParams.get('factory');
   const urlDate = searchParams.get('date');
+  const urlProject = searchParams.get('project');
+  const urlPi = searchParams.get('pi');
+  const urlFabric = searchParams.get('fabric');
+  const [projectFilter, setProjectFilter] = useState(() => urlProject || urlPi || '');
+
+  useEffect(() => {
+    if (urlProject || urlPi) {
+      setProjectFilter(urlProject || urlPi);
+    }
+  }, [urlProject, urlPi]);
 
   const [deleteEntryConfirmId, setDeleteEntryConfirmId] = useState(null);
   const [pendingSaveWarnings, setPendingSaveWarnings] = useState(null);
@@ -108,10 +118,30 @@ export default function DailyLoomEntryPage() {
     return factories.find((f) => f.id === selectedFactoryId) || factories[0] || null;
   }, [factories, selectedFactoryId]);
 
+  // When a project / PI is selected, filter machines running this quality or beam
+  const displayedRows = useMemo(() => {
+    if (!projectFilter) return rows;
+    const q = projectFilter.toLowerCase().trim();
+    const fab = (urlFabric || '').toLowerCase().trim();
+
+    const matched = rows.filter((r) => {
+      const qual = (r.quality_name || '').toLowerCase();
+      const beam = (r.beam_no || '').toLowerCase();
+      return (
+        qual.includes(q) ||
+        beam.includes(q) ||
+        (fab && (qual.includes(fab) || fab.includes(qual)))
+      );
+    });
+
+    // If specific matching machines are found, show only them; otherwise show all so user can input data
+    return matched.length > 0 ? matched : rows;
+  }, [rows, projectFilter, urlFabric]);
+
   const paginatedRows = useMemo(() => {
     const start = (page - 1) * pageSize;
-    return rows.slice(start, start + pageSize);
-  }, [rows, page, pageSize]);
+    return displayedRows.slice(start, start + pageSize);
+  }, [displayedRows, page, pageSize]);
 
   // Generates mobile-friendly URL: automatically replaces "localhost" with LAN IP (e.g. 192.168.1.8) so mobile phones can connect
   const getShareableUrl = useCallback(() => {
@@ -524,7 +554,7 @@ export default function DailyLoomEntryPage() {
               <input
                 type="number"
                 inputMode="decimal"
-                step="0.5"
+                step="any"
                 min="0"
                 value={powerCut}
                 onChange={(e) => {
@@ -609,6 +639,39 @@ export default function DailyLoomEntryPage() {
       )}
 
       {/* Grid Entry Table */}
+      {projectFilter && (
+        <div className="flex flex-wrap items-center justify-between gap-2 px-3.5 py-2.5 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 rounded-xl text-xs shadow-2xs">
+          <div className="flex items-center gap-2 text-blue-800 dark:text-blue-200 font-medium">
+            <CheckCircle2 size={15} className="text-blue-600 shrink-0" />
+            <span>
+              Showing machines for PO / Project:{' '}
+              <strong className="font-mono font-bold text-slate-900 dark:text-slate-100">
+                {projectFilter}
+              </strong>
+              {urlFabric && (
+                <span className="ml-1 text-slate-500 font-normal">({urlFabric})</span>
+              )}
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setProjectFilter('');
+              setSearchParams((prev) => {
+                const next = new URLSearchParams(prev);
+                next.delete('project');
+                next.delete('pi');
+                next.delete('fabric');
+                return next;
+              });
+            }}
+            className="text-blue-600 hover:text-blue-800 dark:text-blue-400 font-semibold underline text-[11px] cursor-pointer"
+          >
+            Show All Machines
+          </button>
+        </div>
+      )}
+
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-xs">
         <div className="pms-table-container overflow-x-auto">
           <table className="w-full text-xs text-left">
@@ -790,7 +853,7 @@ export default function DailyLoomEntryPage() {
         </div>
 
         <TablePagination
-          total={rows.length}
+          total={displayedRows.length}
           page={page}
           pageSize={pageSize}
           onPageChange={setPage}

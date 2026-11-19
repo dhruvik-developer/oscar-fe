@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { isServerId } from "../../../services/resourceSync";
 import {
   X,
   Printer,
@@ -38,13 +39,13 @@ export default function TerminationLetterModal({
       setFormData({
         refNumber:
           existing?.refNumber ||
-          `EV/TRM/2024/${termination.id || "101"}`,
+          `EV/TRM/2024/${(termination.id && !isServerId(termination.id)) ? termination.id : (termination.employeeCode || "101")}`,
         issueDate:
           existing?.issueDate ||
           termination.noticeDate ||
           new Date().toISOString().split("T")[0],
         employeeName: termination.employee || "",
-        employeeId: termination.employeeId || "",
+        employeeId: termination.employeeCode || (!isServerId(termination.employeeId) ? termination.employeeId : "") || "",
         dept: termination.dept || "",
         role: termination.role || "",
         noticeDate: termination.noticeDate || "",
@@ -114,7 +115,7 @@ export default function TerminationLetterModal({
                   Termination Notice — {formData.employeeName}
                 </span>
                 <span className="text-[11px] px-2 py-0.5 rounded-full font-mono bg-red-500/20 text-red-200 border border-red-400/30">
-                  {termination.id}
+                  {isServerId(termination.id) ? `TRM-${termination.id.slice(0, 6).toUpperCase()}` : termination.id}
                 </span>
               </div>
               <p className="text-[11px] text-slate-300">
@@ -406,7 +407,10 @@ export default function TerminationLetterModal({
                 {formData.employeeName}
               </div>
               <div className="text-slate-600">
-                Employee ID: <span className="font-mono font-medium text-slate-800">{formData.employeeId}</span> • {formData.role} ({formData.dept})
+                {formData.employeeId && !isServerId(formData.employeeId) ? (
+                  <>Employee ID: <span className="font-mono font-medium text-slate-800">{formData.employeeId}</span> • </>
+                ) : null}
+                {formData.role} ({formData.dept})
               </div>
             </div>
 

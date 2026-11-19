@@ -3,6 +3,7 @@ import { Avatar } from "../../../components/hrms/Avatar";
 import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../../../stores/appStore';
 import MasterSourceLink from '../../../components/common/MasterSourceLink';
+import KpiCard from '../../../components/ui/KpiCard';
 import {
   Download,
   Search,
@@ -11,6 +12,7 @@ import {
   ChevronDown,
   ChevronUp,
   Building,
+  Building2,
   Mail,
   Phone,
   MapPin,
@@ -20,6 +22,9 @@ import {
   FileSpreadsheet,
   Printer,
   RefreshCw,
+  Layers,
+  Network,
+  RotateCcw,
 } from 'lucide-react';
 import Modal from '../../../components/ui/Modal';
 import PageHeader from '../../../components/ui/PageHeader';
@@ -37,63 +42,132 @@ function walk(nodes, depth = 0, out = []) {
   return out;
 }
 
+function getMaxDepth(nodes, currentDepth = 1) {
+  if (!nodes || nodes.length === 0) return 0;
+  let max = currentDepth;
+  for (const node of nodes) {
+    if (node.reports && node.reports.length > 0) {
+      const childDepth = getMaxDepth(node.reports, currentDepth + 1);
+      if (childDepth > max) max = childDepth;
+    }
+  }
+  return max;
+}
+
 function roleOf(person) {
   return person.designation || person.fullRole || person.role || 'Employee';
 }
 
-/** One person and, when expanded, everyone below them (any depth). */
+/** One person card and, when expanded, everyone below them (any depth). */
 function OrgNode({ person, depth, isCollapsed, onToggle, onSelect, highlight }) {
   const reports = person.reports || [];
   const expanded = reports.length > 0 && !isCollapsed(person.id);
   const isRoot = depth === 0;
   const isLevel1 = depth === 1;
+  const isManager = reports.length > 0;
 
   return (
-    <div className="flex flex-col items-center">
+    <div className="flex flex-col items-center select-none">
       <div
         onClick={() => onSelect(person)}
-        className={`w-[160px] bg-white rounded-xl p-3 flex flex-col items-center shadow-xs cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition-all group ${
+        className={`w-[190px] mx-3.5 bg-white rounded-2xl p-3.5 flex flex-col items-center shadow-xs cursor-pointer hover:shadow-lg hover:-translate-y-1 transition-all duration-200 group relative border ${
           isRoot
-            ? 'border-2 border-navy ring-2 ring-navy/10'
+            ? 'border-[#1F2E4A] ring-4 ring-[#1F2E4A]/10 shadow-md'
             : isLevel1
-            ? 'border-2 border-indigo-500/70 shadow-xs'
-            : 'border border-bdr hover:border-slate-400'
-        } ${highlight(person) ? 'ring-2 ring-blue-500/40 border-blue-400' : ''}`}
+            ? 'border-indigo-300 ring-2 ring-indigo-500/10 shadow-xs'
+            : isManager
+            ? 'border-purple-200 hover:border-purple-300'
+            : 'border-slate-200 hover:border-slate-300'
+        } ${highlight(person) ? 'ring-2 ring-blue-500 border-blue-400 bg-blue-50/20' : ''}`}
       >
+        {/* Tier badge indicator */}
+        <div className="mb-2">
+          {isRoot ? (
+            <span className="px-2 py-0.5 text-[9.5px] uppercase tracking-wider font-bold rounded-full bg-[#1F2E4A] text-white">
+              Executive
+            </span>
+          ) : isLevel1 ? (
+            <span className="px-2 py-0.5 text-[9.5px] font-semibold rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200/60">
+              Department Lead
+            </span>
+          ) : isManager ? (
+            <span className="px-2 py-0.5 text-[9.5px] font-semibold rounded-full bg-purple-50 text-purple-700 border border-purple-200/60">
+              Manager
+            </span>
+          ) : (
+            <span className="px-2 py-0.5 text-[9.5px] font-medium rounded-full bg-slate-100 text-slate-600">
+              Staff
+            </span>
+          )}
+        </div>
+
         <Avatar name={person.name} size={isRoot ? 'lg' : 'md'} />
-        <div className="text-[13px] font-semibold text-slate-900 mt-2 group-hover:text-navy transition-colors text-center truncate w-full">
+
+        <div
+          className="text-[13.5px] font-bold text-slate-900 mt-2 group-hover:text-blue-700 transition-colors text-center truncate w-full"
+          title={person.name}
+        >
           {person.name}
         </div>
-        <div className="text-[11px] text-muted text-center truncate w-full">{roleOf(person)}</div>
-        {person.department && (
-          <div className="text-[10.5px] text-slate-400 text-center truncate w-full">{person.department}</div>
-        )}
 
+        <div
+          className="text-[11.5px] text-slate-600 font-medium text-center truncate w-full mt-0.5"
+          title={roleOf(person)}
+        >
+          {roleOf(person)}
+        </div>
+
+        {/* Employee code & department pills */}
+        <div className="flex flex-wrap items-center justify-center gap-1 mt-2 w-full">
+          {person.employeeCode && (
+            <span className="px-1.5 py-0.5 text-[10px] font-mono bg-slate-100 text-slate-600 rounded">
+              {person.employeeCode}
+            </span>
+          )}
+          {person.department && (
+            <span
+              className="px-2 py-0.5 text-[10px] font-medium bg-blue-50 text-blue-700 rounded-full border border-blue-100 truncate max-w-[150px]"
+              title={person.department}
+            >
+              {person.department}
+            </span>
+          )}
+        </div>
+
+        {/* Direct reports toggle */}
         {reports.length > 0 && (
           <button
             type="button"
-            onClick={(e) => { e.stopPropagation(); onToggle(person.id); }}
-            title={expanded ? 'Hide reports' : `View ${reports.length} reports`}
-            className="mt-2.5 px-2 py-0.5 text-[10.5px] font-medium text-slate-600 bg-off hover:bg-slate-200 border border-bdr rounded-full flex items-center gap-1 transition-colors cursor-pointer"
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggle(person.id);
+            }}
+            title={expanded ? 'Hide direct reports' : `View ${reports.length} direct reports`}
+            className={`mt-3 px-3 py-1 text-[11px] font-semibold rounded-full flex items-center gap-1.5 transition-all cursor-pointer ${
+              expanded
+                ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300'
+                : 'bg-[#1F2E4A] hover:bg-[#1F2E4A]/90 text-white shadow-xs'
+            }`}
           >
             <span>{reports.length} {reports.length === 1 ? 'report' : 'reports'}</span>
-            {expanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+            {expanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
           </button>
         )}
       </div>
 
+      {/* Children branches */}
       {expanded && (
         <>
-          <div className="w-px h-6 bg-bdr" />
+          <div className="w-0.5 h-6 bg-slate-300" />
           <div className="flex">
             {reports.map((child, i) => (
-              <div key={child.id} className="flex flex-col items-center px-3">
-                {/* Half-width segments join siblings into one horizontal bar. */}
+              <div key={child.id} className="flex flex-col items-center">
+                {/* Horizontal joining connector bar */}
                 <div className="flex w-full">
-                  <div className={`flex-1 h-px ${i === 0 ? '' : 'bg-bdr'}`} />
-                  <div className={`flex-1 h-px ${i === reports.length - 1 ? '' : 'bg-bdr'}`} />
+                  <div className={`flex-1 h-0.5 ${i === 0 ? '' : 'bg-slate-300'}`} />
+                  <div className={`flex-1 h-0.5 ${i === reports.length - 1 ? '' : 'bg-slate-300'}`} />
                 </div>
-                <div className="w-px h-6 bg-bdr" />
+                <div className="w-0.5 h-6 bg-slate-300" />
                 <OrgNode
                   person={child}
                   depth={depth + 1}
@@ -125,6 +199,7 @@ export function OrgChartPage() {
   // View controls
   const [zoom, setZoom] = useState(100);
   const [q, setQ] = useState('');
+  const [selectedDeptFilter, setSelectedDeptFilter] = useState('all');
   const [collapsed, setCollapsed] = useState(() => new Set());
 
   // Modals
@@ -146,7 +221,7 @@ export function OrgChartPage() {
     } else {
       const roots = Array.isArray(chart?.tree) ? chart.tree : [];
       setTree(roots);
-      // Open the first two levels (Super User + CEO/Admin); deeper branches start folded.
+      // Open the first two levels; deeper branches start folded.
       setCollapsed(new Set(
         walk(roots).filter(({ node, depth }) => depth >= 2 && node.reports?.length).map(({ node }) => node.id),
       ));
@@ -161,30 +236,35 @@ export function OrgChartPage() {
   const everyone = useMemo(() => walk(tree), [tree]);
   const employeeCount = everyone.length;
   const managersWithReports = everyone.filter(({ node }) => node.reports?.length).map(({ node }) => node.id);
+  const maxLevels = useMemo(() => getMaxDepth(tree), [tree]);
   const noReportingLines = employeeCount > 1 && managersWithReports.length === 0;
 
-  // Search
+  // Search & Filter
   const term = q.trim().toLowerCase();
-  const matches = useCallback((person) => (
-    !term
+  const matches = useCallback((person) => {
+    const matchesText = !term
       || String(person.name ?? '').toLowerCase().includes(term)
       || String(person.designation ?? '').toLowerCase().includes(term)
       || String(person.department ?? '').toLowerCase().includes(term)
-      || String(person.employeeCode ?? '').toLowerCase().includes(term)
-  ), [term]);
+      || String(person.employeeCode ?? '').toLowerCase().includes(term);
+
+    const matchesDept = selectedDeptFilter === 'all'
+      || String(person.department ?? '').toLowerCase() === selectedDeptFilter.toLowerCase();
+
+    return matchesText && matchesDept;
+  }, [term, selectedDeptFilter]);
 
   // Keep a person when they match or someone below them does.
   const visibleTree = useMemo(() => {
-    if (!term) return tree;
+    if (!term && selectedDeptFilter === 'all') return tree;
     const prune = (nodes) => nodes
       .map((node) => ({ ...node, reports: prune(node.reports || []) }))
       .filter((node) => matches(node) || node.reports.length > 0);
     return prune(tree);
-  }, [tree, term, matches]);
+  }, [tree, term, selectedDeptFilter, matches]);
 
-  // While searching every branch is open so matches are visible.
-  const isCollapsed = useCallback((id) => !term && collapsed.has(id), [collapsed, term]);
-  const highlight = useCallback((person) => Boolean(term) && matches(person), [term, matches]);
+  const isCollapsed = useCallback((id) => !term && selectedDeptFilter === 'all' && collapsed.has(id), [collapsed, term, selectedDeptFilter]);
+  const highlight = useCallback((person) => (Boolean(term) || selectedDeptFilter !== 'all') && matches(person), [term, selectedDeptFilter, matches]);
   const allExpanded = collapsed.size === 0;
 
   function toggleBranch(id) {
@@ -256,27 +336,28 @@ export function OrgChartPage() {
     }`;
 
   return (
-    <div className="flex flex-col gap-6 p-2 sm:p-6 max-w-[1600px] mx-auto w-full printable-document">
+    <div className="flex flex-col gap-6 w-full pb-12 printable-document">
+      {/* ── Page Header ─────────────────────────────────────────── */}
       <PageHeader
         title="Org Chart"
         subtitle={subtitle}
         guide={hrmsGuides.orgChart}
         actions={
-          <>
+          <div className="flex items-center gap-2.5">
             <div className="relative">
               <button
                 type="button"
                 onClick={() => setIsExportOpen(!isExportOpen)}
                 disabled={employeeCount === 0}
-                className="px-4 py-2.5 border border-bdr bg-white hover:bg-slate-50 text-slate-700 rounded-xl text-[13.5px] font-medium flex items-center gap-2 shadow-xs transition-colors cursor-pointer disabled:opacity-50"
+                className="px-4 py-2 border border-bdr bg-white hover:bg-slate-50 text-slate-700 rounded-xl text-[13px] font-medium flex items-center gap-2 shadow-xs transition-colors cursor-pointer disabled:opacity-50"
               >
-                <Download size={16} />
+                <Download size={15} />
                 <span>Export</span>
-                <ChevronDown size={14} className="text-muted" />
+                <ChevronDown size={13} className="text-muted" />
               </button>
 
               {isExportOpen && (
-                <div className="absolute left-0 lg:left-auto lg:right-0 mt-2 w-48 bg-white border border-bdr rounded-xl shadow-lg py-1.5 z-30 animate-in fade-in slide-in-from-top-2 duration-150">
+                <div className="absolute right-0 mt-2 w-48 bg-white border border-bdr rounded-xl shadow-lg py-1.5 z-30 animate-in fade-in slide-in-from-top-2 duration-150">
                   <button
                     type="button"
                     onClick={exportCSV}
@@ -300,137 +381,252 @@ export function OrgChartPage() {
             <button
               type="button"
               onClick={() => setIsAddDeptOpen(true)}
-              className="px-5 py-2.5 bg-navy hover:bg-navy/90 text-white rounded-xl text-[13.5px] font-medium shadow-xs transition-colors cursor-pointer"
+              className="px-4 py-2 bg-navy hover:bg-navy/90 text-white rounded-xl text-[13px] font-medium shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer"
             >
-              Add Department
+              <Plus size={15} />
+              <span>Add Department</span>
             </button>
-          </>
+          </div>
         }
       />
 
-      {/* ── Control Bar ─────────────────────────────────────────── */}
-      <div className="bg-white border border-bdr rounded-xl p-4 shadow-xs flex flex-wrap items-center justify-between gap-3 no-print">
-        <div className="flex flex-wrap lg:flex-nowrap items-center gap-3 w-full sm:w-auto">
-          <div className="relative w-full sm:w-auto">
-            <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted pointer-events-none" />
+      {/* ── KPI Summary Cards ────────────────────────────────────── */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 no-print">
+        <KpiCard
+          label="Total Headcount"
+          value={employeeCount}
+          sub="Staff in organization"
+          icon={Users}
+          color="blue"
+        />
+        <KpiCard
+          label="Departments"
+          value={departments.length}
+          sub="Functional divisions"
+          icon={Building2}
+          color="teal"
+        />
+        <KpiCard
+          label="Team Leads & Managers"
+          value={managersWithReports.length}
+          sub="Supervisors with reports"
+          icon={Network}
+          color="purple"
+        />
+        <KpiCard
+          label="Hierarchy Depth"
+          value={`${maxLevels} ${maxLevels === 1 ? 'Tier' : 'Tiers'}`}
+          sub="Reporting structure"
+          icon={Layers}
+          color="orange"
+        />
+      </div>
+
+      {/* ── Control Bar / Filters ─────────────────────────────────── */}
+      <div className="bg-white border border-bdr rounded-xl p-3 sm:p-4 shadow-xs flex flex-wrap items-center justify-between gap-3 no-print">
+        <div className="flex flex-wrap lg:flex-nowrap items-center gap-2.5 w-full sm:w-auto">
+          {/* Search Input */}
+          <div className="relative w-full sm:w-72">
+            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted pointer-events-none" />
             <input
               value={q}
               onChange={(e) => setQ(e.target.value)}
-              placeholder="Search by name, role or department"
-              className="pl-10 pr-4 h-9 w-full sm:w-72 bg-off border border-bdr rounded-xl text-[13px] text-slate-800 placeholder:text-muted focus:outline-none focus:border-navy focus:ring-2 focus:ring-navy/10 transition-all"
+              placeholder="Search by name, role or dept..."
+              className="pl-9 pr-8 h-9 w-full bg-off border border-bdr rounded-xl text-[13px] text-slate-800 placeholder:text-muted focus:outline-none focus:border-navy focus:ring-2 focus:ring-navy/10 transition-all"
             />
             {q && (
               <button
                 type="button"
                 onClick={() => setQ('')}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted hover:text-slate-700 text-[12px] p-0.5"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted hover:text-slate-700 text-[12px] p-0.5 cursor-pointer"
               >
                 <X size={14} />
               </button>
             )}
           </div>
 
+          {/* Department Filter */}
+          {departments.length > 0 && (
+            <select
+              value={selectedDeptFilter}
+              onChange={(e) => setSelectedDeptFilter(e.target.value)}
+              className="h-9 px-3 bg-white border border-bdr rounded-xl text-[13px] text-slate-700 font-medium focus:outline-none focus:border-navy cursor-pointer"
+            >
+              <option value="all">All Departments ({departments.length})</option>
+              {departments.map((d) => (
+                <option key={d.id || d.name} value={d.name}>
+                  {d.name}
+                </option>
+              ))}
+            </select>
+          )}
+
+          {/* Expand / Collapse All */}
           {managersWithReports.length > 0 && (
             <button
               type="button"
               onClick={handleToggleAll}
-              className="px-3 py-1 text-navy hover:bg-slate-100 rounded-lg text-[13px] font-medium transition-colors cursor-pointer"
+              className="h-9 px-3.5 border border-bdr bg-white hover:bg-slate-50 text-slate-700 rounded-xl text-[13px] font-medium transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
             >
-              {allExpanded ? 'Collapse all' : 'Expand all'}
+              {allExpanded ? <ChevronUp size={14} className="text-muted" /> : <ChevronDown size={14} className="text-muted" />}
+              <span>{allExpanded ? 'Collapse All' : 'Expand All'}</span>
             </button>
           )}
 
+          {/* Refresh Button */}
           <button
             type="button"
             onClick={load}
-            className="px-3 py-1 text-slate-600 hover:bg-slate-100 rounded-lg text-[13px] font-medium transition-colors cursor-pointer flex items-center gap-1.5"
+            className="h-9 px-3.5 border border-bdr bg-white hover:bg-slate-50 text-slate-700 rounded-xl text-[13px] font-medium transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
             title="Reload from server"
           >
-            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} /> Refresh
+            <RefreshCw size={14} className={loading ? 'animate-spin text-navy' : 'text-muted'} />
+            <span>Refresh</span>
           </button>
         </div>
 
-        <div className="flex items-center gap-2 text-[12px]">
-          <span className="text-muted font-medium">Zoom</span>
+        {/* Zoom Controls */}
+        <div className="flex items-center gap-1.5 text-[12px]">
+          <span className="text-muted font-medium mr-1 hidden sm:inline">Zoom</span>
           <button
             type="button"
-            onClick={() => setZoom((z) => Math.max(60, z - 10))}
-            disabled={zoom <= 60}
+            onClick={() => setZoom((z) => Math.max(50, z - 10))}
+            disabled={zoom <= 50}
             className="w-8 h-8 border border-bdr rounded-lg grid place-items-center bg-white hover:bg-slate-50 text-slate-700 shadow-xs transition-colors cursor-pointer disabled:opacity-40"
             title="Zoom out"
           >
-            <Minus size={15} />
+            <Minus size={14} />
           </button>
           <button
             type="button"
             onClick={() => setZoom(100)}
-            className="w-10 text-center font-medium hover:text-navy cursor-pointer"
+            className="px-2.5 h-8 border border-bdr rounded-lg bg-off text-center font-mono font-medium hover:text-navy cursor-pointer flex items-center gap-1"
             title="Reset to 100%"
           >
-            {zoom}%
+            <span>{zoom}%</span>
+            {zoom !== 100 && <RotateCcw size={11} className="text-muted" />}
           </button>
           <button
             type="button"
-            onClick={() => setZoom((z) => Math.min(140, z + 10))}
-            disabled={zoom >= 140}
+            onClick={() => setZoom((z) => Math.min(150, z + 10))}
+            disabled={zoom >= 150}
             className="w-8 h-8 border border-bdr rounded-lg grid place-items-center bg-white hover:bg-slate-50 text-slate-700 shadow-xs transition-colors cursor-pointer disabled:opacity-40"
             title="Zoom in"
           >
-            <Plus size={15} />
+            <Plus size={14} />
           </button>
         </div>
       </div>
 
       {noReportingLines && !loading && (
-        <div className="bg-amber-50 border border-amber-200 text-amber-800 rounded-xl px-4 py-3 text-[13px] no-print">
-          No reporting lines are set yet, so everyone appears at the top level. Set each employee&apos;s
-          <strong> Manager</strong> in{' '}
-          <button type="button" onClick={() => navigate('/hrms/employees')} className="underline font-medium cursor-pointer">
-            Employees
-          </button>{' '}
-          to build the hierarchy.
+        <div className="bg-amber-50 border border-amber-200 text-amber-800 rounded-xl px-4 py-3 text-[13px] no-print flex items-center justify-between">
+          <div>
+            No reporting lines are configured yet, so everyone appears at the top level. Assign each employee&apos;s
+            <strong> Reporting Manager</strong> in{' '}
+            <button
+              type="button"
+              onClick={() => navigate('/hrms/employees')}
+              className="underline font-semibold cursor-pointer text-amber-900"
+            >
+              Employees Directory
+            </button>{' '}
+            to establish the organization tree.
+          </div>
         </div>
       )}
 
-      {/* ── Org Chart Canvas ───────────────────────────────────── */}
-      <div className="bg-white border border-bdr rounded-xl shadow-xs p-4 sm:p-8 overflow-x-auto min-h-[520px] flex justify-center-safe items-start">
-        {loading && tree.length === 0 ? (
-          <div className="text-center py-16 text-muted text-[13px] w-full">Loading org chart…</div>
-        ) : loadError ? (
-          <div className="text-center py-16 text-[13px] w-full">
-            <div className="text-red-600 font-medium">Could not load the org chart.</div>
-            <button type="button" onClick={load} className="mt-3 text-navy underline cursor-pointer">Try again</button>
+      {/* ── Canvas Box Container ─────────────────────────────────── */}
+      <div className="bg-white border border-bdr rounded-2xl shadow-xs overflow-hidden flex flex-col">
+        {/* Canvas Legend Header */}
+        <div className="px-5 py-3 border-b border-bdr bg-slate-50/70 flex flex-wrap items-center justify-between gap-3 text-[12px] no-print">
+          <div className="flex items-center gap-2">
+            <span className="font-semibold text-slate-800">Organizational Hierarchy</span>
+            <span className="text-[11px] px-2 py-0.5 rounded-full bg-slate-200 text-slate-700 font-mono">
+              {visibleTree.length} {visibleTree.length === 1 ? 'Root Node' : 'Root Nodes'}
+            </span>
           </div>
-        ) : employeeCount === 0 ? (
-          <div className="text-center py-16 text-muted text-[13px] w-full">
-            No employees yet. Add employees in{' '}
-            <button type="button" onClick={() => navigate('/hrms/employees')} className="text-navy underline cursor-pointer">
-              Employees
-            </button>{' '}
-            to see the organisation here.
+
+          <div className="flex items-center gap-4 text-[11.5px] text-slate-600">
+            <div className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-[#1F2E4A]" />
+              <span className="font-medium">Executive Head</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-indigo-500" />
+              <span className="font-medium">Department Lead</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-purple-500" />
+              <span className="font-medium">Team Manager</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-slate-400" />
+              <span>Staff Member</span>
+            </div>
           </div>
-        ) : visibleTree.length === 0 ? (
-          <div className="text-center py-16 text-muted text-[13px] w-full">
-            No employees found matching &quot;{q}&quot;
-          </div>
-        ) : (
-          <div
-            style={{ transform: `scale(${zoom / 100})`, transformOrigin: 'top center' }}
-            className="flex gap-10 items-start transition-transform duration-150"
-          >
-            {visibleTree.map((root) => (
-              <OrgNode
-                key={root.id}
-                person={root}
-                depth={0}
-                isCollapsed={isCollapsed}
-                onToggle={toggleBranch}
-                onSelect={setSelectedEmployee}
-                highlight={highlight}
-              />
-            ))}
-          </div>
-        )}
+        </div>
+
+        {/* Interactive Org Tree Canvas */}
+        <div className="p-6 sm:p-12 overflow-x-auto min-h-[560px] flex justify-center items-start bg-[radial-gradient(#e2e8f0_1px,transparent_1px)] [background-size:20px_20px] bg-slate-50/40">
+          {loading && tree.length === 0 ? (
+            <div className="text-center py-24 text-muted text-[13px] w-full flex flex-col items-center gap-2">
+              <RefreshCw size={24} className="animate-spin text-navy" />
+              <span>Loading organizational structure…</span>
+            </div>
+          ) : loadError ? (
+            <div className="text-center py-24 text-[13px] w-full">
+              <div className="text-red-600 font-medium mb-1">Could not load the org chart.</div>
+              <button
+                type="button"
+                onClick={load}
+                className="mt-2 px-4 py-1.5 bg-navy text-white text-[12px] font-medium rounded-lg cursor-pointer"
+              >
+                Retry
+              </button>
+            </div>
+          ) : employeeCount === 0 ? (
+            <div className="text-center py-24 text-muted text-[13px] w-full flex flex-col items-center gap-2">
+              <Users size={32} className="text-slate-300" />
+              <p>No active employees found in the directory.</p>
+              <button
+                type="button"
+                onClick={() => navigate('/hrms/employees')}
+                className="mt-2 text-navy font-semibold underline cursor-pointer"
+              >
+                Go to Employees Directory
+              </button>
+            </div>
+          ) : visibleTree.length === 0 ? (
+            <div className="text-center py-24 text-muted text-[13px] w-full flex flex-col items-center gap-2">
+              <Search size={32} className="text-slate-300" />
+              <p>No employees match &quot;{q}&quot; {selectedDeptFilter !== 'all' ? `in ${selectedDeptFilter}` : ''}</p>
+              <button
+                type="button"
+                onClick={() => { setQ(''); setSelectedDeptFilter('all'); }}
+                className="text-navy text-xs font-semibold underline cursor-pointer"
+              >
+                Clear Filters
+              </button>
+            </div>
+          ) : (
+            <div
+              style={{ transform: `scale(${zoom / 100})`, transformOrigin: 'top center' }}
+              className="flex gap-10 items-start transition-transform duration-150 py-4"
+            >
+              {visibleTree.map((root) => (
+                <OrgNode
+                  key={root.id}
+                  person={root}
+                  depth={0}
+                  isCollapsed={isCollapsed}
+                  onToggle={toggleBranch}
+                  onSelect={setSelectedEmployee}
+                  highlight={highlight}
+                />
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* ── ADD DEPARTMENT MODAL ─────────────────────────────────── */}
@@ -492,6 +688,7 @@ export function OrgChartPage() {
               rows={2}
               value={newDept.description}
               onChange={(e) => setNewDept({ ...newDept, description: e.target.value })}
+              placeholder="Responsibilities and operational focus..."
               className="w-full px-3.5 py-2 bg-off border border-bdr rounded-xl text-[13.5px] text-slate-800 focus:outline-none focus:border-navy focus:ring-2 focus:ring-navy/10"
             />
           </div>
@@ -528,7 +725,7 @@ export function OrgChartPage() {
         </form>
       </Modal>
 
-      {/* ── EMPLOYEE QUICK VIEW ─────────────────────────────────── */}
+      {/* ── EMPLOYEE QUICK VIEW MODAL ────────────────────────────── */}
       <Modal
         isOpen={Boolean(selectedEmployee)}
         onClose={() => setSelectedEmployee(null)}
@@ -550,11 +747,11 @@ export function OrgChartPage() {
                     </span>
                   )}
                 </div>
-                <div className="text-[13px] text-slate-600 font-medium">
+                <div className="text-[13px] text-slate-600 font-medium mt-0.5">
                   {roleOf(selectedEmployee)}
                   {selectedEmployee.employeeCode ? ` · ${selectedEmployee.employeeCode}` : ''}
                 </div>
-                <div className="text-[12px] text-muted flex items-center gap-1.5 mt-0.5">
+                <div className="text-[12px] text-muted flex items-center gap-1.5 mt-1">
                   <Building size={13} /> {selectedEmployee.department || 'No department'}
                 </div>
               </div>
@@ -612,7 +809,7 @@ export function OrgChartPage() {
                     <div
                       key={rep.id}
                       onClick={() => setSelectedEmployee(rep)}
-                      className="px-2.5 py-1 bg-white border border-bdr rounded-lg text-[12px] flex items-center gap-2 hover:border-navy cursor-pointer transition-colors"
+                      className="px-2.5 py-1 bg-white border border-bdr rounded-lg text-[12px] flex items-center gap-2 hover:border-navy cursor-pointer transition-colors shadow-2xs"
                     >
                       <Avatar name={rep.name} size="xs" />
                       <span className="font-medium text-slate-800">{rep.name}</span>
@@ -653,6 +850,5 @@ export function OrgChartPage() {
   );
 }
 
-// Named alias for flexibility across legacy and unified imports
 export const OrgChart = OrgChartPage;
 export default OrgChartPage;

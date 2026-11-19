@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from "react";
-import { ChevronRight, ChevronLeft, X, CheckCircle2, XCircle, Clock, Clock3, Calendar, Home } from "lucide-react";
+import { ChevronRight, ChevronLeft, X, CheckCircle2, XCircle, Clock, Clock3, Calendar, Home, Download, Printer } from "lucide-react";
+import { exportToCSV } from "../../../services/exportUtils";
 import KpiCard from "../../../components/ui/KpiCard";
 import { useAppStore } from "../../../stores/appStore";
 import { useAttendanceStore } from "../../../stores/attendanceStore";
@@ -906,13 +907,33 @@ export default function IndividualAttendance() {
       </nav>
 
       {/* Header Row */}
-      <div className="ind-title-row">
+      <div className="ind-title-row flex flex-wrap items-center justify-between gap-3">
         <div>
           <div className="flex items-center gap-2.5">
             <h1 className="ind-title">Individual Attendance</h1>
             <PageInfoButton guide={hrmsGuides.attendanceIndividual} />
           </div>
           <p className="ind-sub">View and manage per-employee attendance history.</p>
+        </div>
+        <div className="flex items-center gap-2 no-print">
+          <button
+            type="button"
+            onClick={handleExportAttendance}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-white border border-slate-300 text-slate-700 rounded-xl text-[13px] font-medium shadow-2xs hover:bg-slate-50 transition-colors cursor-pointer"
+            title="Export to CSV"
+          >
+            <Download size={14} />
+            Export CSV
+          </button>
+          <button
+            type="button"
+            onClick={handlePrintAttendance}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-white border border-slate-300 text-slate-700 rounded-xl text-[13px] font-medium shadow-2xs hover:bg-slate-50 transition-colors cursor-pointer"
+            title="Print Attendance Record"
+          >
+            <Printer size={14} />
+            Print Statement
+          </button>
         </div>
       </div>
 

@@ -137,9 +137,9 @@ export default function Employees() {
   }
 
   const handleExport = () => {
-    const header = "ID,Name,Email,Designation,Department,Manager,Status";
-    const rows = filtered.map((e) => `"${e.id}","${e.name}","${e.email}","${e.designation}","${e.department}","${e.manager || e.reportingManager || ""}","${e.status}"`);
-    const blob = new Blob([[header, ...rows].join("\n")], { type: "text/csv" });
+    const header = "\uFEFFEmployee ID,Name,Email,Designation,Department,Manager,Status";
+    const rows = filtered.map((e) => `"${e.employeeCode || e.empId || e.id || ""}","${e.name || ""}","${e.email || ""}","${e.designation || ""}","${e.department || ""}","${e.manager || e.reportingManager || ""}","${e.status || ""}"`);
+    const blob = new Blob([[header, ...rows].join("\n")], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;

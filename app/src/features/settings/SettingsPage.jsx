@@ -40,7 +40,7 @@ function GeneralSettings() {
     const [pan, setPan] = useState(companyProfile?.pan || '');
     const [address, setAddress] = useState(companyProfile?.address || '');
     const [phone, setPhone] = useState(companyProfile?.phone || '');
-    const [currency, setCurrency] = useState(globalCurrency || 'INR (₹)');
+    const currency = 'INR (₹)';
     const [fiscalYear, setFiscalYear] = useState(companyProfile?.fiscalYear || 'Apr - Mar');
     const [autoReorder, setAutoReorder] = useState(true);
     const [emailAlerts, setEmailAlerts] = useState(true);
@@ -81,7 +81,9 @@ function GeneralSettings() {
 
     const handleSave = async (e) => {
         e.preventDefault();
-        setGlobalCurrency(currency);
+        if (globalCurrency !== 'INR (₹)' && typeof setGlobalCurrency === 'function') {
+            setGlobalCurrency('INR (₹)');
+        }
         let profileOk = true;
         if (typeof setCompanyProfile === 'function') {
             try {
@@ -151,14 +153,6 @@ function GeneralSettings() {
             <div>
               <label className="font-semibold text-slate-700 block mb-1">Company Legal Entity</label>
               <input type="text" value={companyName} onChange={(e) => setCompanyName(e.target.value)} className="w-full p-2 border border-[#CED4DA] rounded bg-[#F8F9FA]"/>
-            </div>
-            <div>
-              <label className="font-semibold text-slate-700 block mb-1">Base Currency</label>
-              <select value={currency} onChange={(e) => setCurrency(e.target.value)} className="w-full p-2 border border-[#CED4DA] rounded bg-[#F8F9FA]">
-                <option value="INR (₹)">INR (₹) - Indian Rupee</option>
-                <option value="EUR (€)">EUR (€) - Euro</option>
-                <option value="GBP (£)">GBP (£) - British Pound</option>
-              </select>
             </div>
             <div>
               <label className="font-semibold text-slate-700 block mb-1">Fiscal Year</label>

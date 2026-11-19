@@ -29,7 +29,10 @@ import {
   Coins,
   CalendarCheck,
   Loader2,
+  Download,
+  ChevronDown,
 } from "lucide-react";
+import { exportToCSV } from "../../../services/exportUtils";
 
 /** Requests still waiting on a decision. */
 const PENDING_STATUSES = ["Pending Review", "Delegate Confirmed"];
@@ -50,6 +53,14 @@ function localDate(iso) {
   const [y, m, d] = String(iso || "").split("-").map(Number);
   if (!y || !m || !d) return null;
   return new Date(y, m - 1, d);
+}
+
+function formatReason(text) {
+  if (!text) return "";
+  let str = String(text);
+  str = str.replace(/Overlapped with approved leave\s+[0-9a-fA-F-]{32,36}/gi, "Overlapped with an existing approved leave");
+  str = str.replace(/\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b/g, "");
+  return str.replace(/\s+/g, " ").trim();
 }
 
 function formatDays(n) {
@@ -95,6 +106,51 @@ export default function Leave() {
   const [detailModalLeave, setDetailModalLeave] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [busyLeaveId, setBusyLeaveId] = useState(null);
+  const [exportMenuOpen, setExportMenuOpen] = useState(false);
+
+  const handleExportRequests = () => {
+    const list = leaves || [];
+    if (list.length === 0) {
+      showToast?.("No leave requests to export.");
+      return;
+    }
+    const headers = ["Employee Code", "Employee Name", "Leave Type", "From Date", "To Date", "Days", "Reason", "Delegate", "Status"];
+    const rows = list.map((l) => [
+      l.employeeCode || "",
+      l.employee || "",
+      l.type || "",
+      l.from || "",
+      l.to || "",
+      formatDays(l.days),
+      l.reason || "",
+      delegateNameOf(l) || "",
+      l.status || "",
+    ]);
+    exportToCSV("leave_requests", headers, rows);
+    showToast?.("Leave requests exported to CSV.");
+  };
+
+  const handleExportBalances = () => {
+    if (balances.length === 0) {
+      showToast?.("No leave balances to export.");
+      return;
+    }
+    const empName = selectedEmployee?.name || currentUser?.name || "All";
+    const headers = ["Employee", "Leave Type", "Code", "Total Quota", "Available", "Used", "Pending", "Carried Forward", "Paid / Unpaid"];
+    const rows = balances.map((b) => [
+      empName,
+      b.leaveType || "",
+      b.code || "",
+      formatDays(b.total),
+      formatDays(b.available),
+      formatDays(b.used),
+      formatDays(b.pending),
+      formatDays(b.carriedForward),
+      b.isPaid === false ? "Unpaid (LOP)" : "Paid",
+    ]);
+    exportToCSV(`leave_balances_${empName.replace(/\s+/g, "_")}`, headers, rows);
+    showToast?.("Leave balances exported to CSV.");
+  };
 
   // Encashment & Comp-Off Modal States
   const [encashModalOpen, setEncashModalOpen] = useState(false);
@@ -505,6 +561,46 @@ export default function Leave() {
         guide={hrmsGuides.leave}
         actions={
           <>
+            <div className="relative inline-block text-left">
+              <button
+                type="button"
+                onClick={() => setExportMenuOpen((v) => !v)}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2.5 bg-white border border-slate-300 text-slate-700 rounded-xl text-[13px] font-medium shadow-2xs hover:bg-slate-50 transition-colors cursor-pointer"
+              >
+                <Download size={15} />
+                Export
+                <ChevronDown size={13} className="text-slate-400" />
+              </button>
+              {exportMenuOpen && (
+                <div
+                  className="absolute right-0 mt-1.5 w-52 bg-white border border-slate-200 rounded-xl shadow-lg z-30 py-1.5 text-xs"
+                  onMouseLeave={() => setExportMenuOpen(false)}
+                >
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleExportRequests();
+                      setExportMenuOpen(false);
+                    }}
+                    className="w-full text-left px-3.5 py-2 hover:bg-slate-50 font-medium text-slate-700 flex items-center justify-between cursor-pointer"
+                  >
+                    <span>Export Leave Requests</span>
+                    <span className="text-[10px] text-slate-400 font-mono">CSV</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleExportBalances();
+                      setExportMenuOpen(false);
+                    }}
+                    className="w-full text-left px-3.5 py-2 hover:bg-slate-50 font-medium text-slate-700 flex items-center justify-between cursor-pointer"
+                  >
+                    <span>Export Leave Balances</span>
+                    <span className="text-[10px] text-slate-400 font-mono">CSV</span>
+                  </button>
+                </div>
+              )}
+            </div>
             <button
               type="button"
               onClick={() => setCompOffModalOpen(true)}
@@ -924,12 +1020,12 @@ export default function Leave() {
 
                   {l.status === "Rejected" && (l.remark || l.rejectReason) && (
                     <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-xl text-[12px] text-rose-800">
-                      <b>Rejection Reason:</b> {l.remark || l.rejectReason}
+                      <b>Rejection Reason:</b> {formatReason(l.remark || l.rejectReason)}
                     </div>
                   )}
                   {l.status === "Cancelled" && l.remark && (
                     <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-[12px] text-slate-700">
-                      <b>Cancellation note:</b> {l.remark}
+                      <b>Cancellation note:</b> {formatReason(l.remark)}
                     </div>
                   )}
 
@@ -1152,7 +1248,7 @@ export default function Leave() {
                         <Avatar name={c.employee} size="xs" />
                         <div>
                           <div className="font-semibold text-slate-900">{c.employee}</div>
-                          <div className="text-[11px] text-muted">{c.id}</div>
+                          {c.employeeCode && <div className="text-[11px] text-muted">{c.employeeCode}</div>}
                         </div>
                       </div>
                     </td>
@@ -1183,7 +1279,7 @@ export default function Leave() {
                             type="button"
                             onClick={() => {
                               rejectCompOff(c.id, "Insufficient overtime proof");
-                              showToast(`Comp-off claim ${c.id} rejected.`);
+                              showToast(`Comp-off claim for ${c.employee} rejected.`);
                             }}
                             className="px-2.5 py-1 text-[11.5px] font-medium text-rose-700 border border-rose-200 rounded-lg hover:bg-rose-50 transition cursor-pointer"
                           >
@@ -1238,7 +1334,7 @@ export default function Leave() {
                         <Avatar name={e.employee} size="xs" />
                         <div>
                           <div className="font-semibold text-slate-900">{e.employee}</div>
-                          <div className="text-[11px] text-muted">{e.id} • {e.requestDate}</div>
+                          <div className="text-[11px] text-muted">{e.employeeCode ? `${e.employeeCode} • ` : ""}{e.requestDate}</div>
                         </div>
                       </div>
                     </td>
@@ -1269,7 +1365,7 @@ export default function Leave() {
                             type="button"
                             onClick={() => {
                               rejectEncashment(e.id, "Exceeds annual encashment quota");
-                              showToast(`Encashment ${e.id} rejected.`);
+                              showToast(`Encashment for ${e.employee} rejected.`);
                             }}
                             className="px-2.5 py-1 text-[11.5px] font-medium text-rose-700 border border-rose-200 rounded-lg hover:bg-rose-50 transition cursor-pointer"
                           >

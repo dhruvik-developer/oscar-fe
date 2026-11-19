@@ -1,7 +1,7 @@
 import { modal } from './ModalContext';
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import { formatDateDDMMYYYY, getCurrentDateFormatted, getCurrentISODate, addDaysISO, toISODate, toDisplayDate } from '../utils/dateUtils';
-import { formatCurrency as formatCurrencyUtil, getCurrencySymbol, getCurrencyConfig, CURRENCY_CONFIGS, fetchLiveExchangeRates, DEFAULT_RATES, setBaseCurrency } from '../utils/currencyUtils';
+import { formatCurrency as formatCurrencyUtil, getCurrencySymbol, getCurrencyConfig, CURRENCY_CONFIGS, DEFAULT_RATES, setBaseCurrency } from '../utils/currencyUtils';
 import { calculateWarrantyCoverageStatus } from '../utils/warrantyUtils';
 import { emitCrmEvent, CRM_EVENT_TYPES } from '../services/crmEventNotifications';
 import { api } from '../services/api';
@@ -126,11 +126,10 @@ export const ERPProvider = ({ children, }) => {
     const [warranties, setWarranties] = useState([]);
     const [currency, setCurrencyState] = useState(() => {
         const stored = localStorage.getItem('evenmore_currency');
-        if (!stored || stored.includes('USD') || stored.includes('?')) {
+        if (stored !== 'INR (₹)') {
             localStorage.setItem('evenmore_currency', 'INR (₹)');
-            return 'INR (₹)';
         }
-        return stored;
+        return 'INR (₹)';
     });
     // Filled from GET /settings/company-profile/ — no invented company details.
     const [companyProfile, setCompanyProfileState] = useState({
@@ -143,13 +142,6 @@ export const ERPProvider = ({ children, }) => {
     const [liveRates, setLiveRates] = useState(DEFAULT_RATES);
     const [toastMessage, setToastMessage] = useState(null);
 
-    useEffect(() => {
-        fetchLiveExchangeRates()
-            .then((rates) => {
-                if (rates) setLiveRates(rates);
-            })
-            .catch((err) => console.warn('Live forex rate sync:', err));
-    }, []);
 
     // ── Live backend synchronization ────────────────────────────────────
     //

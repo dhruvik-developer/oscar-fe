@@ -70,6 +70,43 @@ export function isLoomAdminOrManager(user) {
   return adminKeywords.some((kw) => roleName.includes(kw));
 }
 
+/**
+ * Safely copy text to clipboard across all browsers, including non-secure HTTP contexts on LAN/other systems.
+ */
+async function copyTextToClipboard(text) {
+  if (!text) return false;
+
+  // 1. Try modern Clipboard API (available in secure contexts: localhost, HTTPS)
+  if (typeof navigator !== 'undefined' && navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch (err) {
+      console.warn('navigator.clipboard.writeText failed, trying fallback...', err);
+    }
+  }
+
+  // 2. Fallback for non-secure HTTP contexts (e.g. LAN IP on other systems)
+  try {
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.setAttribute('readonly', '');
+    textarea.style.position = 'fixed';
+    textarea.style.top = '0';
+    textarea.style.left = '-9999px';
+    textarea.style.opacity = '0';
+    document.body.appendChild(textarea);
+    textarea.focus();
+    textarea.select();
+    const successful = document.execCommand('copy');
+    document.body.removeChild(textarea);
+    return successful;
+  } catch (err) {
+    console.error('Fallback execCommand failed:', err);
+    return false;
+  }
+}
+
 export default function DailyLoomEntryPage() {
   const { showToast } = useERP();
   const currentUser = useAppStore((s) => s.currentUser);
@@ -231,7 +268,7 @@ export default function DailyLoomEntryPage() {
       url,
     };
 
-    if (navigator.share && /mobile|android|iphone|ipad/i.test(navigator.userAgent)) {
+    if (navigator?.share && /mobile|android|iphone|ipad/i.test(navigator.userAgent || '')) {
       try {
         await navigator.share(shareData);
         return;
@@ -240,21 +277,19 @@ export default function DailyLoomEntryPage() {
       }
     }
 
-    // Copy to clipboard and open QR modal
-    navigator.clipboard
-      .writeText(url)
-      .then(() => {
-        setCopiedLink(true);
-        setShowShareModal(true);
-        showToast(
-          `Mobile link copied! (Network IP: ${import.meta.env?.VITE_LAN_IP || 'LAN'})`,
-          'success'
-        );
-        setTimeout(() => setCopiedLink(false), 2500);
-      })
-      .catch(() => {
-        setShowShareModal(true);
-      });
+    // Always show QR / share modal on desktop
+    setShowShareModal(true);
+
+    // Copy to clipboard (handles non-secure HTTP / LAN safely)
+    const copied = await copyTextToClipboard(url);
+    if (copied) {
+      setCopiedLink(true);
+      showToast(
+        `Mobile link copied! (Network IP: ${import.meta.env?.VITE_LAN_IP || 'LAN'})`,
+        'success'
+      );
+      setTimeout(() => setCopiedLink(false), 2500);
+    }
   };
 
   const loadFactories = async () => {
@@ -987,11 +1022,15 @@ export default function DailyLoomEntryPage() {
               />
               <button
                 type="button"
-                onClick={() => {
-                  navigator.clipboard.writeText(getShareableUrl());
-                  setCopiedLink(true);
-                  showToast('Mobile link copied to clipboard!', 'success');
-                  setTimeout(() => setCopiedLink(false), 2000);
+                onClick={async () => {
+                  const copied = await copyTextToClipboard(getShareableUrl());
+                  if (copied) {
+                    setCopiedLink(true);
+                    showToast('Mobile link copied to clipboard!', 'success');
+                    setTimeout(() => setCopiedLink(false), 2000);
+                  } else {
+                    showToast('Link could not be copied automatically. Please copy the text manually.', 'warning');
+                  }
                 }}
                 className="pms-btn-emerald shrink-0"
               >

@@ -63,6 +63,19 @@ export default function ProductionCompletionVerificationPage() {
   };
 
   const piIdParam = searchParams.get('pi');
+  const programQuery = searchParams.get('program') || searchParams.get('query');
+
+  const matchingPiForProgram = useMemo(() => {
+    if (!programQuery || !instructions.length) return null;
+    const norm = (s) => String(s || '').trim().toLowerCase();
+    const target = norm(programQuery);
+    return instructions.find((inst) => {
+      const ref = norm(inst.orderReference || inst.order_reference);
+      const num = norm(inst.instructionNumber);
+      const fab = norm(inst.fabric);
+      return ref === target || ref.includes(target) || num === target || fab === target;
+    }) || null;
+  }, [instructions, programQuery]);
 
   // Load instructions list (for the picker)
   useEffect(() => {
@@ -74,7 +87,21 @@ export default function ProductionCompletionVerificationPage() {
         if (!live) return;
         const list = listOf(res);
         setInstructions(list);
-        if (!piIdParam && list.length > 0) {
+        if (piIdParam) {
+          // already selected
+        } else if (programQuery) {
+          const norm = (s) => String(s || '').trim().toLowerCase();
+          const target = norm(programQuery);
+          const matched = list.find((inst) => {
+            const ref = norm(inst.orderReference || inst.order_reference);
+            const num = norm(inst.instructionNumber);
+            const fab = norm(inst.fabric);
+            return ref === target || ref.includes(target) || num === target || fab === target;
+          });
+          if (matched) {
+            setSearchParams({ pi: String(matched.id) });
+          }
+        } else if (list.length > 0) {
           setSearchParams({ pi: String(list[0].id) });
         }
       })
@@ -85,9 +112,9 @@ export default function ProductionCompletionVerificationPage() {
         if (live) setListLoading(false);
       });
     return () => { live = false; };
-  }, [piIdParam, setSearchParams]);
+  }, [piIdParam, programQuery, setSearchParams]);
 
-  const activePiId = piIdParam || (instructions[0]?.id ? String(instructions[0].id) : null);
+  const activePiId = piIdParam || (programQuery && !matchingPiForProgram ? null : (instructions[0]?.id ? String(instructions[0].id) : null));
 
   const loadCompletionData = (id) => {
     if (!id) {
@@ -216,6 +243,27 @@ export default function ProductionCompletionVerificationPage() {
     } catch (err) {
       setActionError(`Mark Complete failed: ${errorText(err)}`);
       showToast(`Mark Complete failed: ${errorText(err)}`, 'error');
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const handleStartInstruction = async () => {
+    if (!activePiId) return;
+    setActionError(null);
+    setActionNotice(null);
+    setBusy('start');
+    try {
+      if (status === 'Draft') {
+        await api.post(`/production/instructions/${activePiId}/approve/`);
+      }
+      const res = await api.post(`/production/instructions/${activePiId}/start/`);
+      setDetail(res);
+      showToast('Production started successfully', 'success');
+      await loadCompletionData(activePiId);
+    } catch (err) {
+      setActionError(`Start failed: ${errorText(err)}`);
+      showToast(`Start failed: ${errorText(err)}`, 'error');
     } finally {
       setBusy(null);
     }
@@ -409,7 +457,27 @@ export default function ProductionCompletionVerificationPage() {
           <button type="button" onClick={() => setActionNotice(null)} className="text-emerald-400 hover:text-emerald-700" title="Dismiss"><X size={14} /></button>
         </div>
       )}
-      {!listLoading && !listError && instructions.length === 0 && (
+      {Boolean(programQuery && !matchingPiForProgram && !listLoading) && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-6 text-center space-y-3">
+          <AlertTriangle size={32} className="mx-auto text-amber-600" />
+          <h3 className="font-bold text-base text-amber-900">
+            No Production Work Instruction Found for Program "{programQuery}"
+          </h3>
+          <p className="text-xs text-amber-700 max-w-lg mx-auto">
+            To verify completion output and generate the commercial Job-Work Auto-PO, you must first issue a Production Instruction (PI) for this program.
+          </p>
+          <div className="pt-2">
+            <button
+              onClick={() => navigate(`/pms/production-instructions?program=${encodeURIComponent(programQuery)}&autoCreate=1`)}
+              className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-xs shadow-sm cursor-pointer"
+            >
+              <ClipboardList size={14} /> + Issue Production Instruction for "{programQuery}"
+            </button>
+          </div>
+        </div>
+      )}
+
+      {!listLoading && !listError && instructions.length === 0 && !programQuery && (
         <div className="rounded-xl border border-[#e2eaf5] bg-white px-4 py-10 text-center">
           <p className="text-[13px] font-extrabold text-[#17294e]">No production instructions yet</p>
           <p className="mt-1 text-[11.5px] text-slate-400">Create a production instruction to track completion and verification.</p>
@@ -463,11 +531,21 @@ export default function ProductionCompletionVerificationPage() {
             </span>
           )}
           <div className="ml-auto flex flex-wrap items-center gap-2">
+            {hasData && (status === 'Draft' || status === 'Approved' || status === 'Not Started') && (
+              <button
+                type="button"
+                onClick={handleStartInstruction}
+                disabled={busy !== null}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3.5 py-1.5 text-[12px] font-bold text-white hover:bg-blue-700 disabled:opacity-50 cursor-pointer shadow-xs"
+              >
+                <Clock size={14} /> {status === 'Draft' ? 'Approve & Start Production' : 'Start Production'}
+              </button>
+            )}
             {hasData && canMarkComplete(status) && (
               <button
                 onClick={() => setConfirmCompleteOpen(true)}
                 disabled={busy !== null}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-3 py-1.5 text-[12px] font-bold text-amber-700 hover:bg-amber-100 disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-3 py-1.5 text-[12px] font-bold text-amber-700 hover:bg-amber-100 disabled:opacity-50 cursor-pointer"
               >
                 {busy === 'complete' ? 'Completing…' : 'Mark Complete'}
               </button>
@@ -480,7 +558,7 @@ export default function ProductionCompletionVerificationPage() {
                   setShowVerifyModal(true);
                 }}
                 disabled={busy !== null}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-[#2563eb] px-3.5 py-1.5 text-[12px] font-bold text-white hover:bg-[#1d4ed8] disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-[#2563eb] px-3.5 py-1.5 text-[12px] font-bold text-white hover:bg-[#1d4ed8] disabled:opacity-50 cursor-pointer"
               >
                 <Check size={14} /> Verify & Approve
               </button>
@@ -491,9 +569,25 @@ export default function ProductionCompletionVerificationPage() {
                 type="button"
                 onClick={() => setShowGeneratePoModal(true)}
                 disabled={busy !== null}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3.5 py-1.5 text-[12px] font-bold text-white hover:bg-emerald-700 disabled:opacity-50 cursor-pointer"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3.5 py-1.5 text-[12px] font-bold text-white hover:bg-emerald-700 disabled:opacity-50 cursor-pointer shadow-xs"
               >
                 <FileText size={14} /> Generate Final PO
+              </button>
+            )}
+            {/* If PO not generated and output not yet verified, provide clear helper button */}
+            {hasData && !isPoGenerated && !canGeneratePo(status) && status !== 'Draft' && status !== 'Approved' && status !== 'Not Started' && (
+              <button
+                type="button"
+                onClick={() => {
+                  setRejectedQtyInput(String(Number(rejectedQty) || 0));
+                  setVerifyError(null);
+                  setShowVerifyModal(true);
+                  showToast?.('Please verify accepted meters to generate the Final Job Work Auto-PO.', 'info');
+                }}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-[12px] font-bold text-emerald-700 hover:bg-emerald-100 transition-colors cursor-pointer"
+                title="Verify accepted output to generate the Final Job Work Auto-PO"
+              >
+                <FileText size={14} /> Auto-PO (Verify First)
               </button>
             )}
             {/* When PO is already generated: 'Generate Final PO' is disabled & gone from screen. Show View Final PO */}

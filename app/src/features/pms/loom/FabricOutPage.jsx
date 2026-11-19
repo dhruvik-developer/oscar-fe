@@ -690,6 +690,11 @@ export default function FabricOutPage() {
                           JWO #{d.job_work_order_number}
                         </span>
                       )}
+                      {d.batch_code && (
+                        <span className="inline-flex items-center gap-1 text-[10px] text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-1.5 py-0.2 rounded border border-emerald-200 dark:border-emerald-900/50 w-fit font-mono">
+                          Batch: {d.batch_code}
+                        </span>
+                      )}
                     </div>
                   </td>
                   <td className="py-2 px-2.5 sm:py-2.5 sm:px-3">

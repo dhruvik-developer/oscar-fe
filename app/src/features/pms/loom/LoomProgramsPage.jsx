@@ -20,6 +20,7 @@ import PageHeader from '../../../components/ui/PageHeader';
 import KpiCard from '../../../components/ui/KpiCard';
 import { Button } from '../../../components/ui/Button';
 import TablePagination from '../../../components/ui/TablePagination';
+import { api } from '../../../services/api';
 import { loomService } from '../../../services/loomService';
 import { qc, formatNum, preventNegativeInput } from '../utils/loomCalculations';
 import { useERP } from '../../../context/ERPContext';
@@ -31,6 +32,7 @@ export default function LoomProgramsPage() {
   const [loading, setLoading] = useState(true);
   const [deleteConfirmProgId, setDeleteConfirmProgId] = useState(null);
   const [programs, setPrograms] = useState([]);
+  const [instructions, setInstructions] = useState([]);
   const [progPage, setProgPage] = useState(1);
   const [progPageSize, setProgPageSize] = useState(10);
   const [factories, setFactories] = useState([]);
@@ -72,30 +74,43 @@ export default function LoomProgramsPage() {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const [prRes, fRes, qRes, yRes] = await Promise.all([
+      const [prRes, fRes, qRes, yRes, piRes] = await Promise.all([
         loomService.getPrograms(),
         loomService.getFactories(),
         loomService.getQualities(),
         loomService.getYarns(),
+        api.get('/production/instructions/', { query: { page_size: 200 } }).catch(() => ({ results: [] })),
       ]);
       const prList = Array.isArray(prRes) ? prRes : prRes?.results || [];
       const fList = Array.isArray(fRes) ? fRes : fRes?.results || [];
       const qList = Array.isArray(qRes) ? qRes : qRes?.results || [];
       const yList = Array.isArray(yRes) ? yRes : yRes?.results || [];
+      const piList = Array.isArray(piRes) ? piRes : piRes?.results || [];
 
       setPrograms(prList);
       setFactories(fList);
       setQualities(qList);
       setYarns(yList);
+      setInstructions(piList);
 
-      if (fList.length && !pFactory) setPFactory(fList[0].id);
-      if (qList.length && !pQuality) setPQuality(qList[0].id);
+      if (fList.length) setPFactory((prev) => prev || fList[0].id);
+      if (qList.length) setPQuality((prev) => prev || qList[0].id);
     } catch (err) {
       console.error('Failed to load programs:', err);
     } finally {
       setLoading(false);
     }
-  }, [pFactory, pQuality]);
+  }, []);
+
+  const getProgramPi = useCallback((programName) => {
+    if (!programName) return null;
+    const norm = (s) => String(s || '').trim().toLowerCase();
+    const target = norm(programName);
+    return instructions.find((pi) => {
+      const ref = norm(pi.orderReference || pi.order_reference);
+      return ref === target;
+    }) || null;
+  }, [instructions]);
 
   useEffect(() => {
     loadData();
@@ -333,37 +348,59 @@ export default function LoomProgramsPage() {
         </div>
 
         {/* Work Instruction (PI) & Auto-PO Settlement Bridge */}
-        <div className="bg-gradient-to-r from-blue-50/80 to-indigo-50/60 dark:from-slate-900 dark:to-blue-950/40 border border-blue-200/80 dark:border-blue-800 rounded-xl p-3.5 sm:p-4 shadow-sm flex flex-wrap items-center justify-between gap-3">
-          <div className="space-y-0.5">
-            <div className="flex items-center gap-2">
-              <ClipboardList size={16} className="text-blue-600 dark:text-blue-400" />
-              <h4 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-slate-100">
-                Work Instruction (PI) & Job-Work Settlement Bridge
-              </h4>
+        {(() => {
+          const activePi = getProgramPi(activeProg.name);
+          return (
+            <div className="bg-gradient-to-r from-blue-50/80 to-indigo-50/60 dark:from-slate-900 dark:to-blue-950/40 border border-blue-200/80 dark:border-blue-800 rounded-xl p-3.5 sm:p-4 shadow-sm flex flex-wrap items-center justify-between gap-3">
+              <div className="space-y-0.5">
+                <div className="flex items-center gap-2">
+                  <ClipboardList size={16} className="text-blue-600 dark:text-blue-400" />
+                  <h4 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-slate-100">
+                    Work Instruction (PI) & Job-Work Settlement Bridge
+                  </h4>
+                </div>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                  {activePi ? (
+                    <span>Linked Work Instruction: <strong className="text-blue-700 dark:text-blue-300 font-mono">{activePi.instructionNumber || activePi.piNumber}</strong> (Status: <strong>{activePi.status}</strong>). Verify daily output to generate the Auto-PO.</span>
+                  ) : (
+                    <span>Issue the formal job-card Production Instruction (PI) for {activeProg.factory_name} ({activeProg.quality_name}) or verify completion output to auto-generate the final Job-Work PO.</span>
+                  )}
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  variant={activePi ? "secondary" : "primary"}
+                  size="sm"
+                  onClick={() => {
+                    if (activePi) {
+                      navigate(`/pms/production-instructions?query=${encodeURIComponent(activeProg.name)}`);
+                    } else {
+                      navigate(`/pms/production-instructions?program=${encodeURIComponent(activeProg.name)}&autoCreate=1`);
+                    }
+                  }}
+                >
+                  <ClipboardList size={13} className="mr-1.5" />
+                  {activePi ? `View PI (${activePi.instructionNumber || activePi.piNumber})` : '+ Issue Work Instruction (PI)'}
+                </Button>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={() => {
+                    if (activePi) {
+                      navigate(`/pms/production-completion?pi=${activePi.id}`);
+                    } else {
+                      showToast(`No PI issued yet for program "${activeProg.name}". Creating PI now...`, 'info');
+                      navigate(`/pms/production-instructions?program=${encodeURIComponent(activeProg.name)}&autoCreate=1`);
+                    }
+                  }}
+                >
+                  <CheckCircle2 size={13} className="mr-1.5" />
+                  Verify Output & Auto-PO
+                </Button>
+              </div>
             </div>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400">
-              Generate the formal job-card Production Instruction (PI) for {activeProg.factory_name} or verify completion output to auto-generate the final Job-Work PO.
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => navigate(`/pms/production-instructions?query=${encodeURIComponent(activeProg.name)}`)}
-            >
-              <ClipboardList size={13} className="mr-1.5 text-blue-600" />
-              View / Issue PI
-            </Button>
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={() => navigate(`/pms/production-completion?query=${encodeURIComponent(activeProg.name)}`)}
-            >
-              <CheckCircle2 size={13} className="mr-1.5" />
-              Verify Output & Auto-PO
-            </Button>
-          </div>
-        </div>
+          );
+        })()}
       </div>
     );
   }
@@ -610,23 +647,43 @@ export default function LoomProgramsPage() {
                     </td>
                     <td className="py-2 px-2.5 sm:py-2.5 sm:px-3 text-center">
                       <div className="flex items-center justify-center gap-1">
-                        <button
-                          onClick={() => navigate(`/pms/production-instructions?query=${encodeURIComponent(p.name)}`)}
-                          className="text-blue-600 hover:text-blue-800 p-1 rounded transition-colors"
-                          title="View / Issue Production Work Instruction (PI)"
-                        >
-                          <ClipboardList size={13} />
-                        </button>
-                        <button
-                          onClick={() => navigate(`/pms/production-completion?query=${encodeURIComponent(p.name)}`)}
-                          className="text-emerald-600 hover:text-emerald-800 p-1 rounded transition-colors"
-                          title="Verify Output & Auto-PO"
-                        >
-                          <CheckCircle2 size={13} />
-                        </button>
+                        {(() => {
+                          const matchedPi = getProgramPi(p.name);
+                          return (
+                            <>
+                              <button
+                                onClick={() => {
+                                  if (matchedPi) {
+                                    navigate(`/pms/production-instructions?query=${encodeURIComponent(p.name)}`);
+                                  } else {
+                                    navigate(`/pms/production-instructions?program=${encodeURIComponent(p.name)}&autoCreate=1`);
+                                  }
+                                }}
+                                className="text-blue-600 hover:text-blue-800 p-1 rounded transition-colors cursor-pointer"
+                                title={matchedPi ? `View Production Work Instruction (${matchedPi.instructionNumber || matchedPi.piNumber})` : `Issue Production Work Instruction (PI) for ${p.name}`}
+                              >
+                                <ClipboardList size={13} />
+                              </button>
+                              <button
+                                onClick={() => {
+                                  if (matchedPi) {
+                                    navigate(`/pms/production-completion?pi=${matchedPi.id}`);
+                                  } else {
+                                    showToast(`No PI issued yet for program "${p.name}". Please issue a Production Instruction first.`, 'warning');
+                                    navigate(`/pms/production-instructions?program=${encodeURIComponent(p.name)}&autoCreate=1`);
+                                  }
+                                }}
+                                className="text-emerald-600 hover:text-emerald-800 p-1 rounded transition-colors cursor-pointer"
+                                title={matchedPi ? `Verify Output & Auto-PO (${matchedPi.instructionNumber || matchedPi.piNumber})` : `Issue PI first to generate Auto-PO for ${p.name}`}
+                              >
+                                <CheckCircle2 size={13} />
+                              </button>
+                            </>
+                          );
+                        })()}
                         <button
                           onClick={() => setDeleteConfirmProgId(p.id)}
-                          className="text-red-500 hover:text-red-700 p-1 rounded transition-colors"
+                          className="text-red-500 hover:text-red-700 p-1 rounded transition-colors cursor-pointer"
                           title="Delete Program"
                         >
                           <Trash2 size={13} />

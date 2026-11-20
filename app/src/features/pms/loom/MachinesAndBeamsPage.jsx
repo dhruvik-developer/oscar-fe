@@ -109,7 +109,8 @@ export default function MachinesAndBeamsPage() {
       ]);
       setStatusData(stRes);
       const bList = Array.isArray(bRes) ? bRes : bRes?.results || [];
-      setBeams(bList);
+      const factoryBeams = bList.filter((b) => !b.factory || b.factory === selectedFactoryId);
+      setBeams(factoryBeams);
     } catch (err) {
       console.error('Failed to load factory status:', err);
     } finally {
@@ -208,6 +209,16 @@ export default function MachinesAndBeamsPage() {
     const m = statusData?.machines?.find((x) => x.machine_id === machineId);
     const q = qualities.find((x) => x.id === beam?.quality);
 
+    // Validation: Check if the target machine is already running an active beam on loom
+    const activeBeam = occupiedMachineMap[machineId];
+    if (activeBeam && activeBeam.id !== beamId) {
+      showToast(
+        `Machine MCN ${m?.no || ''} currently has active beam "${activeBeam.beam_no}" on loom. Cut off or finish the active beam before loading a new one.`,
+        'error'
+      );
+      return;
+    }
+
     if (m && q && m.reed !== q.reed) {
       setReedConfirmModal({
         title: 'Reed Mismatch Warning',
@@ -251,6 +262,20 @@ export default function MachinesAndBeamsPage() {
   };
 
   const machines = statusData?.machines || [];
+  const occupiedMachineMap = useMemo(() => {
+    const map = {};
+    beams.forEach((b) => {
+      if (b.status === 'On loom' && b.machine) {
+        map[b.machine] = b;
+      }
+    });
+    machines.forEach((m) => {
+      if (m.beam && m.machine_id && !map[m.machine_id]) {
+        map[m.machine_id] = { beam_no: m.beam, machine_no: m.no, id: m.beam_id };
+      }
+    });
+    return map;
+  }, [beams, machines]);
   const activeBeams = beams.filter((b) => b.status !== 'Finished');
   const yarnCoverList = statusData?.yarn_cover || [];
 
@@ -655,9 +680,14 @@ export default function MachinesAndBeamsPage() {
               className="pms-select w-full cursor-pointer"
             >
               <option value="">— Unassigned —</option>
-              {machines.map((m) => (
-                <option key={m.machine_id} value={m.machine_id}>MCN {m.no} (Reed {m.reed})</option>
-              ))}
+              {machines.map((m) => {
+                const isOcc = Boolean(occupiedMachineMap[m.machine_id]);
+                return (
+                  <option key={m.machine_id} value={m.machine_id}>
+                    MCN {m.no} (Reed {m.reed}) {isOcc ? '— [Active Beam Running]' : '— [Idle / Ready]'}
+                  </option>
+                );
+              })}
             </select>
           </div>
           <div>
@@ -719,7 +749,18 @@ export default function MachinesAndBeamsPage() {
                     </span>
                   </td>
                   <td className="py-2 px-3 font-semibold text-slate-700 dark:text-slate-300 whitespace-nowrap">
-                    {b.machine_no ? `MCN ${b.machine_no}` : <span className="text-slate-400 font-normal">—</span>}
+                    {b.machine_no ? (
+                      <span className="flex items-center gap-1.5">
+                        <span>MCN {b.machine_no}</span>
+                        {b.status === 'Spare' && (
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800">
+                            Parked
+                          </span>
+                        )}
+                      </span>
+                    ) : (
+                      <span className="text-slate-400 font-normal">—</span>
+                    )}
                   </td>
                   <td className="py-2.5 px-3 text-center whitespace-nowrap min-w-[230px]">
                     <div className="flex items-center justify-center gap-1.5">
@@ -728,12 +769,17 @@ export default function MachinesAndBeamsPage() {
                           <select
                             id={`target_m_${b.id}`}
                             defaultValue={b.machine || ''}
-                            className="h-8 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 font-medium text-slate-800 dark:text-slate-200 cursor-pointer min-w-[120px] outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500"
+                            className="h-8 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 font-medium text-slate-800 dark:text-slate-200 cursor-pointer min-w-[145px] outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500"
                           >
                             <option value="">Select MCN...</option>
-                            {machines.map((m) => (
-                              <option key={m.machine_id} value={m.machine_id}>MCN {m.no}</option>
-                            ))}
+                            {machines.map((m) => {
+                              const isOcc = Boolean(occupiedMachineMap[m.machine_id]);
+                              return (
+                                <option key={m.machine_id} value={m.machine_id}>
+                                  MCN {m.no} {isOcc ? '(Weaving Active Beam)' : '(Idle / Ready)'}
+                                </option>
+                              );
+                            })}
                           </select>
                           <button
                             type="button"
@@ -747,6 +793,7 @@ export default function MachinesAndBeamsPage() {
                               handleLoadToLoom(b.id, el.value);
                             }}
                             className="h-8 px-3 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white rounded-lg text-xs font-semibold shadow-2xs transition cursor-pointer"
+                            title="Load this spare beam onto machine"
                           >
                             Load
                           </button>

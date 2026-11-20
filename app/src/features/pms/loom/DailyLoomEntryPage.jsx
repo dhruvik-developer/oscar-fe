@@ -20,6 +20,11 @@ import {
   Smartphone,
   Wifi,
   Copy,
+  History,
+  Clock,
+  RotateCcw,
+  LayoutGrid,
+  Table as TableIcon,
 } from 'lucide-react';
 import PageHeader from '../../../components/ui/PageHeader';
 import { Button } from '../../../components/ui/Button';
@@ -32,6 +37,7 @@ import { useAppStore } from '../../../stores/appStore';
 import { ConfirmModal } from '../../../components/ui/ConfirmModal';
 import CompanySelector from './components/CompanySelector';
 import DatePicker from './components/DatePicker';
+import DailyEntryHistoryModal from './components/DailyEntryHistoryModal';
 
 /**
  * Checks whether user has Administrator, Admin, or General Manager privileges.
@@ -113,6 +119,7 @@ export default function DailyLoomEntryPage() {
   const isAdminOrGM = useMemo(() => isLoomAdminOrManager(currentUser), [currentUser]);
 
   const [searchParams, setSearchParams] = useSearchParams();
+  const isStandalone = searchParams.get('standalone') === '1' || searchParams.get('direct') === '1';
   const urlFactoryId = searchParams.get('factory');
   const urlDate = searchParams.get('date');
   const urlProject = searchParams.get('project');
@@ -143,10 +150,33 @@ export default function DailyLoomEntryPage() {
   const [saving, setSaving] = useState(false);
   const [showMore, setShowMore] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
+  const [copiedMsg, setCopiedMsg] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
+  const [customWhatsAppMsg, setCustomWhatsAppMsg] = useState('');
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [lastUpdatedAt, setLastUpdatedAt] = useState(null);
+  const [lastUpdatedBy, setLastUpdatedBy] = useState(null);
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState('');
   const [lastSyncedAt, setLastSyncedAt] = useState(null);
   const [isLiveSyncing, setIsLiveSyncing] = useState(false);
+  const [viewMode, setViewMode] = useState(() =>
+    typeof window !== 'undefined' && window.innerWidth < 768 ? 'cards' : 'table'
+  );
+
+  // Summary counts for mobile floating bar & status
+  const activeBeamsCount = useMemo(() => rows.filter((r) => r.has_beam).length, [rows]);
+  const filledOrEnteredCount = useMemo(
+    () => rows.filter((r) => r.has_beam && (r.done || (r.meters !== '' && Number(r.meters) > 0))).length,
+    [rows]
+  );
+  const totalMetersToday = useMemo(
+    () =>
+      rows.reduce((sum, r) => {
+        const m = Number(r.meters);
+        return !isNaN(m) && m > 0 ? sum + m : sum;
+      }, 0),
+    [rows]
+  );
 
   // Track if user is actively editing rows to avoid live-sync overwriting their input
   const isDirtyRef = useRef(false);
@@ -207,19 +237,38 @@ export default function DailyLoomEntryPage() {
     return displayedRows.slice(start, start + pageSize);
   }, [displayedRows, page, pageSize]);
 
-  // Generates mobile-friendly URL: automatically replaces "localhost" with LAN IP (e.g. 192.168.1.8) so mobile phones can connect
+  // Generates mobile-friendly URL using LAN IP so devices on same Wi-Fi can open directly via HTTP
   const getShareableUrl = useCallback(() => {
-    let baseOrigin = window.location.origin;
-    const isLocalhost =
-      window.location.hostname === 'localhost' ||
-      window.location.hostname === '127.0.0.1';
+    let hostname = window.location.hostname;
+    const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
     const lanIp = import.meta.env?.VITE_LAN_IP;
 
     if (isLocalhost && lanIp) {
-      baseOrigin = `${window.location.protocol}//${lanIp}:${window.location.port || '5173'}`;
+      hostname = lanIp;
     }
+
+    const port = window.location.port ? `:${window.location.port}` : '';
+    const baseOrigin = `${window.location.protocol}//${hostname}${port}`;
     return `${baseOrigin}/pms/loom-daily?factory=${selectedFactoryId}&date=${dateStr}&standalone=1`;
   }, [selectedFactoryId, dateStr]);
+
+  // Formatted WhatsApp message for supervisors and operators
+  const getWhatsAppShareText = useCallback(() => {
+    const url = getShareableUrl();
+    const factoryName = selectedFactory?.name || 'Manufacturing Unit';
+    const dParts = (dateStr || '').split('-');
+    const formattedDate = dParts.length === 3 ? `${dParts[2]}-${dParts[1]}-${dParts[0]}` : dateStr;
+    const loomsCount = rows.length || selectedFactory?.machines_count || 0;
+
+    return `*🏭 OSCAR ERP — Daily Loom Production Entry*
+📍 *Unit / Factory:* ${factoryName}
+📅 *Date:* ${formattedDate}
+⚡ *Power Cut:* ${powerCut || 0} hrs
+📊 *Total Looms:* ${loomsCount}
+
+👉 *Click the link below to enter today's machine production & stops:*
+${url}`;
+  }, [getShareableUrl, selectedFactory, dateStr, powerCut, rows]);
 
   // Generate QR code whenever the share modal is open
   useEffect(() => {
@@ -232,8 +281,9 @@ export default function DailyLoomEntryPage() {
       })
         .then((dataUrl) => setQrCodeDataUrl(dataUrl))
         .catch((err) => console.error('Failed to generate QR code:', err));
+      setCustomWhatsAppMsg(getWhatsAppShareText());
     }
-  }, [showShareModal, getShareableUrl]);
+  }, [showShareModal, getShareableUrl, getWhatsAppShareText]);
 
   // Keep URL query params in sync with currently selected factory and date
   const updateUrlParams = useCallback((factoryId, date) => {
@@ -262,10 +312,10 @@ export default function DailyLoomEntryPage() {
   // Copy or share direct link (Supports Web Share API on Mobile like WhatsApp and opens QR modal on PC)
   const handleCopyLink = async () => {
     const url = getShareableUrl();
+    const formattedText = getWhatsAppShareText();
     const shareData = {
-      title: 'Daily Loom Production Entry',
-      text: `Daily Loom Entry for ${selectedFactory?.name || 'Unit'} (${dateStr})`,
-      url,
+      title: `Daily Loom Entry — ${selectedFactory?.name || 'Unit'} (${dateStr})`,
+      text: formattedText,
     };
 
     if (navigator?.share && /mobile|android|iphone|ipad/i.test(navigator.userAgent || '')) {
@@ -280,12 +330,12 @@ export default function DailyLoomEntryPage() {
     // Always show QR / share modal on desktop
     setShowShareModal(true);
 
-    // Copy to clipboard (handles non-secure HTTP / LAN safely)
-    const copied = await copyTextToClipboard(url);
+    // Copy formatted text to clipboard (handles non-secure HTTP / LAN safely)
+    const copied = await copyTextToClipboard(formattedText);
     if (copied) {
       setCopiedLink(true);
       showToast(
-        `Mobile link copied! (Network IP: ${import.meta.env?.VITE_LAN_IP || 'LAN'})`,
+        `Formatted WhatsApp message copied! (Network IP: ${import.meta.env?.VITE_LAN_IP || 'LAN'})`,
         'success'
       );
       setTimeout(() => setCopiedLink(false), 2500);
@@ -346,6 +396,8 @@ export default function DailyLoomEntryPage() {
       setPowerCut(res?.power || 0);
       setRows(res?.rows || []);
       setLastSyncedAt(new Date());
+      setLastUpdatedAt(res?.last_updated_at || null);
+      setLastUpdatedBy(res?.last_updated_by || null);
       isDirtyRef.current = false;
     } catch (err) {
       if (!silent) {
@@ -544,144 +596,242 @@ export default function DailyLoomEntryPage() {
   };
 
   return (
-    <div className="pms-screen w-full space-y-6">
-      <PageHeader
-        title="Daily Loom Production Entry"
-        subtitle="Single-click coordinator matrix: Log daily machine output, stops, and power cuts across active looms."
-        actions={
-          <div className="flex flex-wrap items-center gap-2">
-            {/* Share / Direct Link Button */}
-            <button
-              type="button"
-              onClick={handleCopyLink}
-              title="Copy shareable link for this daily entry"
-              className="pms-btn-secondary"
-            >
-              {copiedLink ? (
-                <>
-                  <Check size={14} className="mr-1 text-emerald-600 dark:text-emerald-400" />
-                  Link Copied!
-                </>
-              ) : (
-                <>
-                  <Share2 size={14} className="mr-1" />
-                  Share Link
-                </>
-              )}
-            </button>
+    <div className="pms-screen w-full space-y-4 sm:space-y-6 pb-24 sm:pb-4">
+      {!isStandalone ? (
+        <PageHeader
+          title="Daily Loom Production Entry"
+          subtitle="Single-click coordinator matrix: Log daily machine output, stops, and power cuts across active looms."
+          actions={
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Entry Logs / History Button */}
+              <button
+                type="button"
+                onClick={() => setShowHistoryModal(true)}
+                title="View daily entry audit log and historical production register"
+                className="pms-btn-secondary"
+              >
+                <History size={14} className="mr-1 text-blue-600 dark:text-blue-400" />
+                Entry Logs
+              </button>
 
-            {/* Refresh Button */}
-            <button
-              type="button"
-              onClick={() => fetchDayData()}
-              disabled={loading}
-              className="pms-btn-secondary"
-            >
-              <RefreshCw size={14} className={`mr-1 ${loading ? 'animate-spin' : ''}`} />
-              Refresh
-            </button>
+              {/* Share / Direct Link Button */}
+              <button
+                type="button"
+                onClick={handleCopyLink}
+                title="Copy shareable link for this daily entry"
+                className="pms-btn-secondary"
+              >
+                {copiedLink ? (
+                  <>
+                    <Check size={14} className="mr-1 text-emerald-600 dark:text-emerald-400" />
+                    Link Copied!
+                  </>
+                ) : (
+                  <>
+                    <Share2 size={14} className="mr-1" />
+                    Share Link
+                  </>
+                )}
+              </button>
 
-            {/* Save Day Entries */}
-            <button
-              type="button"
-              onClick={handleSaveDay}
-              disabled={saving || loading || !selectedFactoryId}
-              className="pms-btn-emerald"
-            >
-              <Save size={15} className="mr-1.5" />
-              {saving ? 'Saving...' : 'Save Day Entries'}
-            </button>
+              {/* Refresh Button */}
+              <button
+                type="button"
+                onClick={() => fetchDayData()}
+                disabled={loading}
+                className="pms-btn-secondary"
+              >
+                <RefreshCw size={14} className={`mr-1 ${loading ? 'animate-spin' : ''}`} />
+                Refresh
+              </button>
+            </div>
+          }
+        />
+      ) : (
+        /* Standalone view: Clean minimal header on mobile and desktop */
+        <div className="flex items-center justify-between pb-1">
+          <div>
+            <h1 className="text-base sm:text-xl font-extrabold text-slate-900 dark:text-slate-100 tracking-tight">
+              Daily Loom Production Entry
+            </h1>
+            <p className="text-xs text-slate-500">
+              {selectedFactory?.name || 'Production Unit'} • {dateStr}
+            </p>
           </div>
-        }
-      />
+          <button
+            type="button"
+            onClick={() => fetchDayData()}
+            disabled={loading}
+            className="pms-btn-secondary text-xs h-[34px] px-2.5"
+            title="Refresh entries"
+          >
+            <RefreshCw size={14} className={`mr-1 ${loading ? 'animate-spin' : ''}`} />
+            <span className="hidden sm:inline">Refresh</span>
+          </button>
+        </div>
+      )}
 
       {/* Control Bar */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3.5 sm:p-4 shadow-2xs">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex flex-wrap items-center gap-2.5 sm:gap-3">
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3 sm:p-4 shadow-2xs">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+          <div className="grid grid-cols-1 sm:flex sm:flex-wrap items-center gap-2 sm:gap-3">
             {/* Factory select with permission scoping */}
             <CompanySelector
               factories={factories}
               selectedFactoryId={selectedFactoryId}
               align="left"
               onSelect={handleSelectFactory}
+              className="w-full sm:w-auto"
             />
 
-            {/* Date Picker */}
-            <DatePicker value={dateStr} onChange={handleChangeDate} align="left" />
-
-            {/* Power cut */}
-            <div className="h-[38px] flex items-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 shadow-2xs">
-              <Zap size={15} className="text-amber-500 shrink-0" />
-              <span className="text-xs font-medium text-slate-600 dark:text-slate-400 whitespace-nowrap">
-                Power Cut:
-              </span>
-              <input
-                type="number"
-                inputMode="decimal"
-                step="any"
-                min="0"
-                value={powerCut}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  if (val === '') {
-                    setPowerCut('');
-                  } else {
-                    const num = parseFloat(val);
-                    setPowerCut(isNaN(num) || num < 0 ? 0 : num);
-                  }
-                }}
-                onKeyDown={preventNegativeInput}
-                className="w-12 bg-transparent text-xs font-bold text-slate-800 dark:text-slate-200 outline-none text-right"
+            {/* Date Picker and Power Cut on Mobile */}
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <DatePicker
+                value={dateStr}
+                onChange={handleChangeDate}
+                align="left"
+                readOnly={isStandalone}
+                className="flex-1 sm:flex-none"
               />
-              <span className="text-xs text-slate-400">hrs</span>
+
+              {/* Power cut */}
+              <div className="h-[38px] flex items-center gap-1.5 sm:gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-2.5 sm:px-3 shadow-2xs shrink-0">
+                <Zap size={14} className="text-amber-500 shrink-0" />
+                <span className="text-xs font-medium text-slate-600 dark:text-slate-400 whitespace-nowrap">
+                  Power:
+                </span>
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  step="any"
+                  min="0"
+                  value={powerCut}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val === '') {
+                      setPowerCut('');
+                    } else {
+                      const num = parseFloat(val);
+                      setPowerCut(isNaN(num) || num < 0 ? 0 : num);
+                    }
+                  }}
+                  onKeyDown={preventNegativeInput}
+                  className="w-10 bg-transparent text-xs font-bold text-slate-800 dark:text-slate-200 outline-none text-right"
+                />
+                <span className="text-xs text-slate-400">hrs</span>
+              </div>
             </div>
 
-            {/* Role Scope Pill */}
-            {isAdminOrGM ? (
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
-                <ShieldCheck size={13} className="text-blue-600 dark:text-blue-400" />
-                Admin / GM View (All Units)
-              </span>
-            ) : selectedFactory ? (
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
-                <Building2 size={13} className="text-emerald-600 dark:text-emerald-400" />
-                Assigned Unit: {selectedFactory.name}
-              </span>
-            ) : null}
+            {/* Admin/Role Scope, Live Connectivity & Save Status Badges (Hidden in standalone link view) */}
+            {!isStandalone && (
+              <>
+                {/* Role Scope Pill */}
+                {isAdminOrGM ? (
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                    <ShieldCheck size={13} className="text-blue-600 dark:text-blue-400" />
+                    Admin / GM View (All Units)
+                  </span>
+                ) : selectedFactory ? (
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                    <Building2 size={13} className="text-emerald-600 dark:text-emerald-400" />
+                    Assigned Unit: {selectedFactory.name}
+                  </span>
+                ) : null}
 
-            {/* Live Connectivity Badge */}
-            <div
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-emerald-50/70 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60"
-              title={`Live real-time connectivity active. ${lastSyncedAt ? `Last checked: ${lastSyncedAt.toLocaleTimeString()}` : ''}`}
-            >
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-              </span>
-              <span className="font-semibold text-[11px]">Live Connected</span>
-              {isLiveSyncing && (
-                <span className="text-[10px] text-emerald-500 animate-pulse ml-0.5">syncing...</span>
-              )}
-            </div>
+                {/* Live Connectivity Badge */}
+                <div
+                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-emerald-50/70 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60"
+                  title={`Live real-time connectivity active. ${lastSyncedAt ? `Last checked: ${lastSyncedAt.toLocaleTimeString()}` : ''}`}
+                >
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                  </span>
+                  <span className="font-semibold text-[11px]">Live Connected</span>
+                  {isLiveSyncing && (
+                    <span className="text-[10px] text-emerald-500 animate-pulse ml-0.5">syncing...</span>
+                  )}
+                </div>
+
+                {/* Day Saved Status Badge */}
+                {lastUpdatedAt ? (
+                  <div
+                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800"
+                    title={`Entries saved at ${new Date(lastUpdatedAt).toLocaleString()}`}
+                  >
+                    <CheckCircle2 size={13} className="text-emerald-600 dark:text-emerald-400 shrink-0" />
+                    <span>
+                      Saved:{' '}
+                      <b>
+                        {new Date(lastUpdatedAt).toLocaleTimeString([], {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </b>
+                      {lastUpdatedBy ? ` by ${lastUpdatedBy}` : ''}
+                    </span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-slate-50 dark:bg-slate-800/80 text-slate-500 border border-slate-200 dark:border-slate-700">
+                    <Clock size={13} className="text-slate-400 shrink-0" />
+                    <span>Pending save for this date</span>
+                  </div>
+                )}
+              </>
+            )}
           </div>
 
-          <div className="flex items-center gap-2">
+          {/* Action Buttons: View Toggle / Show RPM / Save */}
+          <div className="flex items-center justify-between sm:justify-end gap-2 pt-2 md:pt-0 border-t md:border-t-0 border-slate-100 dark:border-slate-800">
+            {/* View Mode Toggle: Cards vs Table */}
+            <div className="inline-flex rounded-xl border border-slate-200 dark:border-slate-700 p-0.5 bg-slate-100/80 dark:bg-slate-800 shadow-2xs">
+              <button
+                type="button"
+                onClick={() => setViewMode('cards')}
+                className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-all flex items-center gap-1 cursor-pointer ${
+                  viewMode === 'cards'
+                    ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-2xs'
+                    : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+                }`}
+                title="Cards View (Optimized for phone)"
+              >
+                <LayoutGrid size={13} />
+                <span>Cards</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode('table')}
+                className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-all flex items-center gap-1 cursor-pointer ${
+                  viewMode === 'table'
+                    ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-2xs'
+                    : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+                }`}
+                title="Table View"
+              >
+                <TableIcon size={13} />
+                <span>Table</span>
+              </button>
+            </div>
+
             <button
               type="button"
               onClick={() => setShowMore(!showMore)}
-              className="pms-btn-secondary"
+              className="pms-btn-secondary text-xs h-[38px] px-2.5"
             >
               <Sliders size={14} />
-              {showMore ? 'Simple View' : 'Show RPM / Hours'}
+              <span className="hidden sm:inline">{showMore ? 'Simple View' : 'Show RPM / Hours'}</span>
+              <span className="sm:hidden">{showMore ? 'Simple' : 'RPM/Hrs'}</span>
             </button>
+
+            {/* Save Day Entries Button */}
             <button
               type="button"
               onClick={handleSaveDay}
               disabled={saving || loading || !selectedFactoryId}
-              className="pms-btn-emerald sm:hidden"
+              className="pms-btn-emerald text-xs h-[38px] px-3.5"
             >
-              <Save size={14} className="mr-1" /> Save
+              <Save size={15} className="mr-1.5" />
+              {saving ? 'Saving...' : 'Save Entries'}
             </button>
           </div>
         </div>
@@ -752,191 +902,387 @@ export default function DailyLoomEntryPage() {
         </div>
       )}
 
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-xs">
-        <div className="pms-table-container overflow-x-auto">
-          <table className="w-full text-xs text-left">
-            <thead className="pms-sticky-header bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-semibold border-b border-slate-200 dark:border-slate-700">
-              <tr>
-                <th className="py-2.5 px-3 sticky left-0 bg-slate-50 dark:bg-slate-800 z-20">MCN</th>
-                <th className="py-2.5 px-3">Quality</th>
-                <th className="py-2.5 px-3 text-right">On Loom (m)</th>
-                <th className="py-2.5 px-3">Meters Today</th>
-                <th className="py-2.5 px-3">Stop Reason</th>
-                <th className="py-2.5 px-3 text-right">Damage (m)</th>
+      {/* Machine Data: Cards View (Touch-Optimized for Phone) or Table View */}
+      {viewMode === 'cards' ? (
+        <div className="space-y-3">
+          {paginatedRows.map((r) => {
+            if (!r.has_beam) {
+              return (
+                <div
+                  key={r.machine_id}
+                  className="bg-slate-50/70 dark:bg-slate-800/30 border border-dashed border-slate-200 dark:border-slate-700/60 rounded-xl p-3 flex items-center justify-between opacity-75"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <span className="font-mono font-black text-xs px-2.5 py-1 rounded-lg bg-slate-200/80 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
+                      MCN {r.machine_no}
+                    </span>
+                    <span className="text-xs italic text-slate-400 dark:text-slate-500">
+                      Idle — No active beam on loom
+                    </span>
+                  </div>
+                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-200/60 dark:bg-slate-700/60 text-slate-500 dark:text-slate-400">
+                    Idle
+                  </span>
+                </div>
+              );
+            }
+
+            return (
+              <div
+                key={r.machine_id}
+                className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3.5 shadow-2xs space-y-3 transition-shadow hover:shadow-xs"
+              >
+                {/* Card Header: MCN + Quality + Beam No + Status */}
+                <div className="flex items-center justify-between pb-2.5 border-b border-slate-100 dark:border-slate-800">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="inline-flex items-center justify-center font-black font-mono text-xs px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 shadow-2xs shrink-0">
+                      MCN {r.machine_no}
+                    </span>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="font-bold text-xs text-slate-900 dark:text-slate-100 truncate">
+                          {r.quality_name}
+                        </span>
+                        <span className="text-slate-400 font-mono text-[11px]">
+                          ({r.beam_no})
+                        </span>
+                        {r.beam_status === 'Finished' && (
+                          <span className="px-1.5 py-0.2 text-[9px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300 rounded">
+                            Finished
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-[11px] text-slate-500 flex items-center gap-1 mt-0.5">
+                        <span>On Loom Remaining:</span>
+                        <span className="font-mono font-bold text-slate-700 dark:text-slate-300">
+                          {formatNum(r.remaining_m)} m
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {r.done ? (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                        Filed
+                      </span>
+                    ) : (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
+                        Pending
+                      </span>
+                    )}
+                    {r.done && r.prod_id && (
+                      <button
+                        type="button"
+                        onClick={() => setDeleteEntryConfirmId(r.prod_id)}
+                        className="text-red-500 hover:text-red-700 p-1 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors"
+                        title="Delete filed row"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Primary Inputs: Meters Today & Damage */}
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                      Meters Today <span className="text-emerald-600 dark:text-emerald-400">*</span>
+                    </label>
+                    <input
+                      type="number"
+                      inputMode="decimal"
+                      min="0"
+                      placeholder="0"
+                      value={r.meters ?? ''}
+                      onChange={(e) => handleRowChange(r.machine_id, 'meters', e.target.value)}
+                      onKeyDown={preventNegativeInput}
+                      className="w-full h-11 px-3 text-base font-mono font-bold rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-800/80 text-slate-900 dark:text-slate-100 text-right focus:bg-white dark:focus:bg-slate-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none shadow-2xs"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                      Damage (m)
+                    </label>
+                    <input
+                      type="number"
+                      inputMode="decimal"
+                      min="0"
+                      placeholder="0"
+                      value={r.damage ?? ''}
+                      onChange={(e) => handleRowChange(r.machine_id, 'damage', e.target.value)}
+                      onKeyDown={preventNegativeInput}
+                      className="w-full h-11 px-3 text-base font-mono rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-800/80 text-slate-900 dark:text-slate-100 text-right focus:bg-white dark:focus:bg-slate-800 focus:border-blue-500 outline-none shadow-2xs"
+                    />
+                  </div>
+                </div>
+
+                {/* Stop Reason Select */}
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    Stop Reason
+                  </label>
+                  <select
+                    value={r.reason || ''}
+                    onChange={(e) => handleRowChange(r.machine_id, 'reason', e.target.value)}
+                    className="w-full h-10 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 px-3 font-medium outline-none cursor-pointer shadow-2xs"
+                  >
+                    <option value="">Normal (Working smoothly)</option>
+                    <option value="Yarn short">Yarn short</option>
+                    <option value="Breakdown">Breakdown</option>
+                    <option value="Beam change">Beam change</option>
+                    <option value="Power">Power</option>
+                    <option value="Labour">Labour</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+
+                {/* Optional RPM / Hours / Stop Inputs if showMore */}
                 {showMore && (
-                  <>
-                    <th className="py-2.5 px-3 text-right">RPM</th>
-                    <th className="py-2.5 px-3 text-right">Hours</th>
-                    <th className="py-2.5 px-3 text-right">Stop (hrs)</th>
-                  </>
+                  <div className="grid grid-cols-3 gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">RPM</label>
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        min="0"
+                        value={r.rpm ?? ''}
+                        onChange={(e) => handleRowChange(r.machine_id, 'rpm', e.target.value)}
+                        onKeyDown={preventNegativeInput}
+                        className="w-full h-9 px-2 text-xs font-mono rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-right outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Hours</label>
+                      <input
+                        type="number"
+                        inputMode="decimal"
+                        min="0"
+                        max="24"
+                        value={r.hours ?? ''}
+                        onChange={(e) => handleRowChange(r.machine_id, 'hours', e.target.value)}
+                        onKeyDown={preventNegativeInput}
+                        className="w-full h-9 px-2 text-xs font-mono rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-right outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Stop (hrs)</label>
+                      <input
+                        type="number"
+                        inputMode="decimal"
+                        min="0"
+                        value={r.stop ?? ''}
+                        onChange={(e) => handleRowChange(r.machine_id, 'stop', e.target.value)}
+                        onKeyDown={preventNegativeInput}
+                        className="w-full h-9 px-2 text-xs font-mono rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-right outline-none"
+                      />
+                    </div>
+                  </div>
                 )}
-                <th className="py-2.5 px-3 text-center">Status</th>
-                <th className="py-2.5 px-3 text-center">Action</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-              {paginatedRows.map((r) => {
-                if (!r.has_beam) {
+              </div>
+            );
+          })}
+          {!rows.length && (
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-8 text-center text-slate-400 text-xs">
+              {factories.length === 0
+                ? 'No assigned factory available.'
+                : 'No machines configured for this factory.'}
+            </div>
+          )}
+        </div>
+      ) : (
+        /* Table View */
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-xs">
+          <div className="pms-table-container overflow-x-auto touch-pan-x">
+            <table className="w-full text-xs text-left">
+              <thead className="pms-sticky-header bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-semibold border-b border-slate-200 dark:border-slate-700">
+                <tr>
+                  <th className="py-2.5 px-3 sticky left-0 bg-slate-50 dark:bg-slate-800 z-20">MCN</th>
+                  <th className="py-2.5 px-3">Quality</th>
+                  <th className="py-2.5 px-3 text-right">On Loom (m)</th>
+                  <th className="py-2.5 px-3">Meters Today</th>
+                  <th className="py-2.5 px-3">Stop Reason</th>
+                  <th className="py-2.5 px-3 text-right">Damage (m)</th>
+                  {showMore && (
+                    <>
+                      <th className="py-2.5 px-3 text-right">RPM</th>
+                      <th className="py-2.5 px-3 text-right">Hours</th>
+                      <th className="py-2.5 px-3 text-right">Stop (hrs)</th>
+                    </>
+                  )}
+                  <th className="py-2.5 px-3 text-center">Status</th>
+                  <th className="py-2.5 px-3 text-center">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                {paginatedRows.map((r) => {
+                  if (!r.has_beam) {
+                    return (
+                      <tr
+                        key={r.machine_id}
+                        className="bg-slate-50/40 dark:bg-slate-800/20 text-slate-400"
+                      >
+                        <td className="py-1.5 px-3 font-bold text-slate-500 sticky left-0 bg-slate-50/90 dark:bg-slate-800/90">
+                          MCN {r.machine_no}
+                        </td>
+                        <td colSpan={showMore ? 8 : 5} className="py-1.5 px-3 italic text-[11px]">
+                          No beam on loom (Idle — park/load a beam to log output)
+                        </td>
+                        <td className="py-1.5 px-3 text-center">
+                          <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-slate-100 text-slate-500">
+                            Idle
+                          </span>
+                        </td>
+                        <td className="py-1.5 px-3 text-center">—</td>
+                      </tr>
+                    );
+                  }
+
                   return (
                     <tr
                       key={r.machine_id}
-                      className="bg-slate-50/40 dark:bg-slate-800/20 text-slate-400"
+                      className="hover:bg-blue-50/30 dark:hover:bg-slate-800/50 transition-colors"
                     >
-                      <td className="py-1.5 px-3 font-bold text-slate-500 sticky left-0 bg-slate-50/90 dark:bg-slate-800/90">
+                      <td className="py-1.5 px-3 font-bold text-slate-900 dark:text-slate-100 sticky left-0 bg-white dark:bg-slate-900 z-10 shadow-xs">
                         MCN {r.machine_no}
                       </td>
-                      <td colSpan={showMore ? 8 : 5} className="py-1.5 px-3 italic text-[11px]">
-                        No beam on loom (Idle — park/load a beam to log output)
+                      <td className="py-1.5 px-3 font-medium text-slate-700 dark:text-slate-300 whitespace-nowrap">
+                        {r.quality_name}
+                        <span className="text-slate-400 font-mono text-[10px] ml-1.5">
+                          ({r.beam_no})
+                        </span>
+                        {r.beam_status === 'Finished' && (
+                          <span className="ml-1.5 px-1.5 py-0.5 text-[9px] font-semibold bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300 rounded">
+                            Finished
+                          </span>
+                        )}
+                      </td>
+                      <td className="py-1.5 px-3 text-right font-mono text-slate-500">
+                        {formatNum(r.remaining_m)}
+                      </td>
+                      <td className="py-1 px-3">
+                        <input
+                          type="number"
+                          inputMode="decimal"
+                          min="0"
+                          placeholder="0"
+                          value={r.meters ?? ''}
+                          onChange={(e) => handleRowChange(r.machine_id, 'meters', e.target.value)}
+                          onKeyDown={preventNegativeInput}
+                          className="w-20 sm:w-24 px-2 py-1 text-xs font-mono font-bold rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-right focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
+                        />
+                      </td>
+                      <td className="py-1 px-3">
+                        <select
+                          value={r.reason || ''}
+                          onChange={(e) => handleRowChange(r.machine_id, 'reason', e.target.value)}
+                          className="h-7 text-xs rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-1.5 font-medium outline-none cursor-pointer"
+                        >
+                          <option value="">Normal</option>
+                          <option value="Yarn short">Yarn short</option>
+                          <option value="Breakdown">Breakdown</option>
+                          <option value="Beam change">Beam change</option>
+                          <option value="Power">Power</option>
+                          <option value="Labour">Labour</option>
+                          <option value="Other">Other</option>
+                        </select>
+                      </td>
+                      <td className="py-1 px-3 text-right">
+                        <input
+                          type="number"
+                          inputMode="decimal"
+                          min="0"
+                          placeholder="0"
+                          value={r.damage ?? ''}
+                          onChange={(e) => handleRowChange(r.machine_id, 'damage', e.target.value)}
+                          onKeyDown={preventNegativeInput}
+                          className="w-14 px-1.5 py-1 text-xs font-mono rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-right outline-none"
+                        />
+                      </td>
+                      {showMore && (
+                        <>
+                          <td className="py-1 px-3 text-right">
+                            <input
+                              type="number"
+                              inputMode="numeric"
+                              min="0"
+                              value={r.rpm ?? ''}
+                              onChange={(e) => handleRowChange(r.machine_id, 'rpm', e.target.value)}
+                              onKeyDown={preventNegativeInput}
+                              className="w-16 px-1.5 py-1 text-xs font-mono rounded border border-slate-200 dark:border-slate-700 text-right outline-none"
+                            />
+                          </td>
+                          <td className="py-1 px-3 text-right">
+                            <input
+                              type="number"
+                              inputMode="decimal"
+                              min="0"
+                              max="24"
+                              value={r.hours ?? ''}
+                              onChange={(e) => handleRowChange(r.machine_id, 'hours', e.target.value)}
+                              onKeyDown={preventNegativeInput}
+                              className="w-14 px-1.5 py-1 text-xs font-mono rounded border border-slate-200 dark:border-slate-700 text-right outline-none"
+                            />
+                          </td>
+                          <td className="py-1 px-3 text-right">
+                            <input
+                              type="number"
+                              inputMode="decimal"
+                              min="0"
+                              value={r.stop ?? ''}
+                              onChange={(e) => handleRowChange(r.machine_id, 'stop', e.target.value)}
+                              onKeyDown={preventNegativeInput}
+                              className="w-14 px-1.5 py-1 text-xs font-mono rounded border border-slate-200 dark:border-slate-700 text-right outline-none"
+                            />
+                          </td>
+                        </>
+                      )}
+                      <td className="py-1.5 px-3 text-center">
+                        {r.done ? (
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300">
+                            Filed
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300">
+                            Pending
+                          </span>
+                        )}
                       </td>
                       <td className="py-1.5 px-3 text-center">
-                        <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-slate-100 text-slate-500">
-                          Idle
-                        </span>
+                        {r.done && r.prod_id ? (
+                          <button
+                            onClick={() => setDeleteEntryConfirmId(r.prod_id)}
+                            className="text-red-500 hover:text-red-700 p-1 rounded transition-colors inline-flex items-center justify-center"
+                            title="Delete filed row"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        ) : (
+                          <span className="text-slate-300 dark:text-slate-600 font-mono text-xs">—</span>
+                        )}
                       </td>
-                      <td className="py-1.5 px-3 text-center">—</td>
                     </tr>
                   );
-                }
-
-                return (
-                  <tr
-                    key={r.machine_id}
-                    className="hover:bg-blue-50/30 dark:hover:bg-slate-800/50 transition-colors"
-                  >
-                    <td className="py-1.5 px-3 font-bold text-slate-900 dark:text-slate-100 sticky left-0 bg-white dark:bg-slate-900 z-10 shadow-xs">
-                      MCN {r.machine_no}
-                    </td>
-                    <td className="py-1.5 px-3 font-medium text-slate-700 dark:text-slate-300 whitespace-nowrap">
-                      {r.quality_name}
-                      <span className="text-slate-400 font-mono text-[10px] ml-1.5">
-                        ({r.beam_no})
-                      </span>
-                      {r.beam_status === 'Finished' && (
-                        <span className="ml-1.5 px-1.5 py-0.5 text-[9px] font-semibold bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300 rounded">
-                          Finished
-                        </span>
-                      )}
-                    </td>
-                    <td className="py-1.5 px-3 text-right font-mono text-slate-500">
-                      {formatNum(r.remaining_m)}
-                    </td>
-                    <td className="py-1 px-3">
-                      <input
-                        type="number"
-                        inputMode="decimal"
-                        min="0"
-                        placeholder="0"
-                        value={r.meters ?? ''}
-                        onChange={(e) => handleRowChange(r.machine_id, 'meters', e.target.value)}
-                        onKeyDown={preventNegativeInput}
-                        className="w-20 sm:w-24 px-2 py-1 text-xs font-mono font-bold rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-right focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
-                      />
-                    </td>
-                    <td className="py-1 px-3">
-                      <select
-                        value={r.reason || ''}
-                        onChange={(e) => handleRowChange(r.machine_id, 'reason', e.target.value)}
-                        className="h-7 text-xs rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-1.5 font-medium outline-none cursor-pointer"
-                      >
-                        <option value="">Normal</option>
-                        <option value="Yarn short">Yarn short</option>
-                        <option value="Breakdown">Breakdown</option>
-                        <option value="Beam change">Beam change</option>
-                        <option value="Power">Power</option>
-                        <option value="Labour">Labour</option>
-                        <option value="Other">Other</option>
-                      </select>
-                    </td>
-                    <td className="py-1 px-3 text-right">
-                      <input
-                        type="number"
-                        inputMode="decimal"
-                        min="0"
-                        placeholder="0"
-                        value={r.damage ?? ''}
-                        onChange={(e) => handleRowChange(r.machine_id, 'damage', e.target.value)}
-                        onKeyDown={preventNegativeInput}
-                        className="w-14 px-1.5 py-1 text-xs font-mono rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-right outline-none"
-                      />
-                    </td>
-                    {showMore && (
-                      <>
-                        <td className="py-1 px-3 text-right">
-                          <input
-                            type="number"
-                            inputMode="numeric"
-                            min="0"
-                            value={r.rpm ?? ''}
-                            onChange={(e) => handleRowChange(r.machine_id, 'rpm', e.target.value)}
-                            onKeyDown={preventNegativeInput}
-                            className="w-16 px-1.5 py-1 text-xs font-mono rounded border border-slate-200 dark:border-slate-700 text-right outline-none"
-                          />
-                        </td>
-                        <td className="py-1 px-3 text-right">
-                          <input
-                            type="number"
-                            inputMode="decimal"
-                            min="0"
-                            max="24"
-                            value={r.hours ?? ''}
-                            onChange={(e) => handleRowChange(r.machine_id, 'hours', e.target.value)}
-                            onKeyDown={preventNegativeInput}
-                            className="w-14 px-1.5 py-1 text-xs font-mono rounded border border-slate-200 dark:border-slate-700 text-right outline-none"
-                          />
-                        </td>
-                        <td className="py-1 px-3 text-right">
-                          <input
-                            type="number"
-                            inputMode="decimal"
-                            min="0"
-                            value={r.stop ?? ''}
-                            onChange={(e) => handleRowChange(r.machine_id, 'stop', e.target.value)}
-                            onKeyDown={preventNegativeInput}
-                            className="w-14 px-1.5 py-1 text-xs font-mono rounded border border-slate-200 dark:border-slate-700 text-right outline-none"
-                          />
-                        </td>
-                      </>
-                    )}
-                    <td className="py-1.5 px-3 text-center">
-                      {r.done ? (
-                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300">
-                          Filed
-                        </span>
-                      ) : (
-                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300">
-                          Pending
-                        </span>
-                      )}
-                    </td>
-                    <td className="py-1.5 px-3 text-center">
-                      {r.done && r.prod_id ? (
-                        <button
-                          onClick={() => setDeleteEntryConfirmId(r.prod_id)}
-                          className="text-red-500 hover:text-red-700 p-1 rounded transition-colors inline-flex items-center justify-center"
-                          title="Delete filed row"
-                        >
-                          <Trash2 size={13} />
-                        </button>
-                      ) : (
-                        <span className="text-slate-300 dark:text-slate-600 font-mono text-xs">—</span>
-                      )}
+                })}
+                {!rows.length && (
+                  <tr>
+                    <td colSpan={showMore ? 11 : 8} className="py-8 text-center text-slate-400">
+                      {factories.length === 0
+                        ? 'No assigned factory available.'
+                        : 'No machines configured for this factory.'}
                     </td>
                   </tr>
-                );
-              })}
-              {!rows.length && (
-                <tr>
-                  <td colSpan={showMore ? 11 : 8} className="py-8 text-center text-slate-400">
-                    {factories.length === 0
-                      ? 'No assigned factory available.'
-                      : 'No machines configured for this factory.'}
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
+      )}
 
+      {/* Pagination Bar */}
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-2xs">
         <TablePagination
           total={displayedRows.length}
           page={page}
@@ -948,6 +1294,27 @@ export default function DailyLoomEntryPage() {
           }}
           pageSizeOptions={[10, 20, 25, 50, 100]}
         />
+      </div>
+
+      {/* Floating Sticky Mobile Bottom Save Bar */}
+      <div className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-t border-slate-200 dark:border-slate-800 px-4 py-3 shadow-lg md:hidden flex items-center justify-between gap-3 safe-area-pb">
+        <div className="min-w-0">
+          <div className="text-xs font-black text-slate-900 dark:text-slate-100 truncate">
+            {formatNum(totalMetersToday)} m Total
+          </div>
+          <div className="text-[11px] text-slate-500 font-medium">
+            {filledOrEnteredCount} of {activeBeamsCount} active looms logged
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={handleSaveDay}
+          disabled={saving || loading || !selectedFactoryId}
+          className="h-10 px-4 rounded-xl text-xs font-extrabold text-white bg-primary hover:bg-primary-dark active:scale-95 transition-all shadow-md flex items-center gap-1.5 shrink-0"
+        >
+          <Save size={15} />
+          {saving ? 'Saving...' : 'Save Entries'}
+        </button>
       </div>
 
       <ConfirmModal
@@ -1016,6 +1383,52 @@ export default function DailyLoomEntryPage() {
             </p>
           </div>
 
+          {/* WhatsApp Formatted Message (Editable) */}
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                WhatsApp Message (Editable):
+              </label>
+              <div className="flex items-center gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCustomWhatsAppMsg(getWhatsAppShareText());
+                    showToast('Message reset to default format', 'info');
+                  }}
+                  className="text-[11px] font-semibold text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 hover:underline flex items-center gap-1 cursor-pointer"
+                  title="Reset to default template"
+                >
+                  <RotateCcw size={12} />
+                  Reset
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const msgToCopy = customWhatsAppMsg || getWhatsAppShareText();
+                    const copied = await copyTextToClipboard(msgToCopy);
+                    if (copied) {
+                      setCopiedMsg(true);
+                      showToast('Formatted WhatsApp message copied!', 'success');
+                      setTimeout(() => setCopiedMsg(false), 2000);
+                    }
+                  }}
+                  className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1 cursor-pointer"
+                >
+                  {copiedMsg ? <Check size={12} /> : <Copy size={12} />}
+                  {copiedMsg ? 'Copied' : 'Copy Message'}
+                </button>
+              </div>
+            </div>
+            <textarea
+              rows={8}
+              value={customWhatsAppMsg}
+              onChange={(e) => setCustomWhatsAppMsg(e.target.value)}
+              placeholder="Type or edit message to share on WhatsApp..."
+              className="w-full p-3 bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-300 dark:border-emerald-800 rounded-xl text-xs font-sans text-slate-800 dark:text-slate-200 outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 leading-relaxed resize-y font-medium"
+            />
+          </div>
+
           {/* Link box */}
           <div className="space-y-1.5">
             <label className="text-xs font-semibold text-slate-500 dark:text-slate-400">
@@ -1034,41 +1447,39 @@ export default function DailyLoomEntryPage() {
                   const copied = await copyTextToClipboard(getShareableUrl());
                   if (copied) {
                     setCopiedLink(true);
-                    showToast('Mobile link copied to clipboard!', 'success');
+                    showToast('Link copied to clipboard!', 'success');
                     setTimeout(() => setCopiedLink(false), 2000);
-                  } else {
-                    showToast('Link could not be copied automatically. Please copy the text manually.', 'warning');
                   }
                 }}
-                className="pms-btn-emerald shrink-0"
+                className="pms-btn-secondary shrink-0"
               >
                 {copiedLink ? <Check size={14} className="mr-1" /> : <Copy size={14} className="mr-1" />}
-                {copiedLink ? 'Copied' : 'Copy'}
+                {copiedLink ? 'Copied' : 'Copy Link'}
               </button>
             </div>
           </div>
 
-          {/* WhatsApp Share Button - sends pure URL so WhatsApp recognizes it as a clickable link */}
+          {/* WhatsApp Share Button - sends beautifully formatted text with clickable URL */}
           <a
-            href={`https://api.whatsapp.com/send?text=${encodeURIComponent(getShareableUrl())}`}
+            href={`https://api.whatsapp.com/send?text=${encodeURIComponent(customWhatsAppMsg || getWhatsAppShareText())}`}
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center justify-center gap-2 w-full py-2.5 px-4 rounded-xl text-xs font-bold text-white bg-[#25D366] hover:bg-[#20ba59] transition-colors shadow-2xs"
           >
-            <Share2 size={14} /> Send Link on WhatsApp
+            <Share2 size={14} /> Send Formatted Message on WhatsApp
           </a>
-
-          {/* Network Explanation Box */}
-          <div className="p-3 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-xl text-xs space-y-1.5 text-blue-900 dark:text-blue-200">
-            <p className="font-bold flex items-center gap-1.5 text-blue-900 dark:text-blue-200">
-              <Wifi size={14} className="text-blue-600 dark:text-blue-400" /> Why "localhost" cannot be opened on mobile:
-            </p>
-            <p className="text-[11px] leading-relaxed text-blue-700 dark:text-blue-300">
-              <b>localhost</b> only exists inside this computer. For a mobile phone, connect the phone to the <b>same Wi-Fi or mobile hotspot</b> as this computer and open the IP address (<b>{import.meta.env?.VITE_LAN_IP || '192.168.1.8'}</b>).
-            </p>
-          </div>
         </div>
       </Modal>
+
+      {/* Historical Entry Logs & Audit Trail Modal */}
+      <DailyEntryHistoryModal
+        isOpen={showHistoryModal}
+        onClose={() => setShowHistoryModal(false)}
+        factoryId={selectedFactoryId}
+        factories={factories}
+        initialDate={dateStr}
+        isAdminOrGM={isAdminOrGM}
+      />
     </div>
   );
 }

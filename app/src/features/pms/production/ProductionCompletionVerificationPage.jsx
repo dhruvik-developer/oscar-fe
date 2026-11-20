@@ -569,7 +569,7 @@ export default function ProductionCompletionVerificationPage() {
                 type="button"
                 onClick={() => setShowGeneratePoModal(true)}
                 disabled={busy !== null}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3.5 py-1.5 text-[12px] font-bold text-white hover:bg-emerald-700 disabled:opacity-50 cursor-pointer shadow-xs"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3.5 py-1.5 text-[12px] font-bold text-white hover:bg-primary-dark disabled:opacity-50 cursor-pointer shadow-xs"
               >
                 <FileText size={14} /> Generate Final PO
               </button>
@@ -800,7 +800,7 @@ export default function ProductionCompletionVerificationPage() {
               <button
                 type="submit"
                 disabled={verifying}
-                className="rounded-lg bg-emerald-600 px-5 py-2 text-[12px] font-bold text-white hover:bg-emerald-700 disabled:opacity-50"
+                className="rounded-lg bg-primary px-5 py-2 text-[12px] font-bold text-white hover:bg-primary-dark disabled:opacity-50"
               >
                 {verifying ? 'Verifying...' : 'Approve & Verify'}
               </button>

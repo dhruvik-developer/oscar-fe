@@ -15,6 +15,7 @@ import {
   ClipboardList,
   FileCheck2,
   LayoutGrid,
+  Lock,
 } from 'lucide-react';
 import PageHeader from '../../../components/ui/PageHeader';
 import KpiCard from '../../../components/ui/KpiCard';
@@ -24,11 +25,16 @@ import { api } from '../../../services/api';
 import { loomService } from '../../../services/loomService';
 import { qc, formatNum, preventNegativeInput } from '../utils/loomCalculations';
 import { useERP } from '../../../context/ERPContext';
+import { useAppStore } from '../../../stores/appStore';
 import { ConfirmModal } from '../../../components/ui/ConfirmModal';
+import { isLoomAdminOrManager } from './DailyLoomEntryPage';
 
 export default function LoomProgramsPage() {
   const navigate = useNavigate();
   const { showToast } = useERP();
+  const currentUser = useAppStore((state) => state.user);
+  const isAdminOrGM = useMemo(() => isLoomAdminOrManager(currentUser), [currentUser]);
+
   const [loading, setLoading] = useState(true);
   const [deleteConfirmProgId, setDeleteConfirmProgId] = useState(null);
   const [programs, setPrograms] = useState([]);
@@ -43,7 +49,7 @@ export default function LoomProgramsPage() {
     return programs.filter((p) => {
       if (statusFilter === 'All') return true;
       if (statusFilter === 'ExcludeRunningOrPo') {
-        if (p.status === 'Running' || p.status === 'Closed') return false;
+        if (p.status === 'Running' || p.status === 'Closed' || p.status === 'Done') return false;
         const matchedPi = instructions.find((pi) => norm(pi.orderReference || pi.order_reference) === norm(p.name));
         if (matchedPi && (matchedPi.finalPoId || ['PO Pending', 'PO Created', 'Closed'].includes(matchedPi.status))) {
           return false;
@@ -212,7 +218,7 @@ export default function LoomProgramsPage() {
       showToast('Program status updated', 'success');
       loadData();
     } catch (err) {
-      showToast('Failed to update status', 'error');
+      showToast(err?.payload?.detail || err?.response?.data?.detail || err?.message || 'Failed to update status', 'error');
     }
   };
 
@@ -245,6 +251,14 @@ export default function LoomProgramsPage() {
           </span>
           <span className="px-2 py-0.5 rounded text-[10px] sm:text-[11px] font-bold bg-purple-100 text-purple-800 dark:bg-purple-950/40 dark:text-purple-300">
             {activeProg.quality_name}
+          </span>
+          <span className={`px-2 py-0.5 rounded text-[10px] sm:text-[11px] font-bold flex items-center gap-1 ${
+            activeProg.status === 'Done'
+              ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300'
+              : 'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-200'
+          }`}>
+            {(activeProg.status === 'Done' || activeProg.status === 'Closed') && <Lock size={10} />}
+            Status: {activeProg.status}
           </span>
         </div>
 
@@ -621,6 +635,7 @@ export default function LoomProgramsPage() {
               <option value="Planned">Planned Only</option>
               <option value="Running">Running Only</option>
               <option value="Hold">On Hold</option>
+              <option value="Done">Done (Finished)</option>
               <option value="Closed">Closed</option>
               <option value="ExcludeRunningOrPo">Hide Running &amp; PO Created</option>
             </select>
@@ -666,16 +681,33 @@ export default function LoomProgramsPage() {
                     <td className="py-2 px-2.5 sm:py-2.5 sm:px-3 font-medium">{p.deadline}</td>
                     <td className="py-2 px-2.5 sm:py-2.5 sm:px-3 text-right font-semibold">₹{s.cost_m?.toFixed(2) || '—'}</td>
                     <td className="py-1.5 px-2.5 sm:py-2 sm:px-3">
-                      <select
-                        value={p.status}
-                        onChange={(e) => handleUpdateStatus(p.id, e.target.value)}
-                        className="h-7 text-xs font-semibold rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-1.5"
-                      >
-                        <option value="Planned">Planned</option>
-                        <option value="Running">Running</option>
-                        <option value="Hold">Hold</option>
-                        <option value="Closed">Closed</option>
-                      </select>
+                      {(p.status === 'Done' || p.status === 'Closed') && !isAdminOrGM ? (
+                        <span
+                          className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-bold ${
+                            p.status === 'Done'
+                              ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
+                              : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700'
+                          }`}
+                          title="This program is finished and locked. Only an Administrator or General Manager can change it."
+                        >
+                          <Lock size={11} className={p.status === 'Done' ? 'text-emerald-600' : 'text-slate-500'} />
+                          {p.status}
+                        </span>
+                      ) : (
+                        <select
+                          value={p.status}
+                          onChange={(e) => handleUpdateStatus(p.id, e.target.value)}
+                          className={`h-7 text-xs font-semibold rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-1.5 ${
+                            p.status === 'Done' ? 'text-emerald-700 dark:text-emerald-400 font-bold' : ''
+                          }`}
+                        >
+                          <option value="Planned">Planned</option>
+                          <option value="Running">Running</option>
+                          <option value="Hold">Hold</option>
+                          <option value="Done">Done</option>
+                          <option value="Closed">Closed</option>
+                        </select>
+                      )}
                     </td>
                     <td className="py-2 px-2.5 sm:py-2.5 sm:px-3 text-center">
                       <div className="flex items-center justify-center gap-1">
@@ -713,13 +745,15 @@ export default function LoomProgramsPage() {
                             </>
                           );
                         })()}
-                        <button
-                          onClick={() => setDeleteConfirmProgId(p.id)}
-                          className="text-red-500 hover:text-red-700 p-1 rounded transition-colors cursor-pointer"
-                          title="Delete Program"
-                        >
-                          <Trash2 size={13} />
-                        </button>
+                        {isAdminOrGM && (
+                          <button
+                            onClick={() => setDeleteConfirmProgId(p.id)}
+                            className="text-red-500 hover:text-red-700 p-1 rounded transition-colors cursor-pointer"
+                            title="Delete Program (Admin only)"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>

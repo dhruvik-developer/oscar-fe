@@ -1096,7 +1096,7 @@ export default function ProductionInstructionsPage() {
               )}
               <div className="flex flex-wrap justify-end gap-2 pt-3 border-t border-slate-200">
                 <button type="button" onClick={() => { setShowAddModal(false); setIsFullscreen(false); }} className="px-3 py-1.5 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-100 font-medium cursor-pointer">Cancel</button>
-                <button type="submit" disabled={saving} className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold shadow-sm disabled:opacity-50 cursor-pointer">{saving ? 'Saving…' : 'Save Production Instruction'}</button>
+                <button type="submit" disabled={saving} className="px-4 py-1.5 bg-primary hover:bg-primary-dark text-white rounded-lg font-bold shadow-sm disabled:opacity-50 cursor-pointer">{saving ? 'Saving…' : 'Save Production Instruction'}</button>
               </div>
             </form>
           </div>
@@ -1415,7 +1415,7 @@ export default function ProductionInstructionsPage() {
               )}
               <div className="flex flex-wrap justify-end gap-2 pt-3 border-t border-slate-100">
                 <button type="button" onClick={() => setEditingPi(null)} className="px-3 py-1.5 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-100 font-medium">Cancel</button>
-                <button type="submit" disabled={saving} className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold shadow-sm disabled:opacity-50">{saving ? 'Saving…' : 'Save Changes'}</button>
+                <button type="submit" disabled={saving} className="px-4 py-1.5 bg-primary hover:bg-primary-dark text-white rounded-lg font-bold shadow-sm disabled:opacity-50">{saving ? 'Saving…' : 'Save Changes'}</button>
               </div>
             </form>
           </div>

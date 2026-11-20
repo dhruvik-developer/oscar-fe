@@ -69,11 +69,11 @@ export default function ProjectsPage() {
           </p>
         </div>
 
-        {/* Green + Create New Project button matching reference UI */}
+        {/* Primary + Create New Project button matching ERP reference UI */}
         <button
           type="button"
           onClick={() => setCreateOpen(true)}
-          className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white text-xs sm:text-sm font-semibold rounded-lg shadow-2xs transition cursor-pointer"
+          className="inline-flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary-dark active:bg-blue-800 text-white text-xs sm:text-sm font-semibold rounded-lg shadow-2xs transition cursor-pointer"
         >
           <Plus size={16} />
           Create New Project
@@ -106,7 +106,7 @@ export default function ProjectsPage() {
             <button
               type="button"
               onClick={() => setCreateOpen(true)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg transition cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary hover:bg-primary-dark text-white text-xs font-semibold rounded-lg transition cursor-pointer"
             >
               <Plus size={14} />
               Create New Project

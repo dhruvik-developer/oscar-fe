@@ -488,7 +488,7 @@ export const inventoryService = {
   revertAuditToCounting: (id) => api.post(`/inventory/audits/${id}/revert_to_counting/`),
   cancelAudit: (id) => api.post(`/inventory/audits/${id}/cancel/`),
   getItemCategories: (query) => api.get('/inventory/categories/', { query }),
-  getUsers: (query) => api.get('/accounts/users/', { query }),
+  getUsers: (query) => api.get('/admin/users/', { query }),
   // Sampling (Phase 3.2)
   getSamples: (query) => api.get('/inventory/samples/', { query }),
   getSample: (id) => api.get(`/inventory/samples/${id}/`),

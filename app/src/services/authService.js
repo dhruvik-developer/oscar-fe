@@ -91,7 +91,7 @@ export async function login({ email, password, role, tenant, remember = true }) 
   const response = await api.post('/auth/login/', {
     email: String(email || '').trim().toLowerCase(),
     password,
-    role,
+    role: role || undefined,
     tenant: String(tenant || '').trim() || undefined,
   });
   if (response?.twoFactorRequired) {

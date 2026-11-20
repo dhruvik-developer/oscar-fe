@@ -485,7 +485,10 @@ export default function LoomDashboardPage() {
                   <tr key={f.factory_id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/50 transition-colors">
                     <td
                       className="py-2 px-3 font-bold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
-                      onClick={() => navigate('/pms/looms')}
+                      onClick={() => {
+                        if (f.factory_id) localStorage.setItem('oscar_pms_selected_factory', f.factory_id);
+                        navigate('/pms/looms');
+                      }}
                     >
                       {f.factory_name}
                     </td>

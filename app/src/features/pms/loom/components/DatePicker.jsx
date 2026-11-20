@@ -35,6 +35,7 @@ export default function DatePicker({
   label = 'Date:',
   className = '',
   align = 'auto',
+  readOnly = false,
 }) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef(null);
@@ -97,6 +98,7 @@ export default function DatePicker({
   }, [open, align]);
 
   const handleToggle = () => {
+    if (readOnly) return;
     if (!open) {
       updateAlignment();
     }
@@ -187,34 +189,42 @@ export default function DatePicker({
       <button
         type="button"
         onClick={handleToggle}
-        className={`h-[38px] flex items-center gap-2 rounded-xl px-3 border transition-all cursor-pointer shadow-2xs select-none ${
-          open
-            ? 'bg-blue-50/50 dark:bg-slate-800 border-blue-500 ring-2 ring-blue-500/20'
-            : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600'
+        disabled={readOnly}
+        title={readOnly ? 'Date locked (view only)' : undefined}
+        className={`h-[38px] flex items-center gap-2 rounded-xl px-3 border transition-all select-none w-full justify-between sm:justify-start ${
+          readOnly
+            ? 'bg-slate-50 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700 cursor-default opacity-90'
+            : open
+            ? 'bg-blue-50/50 dark:bg-slate-800 border-blue-500 ring-2 ring-blue-500/20 cursor-pointer shadow-2xs'
+            : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 cursor-pointer shadow-2xs'
         }`}
       >
-        <div className="w-5 h-5 rounded-md bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
-          <CalendarIcon size={13} />
+        <div className="flex items-center gap-1.5 min-w-0">
+          <div className="w-5 h-5 rounded-md bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
+            <CalendarIcon size={13} />
+          </div>
+          {label && (
+            <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider hidden sm:inline shrink-0">
+              {label}
+            </span>
+          )}
+          <span className="text-xs font-bold text-slate-800 dark:text-slate-100 text-left whitespace-nowrap">
+            {displayFormatted}
+          </span>
+          {isToday && (
+            <span className="text-[10px] font-extrabold px-1.5 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 shrink-0">
+              Today
+            </span>
+          )}
         </div>
-        {label && (
-          <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider hidden sm:inline">
-            {label}
-          </span>
+        {!readOnly && (
+          <ChevronDown
+            size={14}
+            className={`text-slate-400 transition-transform duration-200 ml-0.5 shrink-0 ${
+              open ? 'rotate-180 text-blue-600 dark:text-blue-400' : ''
+            }`}
+          />
         )}
-        <span className="text-xs font-bold text-slate-800 dark:text-slate-100 text-left whitespace-nowrap">
-          {displayFormatted}
-        </span>
-        {isToday && (
-          <span className="text-[10px] font-extrabold px-1.5 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400">
-            Today
-          </span>
-        )}
-        <ChevronDown
-          size={14}
-          className={`text-slate-400 transition-transform duration-200 ml-0.5 shrink-0 ${
-            open ? 'rotate-180 text-blue-600 dark:text-blue-400' : ''
-          }`}
-        />
       </button>
 
       {/* Custom Calendar Popover */}
@@ -222,7 +232,7 @@ export default function DatePicker({
         <div
           className={`absolute ${
             menuAlign === 'right' ? 'right-0' : 'left-0'
-          } top-full mt-1.5 z-50 w-72 max-w-[calc(100vw-2rem)] bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 p-3 animate-in fade-in zoom-in-95 duration-150 select-none`}
+          } top-full mt-1.5 z-50 w-72 max-w-[calc(100vw-1.5rem)] bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 p-3 animate-in fade-in zoom-in-95 duration-150 select-none`}
         >
           {/* Header Month / Year Navigation */}
           <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">

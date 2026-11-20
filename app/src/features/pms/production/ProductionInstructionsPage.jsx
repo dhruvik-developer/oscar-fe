@@ -1,24 +1,25 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useERP } from '../../../context/ERPContext';
 import { ConfirmModal } from '../../../components/ui/ConfirmModal';
 import { Button } from '../../../components/ui/Button';
 import {
   Plus, ClipboardList, X, Search, Clock, CheckCircle2, Package, Layers,
-  Maximize2, Minimize2, Eye, Pencil, AlertTriangle,
+  Maximize2, Minimize2, Eye, Pencil, AlertTriangle, Check, ArrowRight,
 } from 'lucide-react';
 import { toISODate } from '../../../utils/dateUtils';
 import PageHeader from '../../../components/ui/PageHeader';
 import TablePagination from '../../../components/ui/TablePagination';
 import KpiCard from '../../../components/ui/KpiCard';
 import { api } from '../../../services/api';
+import { loomService } from '../../../services/loomService';
 import MasterSourceLink from '../../../components/common/MasterSourceLink';
 import {
   PRODUCTION_STATUSES, ACTIVE_STATUSES, statusPill, canApprove, canStart,
   canEditInstruction, errorText, fmtNum, listOf,
 } from './productionStatus';
 
-const PROCESS_TYPES = ['Dyeing', 'Processing', 'Printing'];
+const PROCESS_TYPES = ['Weaving', 'Dyeing', 'Processing', 'Printing'];
 const LIST_QUERY = { page_size: 200 };
 
 const numOrNull = (v) => (v === null || v === undefined || v === '' ? null : Number(v));
@@ -69,12 +70,17 @@ export default function ProductionInstructionsPage() {
   const [deleteConfirmPi, setDeleteConfirmPi] = useState(null);
   const navigate = useNavigate();
 
+  const [searchParams, setSearchParams] = useSearchParams();
+  const urlQuery = searchParams.get('query') || searchParams.get('program') || '';
+  const urlAutoCreate = searchParams.get('autoCreate') === '1' || searchParams.get('openCreate') === '1';
+
   const [instructions, setInstructions] = useState([]);
   const [aggregates, setAggregates] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [employees, setEmployees] = useState([]);
   const [employeesError, setEmployeesError] = useState(null);
+  const [programs, setPrograms] = useState([]);
   const [actionError, setActionError] = useState(null);
   const [busyId, setBusyId] = useState(null);
   const [formError, setFormError] = useState(null);
@@ -82,7 +88,7 @@ export default function ProductionInstructionsPage() {
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState(urlQuery);
   const [statusFilter, setStatusFilter] = useState('All');
   const [vendorFilter, setVendorFilter] = useState('All');
   const [dateFrom, setDateFrom] = useState('');
@@ -91,11 +97,19 @@ export default function ProductionInstructionsPage() {
   const [pageSize, setPageSize] = useState(10);
 
   // Create form state
+  const [sourceType, setSourceType] = useState('program'); // 'program' | 'po' | 'manual'
+  const [selectedProgramId, setSelectedProgramId] = useState('');
+  const [filterOutRunningAndPoCreated, setFilterOutRunningAndPoCreated] = useState(true);
   const [poId, setPoId] = useState('');
+  const [manualAgency, setManualAgency] = useState('');
+  const [manualOrderRef, setManualOrderRef] = useState('');
+  const [manualFabric, setManualFabric] = useState('');
+  const [agreedJobRate, setAgreedJobRate] = useState('');
+  const [expectedCompletionDate, setExpectedCompletionDate] = useState('');
   const [piDate, setPiDate] = useState(() => getCurrentISODate());
   const [assignedQty, setAssignedQty] = useState('');
   const [startDate, setStartDate] = useState(() => getCurrentISODate());
-  const [processType, setProcessType] = useState('Dyeing');
+  const [processType, setProcessType] = useState('Weaving');
   const [assignedEmployeeId, setAssignedEmployeeId] = useState('');
   const [remarks, setRemarks] = useState('');
   const [openMenuId, setOpenMenuId] = useState(null);
@@ -180,16 +194,31 @@ export default function ProductionInstructionsPage() {
   const [editRemarks, setEditRemarks] = useState('');
   const [editError, setEditError] = useState(null);
 
-  const loadData = () => {
+  const applyProgramFields = useCallback((prog) => {
+    if (!prog) return;
+    setSelectedProgramId(String(prog.id));
+    setAssignedQty(String(prog.target || ''));
+    setManualFabric(prog.quality_name || '');
+    setStartDate(prog.start || getCurrentISODate());
+    setExpectedCompletionDate(prog.deadline || '');
+    setProcessType('Weaving');
+    const r = prog.stats?.cost_m || prog.stats?.jobCost || prog.quality_job_rate || '';
+    if (r) setAgreedJobRate(String(r));
+  }, [getCurrentISODate]);
+
+  const loadData = useCallback(() => {
     setLoading(true);
     setError(null);
     Promise.allSettled([
       api.get('/production/instructions/', { query: LIST_QUERY }),
       api.get('/hrms/employees/', { query: LIST_QUERY }),
+      loomService.getPrograms(),
     ])
-      .then(([piRes, empRes]) => {
+      .then(([piRes, empRes, progRes]) => {
+        let loadedInstructions = [];
         if (piRes.status === 'fulfilled') {
-          setInstructions(listOf(piRes.value).map(normalizeInstruction));
+          loadedInstructions = listOf(piRes.value).map(normalizeInstruction);
+          setInstructions(loadedInstructions);
           setAggregates(piRes.value && !Array.isArray(piRes.value) ? piRes.value.aggregates || null : null);
         } else {
           setInstructions([]);
@@ -203,15 +232,36 @@ export default function ProductionInstructionsPage() {
           setEmployees([]);
           setEmployeesError(errorText(empRes.reason, 'Failed to load employees'));
         }
+        if (progRes.status === 'fulfilled') {
+          const progList = Array.isArray(progRes.value) ? progRes.value : progRes.value?.results || [];
+          setPrograms(progList);
+
+          // If query param matches a program
+          if (urlQuery) {
+            const norm = (s) => String(s || '').trim().toLowerCase();
+            const matchingProg = progList.find((p) => norm(p.name) === norm(urlQuery));
+            if (matchingProg) {
+              applyProgramFields(matchingProg);
+              setSourceType('program');
+              // If autoCreate was requested or no PI exists yet for this program, auto open modal
+              const hasExistingPi = loadedInstructions.some((inst) => norm(inst.orderReference) === norm(urlQuery));
+              if (urlAutoCreate || !hasExistingPi) {
+                setShowAddModal(true);
+              }
+            }
+          }
+        } else {
+          setPrograms([]);
+        }
       })
       .finally(() => {
         setLoading(false);
       });
-  };
+  }, [urlQuery, urlAutoCreate, applyProgramFields]);
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [loadData]);
 
   const replaceRow = (raw) => {
     const updated = normalizeInstruction(raw);
@@ -284,6 +334,60 @@ export default function ProductionInstructionsPage() {
   };
 
   const selectedPo = useMemo(() => purchaseOrders.find((p) => p.id === poId) || null, [purchaseOrders, poId]);
+  const selectedProgram = useMemo(() => programs.find((p) => String(p.id) === String(selectedProgramId)) || null, [programs, selectedProgramId]);
+
+  // Filter loom programs: exclude running or closed programs and programs that already have POs created / active instructions
+  const availablePrograms = useMemo(() => {
+    if (!filterOutRunningAndPoCreated) return programs;
+    const norm = (s) => String(s || '').trim().toLowerCase();
+    return programs.filter((prog) => {
+      // 1. Program's own status in Loom Module: Running or Closed
+      if (prog.status === 'Running' || prog.status === 'Closed') {
+        return false;
+      }
+
+      // 2. Check if a production instruction already exists for this program
+      const matchingInstructions = instructions.filter((inst) =>
+        norm(inst.orderReference) === norm(prog.name)
+      );
+
+      // If an instruction is running, in progress, completed, verified, or has a Final PO created
+      const isAlreadyRunningOrPoCreated = matchingInstructions.some((inst) => {
+        const isRunning = ['Running', 'In Progress', 'Partially Completed', 'Completed', 'Verified'].includes(inst.status);
+        const hasPo = Boolean(
+          inst.finalPoId ||
+          inst.finalPoNumber ||
+          ['PO Pending', 'PO Created', 'Closed'].includes(inst.status)
+        );
+        return isRunning || hasPo;
+      });
+
+      if (isAlreadyRunningOrPoCreated) {
+        return false;
+      }
+
+      return true;
+    });
+  }, [programs, instructions, filterOutRunningAndPoCreated]);
+
+  // Filter purchase orders: exclude cancelled, Final Job Work POs, and POs already handled by active instructions
+  const availablePurchaseOrders = useMemo(() => {
+    return purchaseOrders.filter((po) => {
+      if (po.status === 'Cancelled') return false;
+      const pType = po.purchaseType || po.purchase_type;
+      if (pType === 'Final Job Work') return false;
+      const matching = instructions.filter((inst) =>
+        String(inst.sourcePoId) === String(po.id) ||
+        String(inst.orderReference || '').toLowerCase() === String(po.poNumber || '').toLowerCase()
+      );
+      const isAlreadyHandled = matching.some((inst) =>
+        ['Running', 'In Progress', 'Completed', 'Verified', 'PO Pending', 'PO Created', 'Closed'].includes(inst.status) ||
+        Boolean(inst.finalPoId)
+      );
+      if (isAlreadyHandled) return false;
+      return true;
+    });
+  }, [purchaseOrders, instructions]);
   const poLines = (po) => po?.items || po?.lineItems || [];
   const poQty = (po) => poLines(po).reduce((s, l) => s + (Number(l.qty) || 0), 0);
   const poFabric = (po) => poLines(po)[0]?.name || '';
@@ -317,6 +421,13 @@ export default function ProductionInstructionsPage() {
     });
   }, [instructions, query, statusFilter, vendorFilter, dateFrom, dateTo]);
 
+  // Check if current search query matches an active program
+  const matchingProgramForQuery = useMemo(() => {
+    if (!query.trim() || !programs.length) return null;
+    const q = query.trim().toLowerCase();
+    return programs.find((p) => p.name?.toLowerCase() === q || p.name?.toLowerCase().includes(q)) || null;
+  }, [programs, query]);
+
   useEffect(() => {
     setPage(1);
   }, [query, statusFilter, vendorFilter, dateFrom, dateTo]);
@@ -326,32 +437,95 @@ export default function ProductionInstructionsPage() {
     return filtered.slice(start, start + pageSize);
   }, [filtered, page, pageSize]);
 
+  const handleSelectProgram = (id) => {
+    setSelectedProgramId(id);
+    const prog = programs.find((p) => String(p.id) === String(id));
+    if (prog) {
+      applyProgramFields(prog);
+    }
+  };
+
   const handleSelectPo = (id) => {
     setPoId(id);
     const po = purchaseOrders.find((p) => p.id === id);
-    if (po) setAssignedQty(String(poQty(po) || ''));
+    if (po) {
+      setAssignedQty(String(poQty(po) || ''));
+      setManualFabric(poFabric(po) || '');
+      setStartDate(po.date || getCurrentISODate());
+      setExpectedCompletionDate(po.expectedDate || '');
+      if (po.rate) setAgreedJobRate(String(po.rate));
+    }
   };
 
   const handleCreate = async (e) => {
     e.preventDefault();
     setFormError(null);
-    if (!poId || !selectedPo) { setFormError('Purchase Order is required.'); return; }
+
+    let agencyName = '';
+    let orderReference = '';
+    let fabricName = manualFabric;
+    let rate = Number(agreedJobRate) || 0;
+
+    if (sourceType === 'program') {
+      if (!selectedProgramId) {
+        setFormError('Please select a Production Program.');
+        return;
+      }
+      const prog = programs.find((p) => String(p.id) === String(selectedProgramId));
+      if (!prog) {
+        setFormError('Selected program not found.');
+        return;
+      }
+      agencyName = prog.factory_name || 'In-House Loom Shed';
+      orderReference = prog.name;
+      fabricName = prog.quality_name || manualFabric || 'Standard Quality';
+      if (!rate) {
+        rate = Number(prog.stats?.cost_m || prog.stats?.jobCost || 0);
+      }
+    } else if (sourceType === 'po') {
+      if (!poId || !selectedPo) {
+        setFormError('Purchase Order is required.');
+        return;
+      }
+      agencyName = selectedPo.vendor;
+      orderReference = selectedPo.poNumber;
+      fabricName = poFabric(selectedPo) || manualFabric || null;
+      if (!rate && Number(selectedPo.rate) > 0) {
+        rate = Number(selectedPo.rate);
+      }
+    } else {
+      if (!manualAgency.trim()) {
+        setFormError('Agency / Factory name is required.');
+        return;
+      }
+      if (!manualOrderRef.trim()) {
+        setFormError('Order Reference / Program code is required.');
+        return;
+      }
+      agencyName = manualAgency.trim();
+      orderReference = manualOrderRef.trim();
+    }
+
     if (!piDate) { setFormError('Date is required.'); return; }
-    if (!(Number(assignedQty) > 0)) { setFormError('Assigned Qty (Meter) is required.'); return; }
+    if (!(Number(assignedQty) > 0)) { setFormError('Assigned Qty (Meter) must be greater than 0.'); return; }
     if (!assignedEmployeeId) { setFormError('Assigned Employee is required.'); return; }
 
     const payload = {
-      agencyName: selectedPo.vendor,
-      orderReference: selectedPo.poNumber,
+      agencyName,
+      orderReference,
       orderMeter: Number(assignedQty),
       piDate,
       expectedStartDate: startDate || null,
-      fabric: poFabric(selectedPo) || null,
-      processType,
+      expectedCompletionDate: expectedCompletionDate || null,
+      fabric: fabricName || null,
+      processType: processType || 'Weaving',
       employeeId: assignedEmployeeId,
       notes: remarks || '',
     };
-    if (Number(selectedPo.rate) > 0) payload.agreedJobRate = Number(selectedPo.rate);
+    if (rate > 0) {
+      payload.agreedJobRate = rate;
+      payload.agreedRate = rate;
+    }
 
     setSaving(true);
     try {
@@ -362,9 +536,15 @@ export default function ProductionInstructionsPage() {
       setShowAddModal(false);
       setIsFullscreen(false);
       setPoId('');
+      setSelectedProgramId('');
+      setManualAgency('');
+      setManualOrderRef('');
+      setManualFabric('');
+      setAgreedJobRate('');
       setAssignedQty('');
       setRemarks('');
       setAssignedEmployeeId('');
+      showToast?.(`Production Instruction ${newInst.piNumber || ''} created successfully!`, 'success');
     } catch (err) {
       setFormError(errorText(err, 'Failed to create Production Instruction'));
     } finally {
@@ -430,6 +610,39 @@ export default function ProductionInstructionsPage() {
             <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="text-[12px] text-slate-600 outline-none" title="End date to" />
           </div>
         </div>
+
+        {/* Quick Issue PI banner if searching for a program that has no PI yet */}
+        {Boolean(matchingProgramForQuery && !filtered.length) && (
+          <div className="m-3 p-3.5 rounded-xl border border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50/60 dark:from-slate-900 dark:to-blue-950/40 text-xs flex flex-wrap items-center justify-between gap-3 shadow-2xs">
+            <div className="space-y-0.5">
+              <div className="flex items-center gap-2">
+                <ClipboardList size={16} className="text-blue-600" />
+                <h4 className="font-bold text-slate-900 dark:text-slate-100">
+                  Production Program "{matchingProgramForQuery.name}" is scheduled
+                </h4>
+                <span className="px-2 py-0.5 rounded text-[10.5px] font-bold bg-blue-100 text-blue-800">
+                  {matchingProgramForQuery.factory_name}
+                </span>
+              </div>
+              <p className="text-slate-600 dark:text-slate-300 text-[11.5px]">
+                Quality: <strong>{matchingProgramForQuery.quality_name}</strong> · Target: <strong>{fmtNum(matchingProgramForQuery.target)} M</strong>. No Production Work Instruction (PI) has been issued for this program yet.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setSourceType('program');
+                handleSelectProgram(String(matchingProgramForQuery.id));
+                setShowAddModal(true);
+                setIsFullscreen(false);
+              }}
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-sm cursor-pointer transition-colors"
+            >
+              <Plus size={14} /> Issue PI for "{matchingProgramForQuery.name}"
+            </button>
+          </div>
+        )}
+
         <div className="pms-table-container min-h-[220px]">
           <table className="w-full min-w-[1280px] border-collapse text-left text-[12px] pms-sticky-header">
             <thead>
@@ -601,8 +814,8 @@ export default function ProductionInstructionsPage() {
           <div className={`bg-white border border-slate-200 shadow-2xl flex flex-col overflow-hidden transition-all duration-200 ${isFullscreen ? 'w-full h-full rounded-none p-4 sm:p-8' : 'max-w-3xl w-full rounded-2xl p-4 sm:p-6 max-h-[95vh] sm:max-h-[92vh]'} text-xs`}>
             <div className="flex items-center justify-between pb-3 border-b border-slate-200">
               <div>
-                <h3 className="font-bold text-base text-[#1F2E4A]">Create Production Instruction</h3>
-                <p className="text-[11px] text-slate-400 mt-0.5">Create a new production instruction from a Purchase Order.</p>
+                <h3 className="font-bold text-base text-[#1F2E4A]">Create Production Instruction (PI)</h3>
+                <p className="text-[11px] text-slate-400 mt-0.5">Issue formal manufacturing or job-work instruction from a Program Batch, Purchase Order, or custom reference.</p>
               </div>
               <div className="flex items-center gap-2">
                 <button type="button" onClick={() => setIsFullscreen(!isFullscreen)} className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-100 transition" title={isFullscreen ? 'Exit Fullscreen' : 'Maximize Fullscreen'}>
@@ -615,6 +828,173 @@ export default function ProductionInstructionsPage() {
             </div>
 
             <form onSubmit={handleCreate} className="space-y-4 mt-4 overflow-y-auto pr-1 flex-1">
+              {/* Instruction Source Switcher */}
+              <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3.5 space-y-2.5">
+                <label className="block font-bold text-slate-800 text-xs">
+                  Instruction Source <span className="text-rose-500">*</span>
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSourceType('program');
+                      if (availablePrograms.length && !selectedProgramId) handleSelectProgram(String(availablePrograms[0].id));
+                    }}
+                    className={`flex items-center justify-center gap-2 p-2.5 rounded-lg border text-xs font-bold transition cursor-pointer ${
+                      sourceType === 'program'
+                        ? 'bg-blue-600 border-blue-600 text-white shadow-xs'
+                        : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'
+                    }`}
+                  >
+                    <Layers size={14} /> Production Program (Batch)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSourceType('po');
+                      if (availablePurchaseOrders.length && !poId) handleSelectPo(availablePurchaseOrders[0].id);
+                    }}
+                    className={`flex items-center justify-center gap-2 p-2.5 rounded-lg border text-xs font-bold transition cursor-pointer ${
+                      sourceType === 'po'
+                        ? 'bg-blue-600 border-blue-600 text-white shadow-xs'
+                        : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'
+                    }`}
+                  >
+                    <ClipboardList size={14} /> Purchase Order (PO)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSourceType('manual')}
+                    className={`flex items-center justify-center gap-2 p-2.5 rounded-lg border text-xs font-bold transition cursor-pointer ${
+                      sourceType === 'manual'
+                        ? 'bg-blue-600 border-blue-600 text-white shadow-xs'
+                        : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'
+                    }`}
+                  >
+                    <Pencil size={14} /> Direct / Manual Entry
+                  </button>
+                </div>
+
+                {sourceType === 'program' && (
+                  <div className="pt-2 space-y-2">
+                    <div className="flex flex-wrap items-center justify-between gap-1">
+                      <label className="block font-semibold text-slate-700">
+                        Select Loom Production Program <span className="text-rose-500">*</span>
+                      </label>
+                      <label className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-slate-500 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={filterOutRunningAndPoCreated}
+                          onChange={(e) => setFilterOutRunningAndPoCreated(e.target.checked)}
+                          className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-3.5 w-3.5 cursor-pointer"
+                        />
+                        <span>Hide Running &amp; PO-Created</span>
+                        <span className="text-[10px] text-slate-400">({availablePrograms.length}/{programs.length})</span>
+                      </label>
+                    </div>
+                    <select
+                      value={selectedProgramId}
+                      onChange={(e) => handleSelectProgram(e.target.value)}
+                      className="w-full border border-slate-300 rounded-lg p-2 bg-white text-slate-800 font-medium"
+                    >
+                      <option value="">{availablePrograms.length ? 'Select a Production Program...' : 'No available unassigned planned programs'}</option>
+                      {availablePrograms.map((prog) => (
+                        <option key={prog.id} value={prog.id}>
+                          {prog.name} — {prog.factory_name} ({prog.quality_name}, {fmtNum(prog.target)} M){prog.status !== 'Planned' ? ` [${prog.status}]` : ''}
+                        </option>
+                      ))}
+                    </select>
+                    {availablePrograms.length === 0 && (
+                      <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-2">
+                        All loom programs are currently running or have POs created. Uncheck &ldquo;Hide Running &amp; PO-Created&rdquo; above if you need to view or re-issue for an existing program.
+                      </p>
+                    )}
+                    {selectedProgram && (
+                      <div className="p-2.5 rounded-xl border border-blue-200 bg-blue-50 text-[11px] space-y-1">
+                        <div className="flex items-center justify-between font-bold text-slate-800">
+                          <span>Factory: {selectedProgram.factory_name}</span>
+                          <span className="text-blue-700 font-mono text-[10.5px] bg-blue-100 px-1.5 py-0.5 rounded border border-blue-200">
+                            Target: {fmtNum(selectedProgram.target)} M
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-slate-600 text-[10px]">
+                          <span>Quality: <strong>{selectedProgram.quality_name}</strong></span>
+                          <span>Start: <strong>{selectedProgram.start}</strong></span>
+                          <span>Deadline: <strong>{selectedProgram.deadline}</strong></span>
+                          <span>Status: <strong className={selectedProgram.status === 'Running' ? 'text-blue-600' : 'text-slate-700'}>{selectedProgram.status}</strong></span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {sourceType === 'po' && (
+                  <div className="pt-2 space-y-2">
+                    <label className="block font-semibold text-slate-700">
+                      Purchase Order (PO) <span className="text-rose-500">*</span>
+                    </label>
+                    <select
+                      value={poId}
+                      onChange={(e) => handleSelectPo(e.target.value)}
+                      className="w-full border border-slate-300 rounded-lg p-2 bg-white text-slate-800 font-medium"
+                    >
+                      <option value="">{availablePurchaseOrders.length ? 'Select Purchase Order...' : 'No open purchase orders available'}</option>
+                      {availablePurchaseOrders.map((po) => (
+                        <option key={po.id} value={po.id}>
+                          {po.poNumber} ({formatDateDDMMYYYY(po.date)}) - {po.vendor} - {poQty(po).toLocaleString('en-IN')} M
+                        </option>
+                      ))}
+                    </select>
+                    {selectedPo && (
+                      <div className="mt-2 p-2.5 rounded-xl border border-blue-200 bg-blue-50 text-[11px] space-y-1">
+                        <div className="flex items-center justify-between font-bold text-slate-800">
+                          <span>Vendor: {selectedPo.vendor}</span>
+                          <span className="text-emerald-700 font-mono text-[10px] bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                            PO Value: {formatCurrency(selectedPo.amount ?? selectedPo.total ?? 0)}
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-slate-600 text-[10px]">
+                          <span>PO Date: <strong>{formatDateDDMMYYYY(selectedPo.date)}</strong></span>
+                          <span>Expected: <strong>{formatDateDDMMYYYY(selectedPo.expectedDate)}</strong></span>
+                          <span>Status: <strong>{selectedPo.status}</strong></span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {sourceType === 'manual' && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                    <div>
+                      <label className="block font-semibold text-slate-700 mb-1">
+                        Agency / Factory Name <span className="text-rose-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={manualAgency}
+                        onChange={(e) => setManualAgency(e.target.value)}
+                        placeholder="e.g. Shree Laxmi Fab / Unit 1"
+                        className="w-full border border-slate-300 rounded-lg p-2 bg-white text-slate-800"
+                        required={sourceType === 'manual'}
+                      />
+                    </div>
+                    <div>
+                      <label className="block font-semibold text-slate-700 mb-1">
+                        Order Reference / Batch <span className="text-rose-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={manualOrderRef}
+                        onChange={(e) => setManualOrderRef(e.target.value)}
+                        placeholder="e.g. Batch-2170-Nov"
+                        className="w-full border border-slate-300 rounded-lg p-2 bg-white text-slate-800"
+                        required={sourceType === 'manual'}
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
               <div className="rounded-xl border border-slate-200 p-4 space-y-4">
                 <h4 className="flex items-center gap-2 text-[13px] font-extrabold text-[#17294e]"><ClipboardList size={15} className="text-blue-500" /> Basic Details</h4>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -635,36 +1015,20 @@ export default function ProductionInstructionsPage() {
                 <p className="rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-[11px] font-medium text-sky-700">
                   New instructions are saved as <strong>Draft</strong>. Approve and start them from the list before recording daily production.
                 </p>
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Purchase Order *</label>
-                  <select required value={poId} onChange={(e) => handleSelectPo(e.target.value)} className="w-full border border-slate-300 rounded-lg p-2 bg-white text-slate-800 font-medium">
-                    <option value="">{purchaseOrders.length ? 'Select Purchase Order...' : 'No purchase orders available'}</option>
-                    {purchaseOrders.map((po) => (
-                      <option key={po.id} value={po.id}>{po.poNumber} ({formatDateDDMMYYYY(po.date)}) - {po.vendor} - {poQty(po).toLocaleString('en-IN')} M</option>
-                    ))}
-                  </select>
-                  {selectedPo && (
-                    <div className="mt-2 p-2.5 rounded-xl border border-blue-200 bg-blue-50 text-[11px] space-y-1">
-                      <div className="flex items-center justify-between font-bold text-slate-800">
-                        <span>Vendor: {selectedPo.vendor}</span>
-                        <span className="text-emerald-700 font-mono text-[10px] bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">PO Value: {formatCurrency(selectedPo.amount ?? selectedPo.total ?? 0)}</span>
-                      </div>
-                      <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-slate-600 text-[10px]">
-                        <span>PO Date: <strong>{formatDateDDMMYYYY(selectedPo.date)}</strong></span>
-                        <span>Expected: <strong>{formatDateDDMMYYYY(selectedPo.expectedDate)}</strong></span>
-                        <span>Status: <strong>{selectedPo.status}</strong></span>
-                      </div>
-                    </div>
-                  )}
-                </div>
               </div>
 
               <div className="rounded-xl border border-slate-200 p-4 space-y-4">
                 <h4 className="flex items-center gap-2 text-[13px] font-extrabold text-[#17294e]"><Package size={15} className="text-blue-500" /> Production Details</h4>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div>
-                    <label className="block font-semibold text-slate-700 mb-1">Fabric</label>
-                    <input type="text" readOnly value={selectedPo ? poFabric(selectedPo) || '—' : ''} placeholder="Select a Purchase Order first" className="w-full border border-slate-200 rounded-lg p-2 bg-slate-50 text-slate-500 font-medium" />
+                    <label className="block font-semibold text-slate-700 mb-1">Fabric Quality</label>
+                    <input
+                      type="text"
+                      value={manualFabric}
+                      onChange={(e) => setManualFabric(e.target.value)}
+                      placeholder="e.g. 2170 / Cotton 60s"
+                      className="w-full border border-slate-300 rounded-lg p-2 bg-white text-slate-800 font-medium"
+                    />
                   </div>
                   <div>
                     <label className="block font-semibold text-slate-700 mb-1">Assigned Qty (Meter) *</label>
@@ -707,8 +1071,16 @@ export default function ProductionInstructionsPage() {
                     {employeesError && <p className="mt-1 text-[10.5px] font-semibold text-rose-600">{employeesError}</p>}
                   </div>
                   <div>
-                    <label className="block font-semibold text-slate-700 mb-1">UOM</label>
-                    <input type="text" readOnly value="Meter" className="w-full border border-slate-200 rounded-lg p-2 bg-slate-50 text-slate-500 font-medium" />
+                    <label className="block font-semibold text-slate-700 mb-1">Agreed Job Rate (₹/M)</label>
+                    <input
+                      type="number"
+                      step="any"
+                      min="0"
+                      value={agreedJobRate}
+                      onChange={(e) => setAgreedJobRate(e.target.value)}
+                      placeholder="e.g. 8.40"
+                      className="w-full border border-slate-300 rounded-lg p-2 bg-white text-slate-800 font-mono"
+                    />
                   </div>
                   <div>
                     <label className="block font-semibold text-slate-700 mb-1">Remark (Optional)</label>
@@ -723,8 +1095,8 @@ export default function ProductionInstructionsPage() {
                 </div>
               )}
               <div className="flex flex-wrap justify-end gap-2 pt-3 border-t border-slate-200">
-                <button type="button" onClick={() => { setShowAddModal(false); setIsFullscreen(false); }} className="px-3 py-1.5 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-100 font-medium">Cancel</button>
-                <button type="submit" disabled={saving} className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold shadow-sm disabled:opacity-50">{saving ? 'Saving…' : 'Save Production Instruction'}</button>
+                <button type="button" onClick={() => { setShowAddModal(false); setIsFullscreen(false); }} className="px-3 py-1.5 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-100 font-medium cursor-pointer">Cancel</button>
+                <button type="submit" disabled={saving} className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold shadow-sm disabled:opacity-50 cursor-pointer">{saving ? 'Saving…' : 'Save Production Instruction'}</button>
               </div>
             </form>
           </div>

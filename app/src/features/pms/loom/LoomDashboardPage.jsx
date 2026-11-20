@@ -25,13 +25,14 @@ import TablePagination from '../../../components/ui/TablePagination';
 import { Button } from '../../../components/ui/Button';
 import { loomService } from '../../../services/loomService';
 import { formatNum } from '../utils/loomCalculations';
+import { exportLoomCommandCenterPdf } from './utils/loomPdfExport';
 import { useERP } from '../../../context/ERPContext';
 import { ConfirmModal } from '../../../components/ui/ConfirmModal';
-import { exportToCSV, downloadElementAsPdf } from '../../../services/exportUtils';
+import { exportToCSV } from '../../../services/exportUtils';
 
 export default function LoomDashboardPage() {
   const navigate = useNavigate();
-  const { showToast } = useERP();
+  const { showToast, companyProfile } = useERP();
   const [loading, setLoading] = useState(true);
   const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
   const [dashboardData, setDashboardData] = useState(null);
@@ -184,20 +185,23 @@ export default function LoomDashboardPage() {
     showToast('Excel (.csv) sheet downloaded successfully', 'success');
   };
 
-  const handleExportPdf = async () => {
+  const handleExportPdf = async (orientation = 'portrait') => {
     setShowExportMenu(false);
-    if (!reportContentRef.current) {
-      window.print();
+    if (!dashboardData) {
+      showToast('No dashboard data available to export', 'warning');
       return;
     }
     setExportingPdf(true);
-    showToast('Generating PDF document...', 'info');
+    showToast(`Generating A4 ${orientation === 'portrait' ? 'Portrait' : 'Landscape'} PDF...`, 'info');
     try {
-      await downloadElementAsPdf(
-        reportContentRef.current,
-        `Loom_Manufacturing_Command_Center_${new Date().toISOString().slice(0, 10)}.pdf`
-      );
-      showToast('PDF downloaded successfully', 'success');
+      await exportLoomCommandCenterPdf({
+        companyName: companyProfile?.name || 'OSCAR TEXTILE ERP',
+        dashboardData,
+        activeTab,
+        orientation,
+        filename: `Loom_Manufacturing_Command_Center_${new Date().toISOString().slice(0, 10)}.pdf`,
+      });
+      showToast('A4 PDF downloaded successfully', 'success');
     } catch (err) {
       console.error('PDF export error:', err);
       showToast('Failed to export PDF, opening print preview', 'warning');
@@ -313,14 +317,27 @@ export default function LoomDashboardPage() {
 
                   <button
                     type="button"
-                    onClick={handleExportPdf}
+                    onClick={() => handleExportPdf('portrait')}
                     disabled={exportingPdf}
                     className="w-full text-left px-3 py-2 flex items-center gap-2.5 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer"
                   >
                     <FileText size={15} className="text-rose-600 dark:text-rose-400 shrink-0" />
                     <div>
-                      <div className="font-semibold text-slate-800 dark:text-slate-100">Export to PDF</div>
-                      <div className="text-[10px] text-slate-400">Printable A4 report (.pdf)</div>
+                      <div className="font-semibold text-slate-800 dark:text-slate-100">Export PDF (A4 Portrait)</div>
+                      <div className="text-[10px] text-slate-400">Standard A4 page format (.pdf)</div>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleExportPdf('landscape')}
+                    disabled={exportingPdf}
+                    className="w-full text-left px-3 py-2 flex items-center gap-2.5 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                  >
+                    <FileText size={15} className="text-indigo-600 dark:text-indigo-400 shrink-0" />
+                    <div>
+                      <div className="font-semibold text-slate-800 dark:text-slate-100">Export PDF (A4 Landscape)</div>
+                      <div className="text-[10px] text-slate-400">Wide A4 page format (.pdf)</div>
                     </div>
                   </button>
 
@@ -404,7 +421,7 @@ export default function LoomDashboardPage() {
       </div>
 
       {/* Screen Section Switcher */}
-      <div className="flex flex-wrap items-center justify-between gap-2.5 pt-1">
+      <div className="flex flex-wrap items-center justify-between gap-2.5 pt-1 print:hidden">
         <div className="inline-flex max-w-full overflow-x-auto no-scrollbar p-1 bg-slate-100 dark:bg-slate-800/80 border border-slate-200/90 dark:border-slate-700/80 rounded-xl shadow-2xs">
           {tabs.map((tab) => {
             const Icon = tab.icon;
@@ -524,15 +541,17 @@ export default function LoomDashboardPage() {
             </tbody>
           </table>
         </div>
-        <TablePagination
-          page={factoryPage}
-          pageSize={factoryPageSize}
-          totalItems={factories.length}
-          onPageChange={setFactoryPage}
-          onPageSizeChange={(sz) => { setFactoryPageSize(sz); setFactoryPage(1); }}
-          pageSizeOptions={[5, 10, 20, 50]}
-          bordered
-        />
+        <div className="print:hidden">
+          <TablePagination
+            page={factoryPage}
+            pageSize={factoryPageSize}
+            totalItems={factories.length}
+            onPageChange={setFactoryPage}
+            onPageSizeChange={(sz) => { setFactoryPageSize(sz); setFactoryPage(1); }}
+            pageSizeOptions={[5, 10, 20, 50]}
+            bordered
+          />
+        </div>
       </div>
       )}
 
@@ -549,7 +568,7 @@ export default function LoomDashboardPage() {
                     Yarn Cover Days (Weft Burn Rate)
                   </h3>
                 </div>
-                <Button variant="ghost" onClick={() => navigate('/pms/yarn')} className="h-6 text-[11px] px-1.5 text-blue-600">
+                <Button variant="ghost" onClick={() => navigate('/pms/yarn')} className="h-6 text-[11px] px-1.5 text-blue-600 print:hidden">
                   Manage Yarn <ArrowRight size={11} className="ml-1" />
                 </Button>
               </div>
@@ -607,15 +626,17 @@ export default function LoomDashboardPage() {
             </table>
           </div>
           {yarnItems.length > 0 && (
-            <TablePagination
-              page={yarnPage}
-              pageSize={yarnPageSize}
-              totalItems={yarnItems.length}
-              onPageChange={setYarnPage}
-              onPageSizeChange={(sz) => { setYarnPageSize(sz); setYarnPage(1); }}
-              pageSizeOptions={[5, 10, 20]}
-              bordered
-            />
+            <div className="print:hidden">
+              <TablePagination
+                page={yarnPage}
+                pageSize={yarnPageSize}
+                totalItems={yarnItems.length}
+                onPageChange={setYarnPage}
+                onPageSizeChange={(sz) => { setYarnPageSize(sz); setYarnPage(1); }}
+                pageSizeOptions={[5, 10, 20]}
+                bordered
+              />
+            </div>
           )}
         </div>
         )}
@@ -630,7 +651,7 @@ export default function LoomDashboardPage() {
                   Active Programs Progress
                 </h3>
               </div>
-              <Button variant="ghost" onClick={() => navigate('/pms/programs')} className="h-6 text-[11px] px-1.5 text-blue-600">
+              <Button variant="ghost" onClick={() => navigate('/pms/programs')} className="h-6 text-[11px] px-1.5 text-blue-600 print:hidden">
                 All Programs <ArrowRight size={11} className="ml-1" />
               </Button>
             </div>
@@ -685,15 +706,17 @@ export default function LoomDashboardPage() {
             </table>
           </div>
           {programs.length > 0 && (
-            <TablePagination
-              page={programsPage}
-              pageSize={programsPageSize}
-              totalItems={programs.length}
-              onPageChange={setProgramsPage}
-              onPageSizeChange={(sz) => { setProgramsPageSize(sz); setProgramsPage(1); }}
-              pageSizeOptions={[5, 10, 20]}
-              bordered
-            />
+            <div className="print:hidden">
+              <TablePagination
+                page={programsPage}
+                pageSize={programsPageSize}
+                totalItems={programs.length}
+                onPageChange={setProgramsPage}
+                onPageSizeChange={(sz) => { setProgramsPageSize(sz); setProgramsPage(1); }}
+                pageSizeOptions={[5, 10, 20]}
+                bordered
+              />
+            </div>
           )}
         </div>
         )}

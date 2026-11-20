@@ -739,6 +739,7 @@ export default function MachinesAndBeamsPage() {
                             type="button"
                             onClick={() => {
                               const el = document.getElementById(`target_m_${b.id}`);
+                              if (!el) return;
                               if (!el.value) {
                                 showToast('Please select a target machine', 'warning');
                                 return;

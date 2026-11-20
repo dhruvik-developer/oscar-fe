@@ -70,6 +70,43 @@ export function isLoomAdminOrManager(user) {
   return adminKeywords.some((kw) => roleName.includes(kw));
 }
 
+/**
+ * Safely copy text to clipboard across all browsers, including non-secure HTTP contexts on LAN/other systems.
+ */
+async function copyTextToClipboard(text) {
+  if (!text) return false;
+
+  // 1. Try modern Clipboard API (available in secure contexts: localhost, HTTPS)
+  if (typeof navigator !== 'undefined' && navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch (err) {
+      console.warn('navigator.clipboard.writeText failed, trying fallback...', err);
+    }
+  }
+
+  // 2. Fallback for non-secure HTTP contexts (e.g. LAN IP on other systems)
+  try {
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.setAttribute('readonly', '');
+    textarea.style.position = 'fixed';
+    textarea.style.top = '0';
+    textarea.style.left = '-9999px';
+    textarea.style.opacity = '0';
+    document.body.appendChild(textarea);
+    textarea.focus();
+    textarea.select();
+    const successful = document.execCommand('copy');
+    document.body.removeChild(textarea);
+    return successful;
+  } catch (err) {
+    console.error('Fallback execCommand failed:', err);
+    return false;
+  }
+}
+
 export default function DailyLoomEntryPage() {
   const { showToast } = useERP();
   const currentUser = useAppStore((s) => s.currentUser);
@@ -231,7 +268,7 @@ export default function DailyLoomEntryPage() {
       url,
     };
 
-    if (navigator.share && /mobile|android|iphone|ipad/i.test(navigator.userAgent)) {
+    if (navigator?.share && /mobile|android|iphone|ipad/i.test(navigator.userAgent || '')) {
       try {
         await navigator.share(shareData);
         return;
@@ -240,21 +277,19 @@ export default function DailyLoomEntryPage() {
       }
     }
 
-    // Copy to clipboard and open QR modal
-    navigator.clipboard
-      .writeText(url)
-      .then(() => {
-        setCopiedLink(true);
-        setShowShareModal(true);
-        showToast(
-          `Mobile link copied! (Network IP: ${import.meta.env?.VITE_LAN_IP || 'LAN'})`,
-          'success'
-        );
-        setTimeout(() => setCopiedLink(false), 2500);
-      })
-      .catch(() => {
-        setShowShareModal(true);
-      });
+    // Always show QR / share modal on desktop
+    setShowShareModal(true);
+
+    // Copy to clipboard (handles non-secure HTTP / LAN safely)
+    const copied = await copyTextToClipboard(url);
+    if (copied) {
+      setCopiedLink(true);
+      showToast(
+        `Mobile link copied! (Network IP: ${import.meta.env?.VITE_LAN_IP || 'LAN'})`,
+        'success'
+      );
+      setTimeout(() => setCopiedLink(false), 2500);
+    }
   };
 
   const loadFactories = async () => {
@@ -419,16 +454,19 @@ export default function DailyLoomEntryPage() {
         factory_id: selectedFactoryId,
         date: dateStr,
         power: Number(powerCut),
-        rows: rows.map((r) => ({
-          machine_id: r.machine_id,
-          beam_id: r.beam_id,
-          meters: r.meters !== '' ? Number(r.meters) : null,
-          rpm: Number(r.rpm || 650),
-          hours: Number(r.hours || 22),
-          stop: Number(r.stop || 0),
-          reason: r.reason || '',
-          damage: Number(r.damage || 0),
-        })),
+        rows: rows.map((r) => {
+          const m = r.meters !== '' && r.meters !== null && r.meters !== undefined ? Number(r.meters) : null;
+          return {
+            machine_id: r.machine_id,
+            beam_id: r.beam_id ? String(r.beam_id) : null,
+            meters: (!r.has_beam && !r.beam_id) ? null : (m !== null && !isNaN(m) ? m : null),
+            rpm: Number(r.rpm || 650),
+            hours: Number(r.hours || 22),
+            stop: Number(r.stop || 0),
+            reason: r.reason || '',
+            damage: Number(r.damage || 0),
+          };
+        }),
       });
       isDirtyRef.current = false;
       showToast('Day production saved successfully!', 'success');
@@ -773,6 +811,11 @@ export default function DailyLoomEntryPage() {
                       <span className="text-slate-400 font-mono text-[10px] ml-1.5">
                         ({r.beam_no})
                       </span>
+                      {r.beam_status === 'Finished' && (
+                        <span className="ml-1.5 px-1.5 py-0.5 text-[9px] font-semibold bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300 rounded">
+                          Finished
+                        </span>
+                      )}
                     </td>
                     <td className="py-1.5 px-3 text-right font-mono text-slate-500">
                       {formatNum(r.remaining_m)}
@@ -987,11 +1030,15 @@ export default function DailyLoomEntryPage() {
               />
               <button
                 type="button"
-                onClick={() => {
-                  navigator.clipboard.writeText(getShareableUrl());
-                  setCopiedLink(true);
-                  showToast('Mobile link copied to clipboard!', 'success');
-                  setTimeout(() => setCopiedLink(false), 2000);
+                onClick={async () => {
+                  const copied = await copyTextToClipboard(getShareableUrl());
+                  if (copied) {
+                    setCopiedLink(true);
+                    showToast('Mobile link copied to clipboard!', 'success');
+                    setTimeout(() => setCopiedLink(false), 2000);
+                  } else {
+                    showToast('Link could not be copied automatically. Please copy the text manually.', 'warning');
+                  }
                 }}
                 className="pms-btn-emerald shrink-0"
               >

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Settings, Layers, Save, RefreshCw } from 'lucide-react';
 import { api } from '../../../services/api';
 import { useAppStore } from '../../../stores/appStore';
+import { DEFAULT_AT_RISK_THRESHOLD_PCT, usePmsStore, recalcProject } from '../../../stores/pmsStore';
 import StageConfigPage from '../stages/StageConfigPage';
 
 const TABS = [
@@ -10,7 +11,7 @@ const TABS = [
 ];
 
 const DEFAULT_SETTINGS = {
-  atRiskThresholdPct: 70,
+  atRiskThresholdPct: DEFAULT_AT_RISK_THRESHOLD_PCT,
   requireClientApprovalOnDesign: false,
   requireQaCertificate: false,
   defaultDepartmentCapacity: 20,
@@ -22,39 +23,45 @@ const DEFAULT_SETTINGS = {
 
 export default function PMSSettingsPage() {
   const showToast = useAppStore((s) => s.showToast);
+  const storeSettings = usePmsStore((s) => s.settings);
+  const isLoaded = usePmsStore((s) => s.status.loaded);
+  const isLoading = usePmsStore((s) => s.status.loading);
+  const storeError = usePmsStore((s) => s.status.error);
+
   const [activeTab, setActiveTab] = useState('general');
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!isLoaded);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    let active = true;
-    setLoading(true);
-    api.get('/pms/settings/')
-      .then((data) => {
-        if (!active || !data) return;
-        setSettings({
-          atRiskThresholdPct: data.atRiskThresholdPct ?? data.at_risk_threshold_pct ?? 20,
-          requireClientApprovalOnDesign: Boolean(data.requireClientApprovalOnDesign ?? data.require_client_approval_on_design),
-          requireQaCertificate: Boolean(data.requireQaCertificate ?? data.require_qa_certificate),
-          defaultDepartmentCapacity: data.defaultDepartmentCapacity ?? data.default_department_capacity ?? 20,
-          notifications: {
-            notify_on_delay: Boolean(data.notifications?.notify_on_delay ?? true),
-            notify_on_completion: Boolean(data.notifications?.notify_on_completion ?? true),
-          },
-        });
-      })
-      .catch((err) => {
-        if (!active) return;
-        console.warn('[PMSSettingsPage] Failed to fetch settings:', err);
-        setError(err?.message || 'Failed to load PMS settings');
-      })
-      .finally(() => {
-        if (active) setLoading(false);
+    if (storeSettings && isLoaded) {
+      setSettings({
+        atRiskThresholdPct: storeSettings.atRiskThresholdPct ?? storeSettings.at_risk_threshold_pct ?? DEFAULT_AT_RISK_THRESHOLD_PCT,
+        requireClientApprovalOnDesign: Boolean(storeSettings.requireClientApprovalOnDesign ?? storeSettings.require_client_approval_on_design),
+        requireQaCertificate: Boolean(storeSettings.requireQaCertificate ?? storeSettings.require_qa_certificate),
+        defaultDepartmentCapacity: storeSettings.defaultDepartmentCapacity ?? storeSettings.default_department_capacity ?? 20,
+        notifications: {
+          notify_on_delay: Boolean(storeSettings.notifications?.notify_on_delay ?? storeSettings.notifications?.onDelay ?? true),
+          notify_on_completion: Boolean(storeSettings.notifications?.notify_on_completion ?? storeSettings.notifications?.onCompletion ?? true),
+        },
       });
-    return () => { active = false; };
-  }, []);
+      setLoading(false);
+    } else if (!isLoading && !isLoaded) {
+      usePmsStore.getState().hydrate?.().catch((err) => {
+        setError(err?.message || 'Failed to load PMS settings');
+      }).finally(() => {
+        setLoading(false);
+      });
+    }
+  }, [storeSettings, isLoaded, isLoading]);
+
+  useEffect(() => {
+    if (storeError && !isLoaded) {
+      setError(storeError);
+      setLoading(false);
+    }
+  }, [storeError, isLoaded]);
 
   async function handleSave(e) {
     e.preventDefault();
@@ -68,6 +75,10 @@ export default function PMSSettingsPage() {
         notifications: settings.notifications,
       };
       await api.put('/pms/settings/', payload);
+      usePmsStore.setState((st) => ({
+        settings: { ...st.settings, ...payload },
+        projects: st.projects.map((p) => recalcProject(p, Date.now(), payload.atRiskThresholdPct)),
+      }));
       showToast('PMS settings saved successfully');
     } catch (err) {
       showToast(err?.message || 'Failed to save settings', 'error');

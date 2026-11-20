@@ -140,7 +140,7 @@ const PURCHASE_TYPE_OPTIONS = [
     flow: 'PO → Production Instruction → Daily Entry → Quality Control (QC) → Completion Verification → Final Job Work PO → Vendor Bill → Bill Matching',
   },
 ];
-const purchaseTypeOf = (po) => po?.purchaseType || PURCHASE_TYPE_GREY;
+const purchaseTypeOf = (po) => po?.purchaseType || po?.purchase_type || PURCHASE_TYPE_GREY;
 const TYPE_BADGE = {
   [PURCHASE_TYPE_GREY]: { label: 'Ready Grey', cls: 'bg-sky-50 text-sky-700 border-sky-200' },
   [PURCHASE_TYPE_VENDOR_A]: { label: 'Vendor A', cls: 'bg-violet-50 text-violet-700 border-violet-200' },
@@ -455,18 +455,76 @@ export const PurchaseOrdersPage = () => {
         }
     }, [location.state, searchParams]);
 
-    // Deep link from PMS / other screens: ?po=<id>&stage=<stage key>.
+    // Deep link from PMS / other screens: ?po=<id>&stage=<stage key>&search=<poNumber>
     const deepLinkPoId = searchParams.get('po');
     const deepLinkStage = searchParams.get('stage');
+    const deepLinkSearch = searchParams.get('search');
+    const handledDeepLinkRef = React.useRef(null);
+
     React.useEffect(() => {
-        if (!deepLinkPoId && !deepLinkStage) return;
-        // [DISABLED] PO Detail deep link modal disabled as requested
+        if (!deepLinkPoId && !deepLinkStage && !deepLinkSearch) return;
+
+        const linkKey = `${deepLinkPoId || ''}_${deepLinkStage || ''}_${deepLinkSearch || ''}`;
+        if (handledDeepLinkRef.current === linkKey) return;
+        handledDeepLinkRef.current = linkKey;
+
+        // Switch to the All Purchase Orders tab and clean up deep-link params
         const next = new URLSearchParams(searchParams);
+        next.set('tab', 'orders');
         next.delete('po');
         next.delete('stage');
+        next.delete('search');
         setSearchParams(next, { replace: true });
+
+        // Clear any filters that could hide this target PO
+        setTypeFilter('All');
+        setStatusFilter('All');
+        setVendorFilter('All');
+        setFabricFilter('All');
+        setDateFrom('');
+        setDateTo('');
+        setPage(1);
+
+        const targetSearch = deepLinkSearch || (deepLinkPoId && !deepLinkPoId.includes('-') ? deepLinkPoId : '');
+        if (targetSearch) {
+            setQuery(targetSearch);
+        }
+
+        const matchTarget = (list) => {
+            if (!Array.isArray(list)) return null;
+            return list.find((p) =>
+                (deepLinkPoId && (String(p.id) === String(deepLinkPoId) || String(p.poNumber || '').toLowerCase() === String(deepLinkPoId).toLowerCase())) ||
+                (deepLinkSearch && String(p.poNumber || '').toLowerCase() === String(deepLinkSearch).toLowerCase())
+            );
+        };
+
+        const target = matchTarget(purchaseOrders);
+        if (target) {
+            setHighlightedPoId(target.id);
+            setDetailsModalPo(target);
+            window.setTimeout(() => {
+                document.getElementById(`po-card-${target.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                window.setTimeout(() => setHighlightedPoId(null), 3000);
+            }, 200);
+        } else if (deepLinkPoId) {
+            // PO might not yet be in cached purchaseOrders, fetch directly from API
+            api.get(`/purchase/orders/${deepLinkPoId}/`)
+                .then((res) => {
+                    const fetchedPo = res?.data || res;
+                    if (fetchedPo?.id) {
+                        setDetailsModalPo(fetchedPo);
+                        setHighlightedPoId(fetchedPo.id);
+                        if (typeof refreshCollections === 'function') {
+                            refreshCollections(['purchaseOrders']);
+                        }
+                    }
+                })
+                .catch(() => {
+                    // Fallback handled via search query
+                });
+        }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [deepLinkPoId, deepLinkStage]);
+    }, [deepLinkPoId, deepLinkStage, deepLinkSearch, purchaseOrders]);
 
     const handleOpenCreateModal = () => {
         setEditingPo(null);

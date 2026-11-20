@@ -697,7 +697,7 @@ export default function DealsPage() {
           <title>Deals Report - OSCAR ERP</title>
           <style>
             @page {
-              size: landscape;
+              size: A4 landscape;
               margin: 12mm 15mm;
             }
             * { box-sizing: border-box; }

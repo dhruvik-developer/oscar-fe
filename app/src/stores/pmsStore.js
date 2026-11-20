@@ -16,13 +16,18 @@ import { lazyStore } from "../services/lazyModules";
 import * as pmsApi from "../services/pmsSync";
 import { pmsSync, describeError, isBackendEnabled } from "../services/pmsSync";
 
+/** Shared at-risk defaults — the only source of truth for these numbers. */
+export const DEFAULT_AT_RISK_THRESHOLD_PCT = 70;
+export const DASHBOARD_AT_RISK_ELAPSED_PCT = DEFAULT_AT_RISK_THRESHOLD_PCT;
+export const DASHBOARD_AT_RISK_COMPLETION_PCT = 50;
+
 /**
  * Defaults used only until `hydrate()` has answered — never as data. The server
  * owns projects, stages, departments and settings (api.md §10); these are the
  * shapes the selectors read while the first request is in flight.
  */
 const EMPTY_SETTINGS = {
-  atRiskThresholdPct: 70,
+  atRiskThresholdPct: DEFAULT_AT_RISK_THRESHOLD_PCT,
   requireClientApprovalOnDesign: true,
   requireQaCertificate: true,
   notifications: { enabled: true, onDelay: true, onApproval: true, onAssignment: true, onCompletion: true },
@@ -163,7 +168,7 @@ const AUTO_STATUSES = new Set(["Assigned", "In Progress", "At Risk", "Delayed"])
  * Re-derive a stage's status from the clock. Returns the existing status
  * unchanged unless the stage is in an auto-managed state.
  */
-export function deriveStageStatus(stage, now = Date.now(), atRiskThresholdPct = 70) {
+export function deriveStageStatus(stage, now = Date.now(), atRiskThresholdPct = DEFAULT_AT_RISK_THRESHOLD_PCT) {
   const current = stage?.status;
   if (!AUTO_STATUSES.has(current)) return current;
   if (stage?.delayDetails?.isDelayed) return "Delayed";
@@ -187,7 +192,7 @@ export function deriveStageStatus(stage, now = Date.now(), atRiskThresholdPct = 
 }
 
 /** Roll stage-level signals up into the project status. */
-export function deriveProjectStatus(project, now = Date.now(), atRiskThresholdPct = 70) {
+export function deriveProjectStatus(project, now = Date.now(), atRiskThresholdPct = DEFAULT_AT_RISK_THRESHOLD_PCT) {
   // On Hold is a deliberate pause and only a human clears it.
   if (project?.status === "On Hold") return project.status;
 
@@ -212,7 +217,7 @@ export function deriveProjectStatus(project, now = Date.now(), atRiskThresholdPc
 // ─── Recalculation ───────────────────────────────────────────────────
 
 /** Recompute one stage's derived fields (dates, %, status). */
-export function recalcStage(stage, now = Date.now(), atRiskThresholdPct = 70) {
+export function recalcStage(stage, now = Date.now(), atRiskThresholdPct = DEFAULT_AT_RISK_THRESHOLD_PCT) {
   const completionPct = computeStageCompletionPct(stage);
   const expectedCompletionDateTime =
     computeExpectedCompletion(
@@ -227,7 +232,7 @@ export function recalcStage(stage, now = Date.now(), atRiskThresholdPct = 70) {
 }
 
 /** Recompute a whole project: every stage, then the project rollups. */
-export function recalcProject(project, now = Date.now(), atRiskThresholdPct = 70) {
+export function recalcProject(project, now = Date.now(), atRiskThresholdPct = DEFAULT_AT_RISK_THRESHOLD_PCT) {
   const stages = (project.stages ?? []).map((s) =>
     recalcStage(s, now, atRiskThresholdPct)
   );
@@ -278,12 +283,8 @@ export function computeNavBadges(projects = [], currentUserId = null, now = Date
 // These follow the dashboard spec's own definitions, which are deliberately
 // stricter than the store's general-purpose getKpis(): "active" excludes On
 // Hold, "delayed" also counts projects whose stages have run past due, and
-// "at risk" is measured per stage at a 70%/50% cut rather than via
-// settings.atRiskThresholdPct.
-
-export const DEFAULT_AT_RISK_THRESHOLD_PCT = 70;
-export const DASHBOARD_AT_RISK_ELAPSED_PCT = DEFAULT_AT_RISK_THRESHOLD_PCT;
-export const DASHBOARD_AT_RISK_COMPLETION_PCT = 50;
+// "at risk" is measured per stage using the configured elapsed threshold
+// with the dashboard's fixed completion cut-off.
 
 const ACTIVE_STATUSES = new Set(["In Progress", "At Risk", "Delayed"]);
 

@@ -14,6 +14,7 @@ import {
 import { useLocation, useNavigate } from "react-router-dom";
 import { defaultLeadFormSections } from "../../../data/crm/leadFormSchema";
 import { useCrmStore } from "../../../stores/crmStore";
+import { useERP } from "../../../context/ERPContext";
 import { fetchLiveLeadFormId, findForm, getLiveLeadFormId, isLeadFormSwitchedOn, loadForms } from "../../../services/crmForms";
 import PageInfoButton from "../../../components/ui/PageInfoButton";
 
@@ -27,19 +28,17 @@ function getFieldIcon(field) {
   return Type;
 }
 
-function PhoneInput({ field, Icon }) {
-  const [val, setVal] = useState("+91 ");
-
+function PhoneInput({ field, Icon, value, onChange }) {
   return (
     <div className="relative flex items-center">
       <input
         type="tel"
-        value={val}
+        value={value || "+91 "}
         onChange={(e) => {
           let v = e.target.value;
-          if (!v || v === '+' || v.trim() === '') { setVal('+91 '); return; }
-          if (!v.startsWith('+91')) { const cl = v.replace(/^\+?91\s*/, ''); setVal(`+91 ${cl}`); return; }
-          setVal(v);
+          if (!v || v === '+' || v.trim() === '') { onChange?.('+91 '); return; }
+          if (!v.startsWith('+91')) { const cl = v.replace(/^\+?91\s*/, ''); onChange?.(`+91 ${cl}`); return; }
+          onChange?.(v);
         }}
         placeholder={field.placeholder || "+91 98765 43210"}
         className="w-full bg-white border border-slate-200 rounded-lg pl-3 pr-8 py-2 text-xs text-slate-700 placeholder:text-slate-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
@@ -49,7 +48,7 @@ function PhoneInput({ field, Icon }) {
   );
 }
 
-function renderInput(field) {
+function renderInput(field, value, onChange) {
   if (field.type === "Lead Image") {
     return (
       <div className="rounded-xl border border-slate-200 bg-white p-3.5">
@@ -70,6 +69,8 @@ function renderInput(field) {
     return (
       <textarea
         rows={3}
+        value={value || ""}
+        onChange={(e) => onChange?.(e.target.value)}
         placeholder={field.placeholder}
         className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-700 placeholder:text-slate-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 resize-none"
       />
@@ -77,17 +78,22 @@ function renderInput(field) {
   }
 
   if (field.type === "Dropdown") {
+    const options = Array.isArray(field.options) ? field.options : ["Option 1", "Option 2"];
     return (
       <div className="relative flex items-center">
         <select
-          defaultValue=""
+          value={value || ""}
+          onChange={(e) => onChange?.(e.target.value)}
           className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-700 placeholder:text-slate-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 appearance-none pr-8 cursor-pointer"
         >
           <option value="" disabled>
-            {field.placeholder}
+            {field.placeholder || "Select option"}
           </option>
-          <option>Option 1</option>
-          <option>Option 2</option>
+          {options.map((opt, i) => (
+            <option key={i} value={typeof opt === 'string' ? opt : opt.value || opt.label}>
+              {typeof opt === 'string' ? opt : opt.label || opt.value}
+            </option>
+          ))}
         </select>
         <ChevronDown size={15} className="absolute right-3 text-slate-400 pointer-events-none" />
       </div>
@@ -97,7 +103,12 @@ function renderInput(field) {
   if (field.type === "Checkbox") {
     return (
       <label className="flex items-center gap-2 py-1 cursor-pointer">
-        <input type="checkbox" className="w-4 h-4 text-blue-600 rounded border-slate-300" />
+        <input
+          type="checkbox"
+          checked={Boolean(value)}
+          onChange={(e) => onChange?.(e.target.checked)}
+          className="w-4 h-4 text-blue-600 rounded border-slate-300"
+        />
         <span className="text-xs font-medium text-slate-700">{field.placeholder || field.label}</span>
       </label>
     );
@@ -107,7 +118,9 @@ function renderInput(field) {
     return (
       <div className="relative flex items-center">
         <input
-          type="text"
+          type="date"
+          value={value || ""}
+          onChange={(e) => onChange?.(e.target.value)}
           placeholder={field.placeholder || "Select date"}
           className="w-full bg-white border border-slate-200 rounded-lg pl-3 pr-8 py-2 text-xs text-slate-700 placeholder:text-slate-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
         />
@@ -128,13 +141,15 @@ function renderInput(field) {
 
   const isPhone = field.type === "Phone" || /phone|mobile/i.test(field.label);
   if (isPhone) {
-    return <PhoneInput field={field} Icon={Icon} />;
+    return <PhoneInput field={field} Icon={Icon} value={value} onChange={onChange} />;
   }
 
   return (
     <div className="relative flex items-center">
       <input
         type={inputType}
+        value={value || ""}
+        onChange={(e) => onChange?.(e.target.value)}
         placeholder={field.placeholder}
         className="w-full bg-white border border-slate-200 rounded-lg pl-3 pr-8 py-2 text-xs text-slate-700 placeholder:text-slate-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
       />
@@ -195,6 +210,54 @@ export default function DynamicLeadFormPage({
     return defaultLeadFormSections;
   }, [resolvedForm]);
 
+  const [formData, setFormData] = useState({});
+  const [isSaving, setIsSaving] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+  const erp = useERP();
+
+  const handleFieldChange = (fieldId, val) => {
+    setFormData((prev) => ({ ...prev, [fieldId]: val }));
+    if (errorMessage) setErrorMessage("");
+  };
+
+  const handleSaveLead = async () => {
+    if (isSaving) return;
+    for (const sec of safeSections) {
+      for (const f of sec.fields || []) {
+        if (f.required && !formData[f.id]) {
+          setErrorMessage(`Please fill required field: ${f.label}`);
+          return;
+        }
+      }
+    }
+    setIsSaving(true);
+    try {
+      const payload = {
+        name: formData.name || formData.lead_name || formData.leadName || "New Lead",
+        phone: formData.phone || formData.mobile || "",
+        email: formData.email || "",
+        company: formData.company || formData.company_name || "",
+        stage: "Draft",
+        status: "Active",
+        source: formData.source || "Direct",
+        notes: formData.notes || formData.requirement || "",
+        custom_fields: formData,
+      };
+      const createRecord = useCrmStore.getState().createRecord;
+      if (createRecord) {
+        await createRecord("leads", payload);
+      }
+      if (erp?.showToast) {
+        erp.showToast("Lead created successfully!");
+      }
+      handleBack();
+    } catch (err) {
+      setErrorMessage(err.message || "Failed to save lead.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   return (
     <section className="w-full">
       {/* Top Bar */}
@@ -220,13 +283,21 @@ export default function DynamicLeadFormPage({
           </button>
           <button
             type="button"
-            className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-lg shadow-xs transition cursor-pointer"
+            onClick={handleSaveLead}
+            disabled={isSaving}
+            className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-xs font-medium rounded-lg shadow-xs transition cursor-pointer"
           >
             <Save size={15} />
-            Save Lead
+            {isSaving ? "Saving..." : "Save Lead"}
           </button>
         </div>
       </div>
+
+      {errorMessage && (
+        <div className="mb-4 p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-xs font-medium">
+          {errorMessage}
+        </div>
+      )}
 
       {/* Sections — only the toggled-on form is shown */}
       {safeSections.length === 0 ? (
@@ -269,7 +340,7 @@ export default function DynamicLeadFormPage({
                       {field.required && <span className="text-rose-500 ml-0.5">*</span>}
                     </span>
                   )}
-                  {renderInput(field)}
+                  {renderInput(field, formData[field.id], (v) => handleFieldChange(field.id, v))}
                   {field.helpText && (
                     <small className="text-[11px] text-slate-400">{field.helpText}</small>
                   )}

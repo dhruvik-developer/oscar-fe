@@ -483,7 +483,7 @@ export async function exportStockPDF({ title, screenTitle, filename, dateStr, kp
       doc.setTextColor(148, 163, 184);
       doc.text(`Page ${doc.internal.getNumberOfPages()}  |  Confidential`, pageWidth / 2, pageHeight - 12, { align: 'center' });
 
-      doc.addPage();
+      doc.addPage('a4', 'landscape');
       curY = margin;
       drawTableHeader(curY);
       curY += 20;

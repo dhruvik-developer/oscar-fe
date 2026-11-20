@@ -218,7 +218,7 @@ export function triggerPrint() {
  * Directly downloads an HTML DOM element as a high-quality A4 PDF without opening the printer dialog.
  * Uses dynamic imports for jsPDF and html-to-image so pages importing exportToCSV don't pay bundle/load overhead.
  */
-export async function downloadElementAsPdf(element, filename = 'document.pdf') {
+export async function downloadElementAsPdf(element, filename = 'document.pdf', options = {}) {
     if (!element) {
         window.print();
         return;
@@ -234,8 +234,9 @@ export async function downloadElementAsPdf(element, filename = 'document.pdf') {
             cacheBust: true,
             skipFonts: true,
         });
+        const orientation = options?.orientation || 'portrait';
         const pdf = new jsPDF({
-            orientation: 'portrait',
+            orientation,
             unit: 'mm',
             format: 'a4',
         });
@@ -251,7 +252,7 @@ export async function downloadElementAsPdf(element, filename = 'document.pdf') {
 
         while (heightLeft > 0) {
             position = heightLeft - pdfHeight;
-            pdf.addPage();
+            pdf.addPage('a4', orientation);
             pdf.addImage(dataUrl, 'PNG', 0, position, pdfWidth, pdfHeight);
             heightLeft -= pageHeight;
         }

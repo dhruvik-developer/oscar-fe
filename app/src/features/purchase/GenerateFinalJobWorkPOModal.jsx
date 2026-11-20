@@ -28,7 +28,7 @@ export default function GenerateFinalJobWorkPOModal({
   isApproved = false,
   onSuccess,
 }) {
-  const { vendors = [], showToast } = useERP();
+  const { vendors = [], showToast, refreshCollections } = useERP();
 
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -196,7 +196,7 @@ export default function GenerateFinalJobWorkPOModal({
         }
 
         // Initialize PO Item Details
-        const billable = acc > 0 ? acc : (prod > 0 ? prod : 800);
+        const billable = acc > 0 ? acc : (prod > 0 ? prod : (oQty > 0 ? oQty : 800));
         const basicAmt = billable * rate;
         const gstAmt = (basicAmt * gstPct) / 100;
         const totalAmt = basicAmt + gstAmt;
@@ -452,11 +452,12 @@ export default function GenerateFinalJobWorkPOModal({
           'success'
         );
       }
+      refreshCollections?.(['purchaseOrders']);
       if (onSuccess) onSuccess(res);
       onClose();
     } catch (err) {
       console.error('Failed to save final PO:', err);
-      const msg = err?.response?.data?.detail || err?.message || 'Failed to save Final Job Work PO.';
+      const msg = err?.payload?.detail || err?.response?.data?.detail || err?.message || 'Failed to save Final Job Work PO.';
       if (showToast) showToast(msg, 'error');
       else await modal.error(msg, 'Final Job Work PO Error');
     } finally {

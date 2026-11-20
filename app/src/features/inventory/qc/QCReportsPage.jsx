@@ -362,7 +362,7 @@ export default function QCReportsPage() {
 
       filteredData.forEach((row, rowIdx) => {
         if (currentY + rowHeight > maxY) {
-          doc.addPage();
+          doc.addPage('a4', 'landscape');
           currentY = drawReportHeader(false);
           currentY = drawTableHeaders(currentY);
         }

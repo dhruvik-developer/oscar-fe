@@ -112,9 +112,9 @@ export default function YarnManagementPage() {
       setBookings(bList);
       setParties(pList);
 
-      if (yList.length && !bkYarn) setBkYarn(yList[0].id);
-      if (bList.length && !schBooking) setSchBooking(bList[0].id);
-      if (fList.length && !schFactory) setSchFactory(fList[0].id);
+      if (yList.length) setBkYarn((prev) => prev || yList[0].id);
+      if (bList.length) setSchBooking((prev) => prev || bList[0].id);
+      if (fList.length) setSchFactory((prev) => prev || fList[0].id);
 
       // Collect all deliveries
       const allDels = [];
@@ -134,16 +134,22 @@ export default function YarnManagementPage() {
         return next;
       });
 
-      // Load stock for all factories
-      const stockArr = [];
-      for (const f of fList) {
-        const sRes = await loomService.getFactoryYarnStock(f.id);
-        const sList = Array.isArray(sRes) ? sRes : sRes?.results || [];
-        sList.forEach((item) => {
-          stockArr.push({ factory_name: f.name, ...item });
-        });
-      }
-      setStockOverview(stockArr);
+
+
+      // Load stock for all factories in parallel
+      const stockResults = await Promise.all(
+        fList.map(async (f) => {
+          try {
+            const sRes = await loomService.getFactoryYarnStock(f.id);
+            const sList = Array.isArray(sRes) ? sRes : sRes?.results || [];
+            return sList.map((item) => ({ factory_name: f.name, ...item }));
+          } catch (stockErr) {
+            console.error(`Failed to load stock for factory ${f.id}:`, stockErr);
+            return [];
+          }
+        })
+      );
+      setStockOverview(stockResults.flat());
     } catch (err) {
       console.error('Failed to load yarn management:', err);
     } finally {

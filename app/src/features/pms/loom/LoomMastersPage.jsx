@@ -44,6 +44,7 @@ export default function LoomMastersPage() {
   const [masterWarehouses, setMasterWarehouses] = useState([]);
   const [masterJobWorkers, setMasterJobWorkers] = useState([]);
   const [masterEmployees, setMasterEmployees] = useState([]);
+  const [categories, setCategories] = useState([]);
 
   const [qualPage, setQualPage] = useState(1);
   const [qualPageSize, setQualPageSize] = useState(10);
@@ -82,9 +83,12 @@ export default function LoomMastersPage() {
     ppi: 56,
     wastage: 8,
     pick_charge: 0.15,
+    category: '',
   });
-  const [yForm, setYForm] = useState({ name: '', denier: '', kg_per_bag: 25, rate: 0, note: '' });
+  const [yForm, setYForm] = useState({ name: '', denier: '', kg_per_bag: 25, rate: 0, note: '', category: '' });
+  const [yarnSubmitting, setYarnSubmitting] = useState(false);
   const [fForm, setFForm] = useState({ name: '', coord: '', factory_type: 'in_house', warehouse: '', job_worker_party: '', assigned_employee: '' });
+  const [factorySubmitting, setFactorySubmitting] = useState(false);
   const [mForm, setMForm] = useState({ from_no: 1, to_no: 18, reed: 84 });
   const [cForm, setCForm] = useState({ name: '', phone: '', employee: '' });
 
@@ -97,7 +101,7 @@ export default function LoomMastersPage() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [yRes, qRes, fRes, cRes, mqRes, locRes, partRes, empRes] = await Promise.all([
+      const [yRes, qRes, fRes, cRes, mqRes, locRes, partRes, empRes, catRes] = await Promise.all([
         loomService.getYarns(),
         loomService.getQualities(),
         loomService.getFactories(),
@@ -106,6 +110,7 @@ export default function LoomMastersPage() {
         inventoryService.getLocations().catch(() => []),
         partiesService.getParties().catch(() => []),
         hrmsService.getEmployees().catch(() => []),
+        api.get('/inventory/categories/').catch(() => []),
       ]);
       const yList = Array.isArray(yRes) ? yRes : yRes?.results || [];
       const qList = Array.isArray(qRes) ? qRes : qRes?.results || [];
@@ -116,6 +121,7 @@ export default function LoomMastersPage() {
       const locList = Array.isArray(locRes) ? locRes : locRes?.results || [];
       const partList = Array.isArray(partRes) ? partRes : partRes?.results || [];
       const empList = Array.isArray(empRes) ? empRes : empRes?.results || [];
+      const catList = Array.isArray(catRes) ? catRes : catRes?.results || [];
 
       setYarns(yList);
       setQualities(qList);
@@ -126,6 +132,7 @@ export default function LoomMastersPage() {
       setMasterWarehouses(locList.filter((l) => l.type === 'Warehouse' || l.type === 'Godown' || !l.type));
       setMasterJobWorkers(partList);
       setMasterEmployees(empList);
+      setCategories(catList);
 
       if (yList.length && !qForm.warp_yarn) {
         setQForm((prev) => ({ ...prev, warp_yarn: yList[0].id, weft_yarn: yList[1]?.id || yList[0].id }));
@@ -171,9 +178,10 @@ export default function LoomMastersPage() {
       await loomService.createQuality({
         ...qForm,
         fabric_quality: qForm.fabric_quality || null,
+        category: qForm.category || null,
       });
       showToast('Fabric quality added', 'success');
-      setQForm((prev) => ({ ...prev, name: '', fabric_quality: '' }));
+      setQForm((prev) => ({ ...prev, name: '', fabric_quality: '', category: '' }));
       loadData();
     } catch (err) {
       showToast(err?.payload?.detail || 'Failed to add quality', 'error');
@@ -193,7 +201,7 @@ export default function LoomMastersPage() {
   // Yarn actions
   const handleAddYarn = async (e) => {
     e.preventDefault();
-    if (!yForm.name || !yForm.denier) {
+    if (!yForm.name?.trim() || !yForm.denier) {
       showToast('Name and denier are required', 'warning');
       return;
     }
@@ -201,13 +209,21 @@ export default function LoomMastersPage() {
       showToast('Denier and Kg per bag must be > 0, and rate cannot be negative', 'error');
       return;
     }
+    setYarnSubmitting(true);
     try {
-      await loomService.createYarn(yForm);
-      showToast('Yarn type added', 'success');
-      setYForm({ name: '', denier: '', kg_per_bag: 25, rate: 0, note: '' });
-      loadData();
+      await loomService.createYarn({
+        ...yForm,
+        name: yForm.name.trim(),
+        category: yForm.category || null,
+      });
+      showToast('Yarn type added & synced to Inventory', 'success');
+      setYForm({ name: '', denier: '', kg_per_bag: 25, rate: 0, note: '', category: '' });
+      await loadData();
     } catch (err) {
-      showToast(err?.payload?.detail || 'Failed to add yarn', 'error');
+      const msg = err?.payload?.message || err?.payload?.detail || (err?.payload?.name ? err.payload.name[0] : null) || err?.message || 'Failed to add yarn';
+      showToast(msg, 'error');
+    } finally {
+      setYarnSubmitting(false);
     }
   };
 
@@ -238,23 +254,32 @@ export default function LoomMastersPage() {
   // Factory & Machines actions
   const handleAddFactory = async (e) => {
     e.preventDefault();
-    if (!fForm.name) {
+    if (!fForm.name?.trim()) {
       showToast('Factory name is required', 'warning');
       return;
     }
+    setFactorySubmitting(true);
     try {
-      await loomService.createFactory({
-        ...fForm,
+      const created = await loomService.createFactory({
+        name: fForm.name.trim(),
+        factory_type: fForm.factory_type || 'in_house',
         coord: fForm.coord || null,
         warehouse: fForm.factory_type === 'in_house' ? (fForm.warehouse || null) : null,
         job_worker_party: fForm.factory_type === 'job_work' ? (fForm.job_worker_party || null) : null,
         assigned_employees: fForm.assigned_employee ? [fForm.assigned_employee] : [],
       });
-      showToast('Factory unit registered', 'success');
-      setFForm({ name: '', coord: '', factory_type: 'in_house', warehouse: '', job_worker_party: '' });
-      loadData();
+      showToast('Factory unit registered successfully', 'success');
+      setFForm({ name: '', coord: '', factory_type: 'in_house', warehouse: '', job_worker_party: '', assigned_employee: '' });
+      await loadData();
+      if (created?.id) {
+        setSelectedFactoryId(created.id);
+        localStorage.setItem('oscar_pms_selected_factory', created.id);
+      }
     } catch (err) {
-      showToast('Failed to add factory', 'error');
+      const msg = err?.payload?.message || err?.payload?.detail || (err?.payload?.name ? err.payload.name[0] : null) || err?.message || 'Failed to add factory';
+      showToast(msg, 'error');
+    } finally {
+      setFactorySubmitting(false);
     }
   };
 
@@ -456,6 +481,22 @@ export default function LoomMastersPage() {
                   required
                 />
               </div>
+              <div className="col-span-1 sm:col-span-3">
+                <label className="pms-label flex items-center justify-between">
+                  <span>Inventory Category</span>
+                  <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-normal">Auto-syncs Grey Item</span>
+                </label>
+                <select
+                  value={qForm.category || ''}
+                  onChange={(e) => setQForm({ ...qForm, category: e.target.value })}
+                  className="pms-select w-full cursor-pointer"
+                >
+                  <option value="">-- Default (Grey Fabric) --</option>
+                  {categories.map((c) => (
+                    <option key={c.id} value={c.id}>{c.name} ({c.code})</option>
+                  ))}
+                </select>
+              </div>
               <div>
                 <label className="pms-label">Warp Yarn</label>
                 <select
@@ -650,13 +691,27 @@ export default function LoomMastersPage() {
                   {paginatedQualities.map((q) => (
                     <tr key={q.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50">
                       <td className="py-2 px-2.5 sm:py-2.5 sm:px-3 font-bold text-slate-800 dark:text-slate-200 sticky left-0 bg-white dark:bg-slate-900 z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">
-                        <div className="flex items-center gap-1.5">
-                          <span>{q.name}</span>
-                          {q.fabric_quality_name && (
-                            <span className="inline-flex items-center gap-1 text-[10px] text-blue-600 dark:text-blue-400 font-normal bg-blue-50 dark:bg-blue-950/40 px-1.5 py-0.5 rounded border border-blue-200 dark:border-blue-900/50">
-                              <Link2 size={10} /> Textile: {q.fabric_quality_name}
-                            </span>
-                          )}
+                        <div className="flex flex-col gap-0.5">
+                          <div className="flex items-center gap-1.5">
+                            <span>{q.name}</span>
+                            {q.fabric_quality_name && (
+                              <span className="inline-flex items-center gap-1 text-[10px] text-blue-600 dark:text-blue-400 font-normal bg-blue-50 dark:bg-blue-950/40 px-1.5 py-0.5 rounded border border-blue-200 dark:border-blue-900/50">
+                                <Link2 size={10} /> Textile: {q.fabric_quality_name}
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex flex-wrap items-center gap-1 font-normal">
+                            {q.category_name && (
+                              <span className="inline-flex items-center gap-1 text-[10px] text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-1.5 py-0.2 rounded border border-emerald-200 dark:border-emerald-900/50">
+                                Cat: {q.category_name}
+                              </span>
+                            )}
+                            {q.item_sku && (
+                              <span className="inline-flex items-center gap-1 text-[10px] text-slate-500 font-mono bg-slate-100 dark:bg-slate-800 px-1.5 py-0.2 rounded">
+                                SKU: {q.item_sku}
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </td>
                       <td className="py-2 px-2.5 sm:py-2.5 sm:px-3 text-slate-600 dark:text-slate-400">{q.warp_yarn_name}</td>
@@ -766,6 +821,22 @@ export default function LoomMastersPage() {
                 />
               </div>
               <div>
+                <label className="pms-label flex items-center justify-between">
+                  <span>Inventory Category</span>
+                  <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-normal">Auto-syncs Item</span>
+                </label>
+                <select
+                  value={yForm.category || ''}
+                  onChange={(e) => setYForm({ ...yForm, category: e.target.value })}
+                  className="pms-select w-full cursor-pointer"
+                >
+                  <option value="">-- Default (Yarn Raw Material) --</option>
+                  {categories.map((c) => (
+                    <option key={c.id} value={c.id}>{c.name} ({c.code})</option>
+                  ))}
+                </select>
+              </div>
+              <div>
                 <label className="pms-label">Notes</label>
                 <input
                   type="text"
@@ -775,8 +846,8 @@ export default function LoomMastersPage() {
                   className="pms-input w-full"
                 />
               </div>
-              <button type="submit" className="pms-btn-emerald w-full">
-                <Plus size={16} /> Add Yarn
+              <button type="submit" disabled={yarnSubmitting} className="pms-btn-emerald w-full disabled:opacity-50 cursor-pointer">
+                <Plus size={16} /> {yarnSubmitting ? 'Adding Yarn...' : 'Add Yarn'}
               </button>
             </form>
           </div>
@@ -802,7 +873,23 @@ export default function LoomMastersPage() {
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                   {paginatedYarns.map((y) => (
                     <tr key={y.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50">
-                      <td className="py-2 px-2.5 sm:py-2.5 sm:px-3 font-bold text-slate-800 dark:text-slate-200">{y.name}</td>
+                      <td className="py-2 px-2.5 sm:py-2.5 sm:px-3 font-bold text-slate-800 dark:text-slate-200">
+                        <div className="flex flex-col gap-0.5">
+                          <span>{y.name}</span>
+                          <div className="flex flex-wrap items-center gap-1 font-normal">
+                            {y.category_name && (
+                              <span className="inline-flex items-center gap-1 text-[10px] text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-1.5 py-0.2 rounded border border-emerald-200 dark:border-emerald-900/50">
+                                Cat: {y.category_name}
+                              </span>
+                            )}
+                            {y.item_sku && (
+                              <span className="inline-flex items-center gap-1 text-[10px] text-slate-500 font-mono bg-slate-100 dark:bg-slate-800 px-1.5 py-0.2 rounded">
+                                SKU: {y.item_sku}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </td>
                       <td className="py-2 px-2.5 sm:py-2.5 sm:px-3 text-right font-mono">{y.denier}</td>
                       <td className="py-2 px-2.5 sm:py-2.5 sm:px-3 text-right font-mono">{y.kg_per_bag}</td>
                       <td className="py-1.5 px-2.5 sm:py-2 sm:px-3 text-right">
@@ -964,8 +1051,8 @@ export default function LoomMastersPage() {
                   </select>
                 </div>
                 <div className="col-span-full flex justify-end pt-1">
-                  <button type="submit" className="pms-btn-emerald">
-                    <Plus size={16} /> Add Factory
+                  <button type="submit" disabled={factorySubmitting} className="pms-btn-emerald disabled:opacity-50 cursor-pointer">
+                    <Plus size={16} /> {factorySubmitting ? 'Adding Factory...' : 'Add Factory'}
                   </button>
                 </div>
               </form>
@@ -973,45 +1060,82 @@ export default function LoomMastersPage() {
 
             {/* Batch Add Machines */}
             <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 sm:p-5 shadow-2xs">
-              <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 tracking-tight mb-3">Batch Add Machines to Factory</h3>
-              <form onSubmit={handleBatchCreateMachines} className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 items-end">
+              <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 tracking-tight">
+                  Batch Add Machines to Factory
+                </h3>
+                {selectedFactory && (
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-xs font-semibold bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                    <Factory size={12} className="text-blue-600 dark:text-blue-400" />
+                    Target: <b className="text-blue-900 dark:text-blue-100">{selectedFactory.name}</b>
+                  </span>
+                )}
+              </div>
+              <form onSubmit={handleBatchCreateMachines} className="space-y-3">
                 <div>
-                  <label className="pms-label">From No</label>
-                  <input
-                    type="number"
-                    min="1"
-                    value={mForm.from_no}
-                    onChange={(e) => setMForm({ ...mForm, from_no: e.target.value === '' ? '' : Math.max(1, Number(e.target.value)) })}
-                    onKeyDown={preventNegativeInput}
-                    className="pms-input w-full font-mono"
-                  />
+                  <label className="pms-label flex items-center justify-between">
+                    <span>Target Factory / Company</span>
+                    {selectedFactory && (
+                      <span className="text-[11px] text-slate-500 font-normal">
+                        Selected: <b className="text-slate-700 dark:text-slate-300">{selectedFactory.name}</b> ({selectedFactory.machines_count ?? (selectedFactory.machines || []).length} looms)
+                      </span>
+                    )}
+                  </label>
+                  <select
+                    value={selectedFactoryId}
+                    onChange={(e) => {
+                      setSelectedFactoryId(e.target.value);
+                      localStorage.setItem('oscar_pms_selected_factory', e.target.value);
+                    }}
+                    className="pms-select w-full font-medium"
+                  >
+                    {factories.length === 0 && <option value="">No Factory Available</option>}
+                    {factories.map((f) => (
+                      <option key={f.id} value={f.id}>
+                        {f.name} ({f.machines_count ?? (f.machines || []).length} looms)
+                      </option>
+                    ))}
+                  </select>
                 </div>
-                <div>
-                  <label className="pms-label">To</label>
-                  <input
-                    type="number"
-                    min="1"
-                    value={mForm.to_no}
-                    onChange={(e) => setMForm({ ...mForm, to_no: e.target.value === '' ? '' : Math.max(1, Number(e.target.value)) })}
-                    onKeyDown={preventNegativeInput}
-                    className="pms-input w-full font-mono"
-                  />
-                </div>
-                <div>
-                  <label className="pms-label">Reed</label>
-                  <input
-                    type="number"
-                    min="1"
-                    value={mForm.reed}
-                    onChange={(e) => setMForm({ ...mForm, reed: e.target.value === '' ? '' : Math.max(1, Number(e.target.value)) })}
-                    onKeyDown={preventNegativeInput}
-                    className="pms-input w-full font-mono"
-                  />
-                </div>
-                <div>
-                  <button type="submit" className="pms-btn-secondary w-full">
-                    <Plus size={15} /> Add
-                  </button>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 items-end">
+                  <div>
+                    <label className="pms-label">From No</label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={mForm.from_no}
+                      onChange={(e) => setMForm({ ...mForm, from_no: e.target.value === '' ? '' : Math.max(1, Number(e.target.value)) })}
+                      onKeyDown={preventNegativeInput}
+                      className="pms-input w-full font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="pms-label">To</label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={mForm.to_no}
+                      onChange={(e) => setMForm({ ...mForm, to_no: e.target.value === '' ? '' : Math.max(1, Number(e.target.value)) })}
+                      onKeyDown={preventNegativeInput}
+                      className="pms-input w-full font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="pms-label">Reed</label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={mForm.reed}
+                      onChange={(e) => setMForm({ ...mForm, reed: e.target.value === '' ? '' : Math.max(1, Number(e.target.value)) })}
+                      onKeyDown={preventNegativeInput}
+                      className="pms-input w-full font-mono"
+                    />
+                  </div>
+                  <div>
+                    <button type="submit" className="pms-btn-secondary w-full">
+                      <Plus size={15} /> Add
+                    </button>
+                  </div>
                 </div>
               </form>
             </div>

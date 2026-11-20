@@ -127,19 +127,37 @@ export function rowsOf(body) {
  * exports the result, so `crmSync.pull('leads')` reads the same as
  * `pmsSync.pull('projects')`.
  */
-export function createSync(registry, { label = 'sync' } = {}) {
+export function createSync(registry, { label = 'sync', ttlMs = 45000 } = {}) {
   const get = (key) => registry[key];
   // Identical in-flight pulls (same key + query) share one page walk so
   // concurrent or StrictMode-remounted callers do not duplicate requests.
   const inflight = new Map();
+  const cache = new Map();
   const inflightKey = (key, query) => `${key}:${JSON.stringify(query || {})}`;
 
+  function invalidate(key) {
+    if (!key) {
+      cache.clear();
+      return;
+    }
+    for (const k of cache.keys()) {
+      if (k.startsWith(`${key}:`)) cache.delete(k);
+    }
+  }
+
   /** Load one collection, or `null` when the read failed. */
-  async function pull(key, query = {}) {
+  async function pull(key, query = {}, { force = false } = {}) {
     const resource = get(key);
     if (!resource || !isBackendEnabled()) return null;
 
     const id = inflightKey(key, query);
+    if (!force) {
+      const cached = cache.get(id);
+      if (cached && Date.now() - cached.time < ttlMs) {
+        return cached.data;
+      }
+    }
+
     const pending = inflight.get(id);
     if (pending) return pending;
 
@@ -149,7 +167,9 @@ export function createSync(registry, { label = 'sync' } = {}) {
         const rows = await getAllPages(resource.pullPath || resource.path, {
           query: { ...(resource.pullQuery || {}), ...query },
         });
-        return resource.fromApi ? rows.map(resource.fromApi) : rows;
+        const transformed = resource.fromApi ? rows.map(resource.fromApi) : rows;
+        cache.set(id, { data: transformed, time: Date.now() });
+        return transformed;
       } catch (err) {
         console.warn(`[${label}] pull ${key} failed:`, err?.message || err);
         return null;
@@ -165,10 +185,10 @@ export function createSync(registry, { label = 'sync' } = {}) {
    * Load several collections at once. Failures are per-collection: a key whose
    * read failed is simply absent from the result.
    */
-  async function pullMany(keys = Object.keys(registry), query = {}) {
+  async function pullMany(keys = Object.keys(registry), query = {}, { force = false } = {}) {
     const settled = await mapWithLimit(
       keys,
-      async (key) => [key, await pull(key, query)],
+      async (key) => [key, await pull(key, query, { force })],
     );
     return Object.fromEntries(settled.filter(([, rows]) => rows !== null));
   }
@@ -191,6 +211,7 @@ export function createSync(registry, { label = 'sync' } = {}) {
    * throws — a record the server refused must not look saved.
    */
   async function create(key, record, { idempotencyKey } = {}) {
+    invalidate(key);
     const resource = get(key);
     if (!resource || !isBackendEnabled()) return null;
     const payload = resource.toApi ? resource.toApi(record) : record;
@@ -201,6 +222,7 @@ export function createSync(registry, { label = 'sync' } = {}) {
   }
 
   async function update(key, id, updates) {
+    invalidate(key);
     const resource = get(key);
     if (!resource || !isBackendEnabled() || !isServerId(id)) return null;
     const payload = resource.toApi ? resource.toApi(updates) : { ...updates };
@@ -221,6 +243,7 @@ export function createSync(registry, { label = 'sync' } = {}) {
   }
 
   async function remove(key, id) {
+    invalidate(key);
     const resource = get(key);
     if (!resource || !isBackendEnabled() || id === undefined || id === null || id === "") return null;
     const idStr = String(id);
@@ -239,6 +262,7 @@ export function createSync(registry, { label = 'sync' } = {}) {
    * like the record itself, so callers can drop it straight into state.
    */
   async function act(key, id, action, data, { method = 'POST', raw = false } = {}) {
+    invalidate(key);
     const resource = get(key);
     if (!resource || !isBackendEnabled()) return null;
     const suffix = action ? `${action.replace(/^\/|\/$/g, '')}/` : '';
@@ -250,5 +274,5 @@ export function createSync(registry, { label = 'sync' } = {}) {
     return body.id ? resource.fromApi(body) : body;
   }
 
-  return { registry, pull, pullMany, pullOne, create, update, remove, act };
+  return { registry, pull, pullMany, pullOne, create, update, remove, act, invalidate };
 }

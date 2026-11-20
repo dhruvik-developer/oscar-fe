@@ -77,7 +77,10 @@ export const SalesReturnsPage = () => {
 
     // Posted, non-cancelled invoices can be returned against.
     const activeInvoices = useMemo(() => {
-        return invoices.filter((inv) => inv.status !== 'Cancelled' && inv.status !== 'Draft' && inv.finalized !== false);
+        return invoices.filter((inv) => {
+            const st = String(inv.status || '').toLowerCase();
+            return st !== 'cancelled' && st !== 'draft' && inv.finalized !== false;
+        });
     }, [invoices]);
 
     const invoiceNumberById = useMemo(() => {
@@ -195,7 +198,20 @@ export const SalesReturnsPage = () => {
     };
 
     const handleConditionChange = (index, condition) => updateLine(index, { condition });
-    const handleTakaChange = (index, lotTakaId) => updateLine(index, { lotTakaId });
+    const handleTakaChange = (index, lotTakaId) => {
+        const line = returnLines[index];
+        const patch = { lotTakaId };
+        if (lotTakaId && (!line.returnQty || Number(line.returnQty) === 0)) {
+            const selectedTaka = line.takaOptions?.find((t) => String(t.id) === String(lotTakaId));
+            const takaQty = Number(selectedTaka?.meters || selectedTaka?.qty || selectedTaka?.quantity || 0);
+            if (takaQty > 0 && takaQty <= line.returnableQty) {
+                patch.returnQty = takaQty;
+            } else if (line.returnableQty > 0) {
+                patch.returnQty = line.returnableQty;
+            }
+        }
+        updateLine(index, patch);
+    };
 
     const handleSerialToggle = (lineIndex, serial) => {
         const line = returnLines[lineIndex];
@@ -461,13 +477,13 @@ export const SalesReturnsPage = () => {
                                     <select
                                         value={selectedInvoiceId}
                                         onChange={(e) => handleInvoiceSelect(e.target.value)}
-                                        className="w-full border border-slate-300 rounded-lg p-2 bg-white text-slate-800 font-medium"
+                                        className="w-full border border-slate-300 rounded-lg p-2 bg-white text-slate-800 font-medium cursor-pointer"
                                         required
                                     >
                                         <option value="">{activeInvoices.length ? 'Select a posted invoice…' : 'No posted invoices'}</option>
                                         {activeInvoices.map((inv) => (
                                             <option key={inv.id} value={inv.id}>
-                                                {inv.invoiceNumber} - {inv.customer} ({formatCurrency(inv.total)})
+                                                {inv.invoiceNumber} - {inv.customer || inv.customerName || inv.partyName || 'Customer'} ({formatCurrency(inv.total)})
                                             </option>
                                         ))}
                                     </select>
@@ -546,17 +562,18 @@ export const SalesReturnsPage = () => {
                                                                     step="any"
                                                                     max={line.returnableQty}
                                                                     disabled={isExhausted}
-                                                                    value={line.returnQty}
+                                                                    placeholder="0"
+                                                                    value={line.returnQty || ''}
                                                                     onChange={(e) => handleLineQtyChange(idx, e.target.value)}
-                                                                    className="w-24 p-1 border border-slate-300 rounded text-center font-bold font-mono focus:border-rose-500"
+                                                                    className="w-24 p-1 border border-slate-300 rounded text-center font-bold font-mono focus:border-rose-500 disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed"
                                                                 />
                                                             </td>
                                                             <td className="py-2 px-3">
                                                                 <select
-                                                                    disabled={!line.returnQty}
+                                                                    disabled={isExhausted}
                                                                     value={line.condition}
                                                                     onChange={(e) => handleConditionChange(idx, e.target.value)}
-                                                                    className="w-full p-1 border border-slate-300 rounded bg-white text-slate-800 text-[11px] font-medium"
+                                                                    className="w-full p-1 border border-slate-300 rounded bg-white text-slate-800 text-[11px] font-medium cursor-pointer disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed"
                                                                 >
                                                                     {CONDITIONS.map((c) => (
                                                                         <option key={c} value={c}>{CONDITION_HINT[c]}</option>
@@ -570,10 +587,10 @@ export const SalesReturnsPage = () => {
                                                                     ) : (
                                                                         <>
                                                                             <select
-                                                                                disabled={!line.returnQty}
+                                                                                disabled={isExhausted}
                                                                                 value={line.lotTakaId}
                                                                                 onChange={(e) => handleTakaChange(idx, e.target.value)}
-                                                                                className="w-full p-1 border border-slate-300 rounded bg-white text-slate-800 text-[11px] font-medium"
+                                                                                className="w-full p-1 border border-slate-300 rounded bg-white text-slate-800 text-[11px] font-medium cursor-pointer disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed"
                                                                             >
                                                                                 <option value="">{line.requiresTaka ? 'Select taka *' : 'Select taka (optional)'}</option>
                                                                                 {line.takaOptions.map((t) => (

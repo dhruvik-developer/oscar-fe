@@ -18,20 +18,33 @@ export function normalizeUser(row) {
   if (!row) return null;
   const name = row.name || row.fullName || row.email || '';
   return {
+    ...row,
     id: row.id,
     name,
     email: row.email || '',
     phone: row.phone || '',
     // `role` is an object on the wire and a label on screen.
-    role: row.role?.name || row.role || '',
+    role: typeof row.role === 'object' ? (row.role?.name || '') : (row.role || ''),
     roleId: row.role?.id || row.roleId || null,
-    roleCode: row.role?.code || '',
+    roleCode: row.role?.code || row.roleCode || '',
     department: row.department || '',
     location: row.location || '',
-    employeeId: row.employeeId || null,
+    employeeId: row.employeeId || row.employeeCode || null,
+    employeeCode: row.employeeCode || row.employeeId || null,
     reportingManager: row.reportingManager || null,
     status: row.status || 'Active',
-    avatar: row.avatar || null,
+    avatar: row.avatar || row.avatar_url || null,
+    designation: row.designation || row.designationName || '',
+    dateOfBirth: row.dateOfBirth || null,
+    gender: row.gender || '',
+    bloodGroup: row.bloodGroup || '',
+    personalEmail: row.personalEmail || '',
+    emergencyContact: row.emergencyContact || {},
+    address: row.address || {},
+    joiningDate: row.joiningDate || row.joined_date || null,
+    employmentType: row.employmentType || 'Full-time',
+    employmentStatus: row.employmentStatus || row.status || 'Active',
+    lastLogin: row.lastLogin || row.last_login_at || null,
     // Superusers hold `*`, not each permission code, so gates read this flag.
     isSuperuser: Boolean(row.isSuperuser || row.is_superuser),
     // An administrator set the password; the app holds the user on

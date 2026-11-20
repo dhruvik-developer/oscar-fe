@@ -143,7 +143,7 @@ function leadToApi(lead) {
 
 function dealFromApi(row) {
   return {
-    ...asText(row, ['title', 'name', 'client', 'phone', 'status', 'source', 'assignedUser', 'notes', 'stage']),
+    ...asText(row, ['title', 'name', 'client', 'phone', 'status', 'source', 'assignedUser', 'notes', 'stage', 'product', 'ownerName']),
     id: row.id,
     leadId: row.leadId || row.lead || undefined,
     dealNumber: row.deal_number || row.dealNumber || undefined,
@@ -154,6 +154,10 @@ function dealFromApi(row) {
     stage: row.stage || 'Draft',
     price: num(row.value ?? row.amount),
     value: num(row.value ?? row.amount),
+    product: row.product || (Array.isArray(row.products) ? row.products[0] : '') || '',
+    products: Array.isArray(row.products) ? row.products : (row.product ? [row.product] : []),
+    assignedUser: row.ownerName || row.assignedUser || '',
+    ownerName: row.ownerName || '',
     expectedCloseDate: displayIn(row.expectedCloseDate || row.expected_close_date),
     date: displayIn(row.expectedCloseDate || row.expected_close_date || row.created_at),
     _synced: true,
@@ -499,18 +503,36 @@ export const CRM_RESOURCES = {
 
 export const crmSync = createSync(CRM_RESOURCES, { label: 'crmSync' });
 
-/** Everything the CRM shell needs on sign-in, in dependency order. */
+/** Core CRM resources loaded on CRM entry; ancillary tables load on demand. */
 export const CRM_PULL_ORDER = [
-  'stages', 'dealStages', 'sources', 'industries', 'lostReasons',
-  'leads', 'deals', 'tasks', 'masterTasks', 'stageTasks',
-  'taskAllocations', 'userAllocations', 'forms', 'projects', 'contracts',
+  'stages', 'dealStages', 'sources', 'lostReasons',
+  'leads', 'deals', 'tasks',
 ];
+
+// ── Cache layer for singleton endpoints (TTL 45s) ───────────────────────────
+const endpointCaches = new Map();
+function getCached(key, ttlMs = 45000) {
+  const hit = endpointCaches.get(key);
+  if (hit && Date.now() - hit.time < ttlMs) return hit.data;
+  return null;
+}
+function setCached(key, data) {
+  endpointCaches.set(key, { data, time: Date.now() });
+}
+export function invalidateCrmEndpointCache(key) {
+  if (!key) endpointCaches.clear();
+  else endpointCaches.delete(key);
+}
 
 // ── endpoints that are not plain collections ────────────────────────────────
 
 /** `GET /crm/team-roster/` — who can be assigned, grouped by role. */
-export async function pullTeamRoster() {
+export async function pullTeamRoster({ force = false } = {}) {
   if (!isBackendEnabled()) return null;
+  if (!force) {
+    const cached = getCached('teamRoster');
+    if (cached) return cached;
+  }
   try {
     const body = await api.get('/crm/team-roster/');
     const roster = body?.roster || body || {};
@@ -532,7 +554,9 @@ export async function pullTeamRoster() {
         }
       });
     });
-    return { roster, members };
+    const result = { roster, members };
+    setCached('teamRoster', result);
+    return result;
   } catch (err) {
     console.warn('[crmSync] pull team roster failed:', err?.message || err);
     return null;
@@ -543,13 +567,19 @@ export async function pullTeamRoster() {
  * `GET /crm/assignment-options/` — role names (Administration → Roles) and
  * department names (HRMS → Departments) a task template can be assigned to.
  */
-export async function pullAssignmentOptions() {
+export async function pullAssignmentOptions({ force = false } = {}) {
   const empty = { roles: [], departments: [] };
   if (!isBackendEnabled()) return empty;
+  if (!force) {
+    const cached = getCached('assignmentOptions');
+    if (cached) return cached;
+  }
   try {
     const body = await api.get('/crm/assignment-options/');
     const names = (rows) => (Array.isArray(rows) ? rows : []).map((r) => r?.name).filter(Boolean);
-    return { roles: names(body?.roles), departments: names(body?.departments) };
+    const result = { roles: names(body?.roles), departments: names(body?.departments) };
+    setCached('assignmentOptions', result);
+    return result;
   } catch (err) {
     console.warn('[crmSync] pull assignment options failed:', err?.message || err);
     return empty;
@@ -560,11 +590,17 @@ export async function pullAssignmentOptions() {
  * `GET /crm/incentive-schemes/` — the active salesperson incentive schemes
  * (PDF §12), shown on the lead form when a salesperson is attributed.
  */
-export async function pullIncentiveSchemes() {
+export async function pullIncentiveSchemes({ force = false } = {}) {
   if (!isBackendEnabled()) return [];
+  if (!force) {
+    const cached = getCached('incentiveSchemes');
+    if (cached) return cached;
+  }
   try {
     const body = await api.get('/crm/incentive-schemes/');
-    return Array.isArray(body?.schemes) ? body.schemes : [];
+    const result = Array.isArray(body?.schemes) ? body.schemes : [];
+    setCached('incentiveSchemes', result);
+    return result;
   } catch (err) {
     console.warn('[crmSync] pull incentive schemes failed:', err?.message || err);
     return [];
@@ -572,10 +608,17 @@ export async function pullIncentiveSchemes() {
 }
 
 /** `GET /crm/dashboard/` — the tiles, computed server-side. */
-export async function pullDashboard(query = {}) {
+export async function pullDashboard(query = {}, { force = false } = {}) {
   if (!isBackendEnabled()) return null;
+  const cacheKey = `dashboard:${JSON.stringify(query || {})}`;
+  if (!force) {
+    const cached = getCached(cacheKey, 30000);
+    if (cached) return cached;
+  }
   try {
-    return await api.get('/crm/dashboard/', { query });
+    const result = await api.get('/crm/dashboard/', { query });
+    setCached(cacheKey, result);
+    return result;
   } catch (err) {
     console.warn('[crmSync] pull dashboard failed:', err?.message || err);
     return null;
@@ -583,10 +626,17 @@ export async function pullDashboard(query = {}) {
 }
 
 /** `GET /crm/leads/stats/` — the tab counts above the list. */
-export async function pullLeadStats(query = {}) {
+export async function pullLeadStats(query = {}, { force = false } = {}) {
   if (!isBackendEnabled()) return null;
+  const cacheKey = `leadStats:${JSON.stringify(query || {})}`;
+  if (!force) {
+    const cached = getCached(cacheKey, 30000);
+    if (cached) return cached;
+  }
   try {
-    return await api.get('/crm/leads/stats/', { query });
+    const result = await api.get('/crm/leads/stats/', { query });
+    setCached(cacheKey, result);
+    return result;
   } catch (err) {
     console.warn('[crmSync] pull lead stats failed:', err?.message || err);
     return null;

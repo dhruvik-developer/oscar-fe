@@ -1,9 +1,7 @@
 import React, { useEffect } from 'react';
 import { X, Printer, CheckCircle2, ShieldCheck } from 'lucide-react';
-import { SignatureSlot, useDocumentSignatures } from './SignatureSlot';
 
 export const PaymentReceiptModal = ({ receipt, onClose }) => {
-  const docSigs = useDocumentSignatures('PaymentReceipt', receipt?.id || receipt?.receiptNumber, `Payment Receipt ${receipt?.receiptNumber || ''}`);
 
   useEffect(() => {
     if (!receipt) return;
@@ -117,26 +115,6 @@ export const PaymentReceiptModal = ({ receipt, onClose }) => {
               <div className="flex justify-between items-center text-slate-500 pt-1 border-t border-dashed border-slate-200 text-[11px]">
                 <span>Total Invoice Settlement:</span>
                 <span className="font-mono font-semibold text-slate-700">₹{fmt(totalSettled)}</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4 pt-2">
-            <div className="border border-dashed border-slate-200 rounded-xl p-3 text-center space-y-2">
-              <span className="text-[9px] uppercase font-bold text-slate-400 block">Horizon Accounts Department</span>
-              <div className="border-b border-slate-300 pb-1">
-                <SignatureSlot doc={docSigs} signatory="authorized" label="Accounts — Authorized Signatory" modalType="authorized" className="h-10"
-                  defaultDesignation="Accounts Department — Authorized Signatory"
-                  placeholder={<span className="font-mono text-[10px] text-slate-600">Authorized Signatory</span>} />
-              </div>
-            </div>
-
-            <div className="border border-dashed border-slate-200 rounded-xl p-3 text-center space-y-2">
-              <span className="text-[9px] uppercase font-bold text-slate-400 block">Customer Acknowledgment</span>
-              <div className="border-b border-slate-300 pb-1">
-                <SignatureSlot doc={docSigs} signatory="customer" label="Customer Stamp & Signature" modalType="customer" className="h-10"
-                  defaultDesignation="Customer Authorized Representative"
-                  placeholder={<span className="font-mono text-[10px] text-slate-600">Customer Representative</span>} />
               </div>
             </div>
           </div>

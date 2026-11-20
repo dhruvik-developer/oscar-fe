@@ -341,7 +341,7 @@ export function DepartmentsPage() {
               className="w-full px-3.5 py-2 bg-off border border-bdr rounded-xl text-[13.5px] focus:outline-none focus:border-navy"
             />
           </div>
-          <div>
+          {/* <div>
             <label className="block text-[12.5px] font-semibold text-slate-700 mb-1.5">
               Department Head
             </label>
@@ -352,8 +352,8 @@ export function DepartmentsPage() {
               onChange={(e) => setNewDept({ ...newDept, head: e.target.value })}
               className="w-full px-3.5 py-2 bg-off border border-bdr rounded-xl text-[13.5px] focus:outline-none focus:border-navy"
             />
-          </div>
-          <div>
+          </div> */}
+          {/* <div>
             <label className="block text-[12.5px] font-semibold text-slate-700 mb-1.5">
               Annual Budget
             </label>
@@ -364,7 +364,7 @@ export function DepartmentsPage() {
               onChange={(e) => setNewDept({ ...newDept, budget: e.target.value })}
               className="w-full px-3.5 py-2 bg-off border border-bdr rounded-xl text-[13.5px] focus:outline-none focus:border-navy"
             />
-          </div>
+          </div> */}
           <div className="flex justify-end gap-2 mt-3 pt-3 border-t border-bdr">
             <button
               type="button"
@@ -399,7 +399,7 @@ export function DepartmentsPage() {
                 className="w-full px-3.5 py-2 bg-off border border-bdr rounded-xl text-[13.5px] focus:outline-none focus:border-navy"
               />
             </div>
-            <div>
+            {/* <div>
               <label className="block text-[12.5px] font-semibold text-slate-700 mb-1.5">
                 Department Head
               </label>
@@ -409,8 +409,8 @@ export function DepartmentsPage() {
                 onChange={(e) => setEditingDept({ ...editingDept, head: e.target.value })}
                 className="w-full px-3.5 py-2 bg-off border border-bdr rounded-xl text-[13.5px] focus:outline-none focus:border-navy"
               />
-            </div>
-            <div>
+            </div> */}
+            {/* <div>
               <label className="block text-[12.5px] font-semibold text-slate-700 mb-1.5">
                 Annual Budget
               </label>
@@ -420,7 +420,7 @@ export function DepartmentsPage() {
                 onChange={(e) => setEditingDept({ ...editingDept, budget: e.target.value })}
                 className="w-full px-3.5 py-2 bg-off border border-bdr rounded-xl text-[13.5px] focus:outline-none focus:border-navy"
               />
-            </div>
+            </div> */}
             <div>
               <label className="block text-[12.5px] font-semibold text-slate-700 mb-1.5">
                 Status

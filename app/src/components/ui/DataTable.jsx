@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { MoreVertical, Search, Download } from 'lucide-react';
 import { exportTableData } from '../../services/exportUtils';
 import TablePagination from './TablePagination';
@@ -43,6 +43,18 @@ export function DataTable({
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(initialPageSize || 10);
   const [exportOpen, setExportOpen] = useState(false);
+  const exportRef = useRef(null);
+
+  useEffect(() => {
+    if (!exportOpen) return;
+    const handleOutside = (e) => {
+      if (exportRef.current && !exportRef.current.contains(e.target)) {
+        setExportOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleOutside);
+    return () => document.removeEventListener('mousedown', handleOutside);
+  }, [exportOpen]);
 
   // Sync pageSize if initialPageSize changes externally
   useEffect(() => {
@@ -250,7 +262,7 @@ export function DataTable({
               </div>
             )}
             {exportable && safeData.length > 0 && (
-              <div className="relative">
+              <div ref={exportRef} className="relative">
                 <button type="button" onClick={() => setExportOpen((v) => !v)} className="p-1.5 border border-border hover:bg-card-hover rounded-xl text-muted hover:text-text cursor-pointer transition shadow-2xs flex items-center gap-1 text-xs shrink-0">
                   <Download size={14} />
                 </button>

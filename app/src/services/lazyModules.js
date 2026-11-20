@@ -116,6 +116,26 @@ export function resetLazyModules() {
   });
 }
 
+export function clearAllModuleStores() {
+  modules.forEach((mod) => {
+    if (mod.store) {
+      try {
+        const state = mod.store.getState();
+        (state.clearData || state.clear)?.();
+      } catch {
+        // Safe fallback
+      }
+    }
+    mod.loaded = false;
+    mod.promise = null;
+    mod.failedAt = 0;
+  });
+}
+
+export function getRegisteredStore(name) {
+  return modules.get(name)?.store || null;
+}
+
 /**
  * Re-pull the modules this session has actually used. Signing in from another
  * tab has to reach the screens that are already mounted — they will not read
@@ -145,7 +165,9 @@ export function requestedModuleNames() {
  * lives.
  */
 export function lazyStore(store, name, hydrate) {
-  entry(name).hydrate = hydrate || (() => store.getState().hydrate?.());
+  const e = entry(name);
+  e.hydrate = hydrate || (() => store.getState().hydrate?.());
+  e.store = store;
 
   const hook = (...args) => {
     if (!isModuleRequested(name)) defer(() => ensureModule(name));
@@ -173,7 +195,9 @@ export function lazyStore(store, name, hydrate) {
  * state out, so it counts as a read of everything.
  */
 export function lazyStoreForKeys(store, name, keys, hydrate) {
-  entry(name).hydrate = hydrate || (() => store.getState().hydrate?.());
+  const e = entry(name);
+  e.hydrate = hydrate || (() => store.getState().hydrate?.());
+  e.store = store;
   const watched = new Set(keys);
 
   const hook = (selector, ...rest) => {

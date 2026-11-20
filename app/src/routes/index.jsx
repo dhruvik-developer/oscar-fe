@@ -319,6 +319,7 @@ const LoginPage = lazy(() => import('../features/auth/LoginPage'));
 const ResetPasswordPage = lazy(() => import('../features/auth/ResetPasswordPage'));
 const ChangePasswordPage = lazy(() => import('../features/auth/ChangePasswordPage'));
 const AccountSecurityPage = lazy(() => import('../features/auth/AccountSecurityPage'));
+const MyProfilePage = lazy(() => import('../features/profile/MyProfilePage'));
 
 const router = createBrowserRouter([
   // ── Authentication ────────────────────────────────────────
@@ -388,6 +389,9 @@ const router = createBrowserRouter([
 
       // ── Main Dashboard ─────────────────────────────────────
       { path: 'dashboard', element: <Page component={DashboardPage} /> },
+      // Dedicated My Profile page (accessible to every signed-in user)
+      { path: 'profile', element: <Page component={MyProfilePage} title="My Profile" /> },
+      { path: 'my-profile', element: <Navigate to="/profile" replace /> },
       // Own account security: open to every signed-in user.
       { path: 'account/security', element: <Page component={AccountSecurityPage} /> },
       { path: 'employee/portal', element: <Page component={EmployeePortal} /> },

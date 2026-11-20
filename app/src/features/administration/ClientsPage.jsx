@@ -6,6 +6,7 @@ import AppPagination from '../../components/ui/AppPagination';
 import React, { useState, useMemo, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { adminSync, describeError, pullCustomerClients } from '../../services/adminSync';
+import { exportToPDF } from '../../services/exportUtils';
 import { useERP } from '../../context/ERPContext';
 import {
   Users,
@@ -35,6 +36,7 @@ import {
   Briefcase,
   Calendar,
   FileText,
+  FileCode,
   CheckCircle2,
   AlertTriangle,
   ChevronDown,
@@ -245,22 +247,26 @@ export function ClientsPage() {
     return filteredClients.slice(start, start + CLIENTS_PER_PAGE);
   }, [filteredClients, currentPage]);
 
-  const handleExportData = (format = 'csv') => {
+  const handleExportData = async (format = 'csv') => {
     setIsExportOpen(false);
-    const rows = filteredClients.map((c) => [
-      `"${c.name || ''}"`,
-      `"${c.code || ''}"`,
-      `"${sourceOf(c)}"`,
-      `"${c.email || ''}"`,
-      `"${c.phone || ''}"`,
-      `"${locationOf(c)}"`,
-      `"${c.gstin || ''}"`,
-      `"${c.status || 'Active'}"`,
-      String(Math.round(Number(c.balance) || 0)),
-      String(Math.round(Number(c.creditLimit) || 0)),
-    ]);
+    if (!filteredClients.length) {
+      showNotification('No clients to export.');
+      return;
+    }
+    const headers = ['Name', 'Code', 'Source', 'Email', 'Phone', 'Location', 'GSTIN', 'Status', 'Balance', 'Credit Limit'];
     if (format === 'csv') {
-      const headers = ['Name', 'Code', 'Source', 'Email', 'Phone', 'Location', 'GSTIN', 'Status', 'Balance', 'Credit Limit'];
+      const rows = filteredClients.map((c) => [
+        `"${c.name || ''}"`,
+        `"${c.code || ''}"`,
+        `"${sourceOf(c)}"`,
+        `"${c.email || ''}"`,
+        `"${c.phone || ''}"`,
+        `"${locationOf(c)}"`,
+        `"${c.gstin || ''}"`,
+        `"${c.status || 'Active'}"`,
+        String(Math.round(Number(c.balance) || 0)),
+        String(Math.round(Number(c.creditLimit) || 0)),
+      ]);
       const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
       const link = document.createElement('a');
       link.setAttribute('href', encodeURI(csvContent));
@@ -268,6 +274,25 @@ export function ClientsPage() {
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
+    } else if (format === 'pdf') {
+      const rows = filteredClients.map((c) => [
+        c.name || '',
+        c.code || '',
+        sourceOf(c) || '',
+        c.email || '',
+        c.phone || '',
+        locationOf(c) || '',
+        c.gstin || '',
+        c.status || 'Active',
+        String(Math.round(Number(c.balance) || 0)),
+        String(Math.round(Number(c.creditLimit) || 0)),
+      ]);
+      await exportToPDF('clients_export', headers, rows, {
+        title: 'Clients Directory',
+        subtitle: `Total Clients: ${filteredClients.length} | Generated: ${new Date().toLocaleString()}`,
+        orientation: 'landscape',
+        colWidths: [36, 20, 20, 42, 26, 34, 32, 17, 20, 22],
+      });
     } else {
       const link = document.createElement('a');
       link.setAttribute('href', `data:text/json;charset=utf-8,${encodeURIComponent(JSON.stringify(filteredClients, null, 2))}`);
@@ -314,10 +339,17 @@ export function ClientsPage() {
                     <span>Export as CSV</span>
                   </button>
                   <button
-                    onClick={() => handleExportData('json')}
-                    className="w-full px-3.5 py-2 text-left text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-2.5"
+                    onClick={() => handleExportData('pdf')}
+                    className="w-full px-3.5 py-2 text-left text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-2.5 cursor-pointer"
                   >
-                    <FileText size={15} className="text-blue-600" />
+                    <FileText size={15} className="text-rose-600" />
+                    <span>Export as PDF</span>
+                  </button>
+                  <button
+                    onClick={() => handleExportData('json')}
+                    className="w-full px-3.5 py-2 text-left text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-2.5 cursor-pointer"
+                  >
+                    <FileCode size={15} className="text-blue-600" />
                     <span>Export as JSON</span>
                   </button>
                 </div>

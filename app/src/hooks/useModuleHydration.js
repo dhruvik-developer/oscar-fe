@@ -20,36 +20,12 @@ import { getStoredToken } from '../utils/authUtils';
 import { refreshNotifications } from '../services/crmEventNotifications';
 import {
   resetLazyModules,
+  clearAllModuleStores,
+  getRegisteredStore,
   refreshRequestedModules,
   requestedModuleNames,
 } from '../services/lazyModules';
 import { useAppStore } from '../stores/appStore';
-import { useCrmStore } from '../stores/crmStore';
-import { usePmsStore } from '../stores/pmsStore';
-import { useAttendanceStore } from '../stores/attendanceStore';
-import { useRecruitmentStore } from '../stores/recruitmentStore';
-import { usePerformanceStore } from '../stores/performanceStore';
-import { usePayrollStore } from '../stores/payrollStore';
-import { usePolicyStore } from '../stores/policyStore';
-// import { useTrainingStore } from '../stores/trainingStore';
-import { useAssetStore } from '../stores/assetStore';
-import { useDocumentStore } from '../stores/documentStore';
-import { useCalendarStore } from '../stores/calendarStore';
-
-/** Every store that owns server data, for the sign-out sweep. */
-const MODULE_STORES = [
-  useCrmStore,
-  usePmsStore,
-  useAttendanceStore,
-  useRecruitmentStore,
-  usePerformanceStore,
-  usePayrollStore,
-  usePolicyStore,
-  // useTrainingStore,
-  useAssetStore,
-  useDocumentStore,
-  useCalendarStore,
-];
 
 /** Run when the browser is next idle, so it never competes with the first paint. */
 function whenIdle(fn) {
@@ -68,12 +44,7 @@ export function useModuleHydration() {
       const app = useAppStore.getState();
 
       if (!getStoredToken()) {
-        MODULE_STORES.forEach((store) => {
-          const state = store.getState();
-          // Some stores already used `clear` for their toast, so the data reset
-          // is `clearData` there.
-          (state.clearData || state.clear)?.();
-        });
+        clearAllModuleStores();
         app.clearHrms?.();
         resetLazyModules();
         return;
@@ -84,9 +55,10 @@ export function useModuleHydration() {
       // else stays unloaded until a screen asks.
       refreshRequestedModules(requestedModuleNames());
 
-      // PMS filters "my projects" / "my tasks" by the signed-in user.
+      // PMS filters "my projects" / "my tasks" by the signed-in user if PMS is active.
       const me = app.currentUser;
-      if (me?.id) usePmsStore.getState().setCurrentUserId(me.employeeId || me.id);
+      const pms = getRegisteredStore('pms');
+      if (me?.id && pms) pms.getState().setCurrentUserId?.(me.employeeId || me.id);
     };
 
     run();

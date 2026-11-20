@@ -3,7 +3,7 @@ import CrmKpiCard from '../common/CrmKpiCard';
 import Modal from '../../../components/ui/Modal';
 import PageHeader from '../../../components/ui/PageHeader';
 import MasterSourceLink from '../../../components/common/MasterSourceLink';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
@@ -33,6 +33,8 @@ import {
   Flag,
   UserRound,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Inbox,
   AlertTriangle,
   MoveRight,
@@ -50,22 +52,9 @@ import { TEXTILE_FABRIC_OPTIONS } from '../../../data/crm/leadFormSchema';
 import { useAppStore } from '../../../stores/appStore';
 import { api } from '../../../services/api';
 
-// Fallback columns, used only until /crm/deal-stages/ answers. Once the
-// catalogue loads, the board is driven by DealStage rows in `sequence` order,
-// so stages such as Revised and Declined are no longer invisible.
-const FALLBACK_STAGES = ['Draft', 'Sent', 'Open', 'Won', 'Lost'];
+const FALLBACK_STAGES = ['Draft', 'Won', 'Lost'];
 
-// Deal.stage is a TextField enum, but a lead's lost state comes from a Stage FK,
-// so the name has to be checked as a fallback when `is_lost` is not set.
 const LOST_STAGE_PATTERN = /lost|closed|declined/i;
-
-// Tailwind cannot see classes built at runtime, so the responsive grid widths
-// are enumerated here and picked by index.
-const GRID_CLASSES = [
-  'lg:grid-cols-1', 'lg:grid-cols-2', 'lg:grid-cols-3', 'lg:grid-cols-4',
-  'lg:grid-cols-5', 'lg:grid-cols-6', 'lg:grid-cols-7', 'lg:grid-cols-8',
-];
-// User list is loaded dynamically from /admin/users/
 
 const STAGE_STYLES = {
   Draft: {
@@ -76,24 +65,7 @@ const STAGE_STYLES = {
     headerBadge: 'bg-blue-50 text-blue-700 border border-blue-200',
     countBadge: 'bg-blue-50 text-blue-700 border border-blue-200 font-bold',
     accentColor: 'text-blue-600',
-  },
-  Sent: {
-    title: 'Sent',
-    icon: Send,
-    iconColor: 'bg-purple-50 text-purple-600 border border-purple-200',
-    topBar: 'bg-purple-500',
-    headerBadge: 'bg-purple-50 text-purple-700 border border-purple-200',
-    countBadge: 'bg-purple-50 text-purple-700 border border-purple-200 font-bold',
-    accentColor: 'text-purple-600',
-  },
-  Open: {
-    title: 'Open',
-    icon: Clock,
-    iconColor: 'bg-amber-50 text-amber-600 border border-amber-200',
-    topBar: 'bg-amber-500',
-    headerBadge: 'bg-amber-50 text-amber-700 border border-amber-200',
-    countBadge: 'bg-amber-50 text-amber-700 border border-amber-200 font-bold',
-    accentColor: 'text-amber-600',
+    dropBorder: 'ring-2 ring-blue-500/50 border-blue-400 bg-blue-50/20',
   },
   Won: {
     title: 'Won',
@@ -103,6 +75,7 @@ const STAGE_STYLES = {
     headerBadge: 'bg-emerald-50 text-emerald-700 border border-emerald-200',
     countBadge: 'bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold',
     accentColor: 'text-emerald-600',
+    dropBorder: 'ring-2 ring-emerald-500/50 border-emerald-400 bg-emerald-50/20',
   },
   Lost: {
     title: 'Lost',
@@ -112,6 +85,7 @@ const STAGE_STYLES = {
     headerBadge: 'bg-rose-50 text-rose-700 border border-rose-200',
     countBadge: 'bg-rose-50 text-rose-700 border border-rose-200 font-bold',
     accentColor: 'text-rose-600',
+    dropBorder: 'ring-2 ring-rose-500/50 border-rose-400 bg-rose-50/20',
   },
 };
 
@@ -173,47 +147,11 @@ function getStageStyle(name) {
   return STAGE_STYLES[name] || { ...NEUTRAL_STAGE_STYLE, title: name };
 }
 
-function getEffectiveDealStage(deal, quotations, allLeads) {
+function getEffectiveDealStage(deal) {
   if (!deal) return 'Draft';
-  if (deal.stage === 'Lost' || deal.tag === 'Lost') return 'Lost';
-
-  // Check direct link to quotations
-  const linkedQuotes = (quotations || []).filter((qt) => {
-    if (deal.id && (String(qt.dealId) === String(deal.id) || String(qt.crmDeal) === String(deal.id) || String(qt.dealReference) === String(deal.id))) return true;
-    if (deal.leadId && String(qt.leadId) === String(deal.leadId)) return true;
-    if (deal.name && qt.dealName && qt.dealName.toLowerCase() === deal.name.toLowerCase()) return true;
-    return false;
-  });
-
-  if (linkedQuotes.length > 0) {
-    const hasWon = linkedQuotes.some((qt) => ['Accepted', 'Approved', 'Converted', 'Confirmed', 'Invoiced'].includes(qt.status));
-    if (hasWon) return 'Won';
-    const hasRejected = linkedQuotes.some((qt) => qt.status === 'Rejected');
-    if (hasRejected) return 'Open';
-    const hasSent = linkedQuotes.some((qt) => ['Sent', 'Viewed'].includes(qt.status));
-    if (hasSent) return 'Sent';
-    return 'Draft';
-  }
-
-  // If deal has a lead, check lead's status/quotations
-  if (deal.leadId) {
-    const lead = (allLeads || []).find((l) => String(l.id) === String(deal.leadId));
-    if (lead) {
-      if (lead.isConverted || Boolean(lead.convertedAt)) return 'Won';
-      const leadQuotes = (quotations || []).filter((qt) => String(qt.leadId) === String(lead.id) || (qt.leadName && qt.leadName === lead.name));
-      if (leadQuotes.length > 0) {
-        const hasWon = leadQuotes.some((qt) => ['Accepted', 'Approved', 'Converted', 'Confirmed', 'Invoiced'].includes(qt.status));
-        if (hasWon) return 'Won';
-        const hasRejected = leadQuotes.some((qt) => qt.status === 'Rejected');
-        if (hasRejected) return 'Open';
-        const hasSent = leadQuotes.some((qt) => ['Sent', 'Viewed'].includes(qt.status));
-        if (hasSent) return 'Sent';
-        return 'Draft';
-      }
-    }
-  }
-
-  if (deal.stage === 'Won') return 'Won';
+  const stage = String(deal.stage || '').trim();
+  if (stage === 'Won' || deal.tag === 'Won') return 'Won';
+  if (stage === 'Lost' || deal.tag === 'Lost' || LOST_STAGE_PATTERN.test(stage)) return 'Lost';
   return 'Draft';
 }
 
@@ -257,7 +195,13 @@ export default function DealsPage() {
   const [dateRange, setDateRange] = useState('All Time');
   const [viewMode, setViewMode] = useState('kanban');
   const [listPage, setListPage] = useState(1);
-  const [listPageSize, setListPageSize] = useState(10);
+  const [listPageSize, setListPageSize] = useState(5);
+  const [columnPages, setColumnPages] = useState({});
+  const [columnPageSizes, setColumnPageSizes] = useState({});
+  const [draggedDealId, setDraggedDealId] = useState(null);
+  const [dragOverStage, setDragOverStage] = useState(null);
+  const [savingDealId, setSavingDealId] = useState(null);
+  const isDraggingRef = useRef(false);
 
   const [expandedColumns, setExpandedColumns] = useState({});
   const [dealMenu, setDealMenu] = useState(null); // { deal, top, left }
@@ -357,6 +301,59 @@ export default function DealsPage() {
     return linkedLead?.ownerName || linkedLead?.owner || '';
   };
 
+  // Merge any fresh or unsynced leads into deals so newly created leads
+  // immediately show up as full draggable cards in the Draft column.
+  const combinedDeals = useMemo(() => {
+    const existingLeadIds = new Set(
+      (deals || []).map((d) => String(d.leadId)).filter(Boolean)
+    );
+    const existingDealNames = new Set(
+      (deals || []).map((d) => (d.name || d.title || '').trim().toLowerCase()).filter(Boolean)
+    );
+
+    const synthesized = [];
+    (allLeads || []).forEach((lead) => {
+      if (!lead || !lead.id) return;
+      const sId = String(lead.id);
+      const sName = (lead.name || '').trim().toLowerCase();
+      if (existingLeadIds.has(sId) || (sName && existingDealNames.has(sName))) return;
+
+      const isLost = lead.isLost || lead.status === 'Lost' || (lead.stage && (lead.stage.is_lost ?? lead.stage.isLost));
+      const isWon = lead.isConverted || Boolean(lead.convertedAt) || (lead.stage && (lead.stage.is_won ?? lead.stage.isWon));
+      const st = isLost ? 'Lost' : (isWon ? 'Won' : 'Draft');
+      const prods = lead.products || lead.customValues?.products || lead.customValues?.fields?.products;
+      const prod = Array.isArray(prods) && prods.length > 0 ? getProductLabel(prods[0]) : getProductLabel(prods);
+
+      synthesized.push({
+        id: `lead-deal-${lead.id}`,
+        realLeadId: lead.id,
+        leadId: lead.id,
+        isFromLead: true,
+        name: lead.name || 'Untitled Lead',
+        title: lead.name || 'Untitled Lead',
+        client: lead.company || lead.name || '—',
+        phone: lead.phone || '',
+        price: Number(lead.amount) || 0,
+        value: Number(lead.amount) || 0,
+        stage: st,
+        tag: st === 'Won' ? 'Won' : (st === 'Lost' ? 'Lost' : ''),
+        product: prod,
+        assignedUser: lead.ownerName || lead.owner || '',
+        date: lead.createdAt ? new Date(lead.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '',
+      });
+    });
+
+    return [...deals, ...synthesized];
+  }, [deals, allLeads]);
+
+  const pipelineStages = useMemo(() => [
+    { key: 'Draft', order: 1, isWon: false, isLost: false },
+    { key: 'Won', order: 2, isWon: true, isLost: false },
+    { key: 'Lost', order: 3, isWon: false, isLost: true },
+  ], []);
+
+  const STAGES = useMemo(() => ['Draft', 'Won', 'Lost'], []);
+
   const productOptions = useMemo(() => {
     const list = new Set();
     (items || []).forEach((i) => {
@@ -367,7 +364,7 @@ export default function DealsPage() {
       const name = f.name || f.fabric || f.quality;
       if (name) list.add(String(name).trim());
     });
-    (deals || []).forEach((d) => {
+    (combinedDeals || []).forEach((d) => {
       const prod = getDealProduct(d);
       if (prod) list.add(prod);
       if (Array.isArray(d.products)) d.products.forEach((p) => {
@@ -390,7 +387,7 @@ export default function DealsPage() {
       (TEXTILE_FABRIC_OPTIONS || []).forEach((p) => list.add(p));
     }
     return ['All Products', ...Array.from(list).sort((a, b) => a.localeCompare(b))];
-  }, [items, fabrics, deals, allLeads]);
+  }, [items, fabrics, combinedDeals, allLeads]);
 
   const sourceOptions = useMemo(() => {
     const list = new Set();
@@ -398,7 +395,7 @@ export default function DealsPage() {
       const name = typeof s === 'string' ? s : s?.name;
       if (name) list.add(String(name).trim());
     });
-    (deals || []).forEach((d) => {
+    (combinedDeals || []).forEach((d) => {
       const s = getDealSource(d);
       if (s) list.add(String(s).trim());
     });
@@ -407,27 +404,28 @@ export default function DealsPage() {
       if (s) list.add(String(s).trim());
     });
     return ['All Sources', ...Array.from(list).sort((a, b) => a.localeCompare(b))];
-  }, [crmSources, deals, allLeads]);
+  }, [crmSources, combinedDeals, allLeads]);
 
   const usersList = useMemo(() => {
     const names = new Set();
     (Array.isArray(teamMembers) ? teamMembers : []).forEach((m) => m?.name && names.add(m.name));
-    (deals || []).forEach((d) => {
+    (combinedDeals || []).forEach((d) => {
       const u = getDealUser(d);
       if (u) names.add(u);
     });
     return ['All Users', ...[...names].sort((a, b) => a.localeCompare(b))];
-  }, [teamMembers, deals, allLeads]);
+  }, [teamMembers, combinedDeals, allLeads]);
 
   const filteredDeals = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
-    return deals.filter((d) => {
+    return combinedDeals.filter((d) => {
+      const dealStage = d.stage || 'Draft';
       const dealProduct = getDealProduct(d);
       const dealSource = getDealSource(d);
       const dealUser = getDealUser(d);
 
       if (selectedProduct !== 'All Products' && dealProduct !== selectedProduct) return false;
-      if (selectedStage !== 'All Stages' && d.stage !== selectedStage) return false;
+      if (selectedStage !== 'All Stages' && dealStage !== selectedStage) return false;
       if (selectedSource !== 'All Sources' && dealSource !== selectedSource) return false;
       if (selectedUser !== 'All Users' && dealUser !== selectedUser) return false;
       if (dateRange !== 'All Time') {
@@ -452,155 +450,15 @@ export default function DealsPage() {
       if (q && !`${d.name} ${d.client} ${d.phone} ${dealProduct} ${dealSource} ${dealUser}`.toLowerCase().includes(q)) return false;
       return true;
     });
-  }, [deals, allLeads, searchQuery, selectedProduct, selectedStage, selectedSource, selectedUser, dateRange]);
-
-  /**
-   * Board columns come from the DealStage catalogue, not a hardcoded array, so
-   * stages such as Revised and Declined get a column instead of silently
-   * dropping their deals. Inactive stages are hidden unless a deal still sits
-   * in one. `Deal.stage` values with no catalogue row are appended rather than
-   * hidden -- a partially configured board must never lose records.
-   */
-  const pipelineStages = useMemo(() => {
-    const configured = (dealStages || [])
-      .filter((s) => s && s.name && (s.is_active ?? s.isActive) !== false)
-      .map((s) => ({
-        key: s.name,
-        order: s.order ?? s.sequence ?? 0,
-        isWon: Boolean(s.is_won ?? s.isWon),
-        isLost: Boolean(s.is_lost ?? s.isLost),
-      }))
-      .sort((a, b) => a.order - b.order);
-
-    const seen = new Set();
-    const columns = configured.filter((s) => {
-      if (seen.has(s.key)) return false;
-      seen.add(s.key);
-      return true;
-    });
-
-    if (columns.length === 0) {
-      return FALLBACK_STAGES.map((name, index) => ({
-        key: name,
-        order: index,
-        isWon: name === 'Won',
-        isLost: name === 'Lost',
-      }));
-    }
-
-    const orphans = [...new Set(deals.map((d) => d.stage).filter((s) => s && !seen.has(s)))];
-    return [
-      ...columns,
-      ...orphans.map((name) => ({
-        key: name,
-        order: columns.length + orphans.indexOf(name),
-        isWon: name === 'Won',
-        isLost: LOST_STAGE_PATTERN.test(name),
-      })),
-    ];
-  }, [dealStages, deals]);
-
-  const STAGES = useMemo(() => pipelineStages.map((s) => s.key), [pipelineStages]);
-
-  const lostStageNames = useMemo(
-    () => pipelineStages.filter((s) => s.isLost).map((s) => s.key),
-    [pipelineStages],
-  );
-
-  const gridClass = GRID_CLASSES[Math.min(pipelineStages.length, GRID_CLASSES.length) - 1];
-
-  /**
-   * Leads sitting in a stage flagged `is_lost` on the lead catalogue. The
-   * backend models lost state as a Stage FK, so the flag is authoritative and
-   * the name regex is only a fallback for stages created without one.
-   */
-  /**
-   * Leads classified into pipeline stages according to status and quotation lifecycle:
-   * - Lost: leads marked lost
-   * - Won: leads with approved/accepted quotation or converted
-   * - Open: leads whose quotation was rejected (in negotiation/re-quote)
-   * - Sent: leads whose quotation has been sent
-   * - Draft: new leads entering the pipeline
-   */
-  const leadsByStage = useMemo(() => {
-    const lostStageIds = new Set(
-      (leadStages || []).filter((s) => s && (s.is_lost ?? s.isLost)).map((s) => s.id),
-    );
-    const leadsWithDeals = new Set(
-      (deals || []).map((d) => d.leadId).filter(Boolean).map(String),
-    );
-    const q = searchQuery.trim().toLowerCase();
-
-    const result = {
-      Draft: [],
-      Sent: [],
-      Open: [],
-      Won: [],
-      Lost: [],
-    };    (allLeads || []).forEach((lead) => {
-      if (!lead) return;
-      if (leadsWithDeals.has(String(lead.id))) return;
-
-      const leadSource = lead.source || lead.customValues?.fields?.['lead-source'] || lead.customValues?.source || '';
-      const leadProds = lead.products || lead.customValues?.products || lead.customValues?.fields?.products;
-      const leadProd = Array.isArray(leadProds) && leadProds.length > 0 ? leadProds[0] : (typeof leadProds === 'string' ? leadProds : '');
-      const leadUser = lead.ownerName || lead.owner || '';
-
-      if (selectedProduct !== 'All Products' && leadProd !== selectedProduct) return;
-      if (selectedSource !== 'All Sources' && leadSource !== selectedSource) return;
-      if (selectedUser !== 'All Users' && leadUser !== selectedUser) return;
-
-      if (q && !`${lead.name} ${lead.company} ${lead.phone} ${lead.email} ${leadSource} ${leadProd}`.toLowerCase().includes(q)) {
-        return;
-      }
-
-      const isLost = (lead.stageId && lostStageIds.has(lead.stageId)) || LOST_STAGE_PATTERN.test(String(lead.status || ''));
-      if (isLost) {
-        result.Lost.push(lead);
-        return;
-      }
-
-      const linkedQuotes = (quotations || []).filter(
-        (qt) => String(qt.leadId) === String(lead.id) || (qt.leadName && qt.leadName === lead.name),
-      );
-
-      const hasWonQuote = linkedQuotes.some((qt) =>
-        ['Accepted', 'Approved', 'Converted', 'Confirmed', 'Invoiced'].includes(qt.status),
-      ) || lead.isConverted || Boolean(lead.convertedAt);
-
-      if (hasWonQuote) {
-        result.Won.push(lead);
-        return;
-      }
-
-      const hasRejectedQuote = linkedQuotes.some((qt) => qt.status === 'Rejected');
-      if (hasRejectedQuote) {
-        result.Open.push(lead);
-        return;
-      }
-
-      const hasSentQuote = linkedQuotes.some((qt) => ['Sent', 'Viewed'].includes(qt.status));
-      if (hasSentQuote) {
-        result.Sent.push(lead);
-        return;
-      }
-
-      // Default: newly arrived leads automatically enter Draft
-      result.Draft.push(lead);
-    });
-
-    return result;
-  }, [allLeads, deals, leadStages, quotations, searchQuery, selectedProduct, selectedSource, selectedUser]);
-
-  const visibleLostLeads = useMemo(() => leadsByStage.Lost || [], [leadsByStage]);
+  }, [combinedDeals, searchQuery, selectedProduct, selectedStage, selectedSource, selectedUser, dateRange]);
 
   const stats = useMemo(() => {
-    const totalDeals = deals.length;
-    const totalValueNum = deals.reduce((sum, d) => sum + (Number(d.price) || 0), 0);
-    const wonDeals = deals.filter((d) => d.stage === 'Won').length;
+    const totalDeals = combinedDeals.length;
+    const totalValueNum = combinedDeals.reduce((sum, d) => sum + (Number(d.price ?? d.value) || 0), 0);
+    const wonDeals = combinedDeals.filter((d) => d.stage === 'Won').length;
     const avgDealSizeNum = totalDeals > 0 ? totalValueNum / totalDeals : 0;
     const conversionRateNum = totalDeals > 0 ? (wonDeals / totalDeals) * 100 : 0;
-    const fmt = (n) => 'Rs ' + Number(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 });
+    const fmt = (n) => '₹ ' + Number(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 });
 
     return {
       totalDeals,
@@ -609,7 +467,7 @@ export default function DealsPage() {
       avgDealSize: fmt(avgDealSizeNum),
       conversionRate: conversionRateNum.toFixed(1) + '%',
     };
-  }, [deals]);
+  }, [combinedDeals]);
 
   const handleResetFilters = () => {
     setSearchQuery('');
@@ -787,8 +645,6 @@ export default function DealsPage() {
               text-transform: capitalize;
             }
             .stage-Draft { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; }
-            .stage-Sent { background: #faf5ff; color: #7e22ce; border: 1px solid #e9d5ff; }
-            .stage-Open { background: #fffbeb; color: #b45309; border: 1px solid #fde68a; }
             .stage-Won { background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; }
             .stage-Lost { background: #fff1f2; color: #be123c; border: 1px solid #fecdd3; }
             .empty-cell {
@@ -983,27 +839,151 @@ export default function DealsPage() {
     setDealToDelete(null);
   };
 
-  const handleMoveStage = (dealId, targetStage) => {
-    setDeals((prev) =>
-      prev.map((d) =>
-        d.id === dealId
-          ? {
-              ...d,
-              stage: targetStage,
-              tag: targetStage === 'Won' ? 'Won' : targetStage === 'Lost' ? 'Lost' : d.tag === 'Won' || d.tag === 'Lost' ? '' : d.tag,
-            }
-          : d
-      )
-    );
-    closeDealMenu();
-    useCrmStore.getState().updateRecord('deals', dealId, { stage: targetStage }).catch((err) => {
-      console.warn('[CRM Deals] Server stage update error:', err);
+  const handleMoveStage = async (dealId, targetStage, previousStage, extraData) => {
+    const prevDeal = combinedDeals.find((d) => String(d.id) === String(dealId));
+    const oldStage = previousStage || prevDeal?.stage || 'Draft';
+    if (oldStage === targetStage) return;
+
+    // 1. Optimistic update in deals
+    setDeals((prev) => {
+      const exists = prev.some((d) => String(d.id) === String(dealId));
+      if (exists) {
+        return prev.map((d) =>
+          String(d.id) === String(dealId)
+            ? {
+                ...d,
+                stage: targetStage,
+                tag: targetStage === 'Won' ? 'Won' : targetStage === 'Lost' ? 'Lost' : '',
+              }
+            : d
+        );
+      } else if (prevDeal) {
+        return [
+          {
+            ...prevDeal,
+            stage: targetStage,
+            tag: targetStage === 'Won' ? 'Won' : targetStage === 'Lost' ? 'Lost' : '',
+          },
+          ...prev,
+        ];
+      }
+      return prev;
     });
-    const movedDeal = deals.find((d) => String(d.id) === String(dealId));
-    if (movedDeal?.leadId && targetStage === 'Lost') {
-      useCrmStore.getState().updateRecord('leads', movedDeal.leadId, { status: 'Lost', isLost: true }).catch(() => {});
+
+    closeDealMenu();
+    setSavingDealId(dealId);
+
+    try {
+      if (prevDeal?.isFromLead || String(dealId).startsWith('lead-deal-')) {
+        const leadId = prevDeal?.realLeadId || extraData?.realLeadId;
+        const res = await api.get(`/crm/deals/?leadId=${leadId}`);
+        const existing = res?.data?.results || res?.data || [];
+        if (existing.length > 0) {
+          const actualDeal = existing[0];
+          await api.patch(`/crm/deals/${actualDeal.id}/`, { stage: targetStage });
+        } else {
+          await api.post('/crm/deals/', {
+            leadId,
+            title: prevDeal?.name || 'Deal',
+            stage: targetStage,
+            value: prevDeal?.price || 0,
+          });
+        }
+      } else {
+        await api.patch(`/crm/deals/${dealId}/`, { stage: targetStage });
+        await useCrmStore.getState().updateRecord('deals', dealId, { stage: targetStage });
+      }
+
+      if (prevDeal?.leadId || prevDeal?.realLeadId) {
+        const leadId = prevDeal.leadId || prevDeal.realLeadId;
+        if (targetStage === 'Lost') {
+          useCrmStore.getState().updateRecord('leads', leadId, { status: 'Lost', isLost: true, isConverted: false }).catch(() => {});
+        } else if (targetStage === 'Won') {
+          useCrmStore.getState().updateRecord('leads', leadId, { status: 'Won', isLost: false, isConverted: true, lostReason: null }).catch(() => {});
+        } else if (targetStage === 'Draft') {
+          useCrmStore.getState().updateRecord('leads', leadId, { status: 'Draft', isLost: false, isConverted: false, lostReason: null }).catch(() => {});
+        }
+      }
+
+      await Promise.all([
+        useCrmStore.getState().refresh('deals').catch(() => {}),
+        useCrmStore.getState().refresh('leads').catch(() => {}),
+      ]);
+
+      showNotification(`Deal moved to ${targetStage}`);
+    } catch (err) {
+      console.error('[CRM Deals] Server stage update error:', err);
+      // Rollback
+      setDeals((prev) =>
+        prev.map((d) =>
+          String(d.id) === String(dealId)
+            ? { ...d, stage: oldStage, tag: oldStage === 'Won' ? 'Won' : oldStage === 'Lost' ? 'Lost' : '' }
+            : d
+        )
+      );
+      showNotification(`Failed to move deal to ${targetStage}: ${err?.message || 'Server error'}`);
+    } finally {
+      setSavingDealId(null);
     }
-    showNotification(`Deal moved to ${targetStage}`);
+  };
+
+  const handleDragStart = (e, deal) => {
+    isDraggingRef.current = true;
+    setDraggedDealId(deal.id);
+    e.dataTransfer.setData(
+      'application/json',
+      JSON.stringify({
+        dealId: deal.id,
+        sourceStage: deal.stage || 'Draft',
+        realLeadId: deal.realLeadId || deal.leadId,
+        isFromLead: Boolean(deal.isFromLead),
+      })
+    );
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragEnd = () => {
+    setDraggedDealId(null);
+    setDragOverStage(null);
+    setTimeout(() => {
+      isDraggingRef.current = false;
+    }, 150);
+  };
+
+  const handleDragOver = (e, st) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (dragOverStage !== st) setDragOverStage(st);
+  };
+
+  const handleDragEnter = (e, st) => {
+    e.preventDefault();
+    setDragOverStage(st);
+  };
+
+  const handleDragLeave = (e, st) => {
+    if (!e.currentTarget.contains(e.relatedTarget)) {
+      if (dragOverStage === st) setDragOverStage(null);
+    }
+  };
+
+  const handleDrop = (e, st) => {
+    e.preventDefault();
+    setDragOverStage(null);
+    let data = null;
+    try {
+      data = JSON.parse(e.dataTransfer.getData('application/json'));
+    } catch {
+      data = { dealId: draggedDealId };
+    }
+    const dealId = data?.dealId || draggedDealId;
+    const sourceStage = data?.sourceStage;
+    if (dealId && st !== sourceStage) {
+      handleMoveStage(dealId, st, sourceStage, data);
+    }
+    setTimeout(() => {
+      isDraggingRef.current = false;
+    }, 150);
   };
 
   // [Quotation & Proforma Invoice modules are commented out] — kept for when the module returns; no button calls it now.
@@ -1335,29 +1315,42 @@ export default function DealsPage() {
 
       {/* Kanban Pipeline / List View */}
       {viewMode === 'kanban' ? (
-        <div className={`flex snap-x snap-mandatory lg:grid ${gridClass} lg:snap-none gap-4 items-start overflow-x-auto pb-4 pt-1`}>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-start pb-4 pt-1">
           {pipelineStages.map((column) => {
             const st = column.key;
-            const items = filteredDeals.filter((d) => getEffectiveDealStage(d, quotations, allLeads) === st);
-            const leadItems = column.isLost
-              ? (leadsByStage.Lost || [])
-              : (leadsByStage[st] || []);
+            const items = filteredDeals.filter((d) => (d.stage || 'Draft') === st);
             const stageStyle = getStageStyle(st);
             const StageIcon = stageStyle.icon;
-            const totalStageAmount = items.reduce((sum, d) => sum + (Number(d.price) || 0), 0);
-            const isExpanded = Boolean(expandedColumns[st]);
-            const visibleItems = isExpanded ? items : items.slice(0, 3);
-            const visibleLeadItems = isExpanded ? leadItems : leadItems.slice(0, 3);
-            const remainingCount = items.length - 3;
-            const recordCount = items.length + leadItems.length;
+            const totalStageAmount = items.reduce((sum, d) => sum + (Number(d.price ?? d.value) || 0), 0);
+            
+            // Per-stage column pagination starting at 5 (Draft, Won, Lost)
+            const rawPageSize = columnPageSizes[st] ?? 5;
+            const pageSize = rawPageSize === 'all' ? Math.max(1, items.length) : Number(rawPageSize);
+            const totalPages = Math.max(1, Math.ceil(items.length / pageSize));
+            const currentPage = Math.min(Math.max(1, columnPages[st] || 1), totalPages);
+
+            const startIndex = (currentPage - 1) * pageSize;
+            const endIndex = Math.min(startIndex + pageSize, items.length);
+            const visibleItems = rawPageSize === 'all' ? items : items.slice(startIndex, endIndex);
+
+            const startRecord = items.length === 0 ? 0 : startIndex + 1;
+            const endRecord = endIndex;
+            const recordCount = items.length;
+            const isDragOver = dragOverStage === st;
 
             return (
               <div
                 key={st}
-                className="min-w-[280px] max-w-[320px] shrink-0 lg:shrink snap-start lg:min-w-auto lg:max-w-none border rounded-2xl p-3.5 flex flex-col space-y-3 transition-all duration-200 shadow-2xs relative"
+                onDragOver={(e) => handleDragOver(e, st)}
+                onDragEnter={(e) => handleDragEnter(e, st)}
+                onDragLeave={(e) => handleDragLeave(e, st)}
+                onDrop={(e) => handleDrop(e, st)}
+                className={`border rounded-2xl p-3.5 flex flex-col space-y-3 transition-all duration-200 shadow-2xs relative ${
+                  isDragOver ? stageStyle.dropBorder : ''
+                }`}
                 style={{
-                  backgroundColor: 'var(--soft, #edf2f8)',
-                  borderColor: 'var(--border, #dce5f4)',
+                  backgroundColor: isDragOver ? undefined : 'var(--soft, #edf2f8)',
+                  borderColor: isDragOver ? undefined : 'var(--border, #dce5f4)',
                 }}
               >
                 {/* Column Top Accent Strip */}
@@ -1372,7 +1365,7 @@ export default function DealsPage() {
                     <div className="min-w-0">
                       <h3 className="text-sm font-bold text-slate-900 leading-tight">{stageStyle.title}</h3>
                       <p className="text-[11px] text-slate-500 font-medium truncate">
-                        {formatColumnSummary(totalStageAmount, items.length, leadItems.length)}
+                        {formatStageSummary(totalStageAmount, items.length)}
                       </p>
                     </div>
                   </div>
@@ -1382,10 +1375,17 @@ export default function DealsPage() {
                   </span>
                 </div>
 
+                {/* Drag Drop indicator placeholder when hovering column */}
+                {isDragOver && draggedDealId && (
+                  <div className="border-2 border-dashed border-slate-300 rounded-xl py-3 px-4 bg-white/70 text-center text-xs font-semibold text-slate-500 flex items-center justify-center gap-2 animate-pulse">
+                    <span className={`w-2 h-2 rounded-full ${stageStyle.topBar}`} />
+                    <span>Drop deal here into {st}</span>
+                  </div>
+                )}
 
                 {/* Deal Cards Container */}
                 <div className="space-y-3 min-h-[120px]">
-                  {recordCount === 0 ? (
+                  {recordCount === 0 && !isDragOver ? (
                     <div
                       className="border border-dashed rounded-xl p-6 text-center"
                       style={{
@@ -1398,24 +1398,54 @@ export default function DealsPage() {
                     </div>
                   ) : (
                     visibleItems.map((deal) => {
-                                            return (
+                      const isDraggingThis = draggedDealId === deal.id;
+                      const isSavingThis = savingDealId === deal.id;
+                      const dealUser = getDealUser(deal);
+                      const dealProd = getDealProduct(deal);
+
+                      return (
                         <div
                           key={deal.id}
                           tabIndex={0}
-                          role="link"
+                          role="button"
+                          draggable={!isSavingThis}
+                          onDragStart={(e) => handleDragStart(e, deal)}
+                          onDragEnd={handleDragEnd}
                           aria-label={`View deal ${deal.name}`}
                           onClick={(event) => {
-                            if (!event.target.closest('a, button, .deal-action-menu-container')) handleOpenDealDetail(deal);
+                            if (isDraggingRef.current) return;
+                            if (!event.target.closest('a, button, .deal-action-menu-container, .deal-menu-trigger-btn')) {
+                              handleOpenDealDetail(deal);
+                            }
                           }}
                           onKeyDown={(event) => {
                             if (event.target === event.currentTarget && event.key === 'Enter') handleOpenDealDetail(deal);
                           }}
-                          className="bg-white border border-slate-200 hover:border-blue-400 rounded-xl p-3.5 shadow-2xs hover:shadow-md transition-all cursor-pointer relative group space-y-2.5"
+                          className={`bg-white border rounded-xl p-3.5 shadow-2xs hover:shadow-md transition-all cursor-grab active:cursor-grabbing relative group space-y-2.5 ${
+                            isDraggingThis
+                              ? 'opacity-40 scale-[0.98] ring-2 ring-blue-400 border-dashed border-blue-400 shadow-none'
+                              : 'border-slate-200 hover:border-blue-400'
+                          }`}
                         >
+                          {isSavingThis && (
+                            <div className="absolute inset-0 bg-white/80 backdrop-blur-2xs rounded-xl flex items-center justify-center z-20 text-xs font-bold text-slate-700 gap-2">
+                              <RotateCcw size={14} className="animate-spin text-blue-600" />
+                              <span>Saving...</span>
+                            </div>
+                          )}
+
                           {/* Deal Header */}
                           <div className="flex items-start justify-between gap-2">
                             <h4 className="text-sm font-bold text-slate-900 leading-snug truncate flex-1" title={deal.name}>
-                              <Link to={`?deal=${encodeURIComponent(deal.id)}`} className="hover:text-blue-600 hover:underline">{deal.name}</Link>
+                              <Link
+                                to={`?deal=${encodeURIComponent(deal.id)}`}
+                                onClick={(e) => {
+                                  if (isDraggingRef.current) e.preventDefault();
+                                }}
+                                className="hover:text-blue-600 hover:underline"
+                              >
+                                {deal.name}
+                              </Link>
                             </h4>
 
                             <div className="relative flex-shrink-0" onClick={(e) => e.stopPropagation()}>
@@ -1436,7 +1466,7 @@ export default function DealsPage() {
                           {/* Deal Value & Status Tag */}
                           <div className="flex items-center justify-between">
                             <span className="text-base font-bold text-slate-900 tracking-tight">
-                              {formatPriceINR(deal.price)}
+                              {formatPriceINR(deal.price ?? deal.value)}
                             </span>
 
                             {deal.tag && (
@@ -1444,8 +1474,6 @@ export default function DealsPage() {
                                 className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
                                   deal.tag === 'Won'
                                     ? 'bg-emerald-50 text-emerald-600 border-emerald-200'
-                                    : deal.tag === 'Lost'
-                                    ? 'bg-rose-50 text-rose-600 border-rose-200'
                                     : 'bg-rose-50 text-rose-600 border-rose-200'
                                 }`}
                               >
@@ -1455,11 +1483,11 @@ export default function DealsPage() {
                           </div>
 
                           {/* Product Pill */}
-                          {(deal.product || getDealProduct(deal)) && (
+                          {dealProd && (
                             <div>
                               <span className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-500 bg-slate-50 border border-slate-200 px-2 py-0.5 rounded-md truncate max-w-full">
                                 <Tag size={10} className="text-slate-400 flex-shrink-0" />
-                                <span className="truncate">{deal.product || getDealProduct(deal)}</span>
+                                <span className="truncate">{dealProd}</span>
                               </span>
                             </div>
                           )}
@@ -1469,113 +1497,98 @@ export default function DealsPage() {
                             <div className="flex items-center gap-1.5 min-w-0">
                               <div
                                 className={`w-5 h-5 rounded-full flex items-center justify-center font-bold text-[9px] flex-shrink-0 ${
-                                  deal.avatarColor || 'bg-blue-100 text-blue-700'
+                                  deal.avatarColor || getAvatarColorFromName(deal.client) || 'bg-blue-100 text-blue-700'
                                 }`}
                               >
-                                {deal.initials || 'CL'}
+                                {deal.initials || getInitialsFromName(deal.client) || 'CL'}
                               </div>
-                              <span className="truncate font-medium text-slate-600 text-[11px]">{deal.client}</span>
+                              <span className="truncate font-medium text-slate-600 text-[11px]">{deal.client || '—'}</span>
                             </div>
 
-                            <div className="flex items-center gap-1 text-[11px] text-slate-400 flex-shrink-0">
-                              <Calendar size={11} className="text-slate-400" />
-                              <span>{deal.date}</span>
+                            <div className="flex items-center gap-2 flex-shrink-0">
+                              {dealUser && (
+                                <div className="flex items-center gap-1 text-[11px] text-slate-500 max-w-[90px] truncate" title={`Owner: ${dealUser}`}>
+                                  <UserRound size={11} className="text-slate-400 flex-shrink-0" />
+                                  <span className="truncate">{dealUser}</span>
+                                </div>
+                              )}
+                              <div className="flex items-center gap-1 text-[11px] text-slate-400">
+                                <Calendar size={11} className="text-slate-400" />
+                                <span>{deal.date || '—'}</span>
+                              </div>
                             </div>
                           </div>
                         </div>
                       );
                     })
                   )}
-
-                  {/* Leads in this stage -- read-only cards with Lead badge */}
-                  {visibleLeadItems.map((lead) => {
-                    const leadTone = {
-                      Draft: {
-                        card: 'bg-blue-50/40 border-dashed border-blue-200 hover:border-blue-400',
-                        link: 'hover:text-blue-700',
-                        badge: 'bg-white text-blue-700 border-blue-200',
-                        metaBorder: 'border-blue-100',
-                      },
-                      Sent: {
-                        card: 'bg-purple-50/40 border-dashed border-purple-200 hover:border-purple-400',
-                        link: 'hover:text-purple-700',
-                        badge: 'bg-white text-purple-700 border-purple-200',
-                        metaBorder: 'border-purple-100',
-                      },
-                      Open: {
-                        card: 'bg-amber-50/40 border-dashed border-amber-200 hover:border-amber-400',
-                        link: 'hover:text-amber-700',
-                        badge: 'bg-white text-amber-700 border-amber-200',
-                        metaBorder: 'border-amber-100',
-                      },
-                      Won: {
-                        card: 'bg-emerald-50/40 border-dashed border-emerald-200 hover:border-emerald-400',
-                        link: 'hover:text-emerald-700',
-                        badge: 'bg-white text-emerald-700 border-emerald-200',
-                        metaBorder: 'border-emerald-100',
-                      },
-                      Lost: {
-                        card: 'bg-rose-50/40 border-dashed border-rose-200 hover:border-rose-400',
-                        link: 'hover:text-rose-700',
-                        badge: 'bg-white text-rose-600 border-rose-200',
-                        metaBorder: 'border-rose-100',
-                      },
-                    }[st] || {
-                      card: 'bg-slate-50/50 border-dashed border-slate-200 hover:border-slate-400',
-                      link: 'hover:text-slate-800',
-                      badge: 'bg-white text-slate-700 border-slate-200',
-                      metaBorder: 'border-slate-100',
-                    };
-
-                    return (
-                      <div
-                        key={`lead-${lead.id}`}
-                        className={`${leadTone.card} rounded-xl p-3.5 space-y-2.5 transition-colors`}
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <h4 className="text-sm font-bold text-slate-900 leading-snug truncate flex-1" title={lead.name}>
-                            <Link to={`/crm/leads/${encodeURIComponent(lead.id)}`} className={`${leadTone.link} hover:underline`}>
-                              {lead.name}
-                            </Link>
-                          </h4>
-                          <span className={`flex-shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full border ${leadTone.badge}`}>
-                            Lead
-                          </span>
-                        </div>
-
-                        {lead.company && (
-                          <div>
-                            <span className={`inline-flex items-center gap-1 text-[11px] font-medium text-slate-500 bg-white border ${leadTone.metaBorder} px-2 py-0.5 rounded-md truncate max-w-full`}>
-                              <Building2 size={10} className="text-slate-400 flex-shrink-0" />
-                              <span className="truncate">{lead.company}</span>
-                            </span>
-                          </div>
-                        )}
-
-                        <div className={`flex items-center justify-between gap-2 pt-2 border-t ${leadTone.metaBorder} text-xs text-slate-500`}>
-                          <span className="truncate">
-                            {lead.phone || lead.email || 'No contact'}
-                          </span>
-                          {lead.lostReason && column.isLost && (
-                            <span className="text-[11px] text-rose-500 flex-shrink-0 truncate max-w-[45%]">
-                              {lead.lostReason}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
                 </div>
 
-                {/* Show More/Less Button */}
-                {remainingCount > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => toggleExpandColumn(st)}
-                    className="w-full py-1.5 text-xs font-semibold text-blue-600 hover:bg-blue-50/50 rounded-xl transition-colors text-center cursor-pointer"
-                  >
-                    {isExpanded ? 'Show less' : `+ ${remainingCount} more deals`}
-                  </button>
+                {/* Column Pagination Controls (Draft, Won, Lost - Starts at 5) */}
+                {recordCount > 0 && (
+                  <div className="pt-2.5 mt-auto border-t border-slate-200/80 flex flex-col gap-2">
+                    <div className="flex items-center justify-between text-[11px] text-slate-500 font-medium">
+                      <span>
+                        Showing <strong className="text-slate-700 font-semibold">{startRecord}–{endRecord}</strong> of <strong className="text-slate-700 font-semibold">{recordCount}</strong>
+                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] text-slate-400">Per page:</span>
+                        <select
+                          value={rawPageSize}
+                          onChange={(e) => {
+                            const val = e.target.value === 'all' ? 'all' : Number(e.target.value);
+                            setColumnPageSizes(prev => ({ ...prev, [st]: val }));
+                            setColumnPages(prev => ({ ...prev, [st]: 1 }));
+                          }}
+                          className="text-[11px] font-semibold bg-white border border-slate-200 rounded px-1.5 py-0.5 text-slate-700 cursor-pointer focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        >
+                          <option value={5}>5</option>
+                          <option value={10}>10</option>
+                          <option value={20}>20</option>
+                          <option value="all">All</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    {totalPages > 1 && (
+                      <div className="flex items-center justify-center gap-1 pt-1">
+                        <button
+                          type="button"
+                          disabled={currentPage <= 1}
+                          onClick={() => setColumnPages(prev => ({ ...prev, [st]: Math.max(1, currentPage - 1) }))}
+                          className="w-7 h-7 flex items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-colors shadow-2xs"
+                          title="Previous page"
+                        >
+                          <ChevronLeft size={13} />
+                        </button>
+
+                        {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
+                          <button
+                            key={pageNum}
+                            type="button"
+                            onClick={() => setColumnPages(prev => ({ ...prev, [st]: pageNum }))}
+                            className={`w-7 h-7 text-xs font-bold rounded-lg border transition-all cursor-pointer shadow-2xs ${
+                              pageNum === currentPage
+                                ? 'bg-blue-600 border-blue-600 text-white shadow-xs'
+                                : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                            }`}
+                          >
+                            {pageNum}
+                          </button>
+                        ))}
+
+                        <button
+                          type="button"
+                          disabled={currentPage >= totalPages}
+                          onClick={() => setColumnPages(prev => ({ ...prev, [st]: Math.min(totalPages, currentPage + 1) }))}
+                          className="w-7 h-7 flex items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-colors shadow-2xs"
+                          title="Next page"
+                        >
+                          <ChevronRight size={13} />
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
             );
@@ -1598,7 +1611,7 @@ export default function DealsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {filteredDeals.map((deal) => (
+                {filteredDeals.slice((listPage - 1) * listPageSize, listPage * listPageSize).map((deal) => (
                   <tr key={deal.id} className="hover:bg-slate-50/70 transition-colors">
                     <td className="py-3.5 px-4 font-bold text-slate-900"><Link to={`?deal=${encodeURIComponent(deal.id)}`} className="hover:text-blue-600 hover:underline">{deal.name}</Link></td>
                     <td className="py-3.5 px-4">
@@ -1730,7 +1743,7 @@ export default function DealsPage() {
               pageSize={listPageSize}
               onPageChange={setListPage}
               onPageSizeChange={setListPageSize}
-              pageSizeOptions={[10, 20, 50]}
+              pageSizeOptions={[5, 10, 20, 50]}
               bordered={false}
             />
           </div>
@@ -1791,16 +1804,16 @@ export default function DealsPage() {
 
           <div className="my-1 border-t border-slate-100" />
 
-          {dealMenu.deal?.stage !== 'Lost' && (
+          {dealMenu.deal?.stage !== 'Draft' && (
             <button
               type="button"
               onClick={() => {
-                handleMoveStage(dealMenu.deal.id, 'Lost');
+                handleMoveStage(dealMenu.deal.id, 'Draft');
               }}
-              className="w-full px-3.5 py-1.5 text-left text-xs font-semibold text-rose-600 hover:bg-rose-50 flex items-center gap-2 cursor-pointer"
+              className="w-full px-3.5 py-1.5 text-left text-xs font-semibold text-blue-600 hover:bg-blue-50 flex items-center gap-2 cursor-pointer"
             >
-              <XCircle size={13} className="text-rose-500" />
-              <span>Lost Deal</span>
+              <FileText size={13} className="text-blue-500" />
+              <span>Move to Draft</span>
             </button>
           )}
 
@@ -1814,6 +1827,19 @@ export default function DealsPage() {
             >
               <Trophy size={13} className="text-emerald-500" />
               <span>Won Deal</span>
+            </button>
+          )}
+
+          {dealMenu.deal?.stage !== 'Lost' && (
+            <button
+              type="button"
+              onClick={() => {
+                handleMoveStage(dealMenu.deal.id, 'Lost');
+              }}
+              className="w-full px-3.5 py-1.5 text-left text-xs font-semibold text-rose-600 hover:bg-rose-50 flex items-center gap-2 cursor-pointer"
+            >
+              <XCircle size={13} className="text-rose-500" />
+              <span>Lost Deal</span>
             </button>
           )}
 

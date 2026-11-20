@@ -140,7 +140,7 @@ function formatShortINR(value) {
   return "Rs " + n.toLocaleString("en-IN", { minimumFractionDigits: 2 });
 }
 export default function DashboardView() {
-  const { invoices, quotations, salesOrders, paymentIns, formatCurrency, getInvoiceOutstanding } = useERP();
+  const { formatCurrency } = useERP();
   const currentUser = useAppStore((s) => s.currentUser);
   const leads = useCrmStore((s) => s.leads);
   const deals = useCrmStore((s) => s.deals);
@@ -222,15 +222,6 @@ export default function DashboardView() {
   const activeDeals = deals.filter((d) => d.stage !== "Declined");
   const pipelineDeals = activeDeals.length;
   const dealsTotal = deals.reduce((a, d) => a + (Number(d.price) || 0), 0);
-  const invoicesTotal = invoices.reduce((a, i) => a + (i.total || 0), 0);
-  const quotationsTotal = quotations.reduce((a, q) => a + (q.amount || q.total || 0), 0);
-  const ordersTotal = salesOrders.reduce((a, o) => a + (o.total || o.amount || 0), 0);
-  const collectedTotal = paymentIns.reduce((a, p) => a + (p.amount || 0), 0);
-  const outstandingTotal = invoices.reduce((a, i) => {
-    const r = getInvoiceOutstanding(i.id || i.invoiceNumber);
-    return a + (r.balanceDue || 0);
-  }, 0);
-  const revenueExpected = dealsTotal + invoicesTotal + quotationsTotal;
   const kpis = [
     { label: "Total Active Leads", value: String(crmDashboardKpis?.openLeads ?? activeLeads), icon: Users },
     { label: "New Leads", value: String(newLeads), icon: UserPlus },
@@ -365,7 +356,7 @@ export default function DashboardView() {
     <div className="grid-cols-1 lg:grid-cols-none" style={{ display: "grid", gap: 14, background: "#f6f9ff", minHeight: "100%" }}>
       <PageHeader
         title={`${greet}, ${firstName}!`}
-        subtitle={`Here is what is happening with your CRM today.${ordersTotal > 0 ? ` ${formatCurrency(ordersTotal)} orders` : ''}${paymentIns.length > 0 ? ` ${paymentIns.length} payments` : ''}`}
+        subtitle="Here is what is happening with your CRM today."
         actions={
           <div className="flex flex-wrap items-center gap-3">
             <div style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--card)", border: "1px solid var(--border)", borderRadius: 10, padding: "8px 12px", fontSize: 12, fontWeight: 600, color: "#334155" }}>
@@ -991,7 +982,7 @@ export default function DashboardView() {
         </div>
         <div style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 14, padding: 16 }}>
           <h3 style={{ margin: 0, fontSize: 14, fontWeight: 800, color: "#0f1f3d" }}>Quick Actions</h3>
-          <p style={{ margin: "2px 0 12px", fontSize: 11, color: "#64748b" }}>Perform tasks with one click | {deals.length} deals {invoices.length} invoices</p>
+          <p style={{ margin: "2px 0 12px", fontSize: 11, color: "#64748b" }}>Perform tasks with one click | {deals.length} deals in pipeline</p>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 10, textAlign: "center" }}>
             <button type="button" onClick={() => { setCreateLeadError(''); setIsCreateLeadOpen(true); }} style={{ display: "grid", gap: 6, placeItems: "center", border: "1px solid #eef2f7", borderRadius: 12, padding: "12px 6px", fontSize: 11, fontWeight: 700, color: "#334155", background: "none", cursor: "pointer", width: "100%" }}>
               <span style={{ width: 34, height: 34, borderRadius: 10, background: "#eef4ff", color: "#2f6fed", display: "grid", placeItems: "center" }}><UserPlus size={17} /></span> Add Lead

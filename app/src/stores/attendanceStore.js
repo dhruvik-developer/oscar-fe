@@ -11,6 +11,7 @@ import {
   isServerId,
 } from "../services/hrmsSync";
 import { api } from "../services/api";
+import { toISODate } from "../utils/dateUtils";
 
 function formatSeconds(secs) {
   if (!secs || secs < 0) return "00h 00m";
@@ -474,7 +475,7 @@ const useAttendanceStoreBase = create((set, get) => ({
     if (isBackendEnabled()) {
       const payload = {
         employeeId: isServerId(r.employeeId) ? r.employeeId : undefined,
-        date: r.date,
+        date: toISODate(r.date) || r.date,
         requestedCheckIn: r.requestedCheckIn || r.reqIn,
         requestedCheckOut: r.requestedCheckOut || r.reqOut,
         requestedStatus: r.requestedStatus,
@@ -523,13 +524,13 @@ const useAttendanceStoreBase = create((set, get) => ({
 
   updateRequest: async (id, r) => {
     const targetReq = get().requests.find((item) => item.id === id);
-    if (targetReq && targetReq.status === "Approved") {
-      throw new Error("Approved attendance requests cannot be modified or edited.");
+    if (targetReq && (targetReq.status === "Approved" || targetReq.status === "Rejected")) {
+      throw new Error(`${targetReq.status} attendance requests are locked and cannot be modified or edited.`);
     }
 
     if (isBackendEnabled() && isServerId(id)) {
       const payload = {
-        date: r.date,
+        date: toISODate(r.date) || r.date,
         requestedCheckIn: r.requestedCheckIn || r.reqIn,
         requestedCheckOut: r.requestedCheckOut || r.reqOut,
         requestedStatus: r.requestedStatus,

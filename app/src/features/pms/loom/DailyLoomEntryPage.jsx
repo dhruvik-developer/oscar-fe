@@ -454,16 +454,19 @@ export default function DailyLoomEntryPage() {
         factory_id: selectedFactoryId,
         date: dateStr,
         power: Number(powerCut),
-        rows: rows.map((r) => ({
-          machine_id: r.machine_id,
-          beam_id: r.beam_id,
-          meters: r.meters !== '' ? Number(r.meters) : null,
-          rpm: Number(r.rpm || 650),
-          hours: Number(r.hours || 22),
-          stop: Number(r.stop || 0),
-          reason: r.reason || '',
-          damage: Number(r.damage || 0),
-        })),
+        rows: rows.map((r) => {
+          const m = r.meters !== '' && r.meters !== null && r.meters !== undefined ? Number(r.meters) : null;
+          return {
+            machine_id: r.machine_id,
+            beam_id: r.beam_id ? String(r.beam_id) : null,
+            meters: (!r.has_beam && !r.beam_id) ? null : (m !== null && !isNaN(m) ? m : null),
+            rpm: Number(r.rpm || 650),
+            hours: Number(r.hours || 22),
+            stop: Number(r.stop || 0),
+            reason: r.reason || '',
+            damage: Number(r.damage || 0),
+          };
+        }),
       });
       isDirtyRef.current = false;
       showToast('Day production saved successfully!', 'success');
@@ -808,6 +811,11 @@ export default function DailyLoomEntryPage() {
                       <span className="text-slate-400 font-mono text-[10px] ml-1.5">
                         ({r.beam_no})
                       </span>
+                      {r.beam_status === 'Finished' && (
+                        <span className="ml-1.5 px-1.5 py-0.5 text-[9px] font-semibold bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300 rounded">
+                          Finished
+                        </span>
+                      )}
                     </td>
                     <td className="py-1.5 px-3 text-right font-mono text-slate-500">
                       {formatNum(r.remaining_m)}

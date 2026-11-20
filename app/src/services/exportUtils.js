@@ -1,3 +1,4 @@
+import * as XLSX from 'xlsx';
 import { modal } from '../context/ModalContext';
 
 export function exportToExcel(filename, headers, rows, sheetName = 'Sheet1') {
@@ -165,8 +166,6 @@ export function exportObjectsToCSV(filename, data, columnMapping) {
         exportToCSV(filename, headers, rows);
     }
 }
-
-import * as XLSX from 'xlsx';
 
 export async function exportTableData(filename, columns, rows, format = 'csv') {
   const cols = columns.filter((c) => (c.key || c.id) !== 'actions');

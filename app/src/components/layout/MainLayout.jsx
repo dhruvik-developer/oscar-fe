@@ -135,7 +135,7 @@ export default function MainLayout() {
   if (IS_EMBEDDED) {
     return (
       <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col">
-        <main className={`flex-1 p-3 sm:p-6 max-w-7xl w-full mx-auto content${isErpRoute ? ' erp-scope' : ''}`}>
+        <main className={`flex-1 p-2.5 sm:p-6 pb-28 sm:pb-6 max-w-7xl w-full mx-auto content${isErpRoute ? ' erp-scope' : ''}`}>
           <Outlet />
         </main>
         {toast && <div className="toast">{toast.msg}</div>}
@@ -163,7 +163,7 @@ export default function MainLayout() {
           </div>
         </header>
 
-        <main className={`flex-1 p-3 sm:p-6 max-w-7xl w-full mx-auto content${isErpRoute ? ' erp-scope' : ''}`}>
+        <main className={`flex-1 p-2.5 sm:p-6 pb-28 sm:pb-6 max-w-7xl w-full mx-auto content${isErpRoute ? ' erp-scope' : ''}`}>
           <Outlet />
         </main>
         {toast && <div className="toast">{toast.msg}</div>}

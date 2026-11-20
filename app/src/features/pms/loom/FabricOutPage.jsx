@@ -16,6 +16,11 @@ import {
   FileText,
   X,
   AlertTriangle,
+  ArrowRight,
+  ShieldCheck,
+  Coins,
+  Eye,
+  Check,
 } from 'lucide-react';
 import PageHeader from '../../../components/ui/PageHeader';
 import { Button } from '../../../components/ui/Button';
@@ -26,6 +31,8 @@ import { partiesService, jobworkService } from '../../../services/domainServices
 import { useERP } from '../../../context/ERPContext';
 import { ConfirmModal } from '../../../components/ui/ConfirmModal';
 import CompanySelector from './components/CompanySelector';
+import ReceiveFromMillModal from './components/ReceiveFromMillModal';
+import FabricPassportModal from './components/FabricPassportModal';
 
 export default function FabricOutPage() {
   const navigate = useNavigate();
@@ -72,6 +79,15 @@ export default function FabricOutPage() {
   const [jobWorkOrder, setJobWorkOrder] = useState('');
   const [oChallan, setOChallan] = useState('');
   const [oVehicle, setOVehicle] = useState('');
+  const [allParties, setAllParties] = useState([]);
+  const [oWeavingRate, setOWeavingRate] = useState('');
+  const [oDyeingRate, setODyeingRate] = useState('');
+  const [oLogisticRate, setOLogisticRate] = useState('');
+  const [oTransporterParty, setOTransporterParty] = useState('');
+
+  // Modals for Mill Inward & Fabric Passport
+  const [receiveMillDispatch, setReceiveMillDispatch] = useState(null);
+  const [passportData, setPassportData] = useState(null);
 
   // Current Quality Available Inventory at selected factory
   const currentQualityInventory = useMemo(() => {
@@ -98,6 +114,7 @@ export default function FabricOutPage() {
 
       setFactories(fList);
       setQualities(qList);
+      setAllParties(pList);
       setDyeingParties(
         pList.filter(
           (p) =>
@@ -115,7 +132,12 @@ export default function FabricOutPage() {
       } else if (fList.length) {
         setSelectedFactoryId(fList[0].id);
       }
-      if (qList.length) setOQuality(qList[0].id);
+      if (qList.length) {
+        setOQuality(qList[0].id);
+        const q0 = qList[0];
+        const wRate = (q0.ppi && q0.pick_charge) ? (Number(q0.ppi) * Number(q0.pick_charge)).toFixed(2) : (q0.job_rate_per_meter || '');
+        if (wRate) setOWeavingRate(String(wRate));
+      }
     } catch (err) {
       console.error('Failed to load initial data:', err);
     }
@@ -180,6 +202,10 @@ export default function FabricOutPage() {
         job_work_order: oDest === 'Dyeing mill' ? (jobWorkOrder || null) : null,
         challan: oChallan || '',
         vehicle: oVehicle || '',
+        weaving_rate: oWeavingRate ? Number(oWeavingRate) : 0,
+        dyeing_rate: oDyeingRate ? Number(oDyeingRate) : 0,
+        logistic_rate: oLogisticRate ? Number(oLogisticRate) : 0,
+        transporter_party: oTransporterParty || null,
       });
       showToast('Dispatch challan recorded successfully', 'success');
       setOMeters('');
@@ -189,6 +215,9 @@ export default function FabricOutPage() {
       setDyeingMillParty('');
       setJobWorkOrder('');
       setODestName('');
+      setODyeingRate('');
+      setOLogisticRate('');
+      setOTransporterParty('');
       fetchFactoryDispatches();
     } catch (err) {
       showToast(err?.payload?.detail || err?.message || 'Failed to record dispatch', 'error');
@@ -345,7 +374,15 @@ export default function FabricOutPage() {
             <label className="pms-label">Quality</label>
             <select
               value={oQuality}
-              onChange={(e) => setOQuality(e.target.value)}
+              onChange={(e) => {
+                const val = e.target.value;
+                setOQuality(val);
+                const q = qualities.find((x) => String(x.id) === String(val));
+                if (q) {
+                  const wRate = (q.ppi && q.pick_charge) ? (Number(q.ppi) * Number(q.pick_charge)).toFixed(2) : (q.job_rate_per_meter || '');
+                  if (wRate) setOWeavingRate(String(wRate));
+                }
+              }}
               className="pms-select w-full cursor-pointer"
               required
             >
@@ -482,6 +519,55 @@ export default function FabricOutPage() {
                   className="pms-input w-full"
                 />
               </div>
+              <div>
+                <label className="pms-label">Weaving Rate (₹/m)</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  placeholder="e.g. 8.50"
+                  value={oWeavingRate}
+                  onChange={(e) => setOWeavingRate(e.target.value)}
+                  className="pms-input w-full font-mono font-medium"
+                />
+              </div>
+              <div>
+                <label className="pms-label">Dyeing Rate (₹/m)</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  placeholder="e.g. 14.00"
+                  value={oDyeingRate}
+                  onChange={(e) => setODyeingRate(e.target.value)}
+                  className="pms-input w-full font-mono font-medium text-purple-600 dark:text-purple-400"
+                />
+              </div>
+              <div>
+                <label className="pms-label">Logistics / Freight (₹/m)</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  placeholder="e.g. 1.50"
+                  value={oLogisticRate}
+                  onChange={(e) => setOLogisticRate(e.target.value)}
+                  className="pms-input w-full font-mono font-medium text-amber-600 dark:text-amber-400"
+                />
+              </div>
+              <div>
+                <label className="pms-label">Transporter</label>
+                <select
+                  value={oTransporterParty}
+                  onChange={(e) => setOTransporterParty(e.target.value)}
+                  className="pms-select w-full cursor-pointer text-xs"
+                >
+                  <option value="">-- Optional Transporter --</option>
+                  {allParties.map((p) => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+              </div>
             </>
           ) : (
             <div className="sm:col-span-2">
@@ -589,10 +675,15 @@ export default function FabricOutPage() {
         {/* Grey at Dyeing Mills */}
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm">
           <div className="px-3.5 py-2.5 sm:px-4 sm:py-3 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
-              Grey Fabric Lying at Dyeing Mills
-            </h3>
-            <span className="text-[11px] text-slate-400">Across all mills</span>
+            <div className="flex items-center gap-2">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+                Fabric at Dyeing Mills & Inward Processing
+              </h3>
+              <span className="text-[10px] bg-purple-50 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300 px-2 py-0.5 rounded-full font-medium border border-purple-200 dark:border-purple-800">
+                Weaving → Mill → Landed Inventory
+              </span>
+            </div>
+            <span className="text-[11px] text-slate-400">Track Landed Cost & Lineage</span>
           </div>
           <div className="pms-table-container overflow-x-auto">
             <table className="w-full text-xs text-left pms-sticky-header">
@@ -600,22 +691,80 @@ export default function FabricOutPage() {
                 <tr>
                   <th className="py-2 px-2.5 sm:py-2.5 sm:px-3">Dyeing Mill</th>
                   <th className="py-2 px-2.5 sm:py-2.5 sm:px-3">Quality</th>
-                  <th className="py-2 px-2.5 sm:py-2.5 sm:px-3 text-right">Total Meters</th>
-                  <th className="py-2 px-2.5 sm:py-2.5 sm:px-3 text-right">Takas</th>
+                  <th className="py-2 px-2.5 sm:py-2.5 sm:px-3 text-right">Meters</th>
+                  <th className="py-2 px-2.5 sm:py-2.5 sm:px-3">Rates (Weave / Dye / Freight)</th>
+                  <th className="py-2 px-2.5 sm:py-2.5 sm:px-3">Status</th>
+                  <th className="py-2 px-2.5 sm:py-2.5 sm:px-3 text-center">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {(inventorySummary?.grey_at_mills || []).map((m, idx) => (
-                  <tr key={idx} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50">
-                    <td className="py-2 px-2.5 sm:py-2.5 sm:px-3 font-bold text-slate-800 dark:text-slate-200">{m.mill_name}</td>
-                    <td className="py-2 px-2.5 sm:py-2.5 sm:px-3 font-medium text-slate-700 dark:text-slate-300">{m.quality_name}</td>
-                    <td className="py-2 px-2.5 sm:py-2.5 sm:px-3 text-right font-mono font-bold text-purple-600 dark:text-purple-400">{formatNum(m.meters)}</td>
-                    <td className="py-2 px-2.5 sm:py-2.5 sm:px-3 text-right font-mono font-medium">{m.taka}</td>
+                {(inventorySummary?.mill_dispatches || []).map((m) => (
+                  <tr key={m.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50">
+                    <td className="py-2 px-2.5 sm:py-2.5 sm:px-3">
+                      <div className="font-bold text-slate-800 dark:text-slate-200">{m.mill_name}</div>
+                      <div className="text-[10px] text-slate-400 font-mono">Challan: {m.challan} ({m.date})</div>
+                    </td>
+                    <td className="py-2 px-2.5 sm:py-2.5 sm:px-3">
+                      <div className="font-medium text-slate-700 dark:text-slate-300">{m.quality_name}</div>
+                      <div className="text-[10px] text-slate-400">From: {m.factory_name}</div>
+                    </td>
+                    <td className="py-2 px-2.5 sm:py-2.5 sm:px-3 text-right font-mono">
+                      <div className="font-bold text-purple-600 dark:text-purple-400">{formatNum(m.meters)} m</div>
+                      <div className="text-[10px] text-slate-400">{m.taka} takas</div>
+                    </td>
+                    <td className="py-2 px-2.5 sm:py-2.5 sm:px-3">
+                      <div className="flex items-center gap-1 text-[11px] font-mono">
+                        <span className="text-slate-700 dark:text-slate-300" title="Weaving Rate">W: ₹{m.weaving_rate || '—'}</span>
+                        <span className="text-slate-300">/</span>
+                        <span className="text-purple-600 dark:text-purple-400 font-bold" title="Dyeing Rate">D: ₹{m.dyeing_rate || '—'}</span>
+                        <span className="text-slate-300">/</span>
+                        <span className="text-amber-600 dark:text-amber-400" title="Logistics Rate">F: ₹{m.logistic_rate || '—'}</span>
+                      </div>
+                    </td>
+                    <td className="py-2 px-2.5 sm:py-2.5 sm:px-3">
+                      {m.mill_inward_status === 'Received' ? (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded border border-emerald-200 dark:border-emerald-800">
+                          <Check size={11} /> Inwarded (₹{m.landed_cost_rate}/m)
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-medium text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 px-2 py-0.5 rounded border border-amber-200 dark:border-amber-800">
+                          At Mill
+                        </span>
+                      )}
+                    </td>
+                    <td className="py-2 px-2.5 sm:py-2.5 sm:px-3 text-center">
+                      {m.mill_inward_status === 'Received' ? (
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            try {
+                              const res = await loomService.getDispatchPassport(m.id);
+                              setPassportData(res?.passport || {});
+                            } catch {
+                              showToast('Could not load passport data', 'error');
+                            }
+                          }}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 rounded-lg hover:bg-blue-100 transition-colors cursor-pointer"
+                        >
+                          <ShieldCheck size={12} className="text-blue-600 dark:text-blue-400" />
+                          Passport
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setReceiveMillDispatch(m)}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-bold text-white bg-purple-600 hover:bg-purple-700 rounded-lg shadow-xs transition-colors cursor-pointer"
+                        >
+                          <ArrowRight size={12} />
+                          Receive & Landed Cost
+                        </button>
+                      )}
+                    </td>
                   </tr>
                 ))}
-                {!(inventorySummary?.grey_at_mills || []).length && (
+                {!(inventorySummary?.mill_dispatches || []).length && (
                   <tr>
-                    <td colSpan={4} className="py-6 text-center text-slate-400">
+                    <td colSpan={6} className="py-6 text-center text-slate-400">
                       No fabric currently pending at dyeing mills.
                     </td>
                   </tr>
@@ -714,7 +863,34 @@ export default function FabricOutPage() {
                     </div>
                   </td>
                   <td className="py-2 px-2.5 sm:py-2.5 sm:px-3 text-center">
-                    <div className="inline-flex items-center gap-1">
+                    <div className="inline-flex items-center gap-1.5">
+                      {d.dest === 'Dyeing mill' && d.mill_inward_status === 'Received' && (
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            try {
+                              const res = await loomService.getDispatchPassport(d.id);
+                              setPassportData(res?.passport || d.history_passport || {});
+                            } catch {
+                              setPassportData(d.history_passport || {});
+                            }
+                          }}
+                          className="text-emerald-600 hover:text-emerald-800 p-1 rounded transition-colors cursor-pointer"
+                          title="View Fabric Passport & Lineage"
+                        >
+                          <ShieldCheck size={14} />
+                        </button>
+                      )}
+                      {d.dest === 'Dyeing mill' && d.mill_inward_status !== 'Received' && (
+                        <button
+                          type="button"
+                          onClick={() => setReceiveMillDispatch(d)}
+                          className="text-purple-600 hover:text-purple-800 p-1 rounded transition-colors cursor-pointer"
+                          title="Receive from Mill & Add to Inventory"
+                        >
+                          <ArrowRight size={14} />
+                        </button>
+                      )}
                       <button
                         type="button"
                         onClick={() => setPreviewChallan(d)}
@@ -904,6 +1080,28 @@ export default function FabricOutPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Receive Dyed Fabric from Mill & Calculate Landed Cost Modal */}
+      {receiveMillDispatch && (
+        <ReceiveFromMillModal
+          dispatch={receiveMillDispatch}
+          onClose={() => setReceiveMillDispatch(null)}
+          onSuccess={(passport) => {
+            setReceiveMillDispatch(null);
+            fetchFactoryDispatches();
+            setPassportData(passport);
+            showToast('Fabric successfully added to inventory at landed cost!', 'success');
+          }}
+        />
+      )}
+
+      {/* Fabric Traceability Passport Modal */}
+      {passportData && (
+        <FabricPassportModal
+          passport={passportData}
+          onClose={() => setPassportData(null)}
+        />
       )}
     </div>
   );

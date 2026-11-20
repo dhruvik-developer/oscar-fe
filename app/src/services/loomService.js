@@ -47,6 +47,7 @@ export const loomService = {
 
   // Daily Production
   getFactoryDayProduction: (factoryId, dateStr) => api.get(`${BASE}/daily-production/factory_day/`, { params: { factory: factoryId, date: dateStr } }),
+  getDailyProductionHistory: (params) => api.get(`${BASE}/daily-production/`, { params }),
   bulkSaveDailyProduction: (data) => {
     const fid = data.factory_id || data.factory;
     return api.post(`${BASE}/daily-production/bulk_save/`, { ...data, factory: fid, factory_id: fid });
@@ -75,4 +76,6 @@ export const loomService = {
   createFabricDispatch: (data) => api.post(`${BASE}/fabric-dispatches/`, data),
   getFabricInventorySummary: (factoryId) => api.get(`${BASE}/fabric-dispatches/inventory_summary/`, { params: { factory: factoryId } }),
   deleteFabricDispatch: (id) => api.delete(`${BASE}/fabric-dispatches/${id}/`),
+  receiveFromMill: (id, data) => api.post(`${BASE}/fabric-dispatches/${id}/receive-from-mill/`, data),
+  getDispatchPassport: (id) => api.get(`${BASE}/fabric-dispatches/${id}/passport/`),
 };

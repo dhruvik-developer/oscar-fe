@@ -425,7 +425,7 @@ export default function IncentiveSchemesPage() {
                           <div className="flex items-center justify-end gap-1.5">
                             <button
                               onClick={() => handleOpenRunCalc(s)}
-                              className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded text-[11px] transition flex items-center gap-1 cursor-pointer"
+                              className="px-2.5 py-1 bg-primary hover:bg-primary-dark text-white font-bold rounded text-[11px] transition flex items-center gap-1 cursor-pointer"
                               title="Calculate Incentive"
                             >
                               <Play className="w-3 h-3" /> Run Calc
@@ -549,7 +549,7 @@ export default function IncentiveSchemesPage() {
                                   setPayTarget(c);
                                   setPayRef('');
                                 }}
-                                className="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[11px] font-bold cursor-pointer"
+                                className="px-2 py-1 bg-primary hover:bg-primary-dark text-white rounded text-[11px] font-bold cursor-pointer"
                               >
                                 Settle Pay
                               </button>
@@ -820,7 +820,7 @@ export default function IncentiveSchemesPage() {
                 <button
                   type="submit"
                   disabled={runningCalc}
-                  className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold shadow-xs cursor-pointer disabled:opacity-50"
+                  className="px-4 py-1.5 bg-primary hover:bg-primary-dark text-white rounded-lg font-bold shadow-xs cursor-pointer disabled:opacity-50"
                 >
                   {runningCalc ? 'Calculating…' : 'Generate Calculation'}
                 </button>
@@ -876,7 +876,7 @@ export default function IncentiveSchemesPage() {
                 <button
                   type="submit"
                   disabled={paying}
-                  className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold shadow-xs cursor-pointer disabled:opacity-50"
+                  className="px-4 py-1.5 bg-primary hover:bg-primary-dark text-white rounded-lg font-bold shadow-xs cursor-pointer disabled:opacity-50"
                 >
                   {paying ? 'Recording…' : 'Confirm Settlement'}
                 </button>

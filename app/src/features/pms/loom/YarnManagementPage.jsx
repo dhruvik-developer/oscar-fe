@@ -914,7 +914,7 @@ export default function YarnManagementPage() {
                             type="button"
                             onClick={() => handleConfirmReceipt(d.id)}
                             disabled={confirmingReceiptId === d.id}
-                            className="h-8 px-3 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 disabled:opacity-50 text-white rounded-lg text-xs font-semibold shadow-2xs transition inline-flex items-center gap-1.5 cursor-pointer"
+                            className="h-8 px-3 bg-primary hover:bg-primary-dark active:bg-blue-800 disabled:opacity-50 text-white rounded-lg text-xs font-semibold shadow-2xs transition inline-flex items-center gap-1.5 cursor-pointer"
                             title="Confirm physical yarn receipt and update factory inventory"
                           >
                             {confirmingReceiptId === d.id ? (

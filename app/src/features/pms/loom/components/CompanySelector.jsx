@@ -94,26 +94,28 @@ export default function CompanySelector({
         type="button"
         onClick={handleToggle}
         title={selectedFactory?.name || 'Select Company'}
-        className={`h-[38px] flex items-center gap-2 rounded-xl px-3 border transition-all cursor-pointer shadow-2xs select-none ${
+        className={`h-[38px] flex items-center gap-2 rounded-xl px-3 border transition-all cursor-pointer shadow-2xs select-none w-full justify-between sm:justify-start ${
           open
             ? 'bg-blue-50/50 dark:bg-slate-800 border-blue-500 ring-2 ring-blue-500/20'
             : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600'
         }`}
       >
-        <div className="w-5 h-5 rounded-md bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
-          <Factory size={13} />
-        </div>
-        <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider hidden sm:inline">
-          Company:
-        </span>
-        <span className="text-xs font-bold text-slate-800 dark:text-slate-100 max-w-[140px] sm:max-w-[180px] truncate text-left">
-          {selectedFactory?.name || 'Select Company'}
-        </span>
-        {selectedFactory?.machines_count !== undefined && selectedFactory.machines_count > 0 && (
-          <span className="hidden md:inline-flex items-center text-[10px] font-extrabold px-1.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
-            {selectedFactory.machines_count}
+        <div className="flex items-center gap-2 min-w-0">
+          <div className="w-5 h-5 rounded-md bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
+            <Factory size={13} />
+          </div>
+          <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider hidden sm:inline shrink-0">
+            Company:
           </span>
-        )}
+          <span className="text-xs font-bold text-slate-800 dark:text-slate-100 max-w-[200px] sm:max-w-[180px] truncate text-left">
+            {selectedFactory?.name || 'Select Company'}
+          </span>
+          {selectedFactory?.machines_count !== undefined && selectedFactory.machines_count > 0 && (
+            <span className="inline-flex items-center text-[10px] font-extrabold px-1.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 shrink-0">
+              {selectedFactory.machines_count}
+            </span>
+          )}
+        </div>
         <ChevronDown
           size={14}
           className={`text-slate-400 transition-transform duration-200 ml-0.5 shrink-0 ${
@@ -127,7 +129,7 @@ export default function CompanySelector({
         <div
           className={`absolute ${
             menuAlign === 'right' ? 'right-0' : 'left-0'
-          } top-full mt-1.5 z-50 w-72 sm:w-80 max-w-[calc(100vw-2rem)] bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 p-2.5 animate-in fade-in zoom-in-95 duration-150`}
+          } top-full mt-1.5 z-50 w-full sm:w-80 max-w-[calc(100vw-1.5rem)] bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 p-2.5 animate-in fade-in zoom-in-95 duration-150`}
         >
           {/* Header */}
           <div className="px-2 py-1.5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">

@@ -99,6 +99,7 @@ export default function ProductionInstructionsPage() {
   // Create form state
   const [sourceType, setSourceType] = useState('program'); // 'program' | 'po' | 'manual'
   const [selectedProgramId, setSelectedProgramId] = useState('');
+  const [filterOutRunningAndPoCreated, setFilterOutRunningAndPoCreated] = useState(true);
   const [poId, setPoId] = useState('');
   const [manualAgency, setManualAgency] = useState('');
   const [manualOrderRef, setManualOrderRef] = useState('');
@@ -334,6 +335,59 @@ export default function ProductionInstructionsPage() {
 
   const selectedPo = useMemo(() => purchaseOrders.find((p) => p.id === poId) || null, [purchaseOrders, poId]);
   const selectedProgram = useMemo(() => programs.find((p) => String(p.id) === String(selectedProgramId)) || null, [programs, selectedProgramId]);
+
+  // Filter loom programs: exclude running or closed programs and programs that already have POs created / active instructions
+  const availablePrograms = useMemo(() => {
+    if (!filterOutRunningAndPoCreated) return programs;
+    const norm = (s) => String(s || '').trim().toLowerCase();
+    return programs.filter((prog) => {
+      // 1. Program's own status in Loom Module: Running or Closed
+      if (prog.status === 'Running' || prog.status === 'Closed') {
+        return false;
+      }
+
+      // 2. Check if a production instruction already exists for this program
+      const matchingInstructions = instructions.filter((inst) =>
+        norm(inst.orderReference) === norm(prog.name)
+      );
+
+      // If an instruction is running, in progress, completed, verified, or has a Final PO created
+      const isAlreadyRunningOrPoCreated = matchingInstructions.some((inst) => {
+        const isRunning = ['Running', 'In Progress', 'Partially Completed', 'Completed', 'Verified'].includes(inst.status);
+        const hasPo = Boolean(
+          inst.finalPoId ||
+          inst.finalPoNumber ||
+          ['PO Pending', 'PO Created', 'Closed'].includes(inst.status)
+        );
+        return isRunning || hasPo;
+      });
+
+      if (isAlreadyRunningOrPoCreated) {
+        return false;
+      }
+
+      return true;
+    });
+  }, [programs, instructions, filterOutRunningAndPoCreated]);
+
+  // Filter purchase orders: exclude cancelled, Final Job Work POs, and POs already handled by active instructions
+  const availablePurchaseOrders = useMemo(() => {
+    return purchaseOrders.filter((po) => {
+      if (po.status === 'Cancelled') return false;
+      const pType = po.purchaseType || po.purchase_type;
+      if (pType === 'Final Job Work') return false;
+      const matching = instructions.filter((inst) =>
+        String(inst.sourcePoId) === String(po.id) ||
+        String(inst.orderReference || '').toLowerCase() === String(po.poNumber || '').toLowerCase()
+      );
+      const isAlreadyHandled = matching.some((inst) =>
+        ['Running', 'In Progress', 'Completed', 'Verified', 'PO Pending', 'PO Created', 'Closed'].includes(inst.status) ||
+        Boolean(inst.finalPoId)
+      );
+      if (isAlreadyHandled) return false;
+      return true;
+    });
+  }, [purchaseOrders, instructions]);
   const poLines = (po) => po?.items || po?.lineItems || [];
   const poQty = (po) => poLines(po).reduce((s, l) => s + (Number(l.qty) || 0), 0);
   const poFabric = (po) => poLines(po)[0]?.name || '';
@@ -784,7 +838,7 @@ export default function ProductionInstructionsPage() {
                     type="button"
                     onClick={() => {
                       setSourceType('program');
-                      if (programs.length && !selectedProgramId) handleSelectProgram(String(programs[0].id));
+                      if (availablePrograms.length && !selectedProgramId) handleSelectProgram(String(availablePrograms[0].id));
                     }}
                     className={`flex items-center justify-center gap-2 p-2.5 rounded-lg border text-xs font-bold transition cursor-pointer ${
                       sourceType === 'program'
@@ -798,7 +852,7 @@ export default function ProductionInstructionsPage() {
                     type="button"
                     onClick={() => {
                       setSourceType('po');
-                      if (purchaseOrders.length && !poId) handleSelectPo(purchaseOrders[0].id);
+                      if (availablePurchaseOrders.length && !poId) handleSelectPo(availablePurchaseOrders[0].id);
                     }}
                     className={`flex items-center justify-center gap-2 p-2.5 rounded-lg border text-xs font-bold transition cursor-pointer ${
                       sourceType === 'po'
@@ -823,21 +877,38 @@ export default function ProductionInstructionsPage() {
 
                 {sourceType === 'program' && (
                   <div className="pt-2 space-y-2">
-                    <label className="block font-semibold text-slate-700">
-                      Select Loom Production Program <span className="text-rose-500">*</span>
-                    </label>
+                    <div className="flex flex-wrap items-center justify-between gap-1">
+                      <label className="block font-semibold text-slate-700">
+                        Select Loom Production Program <span className="text-rose-500">*</span>
+                      </label>
+                      <label className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-slate-500 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={filterOutRunningAndPoCreated}
+                          onChange={(e) => setFilterOutRunningAndPoCreated(e.target.checked)}
+                          className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-3.5 w-3.5 cursor-pointer"
+                        />
+                        <span>Hide Running &amp; PO-Created</span>
+                        <span className="text-[10px] text-slate-400">({availablePrograms.length}/{programs.length})</span>
+                      </label>
+                    </div>
                     <select
                       value={selectedProgramId}
                       onChange={(e) => handleSelectProgram(e.target.value)}
                       className="w-full border border-slate-300 rounded-lg p-2 bg-white text-slate-800 font-medium"
                     >
-                      <option value="">{programs.length ? 'Select a Production Program...' : 'No programs found'}</option>
-                      {programs.map((prog) => (
+                      <option value="">{availablePrograms.length ? 'Select a Production Program...' : 'No available unassigned planned programs'}</option>
+                      {availablePrograms.map((prog) => (
                         <option key={prog.id} value={prog.id}>
-                          {prog.name} — {prog.factory_name} ({prog.quality_name}, {fmtNum(prog.target)} M)
+                          {prog.name} — {prog.factory_name} ({prog.quality_name}, {fmtNum(prog.target)} M){prog.status !== 'Planned' ? ` [${prog.status}]` : ''}
                         </option>
                       ))}
                     </select>
+                    {availablePrograms.length === 0 && (
+                      <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-2">
+                        All loom programs are currently running or have POs created. Uncheck &ldquo;Hide Running &amp; PO-Created&rdquo; above if you need to view or re-issue for an existing program.
+                      </p>
+                    )}
                     {selectedProgram && (
                       <div className="p-2.5 rounded-xl border border-blue-200 bg-blue-50 text-[11px] space-y-1">
                         <div className="flex items-center justify-between font-bold text-slate-800">
@@ -850,7 +921,7 @@ export default function ProductionInstructionsPage() {
                           <span>Quality: <strong>{selectedProgram.quality_name}</strong></span>
                           <span>Start: <strong>{selectedProgram.start}</strong></span>
                           <span>Deadline: <strong>{selectedProgram.deadline}</strong></span>
-                          <span>Status: <strong>{selectedProgram.status}</strong></span>
+                          <span>Status: <strong className={selectedProgram.status === 'Running' ? 'text-blue-600' : 'text-slate-700'}>{selectedProgram.status}</strong></span>
                         </div>
                       </div>
                     )}
@@ -867,8 +938,8 @@ export default function ProductionInstructionsPage() {
                       onChange={(e) => handleSelectPo(e.target.value)}
                       className="w-full border border-slate-300 rounded-lg p-2 bg-white text-slate-800 font-medium"
                     >
-                      <option value="">{purchaseOrders.length ? 'Select Purchase Order...' : 'No purchase orders available'}</option>
-                      {purchaseOrders.map((po) => (
+                      <option value="">{availablePurchaseOrders.length ? 'Select Purchase Order...' : 'No open purchase orders available'}</option>
+                      {availablePurchaseOrders.map((po) => (
                         <option key={po.id} value={po.id}>
                           {po.poNumber} ({formatDateDDMMYYYY(po.date)}) - {po.vendor} - {poQty(po).toLocaleString('en-IN')} M
                         </option>

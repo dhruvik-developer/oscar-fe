@@ -134,16 +134,7 @@ export default function YarnManagementPage() {
         return next;
       });
 
-      // Load stock for all factories
-      const stockArr = [];
-      for (const f of fList) {
-        const sRes = await loomService.getFactoryYarnStock(f.id);
-        const sList = Array.isArray(sRes) ? sRes : sRes?.results || [];
-        sList.forEach((item) => {
-          stockArr.push({ factory_name: f.name, ...item });
-        });
-        return next;
-      });
+
 
       // Load stock for all factories in parallel
       const stockResults = await Promise.all(

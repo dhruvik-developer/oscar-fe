@@ -35,12 +35,29 @@ export default function LoomProgramsPage() {
   const [instructions, setInstructions] = useState([]);
   const [progPage, setProgPage] = useState(1);
   const [progPageSize, setProgPageSize] = useState(10);
+  const [statusFilter, setStatusFilter] = useState('All');
   const [factories, setFactories] = useState([]);
+
+  const filteredPrograms = useMemo(() => {
+    const norm = (s) => String(s || '').trim().toLowerCase();
+    return programs.filter((p) => {
+      if (statusFilter === 'All') return true;
+      if (statusFilter === 'ExcludeRunningOrPo') {
+        if (p.status === 'Running' || p.status === 'Closed') return false;
+        const matchedPi = instructions.find((pi) => norm(pi.orderReference || pi.order_reference) === norm(p.name));
+        if (matchedPi && (matchedPi.finalPoId || ['PO Pending', 'PO Created', 'Closed'].includes(matchedPi.status))) {
+          return false;
+        }
+        return true;
+      }
+      return p.status === statusFilter;
+    });
+  }, [programs, instructions, statusFilter]);
 
   const paginatedPrograms = useMemo(() => {
     const start = (progPage - 1) * progPageSize;
-    return programs.slice(start, start + progPageSize);
-  }, [programs, progPage, progPageSize]);
+    return filteredPrograms.slice(start, start + progPageSize);
+  }, [filteredPrograms, progPage, progPageSize]);
   const [qualities, setQualities] = useState([]);
   const [yarns, setYarns] = useState([]);
   const [openProgId, setOpenProgId] = useState(null);
@@ -589,10 +606,25 @@ export default function LoomProgramsPage() {
       {/* Section: Programs List Table */}
       {(activeTab === 'list' || activeTab === 'all') && (
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm">
-        <div className="px-3.5 py-2.5 sm:px-4 sm:py-3 border-b border-slate-100 dark:border-slate-800">
+        <div className="px-3.5 py-2.5 sm:px-4 sm:py-3 border-b border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-2">
           <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
             Active Programs & Progress
           </h3>
+          <div className="flex items-center gap-2">
+            <label className="text-[11px] font-semibold text-slate-500">Status:</label>
+            <select
+              value={statusFilter}
+              onChange={(e) => { setStatusFilter(e.target.value); setProgPage(1); }}
+              className="text-xs font-medium rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2 py-1 text-slate-700 dark:text-slate-200 outline-none cursor-pointer"
+            >
+              <option value="All">All Programs ({programs.length})</option>
+              <option value="Planned">Planned Only</option>
+              <option value="Running">Running Only</option>
+              <option value="Hold">On Hold</option>
+              <option value="Closed">Closed</option>
+              <option value="ExcludeRunningOrPo">Hide Running &amp; PO Created</option>
+            </select>
+          </div>
         </div>
         <div className="pms-table-container overflow-x-auto">
           <table className="w-full text-xs text-left pms-sticky-header">
@@ -705,7 +737,7 @@ export default function LoomProgramsPage() {
         </div>
 
         <TablePagination
-          total={programs.length}
+          total={filteredPrograms.length}
           page={progPage}
           pageSize={progPageSize}
           onPageChange={setProgPage}

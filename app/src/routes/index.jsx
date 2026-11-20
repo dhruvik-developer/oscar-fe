@@ -44,20 +44,22 @@ const LeadSourcesPage = lazy(() => import('../features/crm/setup/LeadSourcesPage
 // const CRMReportsPage = lazy(() => import('../features/crm/reports/CRMReportsPage'));
 
 // ── PMS — Project Management (Lazy Loaded) ───────────────────
-const PMSDashboard = lazy(() => import('../features/pms/dashboard/PMSDashboard'));
-const PMSProjectsPage = lazy(() => import('../features/pms/projects/ProjectsPage'));
-const PMSProjectDetailPage = lazy(() => import('../features/pms/projects/ProjectDetailPage'));
-const PMSMyProjectsPage = lazy(() => import('../features/pms/projects/MyProjectsPage'));
-const PMSMyTasksPage = lazy(() => import('../features/pms/tasks/MyTasksPage'));
-const PMSTimelinePage = lazy(() => import('../features/pms/timeline/TimelinePage'));
+// [DISABLED] Unused generic corporate PMS and legacy production pages:
+// const PMSDashboard = lazy(() => import('../features/pms/dashboard/PMSDashboard'));
+// const PMSProjectsPage = lazy(() => import('../features/pms/projects/ProjectsPage'));
+// const PMSProjectDetailPage = lazy(() => import('../features/pms/projects/ProjectDetailPage'));
+// const PMSMyProjectsPage = lazy(() => import('../features/pms/projects/MyProjectsPage'));
+// const PMSMyTasksPage = lazy(() => import('../features/pms/tasks/MyTasksPage'));
+// const PMSTimelinePage = lazy(() => import('../features/pms/timeline/TimelinePage'));
+// const PMSReportsPage = lazy(() => import('../features/pms/reports/PMSReportsPage'));
+// const PMSClientProofApprovalPage = lazy(() => import('../features/pms/approval/ClientProofApprovalPage'));
+// const PMSProductionDashboardPage = lazy(() => import('../features/pms/production/ProductionDashboardPage'));
+// const PMSDailyProductionPage = lazy(() => import('../features/pms/production/DailyProductionPage'));
+// const PMSPublicProductionEntryPage = lazy(() => import('../features/pms/production/PublicProductionEntryPage'));
+
 const PMSDelayDashboardPage = lazy(() => import('../features/pms/delays/DelayDashboardPage'));
-const PMSReportsPage = lazy(() => import('../features/pms/reports/PMSReportsPage'));
 const PMSSettingsPage = lazy(() => import('../features/pms/settings/PMSSettingsPage'));
-const PMSClientProofApprovalPage = lazy(() => import('../features/pms/approval/ClientProofApprovalPage'));
-const PMSProductionDashboardPage = lazy(() => import('../features/pms/production/ProductionDashboardPage'));
 const PMSProductionInstructionsPage = lazy(() => import('../features/pms/production/ProductionInstructionsPage'));
-const PMSDailyProductionPage = lazy(() => import('../features/pms/production/DailyProductionPage'));
-const PMSPublicProductionEntryPage = lazy(() => import('../features/pms/production/PublicProductionEntryPage'));
 const PMSProductionCompletionPage = lazy(() => import('../features/pms/production/ProductionCompletionVerificationPage'));
 
 // Loom & Weaving Manufacturing Subsystem
@@ -331,20 +333,18 @@ const router = createBrowserRouter([
     element: <Page component={ResetPasswordPage} />,
     errorElement: <RootErrorBoundary />,
   },
-  // ── Client-facing design approval link ────────────────────
-  // Deliberately outside MainLayout: the recipient is a customer, not a user of
-  // the ERP, so the page carries no sidebar, topbar or internal navigation.
-  {
-    path: '/pms/approve/:token',
-    element: <Page component={PMSClientProofApprovalPage} />,
-    errorElement: <RootErrorBoundary />,
-  },
-  // ── Per-project daily production entry link (shop floor, no sign-in) ──
-  {
-    path: '/production-entry/:token',
-    element: <Page component={PMSPublicProductionEntryPage} />,
-    errorElement: <RootErrorBoundary />,
-  },
+  // [DISABLED] Client-facing design approval link
+  // {
+  //   path: '/pms/approve/:token',
+  //   element: <Page component={PMSClientProofApprovalPage} />,
+  //   errorElement: <RootErrorBoundary />,
+  // },
+  // [DISABLED] Per-project daily production entry link (superseded by loom daily entry)
+  // {
+  //   path: '/production-entry/:token',
+  //   element: <Page component={PMSPublicProductionEntryPage} />,
+  //   errorElement: <RootErrorBoundary />,
+  // },
   // ── Public quotation link (shared with customers, no sign-in) ──
   // [Quotation & Proforma Invoice modules are commented out]
   // {
@@ -426,30 +426,31 @@ const router = createBrowserRouter([
       // [REMOVED] `crm/reports` — CRM Reports concept removed from the CRM module.
       // { path: 'crm/quotations', element: <Page component={QuotationsPage} /> },
 
-      // ── PMS — Project Management ──────────────────────────
+      // ── PMS — Loom & Manufacturing ──────────────────────────
       { path: 'pms', element: <Page component={LoomDashboardPage} /> },
-      { path: 'pms/legacy-dashboard', element: <Page component={PMSDashboard} /> },
-      { path: 'pms/projects', element: <Page component={PMSProjectsPage} /> },
-      { path: 'pms/projects/:id', element: <Page component={PMSProjectDetailPage} /> },
-      { path: 'pms/my-projects', element: <Page component={PMSMyProjectsPage} /> },
-      { path: 'pms/my-tasks', element: <Page component={PMSMyTasksPage} /> },
-      { path: 'pms/timeline', element: <Page component={PMSTimelinePage} /> },
-      { path: 'pms/delays', element: <Page component={PMSDelayDashboardPage} /> },
-      { path: 'pms/reports', element: <Page component={PMSReportsPage} /> },
-      { path: 'pms/settings', element: <Page component={PMSSettingsPage} /> },
-      { path: 'pms/production-dashboard', element: <Page component={PMSProductionDashboardPage} /> },
-      { path: 'pms/production-instructions', element: <Page component={PMSProductionInstructionsPage} /> },
-      { path: 'pms/daily-production', element: <Page component={PMSDailyProductionPage} /> },
-      { path: 'pms/production-completion', element: <Page component={PMSProductionCompletionPage} /> },
-
-      // Loom & Weaving Manufacturing
       { path: 'pms/loom-dashboard', element: <Page component={LoomDashboardPage} /> },
       { path: 'pms/looms', element: <Page component={MachinesAndBeamsPage} /> },
       { path: 'pms/loom-daily', element: <Page component={DailyLoomEntryPage} /> },
       { path: 'pms/yarn', element: <Page component={YarnManagementPage} /> },
       { path: 'pms/programs', element: <Page component={LoomProgramsPage} /> },
       { path: 'pms/fabric-out', element: <Page component={FabricOutPage} /> },
+      { path: 'pms/production-instructions', element: <Page component={PMSProductionInstructionsPage} /> },
+      { path: 'pms/production-completion', element: <Page component={PMSProductionCompletionPage} /> },
       { path: 'pms/loom-masters', element: <Page component={LoomMastersPage} /> },
+      { path: 'pms/delays', element: <Page component={PMSDelayDashboardPage} /> },
+      { path: 'pms/settings', element: <Page component={PMSSettingsPage} /> },
+
+      // [DISABLED / REDIRECTED] Unused generic corporate PMS and legacy pages:
+      // Redirect cleanly to active Loom PMS counterparts so no links or bookmarks break
+      { path: 'pms/projects', element: <Navigate to="/pms/programs" replace /> },
+      { path: 'pms/projects/:id', element: <Navigate to="/pms/programs" replace /> },
+      { path: 'pms/my-projects', element: <Navigate to="/pms/programs" replace /> },
+      { path: 'pms/my-tasks', element: <Navigate to="/pms/programs" replace /> },
+      { path: 'pms/timeline', element: <Navigate to="/pms/programs" replace /> },
+      { path: 'pms/legacy-dashboard', element: <Navigate to="/pms" replace /> },
+      { path: 'pms/production-dashboard', element: <Navigate to="/pms" replace /> },
+      { path: 'pms/daily-production', element: <Navigate to="/pms/loom-daily" replace /> },
+      { path: 'pms/reports', element: <Navigate to="/reports" replace /> },
       // Salesperson incentive lives in HRMS only; old links land there.
       { path: 'production/incentives', element: <Navigate to="/hrms/incentives" replace /> },
       { path: 'pms/incentives', element: <Navigate to="/hrms/incentives" replace /> },

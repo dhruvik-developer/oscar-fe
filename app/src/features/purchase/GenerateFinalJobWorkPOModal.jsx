@@ -28,7 +28,7 @@ export default function GenerateFinalJobWorkPOModal({
   isApproved = false,
   onSuccess,
 }) {
-  const { vendors = [], showToast } = useERP();
+  const { vendors = [], showToast, refreshCollections } = useERP();
 
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -452,6 +452,7 @@ export default function GenerateFinalJobWorkPOModal({
           'success'
         );
       }
+      refreshCollections?.(['purchaseOrders']);
       if (onSuccess) onSuccess(res);
       onClose();
     } catch (err) {

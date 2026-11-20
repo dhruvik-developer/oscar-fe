@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ArrowLeft, Printer, Plus, Eye, ListChecks,
   ClipboardList, Package, XCircle, CheckCircle2, AlertTriangle,
-  IndianRupee, Check, X, FileText, LayoutGrid, Pencil,
+  IndianRupee, Check, X, FileText, LayoutGrid, Pencil, Clock,
 } from 'lucide-react';
 import PageHeader from '../../../components/ui/PageHeader';
 import KpiCard from '../../../components/ui/KpiCard';
@@ -30,7 +30,7 @@ const fmtINR = (n) => (n === null || n === undefined || n === ''
 
 export default function ProductionCompletionVerificationPage() {
   const navigate = useNavigate();
-  const { showToast } = useERP();
+  const { showToast, refreshCollections } = useERP();
   const [confirmCompleteOpen, setConfirmCompleteOpen] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -595,8 +595,9 @@ export default function ProductionCompletionVerificationPage() {
               <button
                 type="button"
                 onClick={() => {
-                  if (finalPoId) {
-                    navigate(`/purchase/orders?po=${encodeURIComponent(finalPoId)}`);
+                  const targetRef = finalPoId || finalPoNumber;
+                  if (targetRef) {
+                    navigate(`/purchase/orders?tab=orders&po=${encodeURIComponent(targetRef)}&search=${encodeURIComponent(finalPoNumber || '')}`);
                   } else {
                     setShowGeneratePoModal(true);
                   }
@@ -846,6 +847,7 @@ export default function ProductionCompletionVerificationPage() {
               : `Final Job Work PO ${hasFinalPo ? 'updated' : 'created'} successfully.`
           );
           if (activePiId) loadCompletionData(activePiId);
+          refreshCollections?.(['purchaseOrders']);
         }}
       />
 

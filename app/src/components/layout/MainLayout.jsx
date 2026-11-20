@@ -1,14 +1,15 @@
 import { useEffect } from 'react';
 import { Outlet, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
-import { LogOut } from 'lucide-react';
+
 import Sidebar from './Sidebar';
 import Topbar from './Topbar';
 import { CommandPalette } from '../common/CommandPalette';
+import GlobalVoiceNotifier from '../notifications/GlobalVoiceNotifier';
 import { useAppStore } from '../../stores/appStore';
 import { useProofApprovalSync } from '../../features/pms/approval/useProofApprovalSync';
 import { useModuleHydration } from '../../hooks/useModuleHydration';
 import { logout } from '../../services/authService';
-import { isLoomAdminOrManager } from '../../features/pms/loom/DailyLoomEntryPage';
+
 
 // ERP-only UI scope: graph.json global-shell guidance applied purely as a
 // CSS class. CRM/HRMS routes never receive `erp-scope`, so their UI is
@@ -39,13 +40,6 @@ export default function MainLayout() {
   // Standalone kiosk view is ONLY active when accessed via link query (?standalone=1 or ?direct=1) or iframe.
   // In the real system, the sidebar & full navigation shell remain visible for all users.
   const showStandaloneOnly = IS_EMBEDDED || isStandaloneQuery;
-
-  const handleSignOut = async () => {
-    try {
-      await logout();
-    } catch {}
-    navigate('/login');
-  };
 
   // Fill the module stores from the API for this session.
   useModuleHydration();
@@ -138,7 +132,18 @@ export default function MainLayout() {
     return () => window.clearTimeout(timer);
   }, [clearToast, toast]);
 
-  if (showStandaloneOnly) {
+  if (IS_EMBEDDED) {
+    return (
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col">
+        <main className={`flex-1 p-3 sm:p-6 max-w-7xl w-full mx-auto content${isErpRoute ? ' erp-scope' : ''}`}>
+          <Outlet />
+        </main>
+        {toast && <div className="toast">{toast.msg}</div>}
+      </div>
+    );
+  }
+
+  if (isStandaloneQuery) {
     return (
       <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col">
         {/* Minimal Kiosk / Focused Header Bar - No system navigation */}
@@ -155,52 +160,6 @@ export default function MainLayout() {
                 Daily Loom Production Portal
               </span>
             </div>
-          </div>
-
-          <div className="flex items-center gap-2 sm:gap-3">
-            {currentUser && (
-              <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-800 px-2 sm:px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 text-xs">
-                <div className="w-5 h-5 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 flex items-center justify-center font-bold text-[10px]">
-                  {currentUser.initials || currentUser.name?.[0] || 'U'}
-                </div>
-                <div className="text-left hidden sm:block">
-                  <span className="font-bold text-slate-800 dark:text-slate-200 block text-[11px] leading-tight">
-                    {currentUser.name}
-                  </span>
-                  <span className="text-[9px] text-slate-400 block leading-tight">
-                    {currentUser.role?.name || (typeof currentUser.role === 'string' ? currentUser.role : 'Production Staff')}
-                  </span>
-                </div>
-              </div>
-            )}
-
-            {/* Button to switch to Full System with Sidebar */}
-            {currentUser && (
-              <button
-                type="button"
-                onClick={() => {
-                  const url = new URL(window.location.href);
-                  url.searchParams.delete('standalone');
-                  url.searchParams.delete('direct');
-                  window.location.href = url.pathname + url.search;
-                }}
-                className="text-[11px] font-semibold text-blue-600 hover:text-blue-700 dark:text-blue-400 px-2.5 py-1.5 rounded-lg border border-blue-200 dark:border-blue-800 hover:bg-blue-50 dark:hover:bg-blue-950/40 transition-colors inline-flex"
-                title="Open inside full ERP navigation shell"
-              >
-                Open Full System
-              </button>
-            )}
-
-            {/* Sign Out Button */}
-            <button
-              type="button"
-              onClick={handleSignOut}
-              className="text-xs font-semibold text-rose-600 hover:text-rose-700 dark:text-rose-400 px-2.5 py-1.5 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-lg transition-colors flex items-center gap-1.5 border border-rose-200 dark:border-rose-900/40"
-              title="Sign Out"
-            >
-              <LogOut size={13} />
-              <span className="hidden sm:inline">Sign Out</span>
-            </button>
           </div>
         </header>
 
@@ -240,6 +199,9 @@ export default function MainLayout() {
         isOpen={commandPaletteOpen}
         onClose={() => setCommandPaletteOpen(false)}
       />
+
+      {/* Global Voice Notification Announcements */}
+      <GlobalVoiceNotifier />
 
       {/* Global Toast */}
       {toast && (

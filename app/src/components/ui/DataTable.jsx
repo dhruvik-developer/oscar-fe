@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { MoreVertical, Search, Download } from 'lucide-react';
+import { exportTableData } from '../../services/exportUtils';
 import TablePagination from './TablePagination';
 import { SortIcon } from './SortableTh';
 import { sortRows } from '../../hooks/useTableSort';
@@ -40,7 +41,8 @@ export function DataTable({
   const [sortKey, setSortKey] = useState('');
   const [sortDir, setSortDir] = useState('asc');
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(initialPageSize);
+  const [pageSize, setPageSize] = useState(initialPageSize || 10);
+  const [exportOpen, setExportOpen] = useState(false);
 
   // Sync pageSize if initialPageSize changes externally
   useEffect(() => {
@@ -248,14 +250,20 @@ export function DataTable({
               </div>
             )}
             {exportable && safeData.length > 0 && (
-              <button
-                type="button"
-                onClick={handleExportCSV}
-                title="Export Table to CSV"
-                className="p-1.5 border border-border hover:bg-card-hover rounded-xl text-muted hover:text-text cursor-pointer transition shadow-2xs flex items-center gap-1 text-xs shrink-0"
-              >
-                <Download size={14} />
-              </button>
+              <div className="relative">
+                <button type="button" onClick={() => setExportOpen((v) => !v)} className="p-1.5 border border-border hover:bg-card-hover rounded-xl text-muted hover:text-text cursor-pointer transition shadow-2xs flex items-center gap-1 text-xs shrink-0">
+                  <Download size={14} />
+                </button>
+                {exportOpen && (
+                  <div className="absolute right-0 mt-2 w-40 bg-card border border-border rounded-xl shadow-lg z-20">
+                    {['csv','xlsx','pdf'].map((f) => (
+                      <button key={f} type="button" onClick={() => { setExportOpen(false); exportTableData(title || 'export', columns, filtered, f); }} className="block w-full text-left px-3 py-2 text-xs hover:bg-card-hover">
+                        Export as {f.toUpperCase() === 'XLSX' ? 'Excel (.xlsx)' : f.toUpperCase()}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             )}
             {action && <div>{action}</div>}
           </div>

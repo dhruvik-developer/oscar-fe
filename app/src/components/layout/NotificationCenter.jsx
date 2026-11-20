@@ -23,10 +23,18 @@ import {
   MoreHorizontal,
   UserRound,
   Users,
+  Volume2,
+  VolumeX,
   Wallet,
   Factory,
   X,
 } from 'lucide-react';
+import VoiceSettingsModal from '../notifications/VoiceSettingsModal';
+import {
+  getVoiceSettings,
+  saveSettings as saveVoiceSettings,
+  subscribeToVoiceSettings,
+} from '../../services/voiceNotificationService';
 import { useERP } from '../../context/ERPContext';
 import { useCrmNotificationDigest } from '../../hooks/useCrmNotificationDigest';
 import { useIdleReady } from '../../hooks/useIdleReady';
@@ -477,6 +485,21 @@ export default function NotificationCenter() {
   const [moduleFilter, setModuleFilter] = useState('');
   const [busyKey, setBusyKey] = useState('');
   const [desktop, setDesktop] = useState(readDesktopPref);
+  const [voiceModalOpen, setVoiceModalOpen] = useState(false);
+  const [voiceEnabled, setVoiceEnabled] = useState(() => getVoiceSettings().enabled);
+
+  useEffect(() => {
+    return subscribeToVoiceSettings((s) => {
+      setVoiceEnabled(Boolean(s.enabled));
+    });
+  }, []);
+
+  const toggleVoice = () => {
+    const next = !voiceEnabled;
+    setVoiceEnabled(next);
+    saveVoiceSettings({ enabled: next });
+    setActionNote(next ? 'Notification sound turned ON.' : 'Notification sound muted.');
+  };
 
   const rootRef = useRef(null);
   const bellRef = useRef(null);
@@ -783,6 +806,14 @@ export default function NotificationCenter() {
                 >
                   <CheckCheck size={15} />
                 </IconButton>
+                <IconButton
+                  label={voiceEnabled ? 'Notification Sound (ON) - Configure settings' : 'Notification Sound (Muted) - Configure settings'}
+                  active={voiceEnabled}
+                  onClick={() => { setOpen(false); setVoiceModalOpen(true); }}
+                  className={voiceEnabled ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400'}
+                >
+                  {voiceEnabled ? <Volume2 size={15} /> : <VolumeX size={15} />}
+                </IconButton>
                 <div className="relative" ref={menuRef}>
                   <IconButton
                     label="More options"
@@ -797,6 +828,8 @@ export default function NotificationCenter() {
                     <div role="menu" className="absolute right-0 top-full mt-1 z-30 w-56 rounded-xl border border-border bg-card p-1 shadow-[var(--shadow-popover)]">
                       {[
                         { label: 'Refresh', icon: RefreshCw, run: () => { retry(); setMenuOpen(false); } },
+                        { label: 'Notification sound settings', icon: Volume2, run: () => { setOpen(false); setMenuOpen(false); setVoiceModalOpen(true); } },
+                        { label: voiceEnabled ? 'Mute notification sound' : 'Turn on notification sound', icon: voiceEnabled ? VolumeX : Volume2, run: () => { toggleVoice(); setMenuOpen(false); } },
                         { label: 'All notifications', icon: ListChecks, run: () => go('/notifications') },
                         ...(hasRead ? [{ label: 'Clear read notifications', icon: Eraser, run: clearRead }] : []),
                         { label: desktop ? 'Turn off desktop alerts' : 'Turn on desktop alerts', icon: BellRing, run: toggleDesktop },
@@ -995,6 +1028,12 @@ export default function NotificationCenter() {
           </div>
         </div>
       )}
+
+      {/* Voice Announcement Settings Modal */}
+      <VoiceSettingsModal
+        isOpen={voiceModalOpen}
+        onClose={() => setVoiceModalOpen(false)}
+      />
     </div>
   );
 }

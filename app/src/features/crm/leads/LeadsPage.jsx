@@ -72,7 +72,7 @@ import { buildLeadPayload } from './leadPayload';
 
 const DEFAULT_FILTERS = { statuses: [], sources: [], systemDefined: [], search: '' };
 
-const DEFAULT_SORT = { field: '', direction: 'ascending' };
+const DEFAULT_SORT = { field: 'leadNumber', direction: 'ascending' };
 
 
 
@@ -242,35 +242,29 @@ const leadsGuide = {
 
 function getSortValue(lead, field, columnsByKey) {
 
+  if (!lead) return '';
+
   const column = columnsByKey?.get(field);
 
-  if (column) {
+  const raw = column ? leadColumnValue(lead, column) : (lead[field] ?? '');
 
-    const raw = leadColumnValue(lead, column);
+  if (field === 'createdOn' || column?.rowKey === 'createdOn' || column?.kind === 'taskDate') {
 
-    if (column.rowKey === 'createdOn' || column.kind === 'taskDate') {
+    const rawDate = raw || lead.createdOn || lead.created_on || lead.createdAt || lead.created_at;
 
-      const time = new Date(raw).getTime();
+    const time = new Date(rawDate).getTime();
 
-      if (!Number.isNaN(time) && raw) return time;
-
-    }
-
-    return String(raw ?? '').toLowerCase();
+    if (!Number.isNaN(time) && rawDate) return time;
 
   }
 
-  if (field === 'createdOn') {
+  if (field === 'leadNumber' || column?.kind === 'leadNumber') {
 
-    const time = new Date(lead.createdOn).getTime();
-
-    if (!Number.isNaN(time) && lead.createdOn) return time;
+    return String(lead.leadNumber || lead.lead_number || raw || '').trim();
 
   }
 
-  if (field === 'leadNumber') return String(lead.leadNumber ?? lead.lead_number ?? '').toLowerCase();
-
-  return String(lead[field] ?? '').toLowerCase();
+  return raw ?? '';
 
 }
 
@@ -654,19 +648,37 @@ export default function LeadsPage() {
 
       if (!aPinned && bPinned) return 1;
 
+      const sortField = appliedSort.field || 'leadNumber';
 
+      const av = getSortValue(a, sortField, columnsByKey);
 
-      if (!appliedSort.field) return String(a.id).localeCompare(String(b.id));
+      const bv = getSortValue(b, sortField, columnsByKey);
 
-      const av = getSortValue(a, appliedSort.field, columnsByKey);
+      if (typeof av === 'number' && typeof bv === 'number') {
 
-      const bv = getSortValue(b, appliedSort.field, columnsByKey);
+        if (av !== bv) return (av - bv) * dir;
 
-      if (av < bv) return -1 * dir;
+      } else {
 
-      if (av > bv) return 1 * dir;
+        const cmp = String(av ?? '').localeCompare(String(bv ?? ''), undefined, {
 
-      return String(a.id).localeCompare(String(b.id));
+          numeric: true,
+
+          sensitivity: 'base',
+
+        });
+
+        if (cmp !== 0) return cmp * dir;
+
+      }
+
+      // Tie breaker: natural sort by leadNumber ascending
+
+      const aNum = String(a.leadNumber || a.lead_number || '');
+
+      const bNum = String(b.leadNumber || b.lead_number || '');
+
+      return aNum.localeCompare(bNum, undefined, { numeric: true, sensitivity: 'base' });
 
     });
 

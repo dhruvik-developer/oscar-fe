@@ -1,10 +1,8 @@
 import React, { useEffect } from 'react';
 import { X, Printer, CheckCircle2, FileText } from 'lucide-react';
-import { SignatureSlot, useDocumentSignatures } from './SignatureSlot';
 import { useERP } from '../../context/ERPContext';
 import { fmtAddress } from './printDocUtils';
 export const PrintInvoiceModal = ({ isOpen, onClose, invoice, balanceDue = 0, }) => {
-  const docSigs = useDocumentSignatures('SalesInvoice', invoice?.id, `Invoice ${invoice?.invoiceNumber || invoice?.number || ""}`);
     const { companyProfile } = useERP(); // [PHASE-2E.1] profile-driven letterhead (was hardcoded US strings)
     // ── [PHASE-2E.1] GST compliance helpers (Sweven: MH → intra CGST+SGST, out-of-state → IGST) ──
     const companyName = companyProfile?.name || 'HORIZON ENTERPRISE LOGISTICS';
@@ -269,30 +267,7 @@ export const PrintInvoiceModal = ({ isOpen, onClose, invoice, balanceDue = 0, })
             </div>
           </div>
 
-          {/* Authorization & Signatures */}
-          <div className="pt-8 border-t border-slate-300 grid grid-cols-2 gap-12 text-center text-xs">
-            <div className="space-y-8">
-              <div className="border-b border-slate-400 pb-1">
-                <SignatureSlot doc={docSigs} signatory="customer" label="Client Acceptance" modalType="receiver" defaultName={invoice?.customer || ""} defaultDesignation="Authorized Customer Representative"
-                  placeholder={<span className="font-mono text-slate-400 text-[10px] italic">Client Acceptance Signature</span>} />
-              </div>
-              <div>
-                <p className="font-bold text-slate-900">Authorized Customer Representative</p>
-                <p className="text-[10px] text-slate-500">Sign & Date upon Receiving Consignment</p>
-              </div>
-            </div>
 
-            <div className="space-y-8">
-              <div className="border-b border-slate-400 pb-1">
-                <SignatureSlot doc={docSigs} signatory="authorized" label="Corporate Seal & Auth" modalType="authorized" defaultDesignation="Chief Financial Officer / Billing Controller"
-                  placeholder={<span className="font-mono text-slate-400 text-[10px] italic">{companyShort} Corporate Seal &amp; Auth</span>} />
-              </div>
-              <div>
-                <p className="font-bold text-slate-900">Chief Financial Officer / Billing Controller</p>
-                <p className="text-[10px] text-slate-500">{companyName}</p>
-              </div>
-            </div>
-          </div>
 
           {/* Footer Notice */}
           <div className="text-center text-[10px] text-slate-400 pt-4 border-t border-slate-100">

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import {
   Plus,
@@ -21,9 +21,11 @@ import {
   ChevronDown,
   ChevronRight,
   BookOpen,
+  FileText,
+  FileSpreadsheet,
 } from 'lucide-react';
 import { api } from '../../services/api';
-import { exportToCSV } from '../../services/exportUtils';
+import { exportToCSV, exportToExcel, exportToPDF } from '../../services/exportUtils';
 import { PageHeader } from '../../components/common/PageHeader';
 import ExpenseCategoriesPage from './ExpenseCategoriesPage';
 import AccountingLogPage from './AccountingLogPage';
@@ -250,11 +252,25 @@ export default function ChartOfAccountsPage() {
     }
   };
 
-  // Export CSV
-  const handleExportCSV = () => {
-    if (!accounts.length) return;
+  const [exportMenuOpen, setExportMenuOpen] = useState(false);
+  const exportMenuRef = useRef(null);
+
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (exportMenuRef.current && !exportMenuRef.current.contains(event.target)) {
+        setExportMenuOpen(false);
+      }
+    }
+    if (exportMenuOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [exportMenuOpen]);
+
+  const getExportData = () => {
+    const source = (filteredAccounts && filteredAccounts.length > 0) ? filteredAccounts : accounts;
     const headers = ['Account Code', 'Account Name', 'Type', 'Sub-type', 'Is System', 'Balance (INR)', 'Status'];
-    const rows = accounts.map((a) => [
+    const rows = source.map((a) => [
       a.code,
       a.name,
       a.type,
@@ -263,7 +279,38 @@ export default function ChartOfAccountsPage() {
       Number(a.balance) || 0,
       a.isActive !== false ? 'Active' : 'Inactive',
     ]);
-    exportToCSV(`Chart_of_Accounts_${new Date().toISOString().slice(0, 10)}`, headers, rows);
+    const stamp = new Date().toISOString().slice(0, 10);
+    const filename = `Chart_of_Accounts_${stamp}`;
+    return { headers, rows, filename };
+  };
+
+  // Export CSV
+  const handleExportCSV = () => {
+    const { headers, rows, filename } = getExportData();
+    if (!rows.length) return;
+    exportToCSV(filename, headers, rows);
+    setExportMenuOpen(false);
+  };
+
+  // Export Excel (.xlsx)
+  const handleExportExcel = () => {
+    const { headers, rows, filename } = getExportData();
+    if (!rows.length) return;
+    exportToExcel(filename, headers, rows, 'Chart of Accounts');
+    setExportMenuOpen(false);
+  };
+
+  // Export PDF (.pdf)
+  const handleExportPDF = async () => {
+    const { headers, rows, filename } = getExportData();
+    if (!rows.length) return;
+    await exportToPDF(filename, headers, rows, {
+      title: 'OSCAR ERP — Chart of Accounts',
+      subtitle: `Generated on ${new Date().toLocaleString()} | Total Accounts: ${rows.length}`,
+      orientation: 'landscape',
+      colWidths: [30, 65, 30, 40, 25, 45, 34],
+    });
+    setExportMenuOpen(false);
   };
 
   // Filter accounts
@@ -326,14 +373,50 @@ export default function ChartOfAccountsPage() {
           breadcrumb={[{ label: 'Accounts', to: '/accounts/cash-bank' }, { label: 'Chart of Accounts' }]}
           actions={
             <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                onClick={handleExportCSV}
-                className="px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold flex items-center gap-1.5 shadow-2xs cursor-pointer"
-              >
-                <Download size={14} className="text-slate-500" />
-                <span>Export CSV</span>
-              </button>
+              {/* Export Formats Dropdown (CSV, Excel, PDF) */}
+              <div className="relative" ref={exportMenuRef}>
+                <button
+                  type="button"
+                  onClick={() => setExportMenuOpen((prev) => !prev)}
+                  className="px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold flex items-center gap-1.5 shadow-2xs cursor-pointer transition-colors"
+                >
+                  <Download size={14} className="text-slate-500" />
+                  <span>Export</span>
+                  <ChevronDown size={13} className={`text-slate-400 transition-transform ${exportMenuOpen ? 'rotate-180' : ''}`} />
+                </button>
+
+                {exportMenuOpen && (
+                  <div className="absolute left-0 sm:left-auto sm:right-0 mt-1.5 w-48 bg-white border border-slate-200 rounded-xl shadow-lg z-50 py-1 overflow-hidden animate-in fade-in zoom-in-95 duration-100">
+                    <div className="px-3 py-1.5 text-[11px] font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-100">
+                      Export Options
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleExportCSV}
+                      className="w-full text-left px-3 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-blue-600 flex items-center gap-2 transition-colors cursor-pointer"
+                    >
+                      <Download size={14} className="text-slate-400" />
+                      <span>Export as <strong>CSV (.csv)</strong></span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleExportExcel}
+                      className="w-full text-left px-3 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-emerald-600 flex items-center gap-2 transition-colors cursor-pointer"
+                    >
+                      <FileSpreadsheet size={14} className="text-emerald-500" />
+                      <span>Export as <strong>Excel (.xlsx)</strong></span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleExportPDF}
+                      className="w-full text-left px-3 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-rose-600 flex items-center gap-2 transition-colors cursor-pointer"
+                    >
+                      <FileText size={14} className="text-rose-500" />
+                      <span>Export as <strong>PDF (.pdf)</strong></span>
+                    </button>
+                  </div>
+                )}
+              </div>
               <button
                 type="button"
                 onClick={() => window.print()}

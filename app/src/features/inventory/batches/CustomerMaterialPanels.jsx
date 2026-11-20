@@ -95,6 +95,7 @@ const STATES = [
   ['rework', 'Rework'],
   ['secondQuality', 'Second'],
   ['rejected', 'Rejected'],
+  ['sample', 'Sample'],
 ];
 
 /** Everything physically in OSCAR's custody: own stock vs each customer's material. */

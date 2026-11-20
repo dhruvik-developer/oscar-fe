@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import Modal from '../../../components/ui/Modal';
 import PageHeader from '../../../components/ui/PageHeader';
+import HrmsExportDropdown from '../../../components/hrms/HrmsExportDropdown';
 import { hrmsGuides } from '../../../data/hrms/hrmsGuides';
 import { hrmsSync, pullOrgChart } from '../../../services/hrmsSync';
 
@@ -344,39 +345,25 @@ export function OrgChartPage() {
         guide={hrmsGuides.orgChart}
         actions={
           <div className="flex items-center gap-2.5">
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => setIsExportOpen(!isExportOpen)}
-                disabled={employeeCount === 0}
-                className="px-4 py-2 border border-bdr bg-white hover:bg-slate-50 text-slate-700 rounded-xl text-[13px] font-medium flex items-center gap-2 shadow-xs transition-colors cursor-pointer disabled:opacity-50"
-              >
-                <Download size={15} />
-                <span>Export</span>
-                <ChevronDown size={13} className="text-muted" />
-              </button>
-
-              {isExportOpen && (
-                <div className="absolute right-0 mt-2 w-48 bg-white border border-bdr rounded-xl shadow-lg py-1.5 z-30 animate-in fade-in slide-in-from-top-2 duration-150">
-                  <button
-                    type="button"
-                    onClick={exportCSV}
-                    className="w-full px-3.5 py-2 text-left text-[13px] text-slate-700 hover:bg-slate-50 flex items-center gap-2.5 cursor-pointer"
-                  >
-                    <FileSpreadsheet size={16} className="text-emerald-600" />
-                    <span>Export as CSV</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={exportPrint}
-                    className="w-full px-3.5 py-2 text-left text-[13px] text-slate-700 hover:bg-slate-50 flex items-center gap-2.5 cursor-pointer"
-                  >
-                    <Printer size={16} className="text-blue-600" />
-                    <span>Print / Save as PDF</span>
-                  </button>
-                </div>
-              )}
-            </div>
+            <HrmsExportDropdown
+              filename="Org_Chart"
+              reportTitle="Organisation Structure Chart"
+              subtitle={subtitle}
+              columns={[
+                { label: "Employee Code", get: ({ node }) => node.employeeCode || "", width: 85 },
+                { label: "Name", get: ({ node }) => node.name || "", width: 120 },
+                { label: "Designation", get: ({ node }) => node.designation || "", width: 110 },
+                { label: "Department", get: ({ node }) => node.department || "", width: 95 },
+                { label: "Reports To", get: ({ node }) => node.manager || "—", width: 110 },
+                { label: "Email", get: ({ node }) => node.email || "", width: 130 },
+                { label: "Phone", get: ({ node }) => node.phone || "", width: 90 },
+                { label: "Location", get: ({ node }) => node.location || "", width: 85 },
+                { label: "Status", get: ({ node }) => node.status || "", width: 70, align: "center" },
+              ]}
+              rows={everyone}
+              disabled={employeeCount === 0}
+              buttonLabel="Export"
+            />
 
             <button
               type="button"

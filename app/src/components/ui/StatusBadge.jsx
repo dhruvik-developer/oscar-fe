@@ -81,6 +81,10 @@ const STATUS_MAP = {
   'Finalization': 'badge-green',
 
   // Valuation
+  'Ready for Review': 'badge-purple',
+  'Counting': 'badge-yellow',
+  'Matched': 'badge-green',
+  'Variance': 'badge-orange',
   'Posted': 'badge-green',
   'Voided': 'badge-red',
 };

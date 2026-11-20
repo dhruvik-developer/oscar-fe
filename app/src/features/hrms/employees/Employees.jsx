@@ -5,6 +5,7 @@ import EmployeeProfileModal from "./EmployeeProfileModal";
 import Modal from "../../../components/ui/Modal";
 import { useAppStore } from "../../../stores/appStore";
 import PageHeader from "../../../components/ui/PageHeader";
+import HrmsExportDropdown from "../../../components/hrms/HrmsExportDropdown";
 import AppPagination from "../../../components/ui/AppPagination";
 import { Avatar } from "../../../components/hrms/Avatar";
 import { hrmsGuides } from "../../../data/hrms/hrmsGuides";
@@ -160,9 +161,22 @@ export default function Employees() {
         ]}
         actions={
           <>
-            <button type="button" onClick={handleExport} className="emp-export-btn">
-              <Download size={15} /> Export
-            </button>
+            <HrmsExportDropdown
+              filename="employee-directory"
+              reportTitle="Employee Directory"
+              subtitle={`Total Employees: ${filtered.length}`}
+              columns={[
+                { label: "Employee ID", get: (e) => e.employeeCode || e.empId || e.id || "", width: 85 },
+                { label: "Name", get: (e) => e.name || "", width: 120 },
+                { label: "Email", get: (e) => e.email || "", width: 130 },
+                { label: "Designation", get: (e) => e.designation || "", width: 100 },
+                { label: "Department", get: (e) => e.department || "", width: 95 },
+                { label: "Reporting Manager", get: (e) => e.manager || e.reportingManager || "—", width: 110 },
+                { label: "Status", get: (e) => e.status || "", width: 75, align: "center" },
+              ]}
+              rows={filtered}
+              buttonLabel="Export"
+            />
             <button type="button" onClick={() => setShowForm(true)} className="emp-add-btn">
               Add Employee
             </button>

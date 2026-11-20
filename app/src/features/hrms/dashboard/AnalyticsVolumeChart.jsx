@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { FileSpreadsheet, Download, ChevronDown } from "lucide-react";
 import { useAppStore } from "../../../stores/appStore";
+import HrmsExportDropdown from "../../../components/hrms/HrmsExportDropdown";
 
 const TABS = [
   "Employee",
@@ -320,26 +321,26 @@ export default function AnalyticsVolumeChart({ serverAnalytics = null, serverDep
           })}
         </div>
 
-        {/* Export Buttons */}
+        {/* Export Dropdown */}
         <div className="flex items-center gap-2 pb-2.5">
-          <button
-            type="button"
-            onClick={handleExportCSV}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-semibold text-[#334155] bg-white border border-[#cbd5e1] rounded-lg hover:bg-[#f8fafc] hover:border-[#94a3b8] transition cursor-pointer"
-            title="Export CSV"
-          >
-            <Download size={13} className="text-[#64748b]" />
-            CSV
-          </button>
-          <button
-            type="button"
-            onClick={handleExportExcel}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-semibold text-[#334155] bg-white border border-[#cbd5e1] rounded-lg hover:bg-[#f8fafc] hover:border-[#94a3b8] transition cursor-pointer"
-            title="Export Excel"
-          >
-            <FileSpreadsheet size={13} className="text-[#15803d]" />
-            Excel
-          </button>
+          <HrmsExportDropdown
+            filename={`HRMS_${activeTab}_Volume_${department.replace(/\s+/g, "_")}`}
+            reportTitle={`HRMS ${activeTab} Volume - ${department}`}
+            subtitle={`Department: ${department}  |  Metric: ${activeTab}`}
+            columns={[
+              { label: "Month", get: (m) => m.month, width: 90 },
+              ...seriesNames.map((name, i) => ({
+                label: name,
+                get: (m) => String(m[`s${i + 1}`] ?? 0),
+                width: 80,
+                align: "center",
+              })),
+              { label: "Total", get: (m) => String(m.total ?? 0), width: 80, align: "center" },
+            ]}
+            rows={visibleMonthsData}
+            buttonLabel="Export Chart Data"
+            buttonClassName="inline-flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-semibold text-[#334155] bg-white border border-[#cbd5e1] rounded-lg hover:bg-[#f8fafc] hover:border-[#94a3b8] transition cursor-pointer"
+          />
         </div>
       </div>
 

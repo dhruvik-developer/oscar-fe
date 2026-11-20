@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import {
   TrendingUp, TrendingDown, IndianRupee, Search, Filter, RefreshCw,
@@ -24,11 +24,33 @@ const inr = (v) => {
 
 const meters = (v) => `${num(v).toLocaleString('en-IN', { maximumFractionDigits: 2 })} m`;
 
+const CACHE_KEY = 'oscar_batch_profitability_cache';
+
+const getInitialData = () => {
+  try {
+    const raw = sessionStorage.getItem(CACHE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object' && Array.isArray(parsed.rows)) {
+        return parsed;
+      }
+    }
+  } catch (err) {
+    // Ignore storage parse errors
+  }
+  return { summary: {}, rows: [] };
+};
+
 export default function BatchProfitabilityPage({ inDrawer = false }) {
   const [searchParams, setSearchParams] = useSearchParams();
-  const [loading, setLoading] = useState(true);
+  const initialCached = useMemo(() => getInitialData(), []);
+  const [data, setData] = useState(initialCached);
+  const [loading, setLoading] = useState(() => !initialCached?.rows?.length);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
-  const [data, setData] = useState({ summary: {}, rows: [] });
+
+  // Active in-flight request tracker to prevent overlapping calls
+  const isFetchingRef = useRef(false);
 
   // Filters
   const [search, setSearch] = useState(searchParams.get('search') || '');
@@ -52,9 +74,17 @@ export default function BatchProfitabilityPage({ inDrawer = false }) {
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailData, setDetailData] = useState(null);
 
-  const fetchProfitability = useCallback(async () => {
-    setLoading(true);
+  const fetchProfitability = useCallback(async (isManualRefresh = false) => {
+    if (isFetchingRef.current) return;
+    isFetchingRef.current = true;
+
+    if (isManualRefresh) {
+      setRefreshing(true);
+    } else if (!data?.rows?.length) {
+      setLoading(true);
+    }
     setError('');
+
     try {
       const query = {
         search: search.trim() || undefined,
@@ -63,19 +93,32 @@ export default function BatchProfitabilityPage({ inDrawer = false }) {
         sortBy: sortBy || undefined,
         from: dateFrom || undefined,
         to: dateTo || undefined,
+        ...(isManualRefresh ? { refresh: '1' } : {}),
       };
       const res = await api.get('/inventory/batches/profitability/', { query });
-      setData(res?.data || res || { summary: {}, rows: [] });
+      const responseData = res?.data || res || { summary: {}, rows: [] };
+      setData(responseData);
+
+      // Persist the default view in sessionStorage for instant loading upon subsequent drawer visits
+      if (!search.trim() && fabricType === 'ALL' && status === 'ALL' && !dateFrom && !dateTo) {
+        try {
+          sessionStorage.setItem(CACHE_KEY, JSON.stringify(responseData));
+        } catch (e) {
+          // Ignore session storage quota limits
+        }
+      }
     } catch (err) {
       console.error('Failed to load batch profitability:', err);
       setError(err?.message || 'Unable to load batch profitability data.');
     } finally {
       setLoading(false);
+      setRefreshing(false);
+      isFetchingRef.current = false;
     }
-  }, [search, fabricType, status, sortBy, dateFrom, dateTo]);
+  }, [search, fabricType, status, sortBy, dateFrom, dateTo, data?.rows?.length]);
 
   useEffect(() => {
-    fetchProfitability();
+    fetchProfitability(false);
   }, [fetchProfitability]);
 
   // Load batch detail for modal
@@ -156,10 +199,12 @@ export default function BatchProfitabilityPage({ inDrawer = false }) {
               </Link>
               <button
                 type="button"
-                onClick={fetchProfitability}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-[#2563eb] px-3.5 py-2 text-xs font-bold text-white shadow-xs hover:bg-blue-600 transition-colors cursor-pointer"
+                onClick={() => fetchProfitability(true)}
+                disabled={loading || refreshing}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-[#2563eb] px-3.5 py-2 text-xs font-bold text-white shadow-xs hover:bg-blue-600 transition-colors cursor-pointer disabled:opacity-75"
               >
-                <RefreshCw size={14} className={loading ? 'animate-spin' : ''} /> Refresh
+                <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
+                {refreshing ? 'Refreshing…' : 'Refresh'}
               </button>
             </div>
           </div>
@@ -330,13 +375,18 @@ export default function BatchProfitabilityPage({ inDrawer = false }) {
               <h2 className="text-xs font-extrabold uppercase tracking-wide text-slate-700">
                 Batch Profitability Ledger ({rows.length} Batches{rows.length > pageSize ? ` · Page ${page} of ${Math.ceil(rows.length / pageSize)}` : ''})
               </h2>
+              {refreshing && (
+                <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
+                  <RefreshCw size={10} className="animate-spin" /> Updating…
+                </span>
+              )}
             </div>
             <span className="text-[11px] font-semibold text-slate-500">
               Amounts in Indian Rupees (INR)
             </span>
           </div>
 
-          {loading ? (
+          {loading && !rows.length ? (
             <div className="flex flex-col items-center justify-center py-20 text-slate-400">
               <RefreshCw size={24} className="animate-spin text-blue-600 mb-3" />
               <p className="text-xs font-semibold">Calculating true batch-wise costs and profit allocation…</p>

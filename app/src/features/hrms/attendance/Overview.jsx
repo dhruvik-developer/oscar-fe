@@ -1,6 +1,20 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { Download, ChevronDown, Search, Calendar as CalendarIcon, Pencil, CalendarDays, RefreshCw, AlertTriangle, Info } from "lucide-react";
+import {
+  Download,
+  ChevronDown,
+  Search,
+  Calendar as CalendarIcon,
+  Pencil,
+  CalendarDays,
+  RefreshCw,
+  AlertTriangle,
+  Info,
+  FileSpreadsheet,
+  FileText,
+  FileCode,
+  Loader2,
+} from "lucide-react";
 import PageHeader from "../../../components/ui/PageHeader";
 import KpiCard from "../../../components/ui/KpiCard";
 import { UserCheck, UserX, Clock, Plane, Laptop, HelpCircle, Timer } from "lucide-react";
@@ -94,6 +108,24 @@ export default function AttendanceOverview() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const requestRef = useRef(0);
+
+  const [exportMenuOpen, setExportMenuOpen] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  const exportMenuRef = useRef(null);
+
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (exportMenuRef.current && !exportMenuRef.current.contains(e.target)) {
+        setExportMenuOpen(false);
+      }
+    }
+    if (exportMenuOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [exportMenuOpen]);
 
   const [search, setSearch] = useState("");
   const [deptFilter, setDeptFilter] = useState("All");
@@ -204,37 +236,341 @@ export default function AttendanceOverview() {
     setTypeFilter("All");
   };
 
-  const handleExport = () => {
-    if (filtered.length === 0) {
-      showToast("Nothing to export for the current filters.");
-      return;
-    }
-    const header = ["Employee ID", "Name", "Department", "Designation", "Date", "Check In", "Check Out", "Work Hours", "Overtime", "Shift", "Status", "Leave Type", "Source", "Remark"];
+  const exportToCsv = () => {
+    const header = [
+      "Employee ID",
+      "Employee Name",
+      "Department",
+      "Designation",
+      "Date",
+      "Check In",
+      "Check Out",
+      "Work Hours",
+      "Overtime",
+      "Shift",
+      "Status",
+      "Leave Type",
+      "Source",
+      "Remark",
+    ];
     const lines = filtered.map((r) =>
       [
-        r.employeeCode,
-        r.name,
-        r.department,
-        r.designation,
+        r.employeeCode || "",
+        r.name || "",
+        r.department || "",
+        r.designation || "",
         dateVal,
         formatClock12(r.checkIn),
         formatClock12(r.checkOut),
         r.hours == null ? "" : formatHours(r.hours),
         r.overtimeHours ? formatHours(r.overtimeHours) : "",
-        r.shift,
-        r.status,
+        r.shift || "",
+        r.status || "",
         r.leaveType || "",
         r.source || "",
         r.remark || "",
-      ].map(csvCell).join(",")
+      ]
+        .map(csvCell)
+        .join(",")
     );
-    const blob = new Blob([[header.map(csvCell).join(","), ...lines].join("\n")], { type: "text/csv" });
+    const blob = new Blob(["\uFEFF" + [header.map(csvCell).join(","), ...lines].join("\r\n")], {
+      type: "text/csv;charset=utf-8;",
+    });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
     a.download = `attendance-${dateVal}.csv`;
+    document.body.appendChild(a);
     a.click();
-    URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+  };
+
+  const exportToExcel = async () => {
+    const XLSX = await import("xlsx");
+    const headers = [
+      "Employee ID",
+      "Employee Name",
+      "Department",
+      "Designation",
+      "Date",
+      "Check In",
+      "Check Out",
+      "Work Hours",
+      "Overtime",
+      "Shift",
+      "Status",
+      "Leave Type",
+      "Source",
+      "Remark",
+    ];
+    const data = filtered.map((r) => [
+      r.employeeCode || "",
+      r.name || "",
+      r.department || "",
+      r.designation || "",
+      dateVal,
+      formatClock12(r.checkIn),
+      formatClock12(r.checkOut),
+      r.hours == null ? "" : formatHours(r.hours),
+      r.overtimeHours ? formatHours(r.overtimeHours) : "",
+      r.shift || "",
+      r.status || "",
+      r.leaveType || "",
+      r.source || "",
+      r.remark || "",
+    ]);
+    const ws = XLSX.utils.aoa_to_sheet([headers, ...data]);
+    ws["!cols"] = [
+      { wch: 14 },
+      { wch: 22 },
+      { wch: 18 },
+      { wch: 20 },
+      { wch: 12 },
+      { wch: 12 },
+      { wch: 12 },
+      { wch: 12 },
+      { wch: 12 },
+      { wch: 12 },
+      { wch: 14 },
+      { wch: 16 },
+      { wch: 12 },
+      { wch: 25 },
+    ];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Attendance");
+    XLSX.writeFile(wb, `attendance-${dateVal}.xlsx`);
+  };
+
+  const exportToPdf = async () => {
+    const { jsPDF } = await import("jspdf");
+    const doc = new jsPDF({
+      orientation: "landscape",
+      unit: "pt",
+      format: "a4",
+    });
+
+    const pageWidth = 841.89;
+    const pageHeight = 595.28;
+    const margin = 28;
+    const printableWidth = pageWidth - margin * 2; // 785.89 pt
+
+    const sanitizePdf = (str) => {
+      if (str == null) return "—";
+      return String(str)
+        .replace(/₹\s*/g, "Rs. ")
+        .replace(/[^\x00-\x7F]/g, (char) => {
+          if (char === "•" || char === "·") return "-";
+          if (char === "—" || char === "–") return "-";
+          if (char === "’" || char === "‘") return "'";
+          if (char === "“" || char === "”") return '"';
+          return "";
+        });
+    };
+
+    const columns = [
+      { header: "Emp ID", width: 55, align: "left", get: (r) => r.employeeCode || "—" },
+      { header: "Employee Name", width: 110, align: "left", get: (r) => r.name || "—" },
+      { header: "Department", width: 75, align: "left", get: (r) => r.department || "—" },
+      { header: "Designation", width: 85, align: "left", get: (r) => r.designation || "—" },
+      { header: "Check In", width: 55, align: "center", get: (r) => formatClock12(r.checkIn) || "—" },
+      { header: "Check Out", width: 55, align: "center", get: (r) => formatClock12(r.checkOut) || "—" },
+      { header: "Work Hours", width: 55, align: "center", get: (r) => (r.hours == null ? "—" : formatHours(r.hours)) },
+      { header: "Overtime", width: 50, align: "center", get: (r) => (r.overtimeHours ? formatHours(r.overtimeHours) : "—") },
+      { header: "Shift", width: 55, align: "center", get: (r) => r.shift || "—" },
+      { header: "Status", width: 65, align: "center", get: (r) => r.status || "—" },
+      { header: "Remarks / Notes", width: 125, align: "left", get: (r) => r.remark || r.leaveType || (r.source ? `Source: ${r.source}` : "—") },
+    ];
+
+    const drawHeader = (isFirstPage) => {
+      if (isFirstPage) {
+        // Dark Banner
+        doc.setFillColor(15, 23, 42);
+        doc.rect(margin, margin, printableWidth, 32, "F");
+
+        doc.setFontSize(11);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(255, 255, 255);
+        doc.text("OSCAR TEXTILE ERP  |  HRMS & ATTENDANCE MANAGEMENT", margin + 12, margin + 20);
+
+        doc.setFontSize(8);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(203, 213, 225);
+        doc.text("DAILY ATTENDANCE AUDIT", margin + printableWidth - 130, margin + 20);
+
+        // Title and meta
+        doc.setFontSize(14);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(15, 23, 42);
+        doc.text(`Daily Attendance Report - ${dateVal}`, margin, margin + 54);
+
+        doc.setFontSize(8);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(100, 116, 139);
+        const meta = `Date: ${dateVal}  |  Department: ${deptFilter}  |  Status: ${statusFilter}  |  Shift: ${shiftFilter}  |  Total Staff: ${filtered.length}`;
+        doc.text(meta, margin, margin + 67);
+
+        const genTime = `Generated: ${new Date().toLocaleString()}`;
+        doc.text(genTime, margin + printableWidth - 150, margin + 67);
+
+        // KPI Strip
+        doc.setFillColor(248, 250, 252);
+        doc.setDrawColor(226, 232, 240);
+        doc.roundedRect(margin, margin + 76, printableWidth, 26, 3, 3, "FD");
+
+        const kpis = [
+          { label: "PRESENT", val: String(summary.present ?? 0) },
+          { label: "ABSENT", val: String(summary.absent ?? 0) },
+          { label: "LATE", val: String(summary.late ?? 0) },
+          { label: "ON LEAVE", val: String(summary.onLeave ?? 0) },
+          { label: "WFH", val: String(summary.wfh ?? 0) },
+          { label: "NOT MARKED", val: String(summary.notMarked ?? 0) },
+          { label: "ATTENDANCE %", val: `${summary.attendancePct ?? 0}%` },
+        ];
+        const kpiWidth = printableWidth / kpis.length;
+        kpis.forEach((k, idx) => {
+          const kx = margin + idx * kpiWidth;
+          doc.setFontSize(6.5);
+          doc.setFont("helvetica", "bold");
+          doc.setTextColor(100, 116, 139);
+          doc.text(k.label, kx + 8, margin + 87);
+
+          doc.setFontSize(9);
+          doc.setFont("helvetica", "bold");
+          doc.setTextColor(15, 23, 42);
+          doc.text(k.val, kx + 8, margin + 98);
+        });
+
+        return margin + 112;
+      } else {
+        doc.setFontSize(8.5);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(100, 116, 139);
+        doc.text(`Daily Attendance Report - ${dateVal} (continued)`, margin, margin + 14);
+        doc.setDrawColor(226, 232, 240);
+        doc.line(margin, margin + 20, margin + printableWidth, margin + 20);
+        return margin + 26;
+      }
+    };
+
+    const drawTableHeaders = (startY) => {
+      doc.setFillColor(241, 245, 249);
+      doc.setDrawColor(203, 213, 225);
+      doc.rect(margin, startY, printableWidth, 18, "FD");
+
+      doc.setFontSize(7.5);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(51, 65, 85);
+
+      let curX = margin;
+      columns.forEach((col) => {
+        let textX = curX + 4;
+        if (col.align === "center") {
+          textX = curX + col.width / 2;
+        }
+        doc.text(col.header, textX, startY + 12, {
+          align: col.align === "center" ? "center" : "left",
+        });
+        curX += col.width;
+      });
+
+      return startY + 18;
+    };
+
+    let startY = drawHeader(true);
+    let currentY = drawTableHeaders(startY);
+
+    const rowHeight = 16;
+    filtered.forEach((r, idx) => {
+      if (currentY + rowHeight > pageHeight - 32) {
+        doc.addPage();
+        const nextStart = drawHeader(false);
+        currentY = drawTableHeaders(nextStart);
+      }
+
+      if (idx % 2 === 1) {
+        doc.setFillColor(248, 250, 252);
+        doc.rect(margin, currentY, printableWidth, rowHeight, "F");
+      }
+
+      doc.setDrawColor(241, 245, 249);
+      doc.line(margin, currentY + rowHeight, margin + printableWidth, currentY + rowHeight);
+
+      doc.setFontSize(7.5);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(30, 41, 59);
+
+      let curX = margin;
+      columns.forEach((col) => {
+        const val = sanitizePdf(col.get(r));
+        let textX = curX + 4;
+        if (col.align === "center") {
+          textX = curX + col.width / 2;
+        }
+
+        if (col.header === "Status") {
+          if (val === "Present") doc.setTextColor(21, 128, 61);
+          else if (val === "Absent") doc.setTextColor(220, 38, 38);
+          else if (val === "Late") doc.setTextColor(180, 83, 9);
+          else if (val === "On Leave") doc.setTextColor(37, 99, 235);
+          else if (val === "WFH") doc.setTextColor(3, 105, 161);
+          else doc.setTextColor(71, 85, 105);
+        } else {
+          doc.setTextColor(30, 41, 59);
+        }
+
+        doc.text(val, textX, currentY + 11, {
+          align: col.align === "center" ? "center" : "left",
+          maxWidth: col.width - 6,
+        });
+
+        curX += col.width;
+      });
+
+      currentY += rowHeight;
+    });
+
+    const pageCount = doc.internal.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.setFontSize(7.5);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(148, 163, 184);
+      doc.text(`Page ${i} of ${pageCount}`, margin, pageHeight - 14);
+      doc.text(
+        "Confidential - OSCAR Textile ERP Internal Attendance Record",
+        margin + printableWidth - 220,
+        pageHeight - 14
+      );
+    }
+
+    doc.save(`attendance-${dateVal}.pdf`);
+  };
+
+  const handleExport = async (format) => {
+    if (filtered.length === 0) {
+      showToast("Nothing to export for the current filters.", "error");
+      return;
+    }
+    setExportMenuOpen(false);
+    setIsExporting(true);
+    try {
+      if (format === "csv") {
+        exportToCsv();
+        showToast("Attendance CSV downloaded successfully.");
+      } else if (format === "excel") {
+        await exportToExcel();
+        showToast("Attendance Excel spreadsheet (.xlsx) downloaded successfully.");
+      } else if (format === "pdf") {
+        await exportToPdf();
+        showToast("Attendance PDF report downloaded successfully.");
+      }
+    } catch (err) {
+      console.error("Export error:", err);
+      showToast("Export failed: " + (err?.message || "Unknown error"), "error");
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   const openEdit = (row) => {
@@ -361,9 +697,78 @@ export default function AttendanceOverview() {
         guide={hrmsGuides.attendanceOverview}
         actions={
           <>
-            <button type="button" onClick={handleExport} className="att-export-btn">
-              <Download size={15} /> Export
-            </button>
+            <div className="relative" ref={exportMenuRef}>
+              <button
+                type="button"
+                onClick={() => setExportMenuOpen((prev) => !prev)}
+                className="att-export-btn"
+                disabled={isExporting}
+                title="Export attendance data"
+              >
+                {isExporting ? (
+                  <Loader2 size={15} className="att-spin" />
+                ) : (
+                  <Download size={15} />
+                )}
+                <span>{isExporting ? "Exporting..." : "Export"}</span>
+                <ChevronDown
+                  size={13}
+                  style={{
+                    transition: "transform 0.15s ease",
+                    transform: exportMenuOpen ? "rotate(180deg)" : "none",
+                  }}
+                />
+              </button>
+
+              {exportMenuOpen && (
+                <div className="att-export-menu">
+                  <div className="att-export-menu-header">Export Format</div>
+
+                  <button
+                    type="button"
+                    onClick={() => handleExport("excel")}
+                    className="att-export-menu-item"
+                  >
+                    <div className="att-export-icon-box excel">
+                      <FileSpreadsheet size={16} />
+                    </div>
+                    <div>
+                      <div className="att-export-menu-title">Excel Spreadsheet</div>
+                      <div className="att-export-menu-desc">Microsoft Excel (.xlsx)</div>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleExport("pdf")}
+                    className="att-export-menu-item"
+                  >
+                    <div className="att-export-icon-box pdf">
+                      <FileText size={16} />
+                    </div>
+                    <div>
+                      <div className="att-export-menu-title">PDF Document</div>
+                      <div className="att-export-menu-desc">Formatted Report (.pdf)</div>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleExport("csv")}
+                    className="att-export-menu-item"
+                  >
+                    <div className="att-export-icon-box csv">
+                      <FileCode size={16} />
+                    </div>
+                    <div>
+                      <div className="att-export-menu-title">CSV Document</div>
+                      <div className="att-export-menu-desc">Comma-Separated (.csv)</div>
+                    </div>
+                  </button>
+                </div>
+              )}
+            </div>
+
             <button type="button" onClick={openRegularize} className="att-reg-btn">
               Regularize Attendance
             </button>
@@ -693,6 +1098,67 @@ export default function AttendanceOverview() {
         .att-mgmt-page { background: #f8fafc; margin: -16px -24px -24px; padding: 18px 24px 28px; min-height: calc(100vh - 62px); }
         .att-export-btn { display: inline-flex; align-items: center; gap: 6px; background: #fff; border: 1px solid #d1d5db; border-radius: 10px; padding: 8px 16px; font-size: 13.5px; font-weight: 600; color: #374151; cursor: pointer; transition: background 0.15s ease; box-shadow: 0 1px 2px rgba(0,0,0,0.03); }
         .att-export-btn:hover { background: #f9fafb; }
+        .att-export-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+        .att-export-menu {
+          position: absolute;
+          right: 0;
+          top: calc(100% + 6px);
+          width: 235px;
+          background: #ffffff;
+          border: 1px solid #e2e8f0;
+          border-radius: 12px;
+          box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.12), 0 8px 10px -6px rgba(15, 23, 42, 0.06);
+          padding: 6px;
+          z-index: 60;
+        }
+        .att-export-menu-header {
+          padding: 6px 10px 4px;
+          font-size: 10px;
+          font-weight: 700;
+          color: #94a3b8;
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+        }
+        .att-export-menu-item {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          width: 100%;
+          padding: 8px 10px;
+          border: none;
+          background: transparent;
+          border-radius: 8px;
+          text-align: left;
+          cursor: pointer;
+          transition: background 0.15s ease;
+        }
+        .att-export-menu-item:hover {
+          background: #f8fafc;
+        }
+        .att-export-icon-box {
+          width: 32px;
+          height: 32px;
+          border-radius: 8px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex-shrink: 0;
+        }
+        .att-export-icon-box.excel { background: #ecfdf5; color: #059669; }
+        .att-export-icon-box.pdf { background: #fef2f2; color: #dc2626; }
+        .att-export-icon-box.csv { background: #eff6ff; color: #2563eb; }
+        .att-export-menu-title {
+          font-size: 12.5px;
+          font-weight: 600;
+          color: #1e293b;
+          line-height: 1.2;
+        }
+        .att-export-menu-desc {
+          font-size: 10.5px;
+          color: #64748b;
+          margin-top: 2px;
+        }
         .att-reg-btn { background: var(--primary); color: #fff; border: none; border-radius: 10px; padding: 9px 18px; font-size: 13.5px; font-weight: 700; cursor: pointer; transition: background 0.15s ease; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
         .att-reg-btn:hover { background: var(--primary-dark); }
 

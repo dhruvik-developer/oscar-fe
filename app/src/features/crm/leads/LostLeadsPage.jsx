@@ -107,6 +107,14 @@ export default function LostLeadsPage() {
     // 1. Leads matching isLost or associated with a lost deal
     (leads || []).forEach((lead) => {
       if (!lead) return;
+      // If the lead is linked to an active deal that is Won or Draft, it is NOT lost!
+      const linkedNonLostDeal = (deals || []).find(
+        (d) => d && (d.stage !== 'Lost' && d.tag !== 'Lost') &&
+          ((d.leadId && String(d.leadId) === String(lead.id)) ||
+           ((d.title || d.name || '').trim().toLowerCase() === (lead.name || '').trim().toLowerCase()))
+      );
+      if (linkedNonLostDeal) return;
+
       const linkedLostDeal = lostDealByLeadId.get(String(lead.id)) ||
         lostDealByClientName.get((lead.name || '').trim().toLowerCase());
       const isLost = isLostLead(lead) || Boolean(linkedLostDeal);

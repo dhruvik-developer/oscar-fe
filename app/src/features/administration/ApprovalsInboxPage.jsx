@@ -18,6 +18,7 @@ import {
   Plus,
 } from 'lucide-react';
 import PageHeader from '../../components/ui/PageHeader';
+import AppPagination from '../../components/ui/AppPagination';
 import KpiCard from '../../components/ui/KpiCard';
 import { approvalService } from '../../services/domainServices';
 
@@ -63,6 +64,18 @@ export default function ApprovalsInboxPage() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('Pending');
   const [docTypeFilter, setDocTypeFilter] = useState('All');
+
+  // Pagination for Requests Inbox
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  // Pagination for Rules Tab
+  const [rulesPage, setRulesPage] = useState(1);
+  const [rulesPageSize, setRulesPageSize] = useState(10);
+
+  useEffect(() => {
+    setPage(1);
+  }, [search, statusFilter, docTypeFilter]);
 
   // Decision Modal
   const [selectedRequest, setSelectedRequest] = useState(null);
@@ -192,6 +205,16 @@ export default function ApprovalsInboxPage() {
       return true;
     });
   }, [requests, statusFilter, docTypeFilter, search]);
+
+  const paginatedRequests = useMemo(() => {
+    const start = (page - 1) * pageSize;
+    return filteredRequests.slice(start, start + pageSize);
+  }, [filteredRequests, page, pageSize]);
+
+  const paginatedRules = useMemo(() => {
+    const start = (rulesPage - 1) * rulesPageSize;
+    return rules.slice(start, start + rulesPageSize);
+  }, [rules, rulesPage, rulesPageSize]);
 
   const kpis = useMemo(() => {
     const pending = requests.filter((r) => r.status === 'Pending').length;
@@ -339,7 +362,7 @@ export default function ApprovalsInboxPage() {
                       </td>
                     </tr>
                   ) : (
-                    filteredRequests.map((req) => (
+                    paginatedRequests.map((req) => (
                       <tr key={req.id} className="hover:bg-slate-50/70 transition">
                         <td className="py-3 px-4">
                           <div className="font-semibold text-slate-900">
@@ -470,6 +493,14 @@ export default function ApprovalsInboxPage() {
                 </tbody>
               </table>
             </div>
+            <AppPagination
+              total={filteredRequests.length}
+              page={page}
+              pageSize={pageSize}
+              onPageChange={setPage}
+              onPageSizeChange={setPageSize}
+              pageSizeOptions={[10, 25, 50, 100]}
+            />
           </div>
         </div>
       )}
@@ -500,7 +531,7 @@ export default function ApprovalsInboxPage() {
                       </td>
                     </tr>
                   ) : (
-                    rules.map((rule) => (
+                    paginatedRules.map((rule) => (
                       <tr key={rule.id} className="hover:bg-slate-50/70 transition">
                         <td className="py-3 px-4 font-semibold text-slate-900">{rule.name}</td>
                         <td className="py-3 px-4 text-indigo-600 font-medium text-xs">
@@ -559,6 +590,14 @@ export default function ApprovalsInboxPage() {
                 </tbody>
               </table>
             </div>
+            <AppPagination
+              total={rules.length}
+              page={rulesPage}
+              pageSize={rulesPageSize}
+              onPageChange={setRulesPage}
+              onPageSizeChange={setRulesPageSize}
+              pageSizeOptions={[10, 25, 50]}
+            />
           </div>
         </div>
       )}

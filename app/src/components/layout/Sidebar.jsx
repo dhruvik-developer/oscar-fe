@@ -372,7 +372,7 @@ export const NAV = [
 
         icon: Target,
 
-        defaultOpen: true,
+        defaultOpen: false,
 
         children: [
 
@@ -396,7 +396,7 @@ export const NAV = [
 
         icon: ListChecks,
 
-        defaultOpen: true,
+        defaultOpen: false,
 
         children: [
 
@@ -553,143 +553,62 @@ export const NAV = [
 
 
   {
-
     label: 'Inventory',
-
     icon: Package,
-
     permission: 'menu_inventory',
-
     children: [
-
       { label: 'Dashboard', icon: Home, to: '/inventory/dashboard' },
-
       {
-
         label: 'Inventory',
-
         icon: Package,
-
-        defaultOpen: true,
-
-        navigateOnOpen: true,
-
+        defaultOpen: false,
         children: [
-
           { label: 'Grey Inventory', to: '/inventory/grey', dot: true },
-
           { label: 'Dyeing Inventory', to: '/inventory/dyeing' },
-
         ],
-
       },
-
       { label: 'Batch Registry', icon: QrCode, to: '/inventory/batches' },
-
       { label: 'Stock Position', icon: BarChart3, to: '/inventory/stock-position' },
-
       {
-
-        label: 'QC (Quality Control)', icon: CircleCheck, to: '/inventory/qc/dashboard',
-
-        navigateOnOpen: true,
-
-        // As the requirement (PDF §18): QC Entry, Reprocess, QC History, QC Reports.
-
-        // The Defect Master is in Textile Operations Masters.
-
+        label: 'QC (Quality Control)',
+        icon: CircleCheck,
+        defaultOpen: false,
         children: [
-
           { label: 'QC Dashboard', to: '/inventory/qc/dashboard', dot: true },
-
-          // { label: 'QC Entry', to: '/inventory/qc/entry' },
-
-          // { label: 'Reprocess', to: '/inventory/qc/reprocess' },
-
-          // { label: 'QC History', to: '/inventory/qc/history' },
-
           { label: 'QC Reports', to: '/inventory/qc/reports' },
-
         ],
-
       },
-
-      // { label: 'Production Runs (In-house)', icon: Factory, to: '/inventory/production-runs' },
-
       {
-
         label: 'Warehouse & Movement',
-
         icon: Warehouse,
-
         defaultOpen: false,
-
-        navigateOnOpen: true,
-
         children: [
-
           { label: 'Warehouses', to: '/inventory/warehouses', dot: true },
-
           { label: 'Transfers', to: '/inventory/transfers' },
-
           { label: 'Logistics / Trips', to: '/inventory/trips' },
-
           { label: 'Sample Management', to: '/inventory/samples' },
-
         ],
-
       },
-
       {
-
         label: 'Reports',
-
         icon: TrendingUp,
-
         defaultOpen: false,
-
-        navigateOnOpen: true,
-
         children: [
-
           { label: 'Valuation & Ageing', to: '/inventory/valuation', dot: true },
-
-          // { label: 'Lot Costing & Profitability', to: '/inventory/lot-costing' },
-
           { label: 'Month-End Audit', to: '/inventory/audit' },
-
         ],
-
       },
-
       {
-
         label: 'Masters',
-
         icon: Boxes,
-
         defaultOpen: false,
-
-        navigateOnOpen: true,
-
         children: [
-
-          // Quality, design, shade, item / variant, fabric type, categories and UOM -- one page, one tab each.
-
           { label: 'Fabric Masters', to: '/inventory/fabric-masters', dot: true },
-
           { label: 'Textile Operations Masters', to: '/inventory/masters/textile' },
-
         ],
-
       },
-
     ],
-
   },
-
-
-
   {
 
     label: 'Accounts',
@@ -1321,77 +1240,53 @@ function SubItem({ item, depth = 1, badges = {} }) {
   // Icon leaves (e.g. CRM > Dashboard, Sales > Proforma Invoices, etc.) render like nav row with icon
 
   if (Icon && item.to) {
-
     return (
-
       <NavLink
-
         to={item.to}
-
         end
-
         title={item.label}
-
+        onClick={(e) => {
+          if (location.pathname !== item.to) {
+            navigate(item.to);
+          }
+        }}
         style={accent ? { '--chip': accent } : undefined}
-
         className={({ isActive: navActive }) =>
-
           `sub-group-row${accent ? ' accented' : ''}${linkActive(navActive) ? ' active section-active' : ''}`
-
         }
-
       >
-
-        <span className={accent ? 'nav-ico nav-ico-chip' : 'nav-ico'}>
-
+        <span className={accent ? 'nav-ico nav-ico-chip pointer-events-none' : 'nav-ico pointer-events-none'}>
           <Icon size={accent ? 13 : 16} strokeWidth={accent ? 2.2 : 2} />
-
         </span>
-
-        <span className="nav-txt">{item.label}</span>
-
-        {accent && <ArrowRight size={13} className="sub-arrow" />}
-
+        <span className="nav-txt pointer-events-none">{item.label}</span>
+        {accent && <ArrowRight size={13} className="sub-arrow pointer-events-none" />}
         <NavPill pill={item.pill} />
-
         <NavBadge count={count} color={item.badgeColor} />
-
       </NavLink>
-
     );
-
   }
 
 
 
   return (
-
     <NavLink
-
       to={item.to || '#'}
-
       end
-
       title={item.label}
-
+      onClick={(e) => {
+        if (item.to && location.pathname !== item.to) {
+          navigate(item.to);
+        }
+      }}
       className={({ isActive: navActive }) =>
-
         `sub-item${linkActive(navActive) ? ' active section-active' : ''}`
-
       }
-
     >
-
-      <span className="sub-dot" />
-
-      <span className="sub-label">{item.label}</span>
-
+      <span className="sub-dot pointer-events-none" />
+      <span className="sub-label pointer-events-none">{item.label}</span>
       <NavPill pill={item.pill} />
-
       <NavBadge count={count} color={item.badgeColor} />
-
     </NavLink>
-
   );
 
 }
@@ -1414,20 +1309,14 @@ function SubList({ items, depth = 1, badges, accent }) {
 
     >
 
-      {items.map((item) => {
-
+      {items.map((item, idx) => {
+        const itemKey = item.to || item.id || `${item.label}_${depth}_${idx}`;
         if (item.children) {
-
           return (
-
-            <ExpandableRow key={item.label} item={item} depth={depth} badges={badges} />
-
+            <ExpandableRow key={itemKey} item={item} depth={depth} badges={badges} />
           );
-
         }
-
-        return <SubItem key={item.label} item={item} depth={depth} badges={badges} />;
-
+        return <SubItem key={itemKey} item={item} depth={depth} badges={badges} />;
       })}
 
     </div>
@@ -1639,351 +1528,109 @@ function ModuleToggle({ enabled, onToggle, label }) {
 // ── Expandable group row ────────────────────────────────────
 
 function ExpandableRow({ item, depth = 0, badges = {} }) {
-
   const location = useLocation();
-
   const navigate = useNavigate();
 
-
-
-  // Auto-open if a child route is active. Query links match on their path.
-
+  // Active state matching. Query links match on their path.
   const onPath = (to) => {
-
     const path = to?.split('?')[0];
-
     return Boolean(path) && (location.pathname === path || location.pathname.startsWith(path + '/'));
-
   };
-
   const isChildActive = item.children?.some(
-
     (c) => onPath(c.to) || c.children?.some((sub) => onPath(sub.to))
-
   );
 
-
-
-  const storageKey = `oscar_nav_open_${item.label}`;
-
-
+  // Unique storage key per item, depth and label so parent and child menus never collide
+  const storageKey = `oscar_nav_open_v2_${item.id || item.to || (item.label + '_' + depth)}`;
 
   const [open, setOpen] = useState(() => {
-
     if (item.forceOpen) return true;
-
-    if (isChildActive) return true;
-
     try {
-
       const saved = sessionStorage.getItem(storageKey);
-
       if (saved !== null) return saved === 'true';
-
     } catch {}
-
     return Boolean(item.defaultOpen);
-
   });
 
-
-
   const updateOpenState = (nextVal) => {
-
     setOpen((prev) => {
-
       const resolved = typeof nextVal === 'function' ? nextVal(prev) : nextVal;
-
       try {
-
         sessionStorage.setItem(storageKey, String(resolved));
-
       } catch {}
-
       return resolved;
-
     });
-
   };
 
-
-
   useEffect(() => {
-
     if (item.forceOpen) {
-
       updateOpenState(true);
-
     }
-
   }, [item.forceOpen]);
-
-
-
-  useEffect(() => {
-
-    if (isChildActive) {
-
-      updateOpenState(true);
-
-    }
-
-  }, [isChildActive]);
-
-
 
   const Icon = item.icon;
 
-  const recruitmentEnabled = useAppStore((s) => s.recruitmentEnabled ?? true);
-
-  const setRecruitmentEnabled = useAppStore((s) => s.setRecruitmentEnabled);
-
-  const trainingEnabled = useAppStore((s) => s.trainingEnabled ?? true);
-
-  const setTrainingEnabled = useAppStore((s) => s.setTrainingEnabled);
-
-
-
-  const isModuleRow = item.label === 'Recruitment' || item.label === 'Training';
-
-  const moduleEnabled = item.label === 'Recruitment' ? recruitmentEnabled : trainingEnabled;
-
-  const setModuleEnabled = item.label === 'Recruitment' ? setRecruitmentEnabled : setTrainingEnabled;
-
-
-
-  // Groups flagged `navigateOnOpen` open their default page, so the highlight
-
-  // follows the click. Inside the group already, a click only collapses/expands.
-
-  const toggleGroup = () => {
-
-    const target = item.navigateOnOpen && !isChildActive ? defaultChildPath(item) : null;
-
-    if (target) {
-
-      updateOpenState(true);
-
-      navigate(target);
-
-      return;
-
-    }
-
+  // Toggle group open/collapsed when clicking ANYWHERE on the row (icon, text, empty area, or arrow)
+  const toggleGroup = (e) => {
+    e?.stopPropagation?.();
     updateOpenState((v) => !v);
-
   };
-
-
 
   const isActive = item.to && (location.pathname === item.to || location.pathname.startsWith(item.to + '/'));
 
-
-
   if (item.to && !item.children) {
-
-    // Training is a direct link — toggle removed, render as normal link.
-
-    // if (item.label === 'Training') {
-
-    //   return (
-
-    //     <div className={`nav-row group ${moduleEnabled ? '' : 'opacity-60'}`} title={item.label}>
-
-    //       <NavLink
-
-    //         to={moduleEnabled ? item.to : '#'}
-
-    //         end
-
-    //         onClick={(e) => {
-
-    //           if (!moduleEnabled) e.preventDefault();
-
-    //         }}
-
-    //         className={`flex items-center gap-2 flex-1 min-w-0 ${moduleEnabled ? '' : 'pointer-events-none'}`}
-
-    //       >
-
-    //         {Icon && <Icon size={18} strokeWidth={1.9} className="nav-ico" />}
-
-    //         <span className="nav-txt">{item.label}</span>
-
-    //       </NavLink>
-
-    //       <ModuleToggle enabled={moduleEnabled} onToggle={setModuleEnabled} label={item.label} />
-
-    //     </div>
-
-    //   );
-
-    // }
-
-    // Simple root nav row (direct link like Parties, Reports)
-
+    // Simple leaf nav row (direct link like Dashboard, Parties, Settings)
     return (
-
       <NavLink
-
         to={item.to}
-
         end
-
         title={item.label}
-
+        onClick={(e) => {
+          if (location.pathname !== item.to) {
+            navigate(item.to);
+          }
+        }}
         className={({ isActive: directActive }) =>
-
           `nav-row${directActive || isActive ? ' section-active' : ''}`
-
         }
-
       >
-
-        {Icon && <Icon size={18} strokeWidth={1.9} className="nav-ico" />}
-
-        <span className="nav-txt">{item.label}</span>
-
+        {Icon && <Icon size={18} strokeWidth={1.9} className="nav-ico pointer-events-none" />}
+        <span className="nav-txt pointer-events-none">{item.label}</span>
       </NavLink>
-
     );
-
   }
-
-
 
   const isRoot = depth === 0;
-
   const groupCount = item.badgeKey ? (badges?.[item.badgeKey] ?? 0) : 0;
-
-  // Recruitment / Training — toggle removed, always show as normal expandable group.
-
   const showChildren = open;
 
-
-
-  if (isModuleRow) {
-
-    return (
-
-      <div className="nav-group">
-
-        <div
-
-          title={item.label}
-
-          className={
-
-            isRoot
-
-              ? `nav-row${isChildActive ? ' parent-active' : isActive ? ' section-active' : ''}`
-
-              : `sub-group-row${isChildActive ? ' parent-active' : ''}`
-
-          }
-
-        >
-
-          <button
-
-            type="button"
-
-            onClick={() => {
-
-              updateOpenState((v) => !v);
-
-            }}
-
-            className="flex items-center gap-2 flex-1 min-w-0 bg-transparent border-0 p-0 text-left cursor-pointer"
-
-          >
-
-            {Icon && <Icon size={isRoot ? 18 : 16} strokeWidth={1.9} className="nav-ico" />}
-
-            <span className="nav-txt">{item.label}</span>
-
-            <NavBadge count={groupCount} color={item.badgeColor} />
-
-          </button>
-
-          {/* <ModuleToggle enabled={moduleEnabled} onToggle={setModuleEnabled} label={item.label} /> */}
-
-          <span className="nav-chev">
-
-            {open ? <ChevronDown size={isRoot ? 14 : 12} /> : <ChevronRight size={isRoot ? 14 : 12} />}
-
-          </span>
-
-        </div>
-
-        {showChildren && item.children && (
-
-          <SubList items={item.children} depth={depth + 1} badges={badges} accent={item.accent} />
-
-        )}
-
-      </div>
-
-    );
-
-  }
-
-
-
   return (
-
     <div className="nav-group">
-
       <button
-
         type="button"
-
         onClick={toggleGroup}
-
         title={item.label}
-
         className={
-
           isRoot
-
             ? `nav-row${isChildActive ? ' parent-active' : isActive ? ' section-active' : ''}`
-
             : `sub-group-row${isChildActive ? ' parent-active' : ''}`
-
         }
-
       >
-
         {Icon && <Icon size={isRoot ? 18 : 16} strokeWidth={1.9} className="nav-ico" />}
-
         <span className="nav-txt">{item.label}</span>
-
         <NavBadge count={groupCount} color={item.badgeColor} />
-
         {item.children && (
-
           <span className="nav-chev">
-
             {open ? <ChevronDown size={isRoot ? 14 : 12} /> : <ChevronRight size={isRoot ? 14 : 12} />}
-
           </span>
-
         )}
-
       </button>
-
       {showChildren && item.children && (
-
         <SubList items={item.children} depth={depth + 1} badges={badges} accent={item.accent} />
-
       )}
-
     </div>
-
   );
-
 }
-
 
 
 // ── Sidebar ─────────────────────────────────────────────────
@@ -2312,11 +1959,10 @@ export default function Sidebar() {
 
           {visibleNav.length > 0 ? (
 
-            visibleNav.map((item) => (
-
-              <ExpandableRow key={item.label} item={item} depth={0} badges={badges} />
-
-            ))
+            visibleNav.map((item, idx) => {
+              const itemKey = item.to || item.id || `${item.label}_0_${idx}`;
+              return <ExpandableRow key={itemKey} item={item} depth={0} badges={badges} />;
+            })
 
           ) : (
 
@@ -2482,73 +2128,13 @@ export default function Sidebar() {
 
 
 
-            {/* Quick Theme Switcher */}
-
-            <div className="pb-2.5 mb-2.5 border-b border-white/10">
-
-              <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5 flex items-center justify-between">
-
-                <span>Theme Mode</span>
-
-                <span className="text-[9px] text-blue-400 capitalize">{theme}</span>
-
-              </div>
-
-              <div className="grid grid-cols-5 gap-1">
-
-                {SIDEBAR_THEMES.map((t) => {
-
-                  const Icon = t.icon;
-
-                  const isSelected = theme === t.id;
-
-                  return (
-
-                    <button
-
-                      key={t.id}
-
-                      type="button"
-
-                      onClick={() => setTheme(t.id)}
-
-                      className={`flex flex-col items-center justify-center p-1.5 rounded-xl transition cursor-pointer text-center ${
-
-                        isSelected
-
-                          ? 'bg-blue-600 text-white font-bold shadow-xs'
-
-                          : 'bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/5'
-
-                      }`}
-
-                      title={t.name}
-
-                    >
-
-                      <Icon size={12} className="mb-0.5" />
-
-                      <span className="text-[9px] leading-none">{t.name}</span>
-
-                    </button>
-
-                  );
-
-                })}
-
-              </div>
-
-            </div>
-
-
-
             {/* Quick Navigation Links */}
 
             <div className="space-y-0.5 text-xs">
 
               <Link
 
-                to="/hrms/dashboard"
+                to="/profile"
 
                 onClick={() => setIsProfileOpen(false)}
 
@@ -2558,7 +2144,7 @@ export default function Sidebar() {
 
                 <User size={13} className="text-blue-400 group-hover:scale-110 transition-transform" />
 
-                <span className="text-[11px] font-medium">HR Profile & Attendance</span>
+                <span className="text-[11px] font-medium">My Profile</span>
 
               </Link>
 
@@ -2591,22 +2177,6 @@ export default function Sidebar() {
                 <Settings size={13} className="text-purple-400 group-hover:scale-110 transition-transform" />
 
                 <span className="text-[11px] font-medium">System Preferences & Currency</span>
-
-              </Link>
-
-              <Link
-
-                to="/account/security"
-
-                onClick={() => setIsProfileOpen(false)}
-
-                className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl hover:bg-white/10 text-slate-200 hover:text-white transition group"
-
-              >
-
-                <Lock size={13} className="text-sky-400 group-hover:scale-110 transition-transform" />
-
-                <span className="text-[11px] font-medium">Security & Signed-in Devices</span>
 
               </Link>
 

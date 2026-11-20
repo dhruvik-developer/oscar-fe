@@ -69,12 +69,14 @@ const useCrmStoreBase = create((set, get) => ({
   roster: {},
   teamMembers: [],
   leadStats: null,
+  _loadedKeys: new Set(),
+  _loadingKeys: new Set(),
 
   status: { loading: false, loaded: false, error: null, lastSyncAt: null },
 
   /**
-   * Load everything the CRM shell reads. Collections whose request failed keep
-   * whatever is already in the store instead of blanking the screen.
+   * Load core CRM tables on entry. Ancillary collections (forms, contracts, etc.)
+   * are loaded on demand by `ensureLoaded`.
    */
   hydrate: async ({ force = false } = {}) => {
     if (!isBackendEnabled()) {
@@ -87,12 +89,14 @@ const useCrmStoreBase = create((set, get) => ({
     set((s) => ({ status: { ...s.status, loading: true, error: null } }));
     try {
       const [collections, roster, stats] = await Promise.all([
-        crmSync.pullMany(CRM_PULL_ORDER),
-        pullTeamRoster(),
-        pullLeadStats(),
+        crmSync.pullMany(CRM_PULL_ORDER, {}, { force }),
+        pullTeamRoster({ force }),
+        pullLeadStats({}, { force }),
       ]);
+      const loadedKeys = new Set([...(get()._loadedKeys || []), ...Object.keys(collections || {})]);
       set({
         ...collections,
+        _loadedKeys: loadedKeys,
         roster: roster?.roster || {},
         teamMembers: roster?.members || [],
         leadStats: stats || null,
@@ -110,10 +114,54 @@ const useCrmStoreBase = create((set, get) => ({
     }
   },
 
+  /** On-demand loader for individual collections. */
+  ensureLoaded: async (key) => {
+    if (!isBackendEnabled()) return get()[key] || [];
+    const state = get();
+    if (state._loadedKeys && state._loadedKeys.has(key)) return state[key] || [];
+    if (state._loadingKeys && state._loadingKeys.has(key)) return state[key] || [];
+
+    set((s) => {
+      const loading = new Set(s._loadingKeys || []);
+      loading.add(key);
+      return { _loadingKeys: loading };
+    });
+
+    try {
+      const rows = await crmSync.pull(key);
+      set((s) => {
+        const loaded = new Set(s._loadedKeys || []);
+        loaded.add(key);
+        const loading = new Set(s._loadingKeys || []);
+        loading.delete(key);
+        return {
+          [key]: rows !== null ? rows : (s[key] || []),
+          _loadedKeys: loaded,
+          _loadingKeys: loading,
+        };
+      });
+      return rows;
+    } catch {
+      set((s) => {
+        const loading = new Set(s._loadingKeys || []);
+        loading.delete(key);
+        return { _loadingKeys: loading };
+      });
+      return null;
+    }
+  },
+
   /** Re-read one collection — after a convert, an import, a bulk action. */
   refresh: async (key) => {
-    const rows = await crmSync.pull(key);
-    if (rows) set({ [key]: rows });
+    if (crmSync.invalidate) crmSync.invalidate(key);
+    const rows = await crmSync.pull(key, {}, { force: true });
+    if (rows) {
+      set((s) => {
+        const loaded = new Set(s._loadedKeys || []);
+        loaded.add(key);
+        return { [key]: rows, _loadedKeys: loaded };
+      });
+    }
     return rows;
   },
 
@@ -143,6 +191,9 @@ const useCrmStoreBase = create((set, get) => ({
       set((s) => ({
         [key]: (s[key] || []).map((r) => (r.id === optimistic.id ? saved : r)),
       }));
+      if (key === 'leads') {
+        get().refresh('deals').catch(() => {});
+      }
       return saved;
     } catch (err) {
       set((s) => ({ [key]: (s[key] || []).filter((r) => r.id !== optimistic.id) }));
@@ -163,6 +214,9 @@ const useCrmStoreBase = create((set, get) => ({
           return saved ? { ...r, ...saved, ...updates, _pending: false } : { ...r, ...updates, _pending: false };
         }),
       }));
+      if (key === 'deals' && updates?.stage) {
+        get().refresh('leads').catch(() => {});
+      }
       return saved;
     } catch (err) {
       if (previous) {
@@ -434,6 +488,36 @@ export function sourceFacetsFrom(leads = [], sources = []) {
   return countBy(leads, (l) => l.source || byId.get(l.sourceId));
 }
 
-// Hydrated the first time a screen reads it, not at boot — services/lazyModules.
-export const useCrmStore = lazyStore(useCrmStoreBase, "crm");
+const ANCILLARY_KEYS = new Set([
+  'masterTasks', 'stageTasks', 'taskAllocations', 'userAllocations',
+  'forms', 'projects', 'contracts', 'industries',
+]);
+
+const rawUseCrmStore = lazyStore(useCrmStoreBase, "crm");
+
+export const useCrmStore = (selector, equalityFn) => {
+  if (typeof selector === 'function') {
+    const state = useCrmStoreBase.getState();
+    ANCILLARY_KEYS.forEach((key) => {
+      if (!state._loadedKeys?.has(key) && !state._loadingKeys?.has(key)) {
+        let touched = false;
+        try {
+          selector(new Proxy(state, {
+            get(target, prop) {
+              if (prop === key) touched = true;
+              return target[prop];
+            }
+          }));
+        } catch {
+          touched = false;
+        }
+        if (touched) {
+          useCrmStoreBase.getState().ensureLoaded(key);
+        }
+      }
+    });
+  }
+  return rawUseCrmStore(selector, equalityFn);
+};
+Object.assign(useCrmStore, rawUseCrmStore);
 export default useCrmStore;

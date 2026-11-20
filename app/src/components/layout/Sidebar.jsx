@@ -1113,6 +1113,8 @@ function SubItem({ item, depth = 1, badges = {} }) {
 
   const location = useLocation();
 
+  const navigate = useNavigate();
+
   const currentPath = location.pathname;
 
   const isExact = currentPath === item.to;
@@ -1245,11 +1247,6 @@ function SubItem({ item, depth = 1, badges = {} }) {
         to={item.to}
         end
         title={item.label}
-        onClick={(e) => {
-          if (location.pathname !== item.to) {
-            navigate(item.to);
-          }
-        }}
         style={accent ? { '--chip': accent } : undefined}
         className={({ isActive: navActive }) =>
           `sub-group-row${accent ? ' accented' : ''}${linkActive(navActive) ? ' active section-active' : ''}`
@@ -1266,16 +1263,14 @@ function SubItem({ item, depth = 1, badges = {} }) {
     );
   }
 
-
-
   return (
     <NavLink
       to={item.to || '#'}
       end
       title={item.label}
       onClick={(e) => {
-        if (item.to && location.pathname !== item.to) {
-          navigate(item.to);
+        if (!item.to || item.to === '#') {
+          e.preventDefault();
         }
       }}
       className={({ isActive: navActive }) =>
@@ -1585,11 +1580,6 @@ function ExpandableRow({ item, depth = 0, badges = {} }) {
         to={item.to}
         end
         title={item.label}
-        onClick={(e) => {
-          if (location.pathname !== item.to) {
-            navigate(item.to);
-          }
-        }}
         className={({ isActive: directActive }) =>
           `nav-row${directActive || isActive ? ' section-active' : ''}`
         }

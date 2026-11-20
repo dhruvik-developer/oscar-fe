@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useCrmStore } from '../../../stores/crmStore';
 import { DynamicField, getActiveLeadFormSections } from './CreateLeadModal';
+import SalespersonSelect from '../../../components/common/SalespersonSelect';
+import MasterSourceLink from '../../../components/common/MasterSourceLink';
+import { Percent } from 'lucide-react';
 
 /**
  * Edit renders the SAME active form sections as Create, prefilled from the
@@ -33,6 +36,11 @@ function buildInitialValues(lead, sections, sources, team) {
   set('products', /products?/, lead.customValues?.products ?? []);
   set('lead-users', /lead\s*users?/, lead.customValues?.leadUsers ?? []);
   set('lead-photo', /photo|image/, lead.photo ?? lead.customValues?.photo ?? '');
+  values['salesperson_id'] = lead.salespersonId || lead.customValues?.salesperson_id || lead.customValues?.fields?.salesperson_id || '';
+  values['salesperson_name'] = lead.salespersonName || lead.customValues?.salesperson_name || lead.customValues?.fields?.salesperson_name || '';
+  values['salesperson_commission_basis'] = lead.customValues?.salesperson_commission_basis || lead.customValues?.fields?.salesperson_commission_basis || 'percent';
+  values['salesperson_commission_rate'] = lead.customValues?.salesperson_commission_rate || lead.customValues?.fields?.salesperson_commission_rate || '';
+  values['salesperson_notes'] = lead.customValues?.salesperson_notes || lead.customValues?.fields?.salesperson_notes || '';
 
   const sourceField = fieldBy('lead-source', /source/);
   if (sourceField) {
@@ -161,7 +169,19 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSave }) {
           taskDate: String(getValue('task-date', /task\s*date/)),
           taskTime: String(getValue('task-time', /task\s*time/)),
           photo: photoField ? get(photoField.id) : lead.customValues?.photo,
-          fields: fieldValues,
+          salesperson_id: values.salesperson_id || undefined,
+          salesperson_name: values.salesperson_name || undefined,
+          salesperson_commission_basis: values.salesperson_commission_rate ? (values.salesperson_commission_basis || 'percent') : undefined,
+          salesperson_commission_rate: values.salesperson_commission_rate || undefined,
+          salesperson_notes: values.salesperson_notes || undefined,
+          fields: {
+            ...fieldValues,
+            salesperson_id: values.salesperson_id || undefined,
+            salesperson_name: values.salesperson_name || undefined,
+            salesperson_commission_basis: values.salesperson_commission_rate ? (values.salesperson_commission_basis || 'percent') : undefined,
+            salesperson_commission_rate: values.salesperson_commission_rate || undefined,
+            salesperson_notes: values.salesperson_notes || undefined,
+          },
         },
       });
     } catch (err) {
@@ -220,6 +240,69 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSave }) {
               ))}
             </div>
           ))}
+
+                    {/* Salesperson Assignment & Attribution (Requirement §1) */}
+          <div className="col-span-full bg-emerald-50/70 p-4 rounded-xl border border-emerald-200 space-y-3">
+            <div className="text-xs font-bold text-emerald-950 uppercase tracking-wide flex items-center justify-between">
+              <span className="flex items-center gap-1.5">
+                <Percent size={15} className="text-emerald-600" />
+                Salesperson Attribution & Incentive
+              </span>
+              <MasterSourceLink source="salespeople" />
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Assigned Salesperson
+                </label>
+                <SalespersonSelect
+                  value={values.salesperson_id || ''}
+                  name={values.salesperson_name || ''}
+                  onChange={(person) => setValues((prev) => ({
+                    ...prev,
+                    salesperson_id: person.id,
+                    salesperson_name: person.name,
+                  }))}
+                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg bg-white focus:ring-2 focus:ring-emerald-500 font-medium text-slate-800"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Commission Basis</label>
+                <select
+                  value={values.salesperson_commission_basis || 'percent'}
+                  onChange={(e) => setValues((prev) => ({ ...prev, salesperson_commission_basis: e.target.value }))}
+                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg bg-white focus:ring-2 focus:ring-emerald-500 font-medium text-slate-800"
+                >
+                  <option value="percent">Percentage of Net Value (%)</option>
+                  <option value="per_meter">Fixed per Meter (₹/m)</option>
+                  <option value="per_taka">Fixed per Taka (₹/taka)</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Agreed Rate</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="any"
+                  placeholder="e.g. 2.0 or 2.50"
+                  value={values.salesperson_commission_rate ?? ''}
+                  onChange={(e) => setValues((prev) => ({ ...prev, salesperson_commission_rate: e.target.value }))}
+                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg bg-white focus:ring-2 focus:ring-emerald-500 font-semibold text-slate-800"
+                />
+              </div>
+            </div>
+            {lead.assignmentHistory && lead.assignmentHistory.length > 0 && (
+              <div className="text-[11px] text-slate-500 pt-2 border-t border-emerald-200">
+                <span className="font-semibold text-slate-700">Assignment History: </span>
+                {lead.assignmentHistory.map((h, i) => (
+                  <span key={i} className="inline-block mr-2">
+                    {h.previous_salesperson_name ? `${h.previous_salesperson_name} → ` : ''}
+                    <b>{h.new_salesperson_name || 'Assigned'}</b> ({h.assigned_at ? new Date(h.assigned_at).toLocaleDateString() : 'N/A'})
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
 
           {error && <p className="sm:col-span-2 text-xs font-semibold text-rose-600">{error}</p>}
         </div>

@@ -484,7 +484,11 @@ export const inventoryService = {
   updateAudit: (id, data) => api.patch(`/inventory/audits/${id}/`, data),
   postAuditVariances: (id, data) => api.post(`/inventory/audits/${id}/post_variances/`, data || {}),
   saveAuditCounts: (id, data) => api.post(`/inventory/audits/${id}/save_counts/`, data || {}),
+  markAuditReadyForReview: (id) => api.post(`/inventory/audits/${id}/mark_ready_for_review/`),
+  revertAuditToCounting: (id) => api.post(`/inventory/audits/${id}/revert_to_counting/`),
   cancelAudit: (id) => api.post(`/inventory/audits/${id}/cancel/`),
+  getItemCategories: (query) => api.get('/inventory/categories/', { query }),
+  getUsers: (query) => api.get('/accounts/users/', { query }),
   // Sampling (Phase 3.2)
   getSamples: (query) => api.get('/inventory/samples/', { query }),
   getSample: (id) => api.get(`/inventory/samples/${id}/`),

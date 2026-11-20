@@ -6,6 +6,7 @@ import { hrmsSync, pullLeaveBalanceSummary, cancelLeave, describeError } from ".
 import { Badge } from "../../../components/hrms/Badge";
 import Modal from "../../../components/ui/Modal";
 import PageHeader from "../../../components/ui/PageHeader";
+import HrmsExportDropdown from "../../../components/hrms/HrmsExportDropdown";
 import { hrmsGuides } from "../../../data/hrms/hrmsGuides";
 import { Avatar } from "../../../components/hrms/Avatar";
 import MasterSourceLink from "../../../components/common/MasterSourceLink";
@@ -106,7 +107,7 @@ export default function Leave() {
   const [detailModalLeave, setDetailModalLeave] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [busyLeaveId, setBusyLeaveId] = useState(null);
-  const [exportMenuOpen, setExportMenuOpen] = useState(false);
+  const [exportCategory, setExportCategory] = useState("requests");
 
   const handleExportRequests = () => {
     const list = leaves || [];
@@ -561,46 +562,44 @@ export default function Leave() {
         guide={hrmsGuides.leave}
         actions={
           <>
-            <div className="relative inline-block text-left">
-              <button
-                type="button"
-                onClick={() => setExportMenuOpen((v) => !v)}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2.5 bg-white border border-slate-300 text-slate-700 rounded-xl text-[13px] font-medium shadow-2xs hover:bg-slate-50 transition-colors cursor-pointer"
-              >
-                <Download size={15} />
-                Export
-                <ChevronDown size={13} className="text-slate-400" />
-              </button>
-              {exportMenuOpen && (
-                <div
-                  className="absolute right-0 mt-1.5 w-52 bg-white border border-slate-200 rounded-xl shadow-lg z-30 py-1.5 text-xs"
-                  onMouseLeave={() => setExportMenuOpen(false)}
-                >
-                  <button
-                    type="button"
-                    onClick={() => {
-                      handleExportRequests();
-                      setExportMenuOpen(false);
-                    }}
-                    className="w-full text-left px-3.5 py-2 hover:bg-slate-50 font-medium text-slate-700 flex items-center justify-between cursor-pointer"
-                  >
-                    <span>Export Leave Requests</span>
-                    <span className="text-[10px] text-slate-400 font-mono">CSV</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      handleExportBalances();
-                      setExportMenuOpen(false);
-                    }}
-                    className="w-full text-left px-3.5 py-2 hover:bg-slate-50 font-medium text-slate-700 flex items-center justify-between cursor-pointer"
-                  >
-                    <span>Export Leave Balances</span>
-                    <span className="text-[10px] text-slate-400 font-mono">CSV</span>
-                  </button>
-                </div>
-              )}
-            </div>
+            <HrmsExportDropdown
+              subCategories={[
+                { id: "requests", label: "Leave Requests" },
+                { id: "balances", label: "Leave Balances" },
+              ]}
+              selectedSubCategory={exportCategory}
+              onSubCategoryChange={(cat) => setExportCategory(cat)}
+              filename={exportCategory === "balances" ? `leave_balances_${(selectedEmployee?.name || currentUser?.name || "All").replace(/\s+/g, "_")}` : "leave_requests"}
+              reportTitle={exportCategory === "balances" ? "Employee Leave Balances" : "Leave Requests Register"}
+              subtitle={exportCategory === "balances" ? `Employee: ${selectedEmployee?.name || currentUser?.name || "All"} • Year: ${new Date().getFullYear()}` : `Total Requests: ${(leaves || []).length}`}
+              columns={
+                exportCategory === "balances"
+                  ? [
+                      { label: "Employee", get: () => selectedEmployee?.name || currentUser?.name || "All", width: 120 },
+                      { label: "Leave Type", get: (b) => b.leaveType || "", width: 110 },
+                      { label: "Code", get: (b) => b.code || "", width: 65, align: "center" },
+                      { label: "Total Quota", get: (b) => formatDays(b.total), width: 75, align: "center" },
+                      { label: "Available", get: (b) => formatDays(b.available), width: 75, align: "center" },
+                      { label: "Used", get: (b) => formatDays(b.used), width: 70, align: "center" },
+                      { label: "Pending", get: (b) => formatDays(b.pending), width: 70, align: "center" },
+                      { label: "Carried Forward", get: (b) => formatDays(b.carriedForward), width: 85, align: "center" },
+                      { label: "Type", get: (b) => (b.isPaid === false ? "Unpaid (LOP)" : "Paid"), width: 85, align: "center" },
+                    ]
+                  : [
+                      { label: "Employee Code", get: (l) => l.employeeCode || "", width: 90 },
+                      { label: "Employee Name", get: (l) => l.employee || "", width: 120 },
+                      { label: "Leave Type", get: (l) => l.type || "", width: 95 },
+                      { label: "From Date", get: (l) => l.from || "", width: 80, align: "center" },
+                      { label: "To Date", get: (l) => l.to || "", width: 80, align: "center" },
+                      { label: "Days", get: (l) => formatDays(l.days), width: 65, align: "center" },
+                      { label: "Reason", get: (l) => l.reason || "", width: 130 },
+                      { label: "Delegate", get: (l) => delegateNameOf(l) || "—", width: 100 },
+                      { label: "Status", get: (l) => l.status || "", width: 80, align: "center" },
+                    ]
+              }
+              rows={exportCategory === "balances" ? (balances || []) : (leaves || [])}
+              buttonLabel="Export"
+            />
             <button
               type="button"
               onClick={() => setCompOffModalOpen(true)}

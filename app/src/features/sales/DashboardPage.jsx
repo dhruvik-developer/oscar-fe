@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo, Suspense } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef, Suspense } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../../services/api';
 import { useAppStore } from '../../stores/appStore';
@@ -8,7 +8,7 @@ import {
   TrendingUp, TrendingDown, Calendar, RefreshCw, AlertTriangle, AlertCircle,
   ExternalLink, ChevronRight, CheckCircle2, Clock, Landmark, ShieldAlert,
   Layers, Package, Check, HelpCircle, Loader2,
-  Wallet, Percent, IndianRupee
+  Wallet, Percent, IndianRupee, CalendarDays, BarChart3
 } from 'lucide-react';
 
 const BatchProfitabilityPage = React.lazy(() => import('../../features/inventory/batches/BatchProfitabilityPage'));
@@ -387,12 +387,67 @@ export const DashboardPage = () => {
   const currentUser = useAppStore((s) => s.currentUser);
 
   const todayIso = useMemo(() => localIso(new Date()), []);
+  const currentMonthIso = useMemo(() => todayIso.slice(0, 7), [todayIso]);
+  const currentFyYear = useMemo(() => {
+    const now = new Date();
+    return (now.getMonth() + 1) >= 4 ? now.getFullYear() : now.getFullYear() - 1;
+  }, []);
+
   const [selectedDate, setSelectedDate] = useState(todayIso);
+  const [selectedMonth, setSelectedMonth] = useState(currentMonthIso);
+  const [selectedFy, setSelectedFy] = useState(currentFyYear);
   const [selectedPeriod, setSelectedPeriod] = useState('mtd'); // 'today' | 'mtd' | 'fytd'
   const [vsPrevMonth, setVsPrevMonth] = useState(true);
   const [chartRange, setChartRange] = useState('7D'); // '7D' | '30D' | 'MTD'
   const [batchTab, setBatchTab] = useState('overview'); // 'overview' | 'profitable' | 'loss'
   const [showBatchLedgerDrawer, setShowBatchLedgerDrawer] = useState(false);
+
+  const dateInputRef = useRef(null);
+  const monthInputRef = useRef(null);
+  const yearSelectRef = useRef(null);
+
+  const fyOptions = useMemo(() => {
+    const opts = [];
+    for (let i = 0; i <= 4; i++) {
+      const y = currentFyYear - i;
+      opts.push({
+        year: y,
+        label: i === 0 ? `FY ${y}-${String(y + 1).slice(-2)} (Current)` : `FY ${y}-${String(y + 1).slice(-2)}`,
+      });
+    }
+    return opts;
+  }, [currentFyYear]);
+
+  const handleDateSelect = useCallback((dateStr) => {
+    if (!dateStr) return;
+    setSelectedDate(dateStr);
+    setSelectedPeriod('today');
+  }, []);
+
+  const handleMonthSelect = useCallback((monthStr) => {
+    if (!monthStr) return;
+    setSelectedMonth(monthStr);
+    setSelectedPeriod('mtd');
+    const [yr, mo] = monthStr.split('-').map(Number);
+    const now = new Date();
+    if (yr === now.getFullYear() && mo === (now.getMonth() + 1)) {
+      setSelectedDate(todayIso);
+    } else {
+      const lastDay = new Date(yr, mo, 0).getDate();
+      setSelectedDate(`${yr}-${String(mo).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`);
+    }
+  }, [todayIso]);
+
+  const handleFySelect = useCallback((fyYear) => {
+    const yr = Number(fyYear);
+    setSelectedFy(yr);
+    setSelectedPeriod('fytd');
+    if (yr === currentFyYear) {
+      setSelectedDate(todayIso);
+    } else {
+      setSelectedDate(`${yr + 1}-03-31`);
+    }
+  }, [currentFyYear, todayIso]);
 
   const initialCached = useMemo(() => getCachedDashboard(selectedPeriod, chartRange), []);
   const [data, setData] = useState(() => initialCached);
@@ -442,7 +497,15 @@ export const DashboardPage = () => {
     comparisonLabel: selectedPeriod === 'today' ? 'vs yesterday' : 'vs Oct',
   };
 
-  const periodSuffix = selectedPeriod === 'today' ? 'Today' : selectedPeriod === 'fytd' ? 'FYTD' : 'MTD';
+  const periodSuffix = useMemo(() => {
+    if (selectedPeriod === 'today') {
+      return selectedDate === todayIso ? 'Today' : selectedDate;
+    }
+    if (selectedPeriod === 'fytd') {
+      return selectedFy === currentFyYear ? `FYTD ${selectedFy}-${String(selectedFy + 1).slice(-2)}` : `FY ${selectedFy}-${String(selectedFy + 1).slice(-2)}`;
+    }
+    return selectedMonth === currentMonthIso ? 'MTD' : selectedMonth;
+  }, [selectedPeriod, selectedDate, todayIso, selectedFy, currentFyYear, selectedMonth, currentMonthIso]);
 
   const topCards = data?.topKpiCards || [
     { id: 'sales', title: `Sales (${periodSuffix})`, value: 1842300, diffPct: 12.4, trend: 'up', comparisonText: '▲ 12.4% vs Oct' },
@@ -686,9 +749,9 @@ export const DashboardPage = () => {
   }, [cashFlow]);
 
   return (
-    <div className="space-y-4 p-4 md:p-6 bg-[#f8fafc] min-h-screen text-slate-800 font-sans">
+    <div className="space-y-4 text-slate-800 font-sans">
       {/* ── HEADER & GLOBAL FILTERS ── */}
-      <div className="flex flex-col gap-3 rounded-xl border border-[#e2eaf5] bg-white p-4 shadow-[0_1px_2px_rgba(16,42,82,0.04)] md:flex-row md:items-center md:justify-between">
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between py-1">
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-[20px] font-extrabold tracking-tight text-[#17294e]">Business Position</h1>
@@ -699,47 +762,200 @@ export const DashboardPage = () => {
           </p>
         </div>
 
-        {/* Global Filter Buttons */}
-        <div className="flex flex-wrap items-center gap-1.5 self-start md:self-auto">
-          <div className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-0.5">
-            {[
-              { id: 'today', label: 'Today' },
-              { id: 'mtd', label: 'MTD' },
-              { id: 'fytd', label: 'FYTD 2026-27' },
-            ].map((p) => {
-              const active = selectedPeriod === p.id;
-              return (
+        {/* Global Filter Controls: Date Picker (Day-wise), Month Picker (Month-wise), Year Picker (FY-wise) */}
+        <div className="flex flex-wrap items-center gap-2 self-start md:self-auto">
+          <div className="inline-flex flex-wrap items-center rounded-lg border border-slate-200 bg-white p-0.5 shadow-2xs">
+            {/* 1. DATE WISE (replaces Today) */}
+            <div
+              onClick={() => {
+                setSelectedPeriod('today');
+              }}
+              className={`group relative flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[12px] font-bold transition-all cursor-pointer whitespace-nowrap ${
+                selectedPeriod === 'today'
+                  ? 'bg-[#17294e] text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+              }`}
+            >
+              <Calendar
+                size={13}
+                className={selectedPeriod === 'today' ? 'text-blue-300' : 'text-slate-400'}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSelectedPeriod('today');
+                  try { dateInputRef.current?.showPicker(); } catch {}
+                }}
+              />
+              <span
+                className="text-[11px] font-semibold opacity-80 cursor-pointer"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSelectedPeriod('today');
+                  try { dateInputRef.current?.showPicker(); } catch {}
+                }}
+              >
+                Date:
+              </span>
+              <input
+                ref={dateInputRef}
+                type="date"
+                value={selectedDate}
+                max="2035-12-31"
+                onChange={(e) => handleDateSelect(e.target.value)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSelectedPeriod('today');
+                }}
+                className={`bg-transparent text-[12px] font-bold outline-none cursor-pointer border-none p-0 w-[114px] ${
+                  selectedPeriod === 'today' ? 'text-white' : 'text-slate-700'
+                }`}
+                style={{ colorScheme: selectedPeriod === 'today' ? 'dark' : 'light' }}
+                title="Choose a specific date for date-wise business position"
+              />
+              {selectedPeriod === 'today' && selectedDate !== todayIso && (
                 <button
-                  key={p.id}
                   type="button"
-                  onClick={() => setSelectedPeriod(p.id)}
-                  className={`rounded-md px-3 py-1.5 text-[12px] font-bold transition-all cursor-pointer whitespace-nowrap ${
-                    active ? 'bg-[#17294e] text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
-                  }`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDateSelect(todayIso);
+                  }}
+                  className="ml-0.5 rounded bg-blue-500/30 px-1 py-0.2 text-[10px] font-medium text-blue-200 hover:bg-blue-500/50"
+                  title="Reset to today"
                 >
-                  {p.label}
+                  Today
                 </button>
-              );
-            })}
+              )}
+            </div>
+
+            {/* 2. MONTH WISE (replaces MTD) */}
+            <div
+              onClick={() => {
+                setSelectedPeriod('mtd');
+                handleMonthSelect(selectedMonth);
+              }}
+              className={`group relative flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[12px] font-bold transition-all cursor-pointer whitespace-nowrap ${
+                selectedPeriod === 'mtd'
+                  ? 'bg-[#17294e] text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+              }`}
+            >
+              <CalendarDays
+                size={13}
+                className={selectedPeriod === 'mtd' ? 'text-blue-300' : 'text-slate-400'}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSelectedPeriod('mtd');
+                  try { monthInputRef.current?.showPicker(); } catch {}
+                }}
+              />
+              <span
+                className="text-[11px] font-semibold opacity-80 cursor-pointer"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSelectedPeriod('mtd');
+                  try { monthInputRef.current?.showPicker(); } catch {}
+                }}
+              >
+                Month:
+              </span>
+              <input
+                ref={monthInputRef}
+                type="month"
+                value={selectedMonth}
+                onChange={(e) => handleMonthSelect(e.target.value)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSelectedPeriod('mtd');
+                }}
+                className={`bg-transparent text-[12px] font-bold outline-none cursor-pointer border-none p-0 w-[118px] ${
+                  selectedPeriod === 'mtd' ? 'text-white' : 'text-slate-700'
+                }`}
+                style={{ colorScheme: selectedPeriod === 'mtd' ? 'dark' : 'light' }}
+                title="Choose a specific month for month-wise business position"
+              />
+              {selectedPeriod === 'mtd' && selectedMonth !== currentMonthIso && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleMonthSelect(currentMonthIso);
+                  }}
+                  className="ml-0.5 rounded bg-blue-500/30 px-1 py-0.2 text-[10px] font-medium text-blue-200 hover:bg-blue-500/50"
+                  title="Reset to current month"
+                >
+                  Current
+                </button>
+              )}
+            </div>
+
+            {/* 3. YEAR WISE (replaces FYTD) */}
+            <div
+              onClick={() => {
+                setSelectedPeriod('fytd');
+                handleFySelect(selectedFy);
+              }}
+              className={`group relative flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[12px] font-bold transition-all cursor-pointer whitespace-nowrap ${
+                selectedPeriod === 'fytd'
+                  ? 'bg-[#17294e] text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+              }`}
+            >
+              <BarChart3 size={13} className={selectedPeriod === 'fytd' ? 'text-blue-300' : 'text-slate-400'} />
+              <span className="text-[11px] font-semibold opacity-80">Year:</span>
+              <select
+                ref={yearSelectRef}
+                value={selectedFy}
+                onChange={(e) => handleFySelect(Number(e.target.value))}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSelectedPeriod('fytd');
+                }}
+                className={`bg-transparent text-[12px] font-bold outline-none cursor-pointer border-none p-0 pr-1 ${
+                  selectedPeriod === 'fytd'
+                    ? 'text-white [&>option]:text-slate-800 [&>option]:bg-white'
+                    : 'text-slate-700 [&>option]:text-slate-800 [&>option]:bg-white'
+                }`}
+                title="Choose a financial year for year-wise business position"
+              >
+                {fyOptions.map((fy) => (
+                  <option key={fy.year} value={fy.year}>
+                    {fy.label}
+                  </option>
+                ))}
+              </select>
+              {selectedPeriod === 'fytd' && selectedFy !== currentFyYear && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleFySelect(currentFyYear);
+                  }}
+                  className="ml-0.5 rounded bg-blue-500/30 px-1 py-0.2 text-[10px] font-medium text-blue-200 hover:bg-blue-500/50"
+                  title="Reset to current financial year"
+                >
+                  Current
+                </button>
+              )}
+            </div>
           </div>
 
           <button
             type="button"
             onClick={() => setVsPrevMonth((v) => !v)}
-            className={`rounded-lg border px-3 py-1.5 text-[12px] font-semibold transition-all cursor-pointer whitespace-nowrap ${
+            title="Toggle previous period comparison percentage"
+            className={`rounded-lg border px-3 py-1.5 text-[12px] font-semibold transition-all cursor-pointer whitespace-nowrap shadow-2xs ${
               vsPrevMonth
                 ? 'border-blue-200 bg-blue-50/70 text-blue-700 font-bold'
                 : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'
             }`}
           >
-            vs Previous Month
+            {vsPrevMonth ? (periodInfo?.comparisonLabel || 'vs Previous') : 'Comparison Off'}
           </button>
 
           <button
             type="button"
             onClick={refresh}
             title="Refresh live figures"
-            className="rounded-lg border border-slate-200 bg-white p-1.5 text-slate-500 hover:bg-slate-50 hover:text-slate-700 cursor-pointer transition-colors"
+            className="rounded-lg border border-slate-200 bg-white p-1.5 text-slate-500 hover:bg-slate-50 hover:text-slate-700 cursor-pointer transition-colors shadow-2xs"
           >
             <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
           </button>

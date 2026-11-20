@@ -39,6 +39,7 @@ import { aggregatePayrollStats, formatINR } from "./salaryCalculations";
 import { describeError, localISODate } from "../../../services/hrmsSync";
 import { Badge } from "../../../components/hrms/Badge";
 import PageHeader from "../../../components/ui/PageHeader";
+import HrmsExportDropdown from "../../../components/hrms/HrmsExportDropdown";
 import AppPagination from "../../../components/ui/AppPagination";
 import { hrmsGuides } from "../../../data/hrms/hrmsGuides";
 import { Avatar } from "../../../components/hrms/Avatar";
@@ -110,133 +111,319 @@ function attendanceLine(p) {
   return `${parts.join(" | ")} of ${fmtDays(p.totalDays)} working days${detail.length ? ` (${detail.join(", ")})` : ""}`;
 }
 
-// Clean browser PDF payslip generator with full formula breakdown
-function downloadPayslipPdf(p) {
-  const clean = (s) =>
-    String(s || "")
-      .replace(/[()\\]/g, "")
-      .replace(/[₹•–—]/g, "-")
-      .replace(/[^\x20-\x7E]/g, " ");
+// Minimal, authoritative Payroll Slip PDF generator conforming strictly to traditional payroll standard
+async function downloadPayslipPdf(p) {
+  try {
+    const { jsPDF } = await import('jspdf');
 
-  const name = clean(p.name || "EMPLOYEE").toUpperCase();
-  const id = clean(String(p.id || "").slice(0, 8).toUpperCase() || "-");
-  const empId = clean(p.empId || "-");
-  const role = clean(p.role || "-");
-  const dept = clean(p.department || "-");
-  const month = clean(slipMonth(p));
-  const bank = clean(p.bank || "-");
+    function amountToWords(num) {
+      const n = Math.round(Number(num) || 0);
+      if (n === 0) return 'Zero Rupees Only';
+      const a = ['', 'One ', 'Two ', 'Three ', 'Four ', 'Five ', 'Six ', 'Seven ', 'Eight ', 'Nine ', 'Ten ', 'Eleven ', 'Twelve ', 'Thirteen ', 'Fourteen ', 'Fifteen ', 'Sixteen ', 'Seventeen ', 'Eighteen ', 'Nineteen '];
+      const b = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+      function inWords(val) {
+        if (val === 0) return '';
+        if (val < 20) return a[val];
+        if (val < 100) return b[Math.floor(val / 10)] + (val % 10 !== 0 ? ' ' + a[val % 10] : ' ');
+        if (val < 1000) return a[Math.floor(val / 100)] + 'Hundred ' + inWords(val % 100);
+        if (val < 100000) return inWords(Math.floor(val / 1000)) + 'Thousand ' + inWords(val % 1000);
+        if (val < 10000000) return inWords(Math.floor(val / 100000)) + 'Lakh ' + inWords(val % 100000);
+        return inWords(Math.floor(val / 10000000)) + 'Crore ' + inWords(val % 10000000);
+      }
+      return ('Indian Rupees ' + inWords(n).trim() + ' Only').replace(/\s+/g, ' ');
+    }
 
-  const std = Number(p.standardSalary || 0);
-  const totalD = Number(p.totalDays || 0);
-  const attended = Number(p.attendedDays || 0);
-  const paidLeave = Number(p.paidLeaves || 0);
-  const lop = Number(p.unpaidLeaves || 0);
-  const absent = Number(p.absentDays || 0);
-  const perDay = Number(p.perDaySalary || 0);
-  const attDeduction = Number(p.attendanceDeduction || 0);
-  const earned = Number(p.earnedSalary || 0);
-  const earnings = Number(p.additionalEarnings || 0);
-  const deductions = Number(p.deductions || 0);
-  const advance = Number(p.advance || 0);
-  const remaining = Number(p.netPayable ?? p.remainingPayable ?? 0);
-  const basic = Number(p.basic || 0);
-  const hra = Number(p.hra || 0);
-  const allowances = Number(p.allowances || 0);
-  const status = clean(p.status || "In Progress");
-  const paidDate = clean(fmtDate(p.paymentDate) || "N/A");
-  const paidAmt = p.paidAmount !== null && p.paidAmount !== undefined ? Number(p.paidAmount) : null;
-  const inr = (n) => Math.round(n).toLocaleString("en-IN");
+    const clean = (s) =>
+      String(s || '')
+        .replace(/[₹]/g, 'INR ')
+        .replace(/[•·]/g, '-')
+        .replace(/[—–]/g, '-')
+        .replace(/[’‘]/g, "'")
+        .replace(/[“”]/g, '"')
+        .replace(/[^\x20-\x7E]/g, ' ')
+        .trim();
 
-  const lines = [
-    "BT",
-    "/F1 18 Tf",
-    "50 780 Td",
-    "(EVENMORE ERP - CONFIDENTIAL SALARY SLIP) Tj",
-    "/F1 10 Tf",
-    "0 -22 Td",
-    `(Pay Period: ${month}   |   Slip Ref: ${id}   |   Status: ${status}) Tj`,
-    "0 -18 Td",
-    `(Employee: ${name}   |   Staff ID: ${empId}) Tj`,
-    "0 -16 Td",
-    `(Designation: ${role}   |   Department: ${dept}) Tj`,
-    "0 -16 Td",
-    `(Disbursal Bank: ${bank}) Tj`,
-    "0 -26 Td",
-    "/F1 12 Tf",
-    "(MONTHLY SALARY CALCULATION BREAKDOWN:) Tj",
-    "0 -18 Td",
-    "/F1 10 Tf",
-    `(Standard Monthly Salary: INR ${inr(std)}) Tj`,
-    "0 -16 Td",
-    `(Working Days: ${fmtDays(totalD)} | Attended: ${fmtDays(attended)} | Paid Leave: ${fmtDays(paidLeave)} | LOP: ${fmtDays(lop)} | Deducted Days: ${fmtDays(absent)}) Tj`,
-    "0 -16 Td",
-    `(Rate: INR ${inr(perDay)}/day | Attendance Deduction: - INR ${inr(attDeduction)}) Tj`,
-    "0 -16 Td",
-    `(Earned Salary: INR ${inr(earned)}) Tj`,
-    "0 -16 Td",
-    `(Basic: INR ${inr(basic)}   |   HRA: INR ${inr(hra)}   |   Allowances: INR ${inr(allowances)}) Tj`,
-    "0 -16 Td",
-    `(Additional Earnings: + INR ${inr(earnings)}) Tj`,
-    "0 -16 Td",
-    `(Deductions: - INR ${inr(deductions)}) Tj`,
-    "0 -16 Td",
-    `(Salary Advance Recovered: - INR ${inr(advance)}) Tj`,
-    "0 -24 Td",
-    "/F1 11 Tf",
-    "(FORMULA: Net = Standard - Per-day x Deducted Days + Earnings - Deductions - Advance) Tj",
-    "0 -22 Td",
-    "/F1 14 Tf",
-    `(NET PAYABLE: INR ${inr(remaining)}) Tj`,
-    "0 -24 Td",
-    "/F1 10 Tf",
-    `(Payout Status: ${status}   |   Disbursed: ${status === "Paid" && paidAmt !== null ? inr(paidAmt) : "-"}   |   Date: ${paidDate}) Tj`,
-    "0 -32 Td",
-    "/F1 9 Tf",
-    "(This is a computer-generated salary slip. Attendance and leave figures are taken from HRMS records.) Tj",
-    "ET",
-  ];
+    const name = clean(p.name || 'EMPLOYEE').toUpperCase();
+    const empId = clean(p.empId || '-');
+    const role = clean(p.role || '-');
+    const dept = clean(p.department || '-');
+    const month = clean(slipMonth(p)) || 'Current Month';
+    const bank = clean(p.bank || 'N/A');
 
-  const stream = lines.join("\n");
-  const streamBytes = new TextEncoder().encode(stream).length;
+    const totalD = Number(p.totalDays || 0);
+    const attended = Number(p.attendedDays || 0);
+    const paidLeave = Number(p.paidLeaves || 0);
+    const lop = Number(p.unpaidLeaves || 0);
+    const absent = Number(p.absentDays || 0);
+    const perDay = Number(p.perDaySalary || 0);
+    const attDeduction = Number(p.attendanceDeduction || 0);
+    const earned = Number(p.earnedSalary || 0);
+    const earnings = Number(p.additionalEarnings || 0);
+    const deductions = Number(p.deductions || 0);
+    const advance = Number(p.advance || 0);
+    const remaining = Number(p.netPayable ?? p.remainingPayable ?? 0);
+    const basic = Number(p.basic || 0);
+    const hra = Number(p.hra || 0);
+    const allowances = Number(p.allowances || 0);
+    const issueDate = p.paymentDate ? clean(fmtDate(p.paymentDate)) : new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    const inr = (n) => Math.round(Number(n) || 0).toLocaleString('en-IN');
+    const fmtDays = (n) => (Number(n) === 1 ? '1 Day' : `${n || 0} Days`);
 
-  let out = "%PDF-1.4\n";
-  const offsets = [];
+    const doc = new jsPDF({
+      orientation: 'portrait',
+      unit: 'pt',
+      format: 'a4',
+    });
 
-  function addObj(content) {
-    offsets.push(new TextEncoder().encode(out).length);
-    out += content + "\n";
+    const pageWidth = 595.28;
+    const margin = 40;
+    const contentWidth = pageWidth - margin * 2; // 515.28 pt
+
+    let y = 48;
+
+    // 1. Centered Header: PAYROLL SLIP (No company branding)
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(18);
+    doc.setTextColor(17, 24, 39); // dark charcoal #111827
+    doc.text('PAYROLL SLIP', pageWidth / 2, y, { align: 'center' });
+
+    y += 24;
+
+    // Right-aligned Payroll Period and Issue Date
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.setTextColor(55, 65, 81);
+    doc.text(`Payroll Period: ${month}`, margin + contentWidth, y, { align: 'right' });
+    y += 14;
+    doc.text(`Issue Date: ${issueDate}`, margin + contentWidth, y, { align: 'right' });
+
+    y += 12;
+
+    // Minimal Thin Divider
+    doc.setDrawColor(209, 213, 219);
+    doc.setLineWidth(0.75);
+    doc.line(margin, y, margin + contentWidth, y);
+
+    y += 16;
+
+    // 2. Employee Information Section (2-Column Box)
+    const infoBoxY = y;
+    const infoRowH = 18;
+    const halfW = contentWidth / 2;
+
+    const leftFields = [
+      ['Employee Name:', name],
+      ['Employee ID:', empId],
+      ['Designation:', role],
+      ['Department:', dept],
+      ['Bank Account:', bank],
+    ];
+
+    const rightFields = [
+      ['Payroll Period:', month],
+      ['Scheduled Days:', fmtDays(totalD)],
+      ['Attended Days:', fmtDays(attended)],
+      ['Paid Leaves:', fmtDays(paidLeave)],
+      ['Unpaid Leaves:', fmtDays(lop)],
+    ];
+
+    const infoBoxH = Math.max(leftFields.length, rightFields.length) * infoRowH + 12;
+
+    // Subtle Box Border
+    doc.setDrawColor(229, 231, 235);
+    doc.rect(margin, infoBoxY, contentWidth, infoBoxH, 'S');
+
+    let infoY = infoBoxY + 16;
+    for (let i = 0; i < Math.max(leftFields.length, rightFields.length); i++) {
+      if (leftFields[i]) {
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(8.5);
+        doc.setTextColor(75, 85, 99);
+        doc.text(leftFields[i][0], margin + 14, infoY);
+
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(17, 24, 39);
+        doc.text(leftFields[i][1], margin + 110, infoY);
+      }
+
+      if (rightFields[i]) {
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(8.5);
+        doc.setTextColor(75, 85, 99);
+        doc.text(rightFields[i][0], margin + halfW + 14, infoY);
+
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(17, 24, 39);
+        doc.text(rightFields[i][1], margin + halfW + 110, infoY);
+      }
+
+      infoY += infoRowH;
+    }
+
+    y = infoBoxY + infoBoxH + 24;
+
+    // 3. Centered Heading: Salary Breakdown (INR)
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(12);
+    doc.setTextColor(17, 24, 39);
+    doc.text('Salary Breakdown (INR)', pageWidth / 2, y, { align: 'center' });
+
+    y += 14;
+
+    // 4. Two-Column Table: Earnings / Deductions | Amount (INR)
+    const tableY = y;
+    const thH = 22;
+
+    doc.setFillColor(243, 244, 246);
+    doc.rect(margin, tableY, contentWidth, thH, 'F');
+    doc.setDrawColor(209, 213, 219);
+    doc.setLineWidth(0.75);
+    doc.rect(margin, tableY, contentWidth, thH, 'S');
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.setTextColor(17, 24, 39);
+    doc.text('Earnings / Deductions', margin + 14, tableY + 14);
+    doc.text('Amount (INR)', margin + contentWidth - 14, tableY + 14, { align: 'right' });
+
+    // Build ONLY applicable components (no zero-value rows)
+    const salaryRows = [];
+
+    if (basic > 0) {
+      salaryRows.push(['Basic Salary', inr(basic), false]);
+    } else if (earned > 0 && earnings === 0) {
+      salaryRows.push(['Earned Salary', inr(earned), false]);
+    }
+
+    if (hra > 0) {
+      salaryRows.push(['House Rent Allowance', inr(hra), false]);
+    }
+    if (allowances > 0) {
+      salaryRows.push(['Special Allowance', inr(allowances), false]);
+    }
+    if (earnings > 0) {
+      salaryRows.push(['Bonus / Additional Earnings', inr(earnings), false]);
+    }
+
+    if (Array.isArray(p.components)) {
+      p.components.forEach((c) => {
+        const amt = Number(c.amount || 0);
+        if (amt > 0) {
+          if (c.kind === 'earning') {
+            salaryRows.push([clean(c.name || 'Sales Incentive / Earning'), inr(amt), false]);
+          } else if (c.kind === 'deduction') {
+            salaryRows.push([clean(c.name || 'Deduction'), `-${inr(amt)}`, false]);
+          }
+        }
+      });
+    }
+
+    if (attDeduction > 0) {
+      salaryRows.push(['Attendance Deduction', `-${inr(attDeduction)}`, false]);
+    }
+    if (deductions > 0) {
+      salaryRows.push(['PF / ESI / TDS', `-${inr(deductions)}`, false]);
+    }
+    if (advance > 0) {
+      salaryRows.push(['Salary Advance Recovery', `-${inr(advance)}`, false]);
+    }
+
+    if (salaryRows.length === 0) {
+      salaryRows.push(['Basic Salary', '0', false]);
+    }
+
+    const totalEarnings = (basic || earned) + hra + allowances + earnings;
+    salaryRows.push(['Total Earnings', inr(totalEarnings), true]);
+
+    const totalDeductions = attDeduction + deductions + advance;
+    salaryRows.push(['Total Deductions', inr(totalDeductions), true]);
+
+    const netLabel = p.status === 'Paid' ? 'Net Salary Paid' : 'Net Salary Payable';
+    salaryRows.push([netLabel, inr(remaining), 'FINAL']);
+
+    let rowY = tableY + thH;
+    const rowH = 20;
+
+    salaryRows.forEach((r) => {
+      const isFinal = r[2] === 'FINAL';
+      const isTotal = r[2] === true;
+
+      if (isFinal) {
+        doc.setFillColor(243, 244, 246);
+        doc.rect(margin, rowY, contentWidth, rowH, 'F');
+      } else if (isTotal) {
+        doc.setFillColor(249, 250, 251);
+        doc.rect(margin, rowY, contentWidth, rowH, 'F');
+      }
+
+      doc.setDrawColor(229, 231, 235);
+      doc.setLineWidth(0.5);
+      doc.line(margin, rowY + rowH, margin + contentWidth, rowY + rowH);
+
+      doc.setFont('helvetica', isFinal || isTotal ? 'bold' : 'normal');
+      doc.setFontSize(isFinal ? 9.5 : 8.5);
+      doc.setTextColor(17, 24, 39);
+
+      doc.text(r[0], margin + 14, rowY + 13.5);
+      doc.text(r[1], margin + contentWidth - 14, rowY + 13.5, { align: 'right' });
+
+      rowY += rowH;
+    });
+
+    // Outer table border
+    doc.setDrawColor(209, 213, 219);
+    doc.setLineWidth(0.75);
+    doc.rect(margin, tableY, contentWidth, rowY - tableY, 'S');
+
+    y = rowY + 16;
+
+    // 5. Amount in Words
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8.5);
+    doc.setTextColor(55, 65, 81);
+    doc.text('Amount in Words: ' + amountToWords(remaining), margin, y);
+
+    y += 50;
+
+    // 6. Signature Section: Received By | Authorized By
+    const sigLineW = 150;
+    const leftSigX = margin + 20;
+    const rightSigX = margin + contentWidth - sigLineW - 20;
+
+    doc.setDrawColor(156, 163, 175);
+    doc.setLineWidth(0.75);
+
+    // Left signature line
+    doc.line(leftSigX, y, leftSigX + sigLineW, y);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8.5);
+    doc.setTextColor(55, 65, 81);
+    doc.text('Received By', leftSigX + sigLineW / 2, y + 14, { align: 'center' });
+
+    // Right signature line
+    doc.line(rightSigX, y, rightSigX + sigLineW, y);
+    doc.text('Authorized By', rightSigX + sigLineW / 2, y + 14, { align: 'center' });
+
+    const fileName = `Payslip_${(p.name || 'Employee').replace(/\s+/g, '_')}_${month.replace(/\s+/g, '_')}.pdf`;
+    doc.save(fileName);
+  } catch (err) {
+    console.error('Failed to generate PDF payslip:', err);
   }
-
-  addObj("1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj");
-  addObj("2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj");
-  addObj("3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>\nendobj");
-  addObj(`4 0 obj\n<< /Length ${streamBytes} >>\nstream\n${stream}\nendstream\nendobj`);
-  addObj("5 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj");
-
-  const startXref = new TextEncoder().encode(out).length;
-  out += "xref\n0 " + (offsets.length + 1) + "\n0000000000 65535 f \n";
-  for (const off of offsets) {
-    out += String(off).padStart(10, "0") + " 00000 n \n";
-  }
-  out += "trailer\n<< /Size " + (offsets.length + 1) + " /Root 1 0 R >>\nstartxref\n" + startXref + "\n%%EOF";
-
-  const blob = new Blob([out], { type: "application/pdf" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = `Payslip_${(p.name || "Employee").replace(/\s+/g, "_")}_${month.replace(/\s+/g, "_")}.pdf`;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
 }
 
-// Modern printable/save-as-PDF window generator with corporate styling
+// Minimal printable window generator matching the PDF template exactly
 function printPayslip(p) {
   const esc = (s) =>
-    String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
-  const inr = (n) => Math.round(Number(n) || 0).toLocaleString("en-IN");
-  const std = Number(p.standardSalary || 0);
+    String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+  const inr = (n) => Math.round(Number(n) || 0).toLocaleString('en-IN');
+  const month = slipMonth(p) || 'Current Month';
+  const issueDate = p.paymentDate ? fmtDate(p.paymentDate) : new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+  const name = String(p.name || 'Employee').toUpperCase();
+  const empId = p.empId || '-';
+  const role = p.role || '-';
+  const dept = p.department || '-';
+  const bank = p.bank || 'N/A';
+
   const totalD = Number(p.totalDays || 0);
   const attended = Number(p.attendedDays || 0);
   const paidLeave = Number(p.paidLeaves || 0);
@@ -252,130 +439,249 @@ function printPayslip(p) {
   const basic = Number(p.basic || 0);
   const hra = Number(p.hra || 0);
   const allowances = Number(p.allowances || 0);
-  const month = slipMonth(p);
+
+  function amountToWords(num) {
+    const n = Math.round(Number(num) || 0);
+    if (n === 0) return 'Zero Rupees Only';
+    const a = ['', 'One ', 'Two ', 'Three ', 'Four ', 'Five ', 'Six ', 'Seven ', 'Eight ', 'Nine ', 'Ten ', 'Eleven ', 'Twelve ', 'Thirteen ', 'Fourteen ', 'Fifteen ', 'Sixteen ', 'Seventeen ', 'Eighteen ', 'Nineteen '];
+    const b = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+    function inWords(val) {
+      if (val === 0) return '';
+      if (val < 20) return a[val];
+      if (val < 100) return b[Math.floor(val / 10)] + (val % 10 !== 0 ? ' ' + a[val % 10] : ' ');
+      if (val < 1000) return a[Math.floor(val / 100)] + 'Hundred ' + inWords(val % 100);
+      if (val < 100000) return inWords(Math.floor(val / 1000)) + 'Thousand ' + inWords(val % 1000);
+      if (val < 10000000) return inWords(Math.floor(val / 100000)) + 'Lakh ' + inWords(val % 100000);
+      return inWords(Math.floor(val / 10000000)) + 'Crore ' + inWords(val % 10000000);
+    }
+    return ('Indian Rupees ' + inWords(n).trim() + ' Only').replace(/\s+/g, ' ');
+  }
+
+  const rows = [];
+  if (basic > 0) rows.push(['Basic Salary', inr(basic), false]);
+  else if (earned > 0 && earnings === 0) rows.push(['Earned Salary', inr(earned), false]);
+  if (hra > 0) rows.push(['House Rent Allowance', inr(hra), false]);
+  if (allowances > 0) rows.push(['Special Allowance', inr(allowances), false]);
+  if (earnings > 0) rows.push(['Bonus / Additional Earnings', inr(earnings), false]);
+
+  if (Array.isArray(p.components)) {
+    p.components.forEach((c) => {
+      const amt = Number(c.amount || 0);
+      if (amt > 0) {
+        if (c.kind === 'earning') rows.push([c.name || 'Sales Incentive / Earning', inr(amt), false]);
+        else if (c.kind === 'deduction') rows.push([c.name || 'Deduction', `-${inr(amt)}`, false]);
+      }
+    });
+  }
+
+  if (attDeduction > 0) rows.push(['Attendance Deduction', `-${inr(attDeduction)}`, false]);
+  if (deductions > 0) rows.push(['PF / ESI / TDS', `-${inr(deductions)}`, false]);
+  if (advance > 0) rows.push(['Salary Advance Recovery', `-${inr(advance)}`, false]);
+
+  if (rows.length === 0) rows.push(['Basic Salary', '0', false]);
+
+  const totalEarnings = (basic || earned) + hra + allowances + earnings;
+  rows.push(['Total Earnings', inr(totalEarnings), 'total']);
+  const totalDeductions = attDeduction + deductions + advance;
+  rows.push(['Total Deductions', inr(totalDeductions), 'total']);
+  const netLabel = p.status === 'Paid' ? 'Net Salary Paid' : 'Net Salary Payable';
+  rows.push([netLabel, inr(remaining), 'final']);
+
+  const tableRowsHtml = rows
+    .map((r) => {
+      const cls = r[2] === 'final' ? ' class="final"' : r[2] === 'total' ? ' class="total"' : '';
+      return `<tr${cls}><td>${esc(r[0])}</td><td class="amt">${esc(r[1])}</td></tr>`;
+    })
+    .join('');
 
   const html = `
     <!DOCTYPE html>
     <html>
       <head>
-        <title>Payslip - ${esc(p.name)} - ${esc(month)}</title>
+        <title>Payroll Slip - ${esc(name)} - ${esc(month)}</title>
         <style>
-          @page { size: A4; margin: 12mm; }
-          body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: #1e293b; margin: 0; padding: 20px; font-size: 13px; line-height: 1.5; }
-          .header { display: flex; justify-content: space-between; border-bottom: 2px solid #0f172a; padding-bottom: 12px; margin-bottom: 20px; }
-          .logo { font-size: 20px; font-weight: 800; color: #0f172a; letter-spacing: -0.5px; }
-          .subtitle { font-size: 12px; color: #64748b; }
-          .badge { background: #dcfce7; color: #15803d; font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 6px; display: inline-block; }
-          .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
-          .box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; }
-          .label { font-size: 11px; color: #64748b; text-transform: uppercase; font-weight: 600; margin-bottom: 4px; }
-          .val { font-size: 13.5px; font-weight: 700; color: #0f172a; }
-          table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
-          th { background: #f1f5f9; text-align: left; padding: 8px 12px; font-size: 12px; font-weight: 700; color: #334155; border: 1px solid #cbd5e1; }
-          td { padding: 8px 12px; font-size: 12.5px; border: 1px solid #e2e8f0; }
-          .num { text-align: right; font-weight: 600; }
-          .formula-box { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 12px; margin-bottom: 20px; }
-          .net-payable { display: flex; justify-content: space-between; align-items: center; background: #0f172a; color: #fff; padding: 14px 18px; border-radius: 8px; font-size: 16px; font-weight: 800; }
-          .footer { margin-top: 30px; padding-top: 15px; border-top: 1px solid #e2e8f0; font-size: 11px; color: #94a3b8; display: flex; justify-content: space-between; align-items: center; }
+          @page { size: A4 portrait; margin: 15mm; }
+          body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+            color: #111827;
+            margin: 0;
+            padding: 24px;
+            font-size: 13px;
+            line-height: 1.5;
+            background: #ffffff;
+          }
+          .title {
+            text-align: center;
+            font-size: 22px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            margin-bottom: 12px;
+            color: #111827;
+          }
+          .meta {
+            text-align: right;
+            font-size: 12px;
+            color: #4b5563;
+            margin-bottom: 12px;
+            line-height: 1.6;
+          }
+          .divider {
+            border-top: 1px solid #d1d5db;
+            margin-bottom: 18px;
+          }
+          .info-grid {
+            border: 1px solid #e5e7eb;
+            border-radius: 4px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            margin-bottom: 24px;
+          }
+          .info-col {
+            padding: 12px 16px;
+          }
+          .info-col:first-child {
+            border-right: 1px solid #e5e7eb;
+          }
+          .info-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 3px 0;
+            font-size: 12px;
+          }
+          .info-label {
+            color: #4b5563;
+            font-weight: 600;
+          }
+          .info-val {
+            color: #111827;
+          }
+          .table-title {
+            text-align: center;
+            font-size: 14px;
+            font-weight: 700;
+            margin-bottom: 10px;
+            color: #111827;
+          }
+          table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 14px;
+            border: 1px solid #d1d5db;
+          }
+          th {
+            background: #f3f4f6;
+            text-align: left;
+            padding: 8px 14px;
+            font-size: 12px;
+            font-weight: 700;
+            color: #111827;
+            border-bottom: 1px solid #d1d5db;
+          }
+          th.amt {
+            text-align: right;
+          }
+          td {
+            padding: 7px 14px;
+            font-size: 12px;
+            border-bottom: 1px solid #e5e7eb;
+            color: #374151;
+          }
+          td.amt {
+            text-align: right;
+            font-variant-numeric: tabular-nums;
+          }
+          tr.total {
+            background: #f9fafb;
+            font-weight: 700;
+            color: #111827;
+          }
+          tr.final {
+            background: #f3f4f6;
+            font-weight: 700;
+            font-size: 13px;
+            color: #111827;
+          }
+          .words {
+            font-size: 12px;
+            color: #4b5563;
+            margin-bottom: 50px;
+          }
+          .sig-section {
+            display: flex;
+            justify-content: space-between;
+            padding: 0 40px;
+          }
+          .sig-block {
+            text-align: center;
+            width: 170px;
+          }
+          .sig-line {
+            border-top: 1px solid #9ca3af;
+            margin-bottom: 8px;
+          }
+          .sig-label {
+            font-size: 12px;
+            font-weight: 700;
+            color: #374151;
+          }
         </style>
       </head>
       <body>
-        <div class="header">
-          <div>
-            <div class="logo">EVENMORE TECHNOLOGIES</div>
-            <div class="subtitle">CONFIDENTIAL SALARY STATEMENT • CORPORATE HRMS</div>
+        <div class="title">PAYROLL SLIP</div>
+        <div class="meta">
+          <div><strong>Payroll Period:</strong> ${esc(month)}</div>
+          <div><strong>Issue Date:</strong> ${esc(issueDate)}</div>
+        </div>
+        <div class="divider"></div>
+
+        <div class="info-grid">
+          <div class="info-col">
+            <div class="info-row"><span class="info-label">Employee Name:</span><span class="info-val"><strong>${esc(name)}</strong></span></div>
+            <div class="info-row"><span class="info-label">Employee ID:</span><span class="info-val">${esc(empId)}</span></div>
+            <div class="info-row"><span class="info-label">Designation:</span><span class="info-val">${esc(role)}</span></div>
+            <div class="info-row"><span class="info-label">Department:</span><span class="info-val">${esc(dept)}</span></div>
+            <div class="info-row"><span class="info-label">Bank Account:</span><span class="info-val">${esc(bank)}</span></div>
           </div>
-          <div style="text-align: right;">
-            <span class="badge">${esc(p.status || "In Progress")}</span>
-            <div style="font-size: 11px; color: #64748b; margin-top: 4px;">Pay Period: ${esc(month)}</div>
+          <div class="info-col">
+            <div class="info-row"><span class="info-label">Payroll Period:</span><span class="info-val">${esc(month)}</span></div>
+            <div class="info-row"><span class="info-label">Scheduled Days:</span><span class="info-val">${fmtDays(totalD)}</span></div>
+            <div class="info-row"><span class="info-label">Attended Days:</span><span class="info-val">${fmtDays(attended)}</span></div>
+            <div class="info-row"><span class="info-label">Paid Leaves:</span><span class="info-val">${fmtDays(paidLeave)}</span></div>
+            <div class="info-row"><span class="info-label">Unpaid Leaves:</span><span class="info-val">${fmtDays(lop)}</span></div>
           </div>
         </div>
 
-        <div class="grid-2">
-          <div class="box">
-            <div class="label">Employee Details</div>
-            <div class="val">${esc(p.name)}</div>
-            <div style="color: #475569; font-size: 12px; margin-top: 2px;">${esc(p.role || "-")} • ${esc(p.department || "-")}</div>
-            <div style="color: #64748b; font-size: 11.5px; margin-top: 4px;">Staff ID: ${esc(p.empId || "-")}</div>
-          </div>
-          <div class="box">
-            <div class="label">Disbursal &amp; Attendance</div>
-            <div class="val">${esc(p.bank || "-")}</div>
-            <div style="color: #475569; font-size: 12px; margin-top: 2px;">${fmtDays(attended)} attended + ${fmtDays(paidLeave)} paid leave of ${fmtDays(totalD)} working days • ${fmtDays(lop)} LOP • ${fmtDays(absent)} days deducted</div>
-            <div style="color: #64748b; font-size: 11.5px; margin-top: 4px;">${p.paymentDate ? `Paid on ${esc(fmtDate(p.paymentDate))} • ` : ""}Rate: INR ${inr(perDay)}/day</div>
-          </div>
-        </div>
+        <div class="table-title">Salary Breakdown (INR)</div>
 
         <table>
           <thead>
             <tr>
-              <th>EARNINGS</th>
-              <th class="num">AMOUNT (INR)</th>
-              <th>DEDUCTIONS &amp; RECOVERIES</th>
-              <th class="num">AMOUNT (INR)</th>
+              <th>Earnings / Deductions</th>
+              <th class="amt">Amount (INR)</th>
             </tr>
           </thead>
           <tbody>
-            <tr>
-              <td>Basic Salary</td>
-              <td class="num">${inr(basic)}</td>
-              <td>Attendance deduction (${fmtDays(absent)} days @ INR ${inr(perDay)}/d)</td>
-              <td class="num" style="color: #b91c1c;">-${inr(attDeduction)}</td>
-            </tr>
-            <tr>
-              <td>House Rent Allowance (HRA)</td>
-              <td class="num">${inr(hra)}</td>
-              <td>Salary Advance Recovered</td>
-              <td class="num" style="color: #b45309;">-${inr(advance)}</td>
-            </tr>
-            <tr>
-              <td>Allowances</td>
-              <td class="num">${inr(allowances)}</td>
-              <td>Other Deductions</td>
-              <td class="num">-${inr(deductions)}</td>
-            </tr>
-            <tr>
-              <td>Additional Earnings</td>
-              <td class="num">+${inr(earnings)}</td>
-              <td></td>
-              <td class="num"></td>
-            </tr>
-            <tr style="font-weight: 700; background: #f8fafc;">
-              <td>Earned Salary</td>
-              <td class="num" style="color: #1e40af;">INR ${inr(earned)}</td>
-              <td>Total Deductions &amp; Advances</td>
-              <td class="num" style="color: #b91c1c;">-INR ${inr(deductions + advance + attDeduction)}</td>
-            </tr>
-            <tr style="font-weight: 700; background: #f8fafc;">
-              <td>Standard Monthly Salary</td>
-              <td class="num">INR ${inr(std)}</td>
-              <td>Net Payable</td>
-              <td class="num" style="color: #15803d;">INR ${inr(remaining)}</td>
-            </tr>
+            ${tableRowsHtml}
           </tbody>
         </table>
 
-        <div class="formula-box">
-          <div style="font-weight: 700; font-size: 11.5px; color: #15803d; margin-bottom: 2px;">FORMULA AUDIT TRAIL:</div>
-          <div style="font-size: 12px; color: #334155;">
-            Net Payable = Standard (INR ${inr(std)}) - Attendance deduction (INR ${inr(attDeduction)} for ${fmtDays(absent)} days not attended or on paid leave) + Additional Earnings (INR ${inr(earnings)}) - Deductions (INR ${inr(deductions)}) - Advance (INR ${inr(advance)})
+        <div class="words">Amount in Words: ${esc(amountToWords(remaining))}</div>
+
+        <div class="sig-section">
+          <div class="sig-block">
+            <div class="sig-line"></div>
+            <div class="sig-label">Received By</div>
           </div>
-        </div>
-
-        <div class="net-payable">
-          <span>NET PAYABLE</span>
-          <span>INR ${inr(remaining)}</span>
-        </div>
-
-        <div class="footer">
-          <div>Computer-generated salary slip from Evenmore ERP HRMS.</div>
-          <div>Authorized Signatory: Head of Payroll &amp; Finance</div>
+          <div class="sig-block">
+            <div class="sig-line"></div>
+            <div class="sig-label">Authorized By</div>
+          </div>
         </div>
       </body>
     </html>
   `;
 
-  const printWindow = window.open("", "_blank", "width=850,height=900");
+  const printWindow = window.open('', '_blank', 'width=850,height=900');
   if (printWindow) {
     printWindow.document.write(html);
     printWindow.document.close();
@@ -1343,8 +1649,37 @@ export default function Payroll() {
               </select>
             </div>
 
-            <div className="text-[12px] text-muted">
-              Showing <span className="font-semibold text-slate-800">{filteredEmployees.length}</span> staff members
+            <div className="flex items-center gap-3">
+              <div className="text-[12px] text-muted">
+                Showing <span className="font-semibold text-slate-800">{filteredEmployees.length}</span> staff members
+              </div>
+              <HrmsExportDropdown
+                filename={`Payroll_Register_${period}`}
+                reportTitle={`Monthly Payroll Register - ${period}`}
+                subtitle={`Month: ${period}  |  Department: ${deptFilter}  |  Status: ${statusFilter}`}
+                columns={[
+                  { label: "Employee Code", get: (e) => e.empId || e.employeeCode || "", width: 85 },
+                  { label: "Employee Name", get: (e) => e.name || "", width: 120 },
+                  { label: "Department", get: (e) => e.department || "", width: 95 },
+                  { label: "Role / Designation", get: (e) => e.role || e.designation || "", width: 100 },
+                  { label: "Standard Salary (Rs.)", get: (e) => String(e.standardSalary || 0), width: 90, align: "right" },
+                  { label: "Working Days", get: (e) => String(e.totalDays || 0), width: 65, align: "center" },
+                  { label: "Attended Days", get: (e) => String(e.attendedDays || 0), width: 65, align: "center" },
+                  { label: "Paid Leave Days", get: (e) => String(e.paidLeaves || 0), width: 65, align: "center" },
+                  { label: "LOP Days", get: (e) => String(e.unpaidLeaves || 0), width: 60, align: "center" },
+                  { label: "Per-Day Rate (Rs.)", get: (e) => String(e.perDaySalary || 0), width: 80, align: "right" },
+                  { label: "Att Deduction (Rs.)", get: (e) => String(e.attendanceDeduction || 0), width: 80, align: "right" },
+                  { label: "Earned Salary (Rs.)", get: (e) => String(e.earnedSalary || 0), width: 85, align: "right" },
+                  { label: "Earnings (Rs.)", get: (e) => String(e.additionalEarnings || 0), width: 75, align: "right" },
+                  { label: "Deductions (Rs.)", get: (e) => String(e.deductions || 0), width: 75, align: "right" },
+                  { label: "Advance (Rs.)", get: (e) => String(e.advanceDeduction || 0), width: 75, align: "right" },
+                  { label: "Net Payable (Rs.)", get: (e) => String(e.netPayable || 0), width: 85, align: "right" },
+                  { label: "Status", get: (e) => e.status || "In Progress", width: 75, align: "center" },
+                  { label: "Payment Mode", get: (e) => e.paymentMode || "Bank Transfer", width: 85 },
+                ]}
+                rows={filteredEmployees}
+                buttonLabel="Export Register"
+              />
             </div>
           </div>
 

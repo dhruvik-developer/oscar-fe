@@ -478,22 +478,11 @@ export const HRMS_RESOURCES = {
         inferredType = 'General Request';
       }
 
-      const formatTime = (dtStr) => {
-        if (!dtStr) return null;
-        try {
-          const d = new Date(dtStr);
-          if (isNaN(d.getTime())) {
-            const match = String(dtStr).match(/\d{2}:\d{2}/);
-            return match ? match[0] : null;
-          }
-          return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
-        } catch {
-          return null;
-        }
-      };
-
-      const reqInTime = formatTime(row.requestedCheckIn) || row.reqIn || '09:00';
-      const reqOutTime = formatTime(row.requestedCheckOut) || row.reqOut || '18:30';
+      const rawIn = row.requestedCheckIn || row.requested_check_in || row.reqIn || null;
+      const rawOut = row.requestedCheckOut || row.requested_check_out || row.reqOut || null;
+      const reqInTime = rawIn ? formatClock12(rawIn) : '';
+      const reqOutTime = rawOut ? formatClock12(rawOut) : '';
+      const reqStatus = row.requestedStatus || row.requested_status || (inferredType === 'Half Day' ? 'Half Day' : inferredType === 'Work From Home (WFH)' ? 'WFH' : 'Present');
 
       return {
         id: row.id,
@@ -506,9 +495,14 @@ export const HRMS_RESOURCES = {
         currentOut: row.currentOut || row.curOut || '18:30',
         requestedIn: reqInTime,
         requestedOut: reqOutTime,
+        reqIn: reqInTime,
+        reqOut: reqOutTime,
+        requestedCheckIn: rawIn,
+        requestedCheckOut: rawOut,
+        requestedStatus: reqStatus,
         reason: row.reason || 'Attendance request',
         requestedBy: row.employeeName || row.requestedBy || row.employee || 'Employee',
-        submitted: row.submitted || 'Recent',
+        submitted: row.submitted || (row.created_at ? displayIn(row.created_at) : 'Recent'),
         status: row.status || 'Pending',
         remark: row.remark || '',
         _synced: true,
@@ -1493,6 +1487,87 @@ export const HRMS_RESOURCES = {
       };
     },
   },
+  incentiveSchemes: {
+    path: '/hrms/incentive-schemes/',
+    toApi: (s) => compact({
+      id: s.id || undefined,
+      name: s.name,
+      description: s.description || undefined,
+      period_type: s.periodType || s.period_type || 'Quarterly',
+      basis: s.basis || 'INVOICE',
+      slab_type: s.slabType || s.slab_type || 'FLAT',
+      rate_pct: Number(s.ratePct || s.rate_pct || 0),
+      slabs: Array.isArray(s.slabs) ? s.slabs : [],
+      hold_unpaid_invoices: Boolean(s.holdUnpaidInvoices ?? s.hold_unpaid_invoices),
+      exclude_gst: Boolean(s.excludeGst ?? s.exclude_gst),
+      payout_after_days: s.payoutAfterDays ?? s.payout_after_days ?? 90,
+      is_active: Boolean(s.isActive ?? s.is_active),
+    }),
+    fromApi: (row) => ({
+      id: row.id,
+      name: row.name,
+      description: row.description || '',
+      periodType: row.period_type || row.periodType || 'Quarterly',
+      basis: row.basis || 'INVOICE',
+      slabType: row.slab_type || row.slabType || 'FLAT',
+      ratePct: Number(row.rate_pct ?? row.ratePct ?? 0),
+      slabs: Array.isArray(row.slabs) ? row.slabs : [],
+      holdUnpaidInvoices: Boolean(row.hold_unpaid_invoices ?? row.holdUnpaidInvoices),
+      excludeGst: Boolean(row.exclude_gst ?? row.excludeGst),
+      payoutAfterDays: row.payout_after_days ?? row.payoutAfterDays ?? 90,
+      isActive: Boolean(row.is_active ?? row.isActive),
+      _synced: true,
+    }),
+  },
+  incentives: {
+    path: '/hrms/incentives/',
+    fromApi: (row) => {
+      const detail = row.detail || {};
+      const calculated = Number(row.calculated_incentive ?? row.calculatedIncentive ?? 0);
+      const paid = Number(row.paid_amount ?? row.paidAmount ?? 0);
+      const remaining = Number(row.remaining_balance ?? row.remainingBalance ?? Math.max(0, calculated - paid));
+      const isSalary = detail.payment_method === 'SALARY' || Boolean(detail.queued_salary_amount);
+      const isDirect = detail.payment_method === 'DIRECT';
+      const isMixed = detail.payment_method === 'MIXED';
+
+      const method =
+        row.paymentMethod ||
+        row.payment_method ||
+        (isMixed ? 'Direct & Salary' : isDirect ? 'Direct Payment' : isSalary ? 'Through Salary' : '-');
+
+      return {
+        id: row.id,
+        employeeId: row.employeeId || row.employee?.id,
+        employeeName: row.employeeName || row.employee?.name || 'Salesperson',
+        employeeCode: row.employeeCode || row.employee?.employee_code || '—',
+        periodName: row.period_name || row.periodName || row.period_label || '—',
+        periodLabel: row.period_label || row.period_name || row.periodName,
+        startDate: row.start_date || row.startDate || row.period_start,
+        endDate: row.end_date || row.endDate || row.period_end,
+        grossSales: Number(row.gross_sales ?? row.grossSales ?? 0),
+        returnsDeduction: Number(row.returns_deduction ?? row.returnsDeduction ?? 0),
+        netEligibleSales: Number(row.net_eligible_sales ?? row.netEligibleSales ?? 0),
+        applicableRate: Number(row.applicable_rate ?? row.applicableRate ?? 0),
+        calculatedIncentive: calculated,
+        payableNow: Number(row.payable_now ?? row.payableNow ?? 0),
+        payableAmount: Number(row.payable_amount ?? row.payableAmount ?? 0),
+        paidAmount: paid,
+        remainingBalance: remaining,
+        paymentMethod: method,
+        paymentHistory: row.paymentHistory || row.payment_history || detail.payments || [],
+        payslipId: row.payslip || row.payslipId || detail.payslip_id || null,
+        payrollRunId: row.payroll_run || row.payrollRunId || detail.payroll_run_id || null,
+        payslipStatus: row.payslip_status || row.payslipStatus || (detail.queued_salary_amount ? 'Pending Payroll' : null),
+        nextPayoutDate: row.next_payout_date || row.nextPayoutDate || null,
+        status: (row.status || row.ledger_status || 'ACCRUED').toUpperCase(),
+        ledgerStatus: row.ledger_status || row.status,
+        holdReason: row.hold_reason || row.holdReason || (detail.managementHold?.reason),
+        schemeName: row.scheme_name || row.schemeName || row.scheme?.name,
+        detail,
+        _synced: true,
+      };
+    },
+  },
 };
 
 export const hrmsSync = createSync(HRMS_RESOURCES, { label: 'hrmsSync' });
@@ -1723,10 +1798,40 @@ export default hrmsSync;
 
 // Helper formatters
 export function formatClock12(value) {
-  if (!value) return '';
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return '';
-  return d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }).toUpperCase();
+  if (!value || value === '-' || value === '—') return '';
+  const str = String(value).trim();
+  if (!str) return '';
+
+  // 1. If it already has AM/PM, normalize and return
+  if (/^(0?[1-9]|1[0-2]):[0-5][0-9](\s*[APap][Mm])$/.test(str)) {
+    return str.toUpperCase();
+  }
+
+  // 2. If it's an ISO datetime string or contains date part (e.g. 2026-11-20T03:30:00+00:00)
+  if (str.includes('T') || /^\d{4}[-/]\d{2}[-/]\d{2}/.test(str)) {
+    const d = new Date(str);
+    if (!Number.isNaN(d.getTime())) {
+      return d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }).toUpperCase();
+    }
+  }
+
+  // 3. If it's a 24-hr time like HH:MM or HH:MM:SS
+  const m = /^(\d{1,2}):(\d{2})(?::\d{2})?/.exec(str);
+  if (m) {
+    let hours = parseInt(m[1], 10);
+    const mins = m[2];
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    hours = hours % 12 || 12;
+    return `${String(hours).padStart(2, '0')}:${mins} ${ampm}`;
+  }
+
+  // 4. Fallback to standard Date parse
+  const d = new Date(str);
+  if (!Number.isNaN(d.getTime())) {
+    return d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }).toUpperCase();
+  }
+
+  return str;
 }
 
 export function formatHours(hours) {
@@ -1786,3 +1891,12 @@ export const approveBrokerCommission = (id) => api.post(`/hrms/broker-commission
 export const markBrokerCommissionPayable = (id) => api.post(`/hrms/broker-commissions/${id}/mark-payable/`, {});
 export const markBrokerCommissionPaid = (id) => api.post(`/hrms/broker-commissions/${id}/mark-paid/`, {});
 export const holdBrokerCommission = (id) => api.post(`/hrms/broker-commissions/${id}/hold/`, {});
+
+export const reverseIncentivePayout = (id, reason) => api.post(`/hrms/incentives/${id}/reverse/`, { reason });
+export const payIncentiveDirect = (id, payload) => api.post(`/hrms/incentives/${id}/pay-direct/`, payload);
+export const payIncentiveThroughSalary = (id, payload) => api.post(`/hrms/incentives/${id}/pay-salary/`, payload);
+export const pullIncentivePaymentHistory = (query) => api.get('/hrms/incentives/payment-history/', query ? { query } : undefined);
+export const pullBankAccounts = () => api.get('/accounts/bank-accounts/?page_size=100');
+export const pullSalespersonPerformance = (query) => api.get('/hrms/incentives/salesperson-performance/', query ? { query } : undefined);
+export const pullIncentiveDashboardSummary = (query) => api.get('/hrms/incentives/dashboard-summary/', query ? { query } : undefined);
+export const pullSalespersonDetail = (employeeId, query) => api.get('/hrms/incentives/salesperson-detail/', { query: { employeeId, ...(query || {}) } });

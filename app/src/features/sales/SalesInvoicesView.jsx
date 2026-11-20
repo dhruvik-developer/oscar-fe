@@ -1383,7 +1383,7 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
                                 </div>
                             </div>
 
-                            {/* E-INVOICE & E-WAY BILL PANEL (Simulated §2) */}
+                            {/* [COMMENTED OUT] E-INVOICE & E-WAY BILL PANEL
                             <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 text-xs space-y-3">
                                 <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-200">
                                     <div className="flex items-center gap-2">
@@ -1414,7 +1414,7 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
                                 )}
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                    {/* IRN Section */}
+                                    // IRN Section
                                     <div className="p-3 bg-white rounded-lg border border-slate-200 space-y-2">
                                         <div className="flex items-center justify-between">
                                             <span className="font-bold text-slate-700 text-[11px]">INVOICE REFERENCE NUMBER (IRN)</span>
@@ -1472,7 +1472,7 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
                                         )}
                                     </div>
 
-                                    {/* E-Way Bill Section */}
+                                    // E-Way Bill Section
                                     <div className="p-3 bg-white rounded-lg border border-slate-200 space-y-2">
                                         <div className="flex items-center justify-between">
                                             <span className="font-bold text-slate-700 text-[11px]">E-WAY BILL NUMBER</span>
@@ -1517,6 +1517,7 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
                                     </div>
                                 </div>
                             </div>
+                            */}
 
                             {/* Related Docs */}
                             <RelatedDocumentsCard documents={getInvoiceRelatedDocs(selectedInvoice)}/>
@@ -1593,8 +1594,8 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
                 </div>
             )}
 
-            {/* CANCEL IRN MODAL */}
-            {showCancelIrnModal && (
+            {/* [COMMENTED OUT] CANCEL IRN MODAL
+            showCancelIrnModal && (
                 <div className="fixed inset-0 z-60 bg-black/50 backdrop-blur-xs flex items-center justify-center p-3">
                     <div className="bg-white rounded-2xl border border-slate-200 max-w-md w-full p-5 shadow-2xl text-xs space-y-3">
                         <h3 className="font-bold text-base text-[#1F2E4A]">Cancel E-Invoice IRN?</h3>
@@ -1630,7 +1631,8 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
                         </div>
                     </div>
                 </div>
-            )}
+            )
+            */}
 
             {/* FINALIZE CONFIRMATION MODAL */}
             {finalizeModalTarget && (

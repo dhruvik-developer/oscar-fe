@@ -6,6 +6,8 @@ import { api } from '../../services/api';
 import { refreshNotifications } from '../../services/crmEventNotifications';
 import { routeForNotification } from '../../services/notificationCenter';
 import { describeApiError } from '../accounts/accountingShared';
+import { Volume2 } from 'lucide-react';
+import VoiceSettingsModal from '../../components/notifications/VoiceSettingsModal';
 
 const VIEWS = [
   ['inbox', 'Inbox'],
@@ -30,6 +32,7 @@ export default function NotificationsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [note, setNote] = useState('');
+  const [voiceModalOpen, setVoiceModalOpen] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -94,6 +97,15 @@ export default function NotificationsPage() {
           {CATEGORIES.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
         </select>
         <input value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} placeholder="Search title or text" className="h-9 px-2.5 rounded-lg border border-slate-200 w-60" aria-label="Search notifications" />
+        <button
+          type="button"
+          onClick={() => setVoiceModalOpen(true)}
+          className="h-9 px-3 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 font-semibold inline-flex items-center gap-1.5 sm:ml-auto text-slate-700 cursor-pointer transition-colors shadow-2xs"
+          title="Configure notification sound"
+        >
+          <Volume2 size={15} className="text-blue-600" />
+          <span>Sound Settings</span>
+        </button>
       </div>
 
       {selected.size > 0 && (
@@ -146,6 +158,10 @@ export default function NotificationsPage() {
         </table>
       </div>
       <AppPagination total={data.count} page={page} pageSize={pageSize} onPageChange={setPage} onPageSizeChange={setPageSize} pageSizeOptions={[25, 50, 100]} loading={loading} />
+      <VoiceSettingsModal
+        isOpen={voiceModalOpen}
+        onClose={() => setVoiceModalOpen(false)}
+      />
     </div>
   );
 }

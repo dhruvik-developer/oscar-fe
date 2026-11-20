@@ -1006,7 +1006,8 @@ export default function CreateLeadModal({ isOpen, onClose, onCreate, onEditLayou
             const sourceField = fieldBy('lead-source', /source/);
             const currentSourceVal = String(values[sourceField?.id] ?? '');
             const matchedSource = (sources || []).find((s) => String(s.id) === currentSourceVal || String(s.name).toLowerCase() === currentSourceVal.toLowerCase());
-            if (!isSalespersonSource(matchedSource?.name || currentSourceVal) && !values.salesperson_id) return null;
+            // Salesperson can be attributed to any lead
+            const isSourceSalesperson = isSalespersonSource(matchedSource?.name || currentSourceVal);
 
             return (
               <div className="col-span-full bg-emerald-50/70 p-4 rounded-xl border border-emerald-200 mb-2 space-y-3">
@@ -1018,7 +1019,7 @@ export default function CreateLeadModal({ isOpen, onClose, onCreate, onEditLayou
                   <div>
                     <div className="flex items-center justify-between mb-1">
                       <label className="block text-xs font-semibold text-slate-700">
-                        Select Salesperson <span className="text-rose-500">*</span>
+                        Select Salesperson {isSourceSalesperson && <span className="text-rose-500">*</span>}
                       </label>
                       <MasterSourceLink source="salespeople" />
                     </div>
